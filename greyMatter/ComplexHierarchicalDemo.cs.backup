@@ -13,8 +13,7 @@ await brain.InitializeAsync();
 
 Console.WriteLine("📊 Initial Brain Status:");
 var initialStats = await brain.GetStatsAsync();
-var brainAge = await brain.GetBrainAgeAsync();
-Console.WriteLine($"   Age: {brainAge}");
+Console.WriteLine($"   Age: {await brain.GetBrainAgeAsync()}");
 Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
 Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}\n");
 
@@ -38,14 +37,15 @@ foreach (var concept in foundationConcepts)
 {
     try
     {
-        var result = await brain.LearnConceptAsync(concept, primitiveFeatures);
+        var result = await brain.LearnConceptWithScaffoldingAsync(concept, primitiveFeatures);
         var mastery = await brain.GetConceptMasteryLevelAsync(concept);
         Console.WriteLine($"   ✅ {concept}: Mastery {mastery:P1} ({result.NeuronsInvolved} neurons)");
     }
     catch (Exception ex)
     {
         Console.WriteLine($"   ❌ Failed to learn {concept}: {ex.Message}");
-        var result = await brain.LearnConceptAsync(concept, primitiveFeatures);
+        // Fallback to basic learning
+        await brain.LearnConceptAsync(concept, primitiveFeatures);
         Console.WriteLine($"   ✅ {concept}: Learned via basic method");
     }
 }
@@ -69,7 +69,7 @@ foreach (var concept in associationConcepts)
 {
     try
     {
-        var result = await brain.LearnConceptAsync(concept, associationFeatures);
+        var result = await brain.LearnConceptWithScaffoldingAsync(concept, associationFeatures);
         var mastery = await brain.GetConceptMasteryLevelAsync(concept);
         Console.WriteLine($"   ✅ {concept}: Mastery {mastery:P1} ({result.NeuronsInvolved} neurons)");
         
@@ -81,7 +81,7 @@ foreach (var concept in associationConcepts)
     catch (Exception ex)
     {
         Console.WriteLine($"   ❌ Failed to learn {concept}: {ex.Message}");
-        var result = await brain.LearnConceptAsync(concept, associationFeatures);
+        await brain.LearnConceptAsync(concept, associationFeatures);
         Console.WriteLine($"   ✅ {concept}: Learned via basic method");
     }
 }
@@ -104,14 +104,14 @@ foreach (var concept in relationalConcepts)
 {
     try
     {
-        var result = await brain.LearnConceptAsync(concept, relationalFeatures);
+        var result = await brain.LearnConceptWithScaffoldingAsync(concept, relationalFeatures);
         var mastery = await brain.GetConceptMasteryLevelAsync(concept);
         Console.WriteLine($"   ✅ {concept}: Mastery {mastery:P1} ({result.NeuronsInvolved} neurons)");
     }
     catch (Exception ex)
     {
         Console.WriteLine($"   ❌ Failed to learn {concept}: {ex.Message}");
-        var result = await brain.LearnConceptAsync(concept, relationalFeatures);
+        await brain.LearnConceptAsync(concept, relationalFeatures);
         Console.WriteLine($"   ✅ {concept}: Learned via basic method");
     }
 }
@@ -134,7 +134,7 @@ foreach (var concept in abstractConcepts)
 {
     try
     {
-        var result = await brain.LearnConceptAsync(concept, abstractFeatures);
+        var result = await brain.LearnConceptWithScaffoldingAsync(concept, abstractFeatures);
         var mastery = await brain.GetConceptMasteryLevelAsync(concept);
         Console.WriteLine($"   ✅ {concept}: Mastery {mastery:P1} ({result.NeuronsInvolved} neurons)");
         
@@ -145,7 +145,7 @@ foreach (var concept in abstractConcepts)
     catch (Exception ex)
     {
         Console.WriteLine($"   ❌ Failed to learn {concept}: {ex.Message}");
-        var result = await brain.LearnConceptAsync(concept, abstractFeatures);
+        await brain.LearnConceptAsync(concept, abstractFeatures);
         Console.WriteLine($"   ✅ {concept}: Learned via basic method");
     }
 }
@@ -177,7 +177,7 @@ try
     Console.WriteLine($"   Knowledge Layers: Automatically organized by cognitive complexity");
     Console.WriteLine($"   Neural Pathways: {enhancedStats.BaseStats.TotalSynapses} synaptic connections");
 }
-catch (Exception)
+catch (Exception ex)
 {
     var basicStats = await brain.GetStatsAsync();
     Console.WriteLine($"   Total Clusters: {basicStats.TotalClusters}");

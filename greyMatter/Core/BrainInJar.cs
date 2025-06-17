@@ -9,9 +9,9 @@ namespace GreyMatter.Core
 {
     /// <summary>
     /// BrainInJar: Main orchestrator for the SBIJ system
-    /// Manages neuron clusters, learning, and dynamic scaling
+    /// Manages neuron clusters, learning, and dynamic scaling with hierarchical learning support
     /// </summary>
-    public class BrainInJar
+    public class BrainInJar : IBrainInterface
     {
         private readonly BrainStorage _storage;
         private readonly EnhancedBrainStorage _enhancedStorage;
@@ -19,6 +19,7 @@ namespace GreyMatter.Core
         private readonly Dictionary<Guid, Synapse> _synapses = new();
         private readonly FeatureMapper _featureMapper = new();
         private readonly Random _random = new();
+        private readonly ConceptDependencyGraph _dependencyGraph = new();
         
         // Brain configuration
         public int MaxLoadedClusters { get; set; } = 10;
@@ -278,6 +279,87 @@ namespace GreyMatter.Core
                     .Take(5)
                     .ToDictionary(p => p.Key, p => p.Value)
             };
+        }
+
+        /// <summary>
+        /// Get concept mastery level for hierarchical learning
+        /// </summary>
+        public async Task<double> GetConceptMasteryLevelAsync(string concept)
+        {
+            var conceptNode = _dependencyGraph.GetConcept(concept);
+            if (conceptNode != null)
+            {
+                return conceptNode.CurrentMastery;
+            }
+
+            // Calculate mastery based on neuron activation patterns
+            var relevantClusters = await FindRelevantClusters(new[] { concept });
+            if (!relevantClusters.Any())
+            {
+                return 0.0; // No knowledge of this concept
+            }
+
+            var totalActivation = 0.0;
+            var neuronCount = 0;
+
+            foreach (var cluster in relevantClusters.Take(3))
+            {
+                var neurons = await cluster.GetNeuronsAsync();
+                foreach (var neuron in neurons.Values)
+                {
+                    if (neuron.AssociatedConcepts.Contains(concept, StringComparer.OrdinalIgnoreCase))
+                    {
+                        totalActivation += Math.Max(0, neuron.CurrentPotential - neuron.RestingPotential);
+                        neuronCount++;
+                    }
+                }
+            }
+
+            return neuronCount > 0 ? totalActivation / neuronCount : 0.0;
+        }
+
+        /// <summary>
+        /// Get brain age for critical period analysis
+        /// </summary>
+        public async Task<TimeSpan> GetBrainAgeAsync()
+        {
+            return await Task.FromResult(DateTime.UtcNow - CreatedAt);
+        }
+
+        /// <summary>
+        /// Enhanced learning with hierarchical concept checking
+        /// </summary>
+        public async Task<LearningResult> LearnConceptWithScaffoldingAsync(string concept, Dictionary<string, double> features)
+        {
+            Console.WriteLine($"🧠 Learning concept with scaffolding: {concept}");
+            
+            // Check if concept can be learned (prerequisites met)
+            var canLearn = await _dependencyGraph.CanLearnConcept(concept, this);
+            if (!canLearn)
+            {
+                var learningPath = await _dependencyGraph.GetLearningPath(concept, this);
+                Console.WriteLine($"📚 Prerequisites needed: {string.Join(" → ", learningPath)}");
+                
+                // Learn prerequisites first
+                foreach (var prerequisite in learningPath.Where(p => p != concept))
+                {
+                    var prereqMastery = await GetConceptMasteryLevelAsync(prerequisite);
+                    if (prereqMastery < 0.7)
+                    {
+                        Console.WriteLine($"🎓 Learning prerequisite: {prerequisite}");
+                        await LearnConceptAsync(prerequisite, features);
+                    }
+                }
+            }
+            
+            // Now learn the target concept
+            var result = await LearnConceptAsync(concept, features);
+            
+            // Update mastery tracking
+            var masteryLevel = await GetConceptMasteryLevelAsync(concept);
+            _dependencyGraph.UpdateConceptMastery(concept, masteryLevel);
+            
+            return result;
         }
 
         // Private helper methods
