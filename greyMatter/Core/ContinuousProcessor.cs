@@ -20,6 +20,12 @@ namespace GreyMatter.Core
         private readonly Timer _dreammingTimer;
         private readonly Random _random = new();
         private readonly EthicalDriveSystem _ethicalDrives;
+        private readonly DevelopmentalLearningSystem _developmentalLearning;
+        private readonly LearningResourceManager _resourceManager;
+        
+        // NEW: Enhanced cognitive systems
+        private readonly EmotionalProcessor _emotionalProcessor;
+        private readonly LongTermGoalSystem _goalSystem;
         
         // Consciousness parameters
         public TimeSpan ConsciousnessInterval { get; set; } = TimeSpan.FromMilliseconds(500); // 2Hz like brain waves
@@ -33,6 +39,11 @@ namespace GreyMatter.Core
         public double CooperativeSpirit => _ethicalDrives.CooperativeSpirit;
         public double BenevolentCuriosity => _ethicalDrives.BenevolentCuriosity;
         
+        // NEW: Enhanced cognitive capabilities access
+        public EmotionalState CurrentEmotionalState => _emotionalProcessor.GetCurrentEmotionalState();
+        public GoalSystemStatus CurrentGoalStatus => _goalSystem.GetCurrentStatus();
+        public Dictionary<string, double> EmotionalInfluenceFactors => _emotionalProcessor.GetEmotionalInfluenceFactors();
+        
         // Processing state
         public bool IsProcessing { get; private set; } = false;
         public int ConsciousnessIterations { get; private set; } = 0;
@@ -44,10 +55,16 @@ namespace GreyMatter.Core
         private readonly Dictionary<string, TopicEvaluation> _topicEvaluations = new();
         private readonly SemaphoreSlim _processingLock = new(1, 1);
 
-        public ContinuousProcessor(BrainInJar brain)
+        public ContinuousProcessor(BrainInJar brain, string libraryPath = "/mnt/nas/brain_library")
         {
             _brain = brain;
             _ethicalDrives = new EthicalDriveSystem(brain);
+            _resourceManager = new LearningResourceManager(libraryPath);
+            _developmentalLearning = new DevelopmentalLearningSystem(brain, libraryPath);
+            
+            // NEW: Initialize enhanced cognitive systems
+            _emotionalProcessor = new EmotionalProcessor(brain);
+            _goalSystem = new LongTermGoalSystem(brain, _emotionalProcessor, _ethicalDrives);
             
             // Initialize consciousness timer (constant background processing)
             _consciousnessTimer = new Timer(async _ => await PerformConsciousnessIteration(), 
@@ -131,6 +148,26 @@ namespace GreyMatter.Core
                 // Evaluate current topics of interest
                 await EvaluateTopics();
                 
+                // Enhanced cognitive processing with emotional and goal systems
+                
+                // Emotional maintenance (every 30 iterations = ~15 seconds at 2Hz)
+                if (ConsciousnessIterations % 30 == 0)
+                {
+                    await PerformEmotionalMaintenance();
+                }
+                
+                // Goal progress tracking (every 60 iterations = ~30 seconds at 2Hz)
+                if (ConsciousnessIterations % 60 == 0)
+                {
+                    await UpdateGoalProgress();
+                }
+                
+                // Goal formation consideration (every 7200 iterations = ~1 hour at 2Hz)
+                if (ConsciousnessIterations % 7200 == 0)
+                {
+                    await ConsiderNewGoals();
+                }
+                
                 // Maintain neural network health
                 if (ConsciousnessIterations % 100 == 0) // Every 50 seconds at 2Hz
                 {
@@ -161,11 +198,21 @@ namespace GreyMatter.Core
             
             CurrentFocus = thoughtTopic;
             
-            // Generate internal mental activity
+            // Generate internal mental activity with emotional influence
             var internalFeatures = GenerateInternalFeatures(dominantDrive);
+            
+            // Add emotional context to the thought
+            var emotionalInfluence = _emotionalProcessor.GetEmotionalInfluenceFactors();
+            foreach (var influence in emotionalInfluence)
+            {
+                internalFeatures[$"emotional_{influence.Key}"] = influence.Value * 0.3; // Moderate emotional influence
+            }
             
             // Process the thought internally (no external output)
             var result = await _brain.ProcessInputAsync(thoughtTopic, internalFeatures);
+            
+            // Let emotional processor analyze this thought experience
+            await _emotionalProcessor.ProcessExperienceAsync(thoughtTopic, internalFeatures, result.Confidence);
             
             // Update topic evaluations
             UpdateTopicEvaluation(thoughtTopic, result.Confidence);
@@ -173,7 +220,8 @@ namespace GreyMatter.Core
             // Occasionally express thoughts for debugging
             if (_random.NextDouble() < 0.01) // 1% chance
             {
-                Console.WriteLine($"💭 Spontaneous thought: {thoughtTopic} (confidence: {result.Confidence:P0})");
+                var emotionalState = _emotionalProcessor.GetCurrentEmotionalState();
+                Console.WriteLine($"💭 Spontaneous thought: {thoughtTopic} (confidence: {result.Confidence:P0}, emotion: {emotionalState.DominantEmotion})");
             }
         }
 
@@ -332,7 +380,14 @@ namespace GreyMatter.Core
                 ["benevolent_curiosity"] = BenevolentCuriosity
             };
             
-            return drives.OrderByDescending(d => d.Value).First().Key;
+            // Ensure we have valid drives and return safely
+            if (drives.Any() && drives.Values.Any(v => v > 0))
+            {
+                return drives.OrderByDescending(d => d.Value).First().Key;
+            }
+            
+            // Fallback to curiosity if no drives are active
+            return "benevolent_curiosity";
         }
 
         private string GenerateThoughtTopic(string dominantDrive)
@@ -462,7 +517,7 @@ namespace GreyMatter.Core
 
         private async Task ProcessEmotionalMemories()
         {
-            // Future: implement emotional weighting system
+            // Enhanced emotional memory processing with the emotional processor
             var emotionalFeatures = new Dictionary<string, double>
             {
                 ["emotional_processing"] = 0.6,
@@ -470,7 +525,11 @@ namespace GreyMatter.Core
                 ["affective_consolidation"] = 0.4
             };
             
+            // Process through both brain and emotional system
             await _brain.ProcessInputAsync("emotional memory processing", emotionalFeatures);
+            
+            // Let the emotional processor analyze and store emotional context
+            await _emotionalProcessor.ProcessExperienceAsync("memory consolidation", emotionalFeatures, 0.7);
         }
 
         private async Task ConsolidateLearningPatterns()
@@ -515,7 +574,41 @@ namespace GreyMatter.Core
             await Task.CompletedTask;
         }
 
+        private async Task PerformEmotionalMaintenance()
+        {
+            Console.WriteLine("💖 Performing emotional maintenance...");
+            await _emotionalProcessor.PerformEmotionalMaintenanceAsync();
+        }
+
+        private async Task UpdateGoalProgress()
+        {
+            Console.WriteLine("🎯 Updating goal progress...");
+            await _goalSystem.UpdateGoalProgressAsync();
+        }
+
+        private async Task ConsiderNewGoals()
+        {
+            Console.WriteLine("🌟 Considering new goals...");
+            await _goalSystem.GenerateNewGoalsAsync();
+        }
+
         #endregion
+
+        /// <summary>
+        /// Get the emotional processor from consciousness (for external access)
+        /// </summary>
+        public EmotionalProcessor? GetEmotionalProcessor()
+        {
+            return _emotionalProcessor;
+        }
+
+        /// <summary>
+        /// Get the goal system from consciousness (for external access)
+        /// </summary>
+        public LongTermGoalSystem? GetGoalSystem()
+        {
+            return _goalSystem;
+        }
 
         public void Dispose()
         {

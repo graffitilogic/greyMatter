@@ -148,6 +148,27 @@ namespace GreyMatter.Core
             result.ActivatedNeurons = neuronOutputs.Count;
             result.Confidence = CalculateConfidence(neuronOutputs);
             
+            // Enhanced: Integrate emotional processing if consciousness is active
+            // BUT avoid recursive loops for emotional context inputs and goal reflections
+            if (_continuousProcessor != null && _continuousProcessor.IsProcessing && 
+                !input.StartsWith("emotional_context_") && !input.StartsWith("emotional_memory_") &&
+                !input.StartsWith("reflect on goal strategy:") && !input.StartsWith("goal_reflection_"))
+            {
+                // Let the emotional processor analyze this experience
+                var emotionalProcessor = _continuousProcessor.GetEmotionalProcessor();
+                if (emotionalProcessor != null)
+                {
+                    await emotionalProcessor.ProcessExperienceAsync(input, features, result.Confidence);
+                }
+                
+                // Check for goal alignment if goals are active
+                var goalSystem = _continuousProcessor.GetGoalSystem();
+                if (goalSystem != null)
+                {
+                    await goalSystem.AssessGoalAlignmentAsync(input, features);
+                }
+            }
+            
             Console.WriteLine($"💭 Generated response with confidence {result.Confidence:F2}");
             
             return result;
@@ -352,7 +373,7 @@ namespace GreyMatter.Core
                 return new ConsciousnessStats { IsConscious = false };
             }
 
-            return new ConsciousnessStats
+            var stats = new ConsciousnessStats
             {
                 IsConscious = _continuousProcessor.IsProcessing,
                 ConsciousnessIterations = _continuousProcessor.ConsciousnessIterations,
@@ -365,6 +386,20 @@ namespace GreyMatter.Core
                 BenevolentCuriosity = _continuousProcessor.BenevolentCuriosity,
                 ConsciousnessFrequency = _continuousProcessor.ConsciousnessInterval
             };
+
+            // Add emotional state information
+            var emotionalState = _continuousProcessor.CurrentEmotionalState;
+            stats.DominantEmotion = emotionalState.DominantEmotion;
+            stats.EmotionalBalance = emotionalState.EmotionalBalance;
+            stats.EmotionalClarity = emotionalState.EmotionalClarity;
+
+            // Add goal system information
+            var goalStatus = _continuousProcessor.CurrentGoalStatus;
+            stats.ActiveGoals = goalStatus.ActiveGoalCount;
+            stats.CompletedGoals = goalStatus.CompletedGoalCount;
+            stats.AverageGoalProgress = goalStatus.AverageProgress;
+
+            return stats;
         }
 
         /// <summary>
@@ -664,7 +699,20 @@ namespace GreyMatter.Core
         public double CooperativeSpirit { get; set; } = 0.0;
         public double BenevolentCuriosity { get; set; } = 0.0;
         public TimeSpan ConsciousnessFrequency { get; set; } = TimeSpan.Zero;
+        
+        // Enhanced: Emotional state information
+        public string DominantEmotion { get; set; } = "";
+        public double EmotionalBalance { get; set; } = 0.0;
+        public double EmotionalClarity { get; set; } = 0.0;
+        
+        // Enhanced: Goal system information
+        public int ActiveGoals { get; set; } = 0;
+        public int CompletedGoals { get; set; } = 0;
+        public double AverageGoalProgress { get; set; } = 0.0;
+        
         public string Status => IsConscious ? "Awake & Processing" : "Dormant";
         public string EthicalState => $"Wisdom: {WisdomSeeking:P0}, Compassion: {UniversalCompassion:P0}, Creativity: {CreativeContribution:P0}";
+        public string EmotionalStatus => IsConscious ? $"{DominantEmotion} (Balance: {EmotionalBalance:P0})" : "Dormant";
+        public string GoalStatus => IsConscious ? $"{ActiveGoals} active, {CompletedGoals} completed" : "Dormant";
     }
 }
