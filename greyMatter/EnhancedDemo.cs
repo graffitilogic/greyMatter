@@ -1,0 +1,101 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using GreyMatter.Core;
+using GreyMatter.Storage;
+
+namespace GreyMatter
+{
+    /// <summary>
+    /// Demonstration of enhanced neurobiologically-inspired storage and partitioning
+    /// </summary>
+    public class EnhancedDemo
+    {
+        public static async Task RunEnhancedDemoAsync()
+        {
+            Console.WriteLine("🧠🔬 Enhanced GreyMatter Demo - Neurobiological Storage & Partitioning");
+            Console.WriteLine("=" + new string('=', 75));
+
+            var brain = new BrainInJar();
+            await brain.InitializeAsync();
+
+            // Demonstrate enhanced statistics
+            Console.WriteLine("\n📊 Enhanced Brain Analysis:");
+            var enhancedStats = await brain.GetEnhancedStatsAsync();
+            Console.WriteLine($"   Partition Efficiency: {enhancedStats.PartitionEfficiency:P2}");
+            Console.WriteLine($"   Total Partitions: {enhancedStats.StorageStats.TotalPartitions}");
+            
+            Console.WriteLine("\n🏗️ Top Functional Partitions:");
+            foreach (var partition in enhancedStats.TopPartitions.Take(3))
+            {
+                Console.WriteLine($"   • {partition.Key}: {partition.Value.ClusterCount} clusters, {partition.Value.TotalNeurons} neurons");
+                Console.WriteLine($"     Avg Importance: {partition.Value.AverageImportance:F3}, Last Activity: {partition.Value.LastActivity:yyyy-MM-dd HH:mm}");
+            }
+
+            // Demonstrate biological concept learning with detailed partitioning
+            Console.WriteLine("\n🧬 Teaching Biologically-Inspired Concepts:");
+            
+            var conceptsToLearn = new Dictionary<string, Dictionary<string, double>>
+            {
+                ["visual_red"] = new() { ["wavelength"] = 0.7, ["intensity"] = 0.9, ["saturation"] = 0.8 },
+                ["auditory_music"] = new() { ["frequency"] = 0.6, ["rhythm"] = 0.8, ["harmony"] = 0.7 },
+                ["motor_walking"] = new() { ["coordination"] = 0.9, ["balance"] = 0.8, ["rhythm"] = 0.6 },
+                ["memory_childhood"] = new() { ["emotion"] = 0.9, ["vividness"] = 0.7, ["time_depth"] = 0.9 },
+                ["association_love"] = new() { ["emotion"] = 1.0, ["complexity"] = 0.8, ["social"] = 0.9 }
+            };
+
+            foreach (var concept in conceptsToLearn)
+            {
+                var result = await brain.LearnConceptAsync(concept.Key, concept.Value);
+                Console.WriteLine($"   ✅ {concept.Key}: {result.NeuronsInvolved} neurons in cluster {result.ClusterId:N}");
+            }
+
+            // Test retrieval and show partitioning effectiveness
+            Console.WriteLine("\n🔍 Testing Neurobiological Retrieval:");
+            
+            var testQueries = new[]
+            {
+                "What do you know about visual perception?",
+                "Tell me about motor coordination",
+                "How do you feel about love and emotions?",
+                "What memories do you have?"
+            };
+
+            foreach (var query in testQueries)
+            {
+                var response = await brain.ProcessInputAsync(query, new Dictionary<string, double> 
+                { 
+                    ["relevance"] = 0.8, 
+                    ["context"] = 0.7 
+                });
+                
+                Console.WriteLine($"   🤔 Q: {query}");
+                Console.WriteLine($"      A: {response.Response}");
+                Console.WriteLine($"      Confidence: {response.Confidence:P0}, Neurons: {response.ActivatedNeurons}, Clusters: {response.ActivatedClusters.Count}");
+                Console.WriteLine();
+            }
+
+            // Demonstrate memory consolidation
+            Console.WriteLine("🔄 Running Memory Consolidation (Biological Sleep-like Process):");
+            await brain.MaintenanceAsync();
+
+            // Show final enhanced statistics
+            var finalStats = await brain.GetEnhancedStatsAsync();
+            Console.WriteLine($"\n📈 Final Enhanced Statistics:");
+            Console.WriteLine($"   Hierarchical Efficiency: {finalStats.PartitionEfficiency:P2}");
+            Console.WriteLine($"   Storage Partitions: {finalStats.StorageStats.TotalPartitions}");
+            Console.WriteLine($"   Base Storage: {finalStats.StorageStats.BaseStats.TotalSizeFormatted}");
+            
+            Console.WriteLine("\n🧠 Partition Distribution:");
+            foreach (var partition in finalStats.StorageStats.PartitionStats.Take(5))
+            {
+                Console.WriteLine($"   • {partition.Key}: {partition.Value.ClusterCount} clusters");
+            }
+
+            await brain.SaveAsync();
+            
+            Console.WriteLine("\n🎉 Enhanced Demo Complete!");
+            Console.WriteLine("The brain now uses neurobiologically-inspired multi-modal partitioning for optimal scaling!");
+        }
+    }
+}

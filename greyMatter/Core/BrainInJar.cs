@@ -14,6 +14,7 @@ namespace GreyMatter.Core
     public class BrainInJar
     {
         private readonly BrainStorage _storage;
+        private readonly EnhancedBrainStorage _enhancedStorage;
         private readonly Dictionary<Guid, NeuronCluster> _loadedClusters = new();
         private readonly Dictionary<Guid, Synapse> _synapses = new();
         private readonly FeatureMapper _featureMapper = new();
@@ -37,6 +38,7 @@ namespace GreyMatter.Core
         public BrainInJar(string storagePath = "brain_data")
         {
             _storage = new BrainStorage(storagePath);
+            _enhancedStorage = new EnhancedBrainStorage(storagePath);
         }
 
         /// <summary>
@@ -149,19 +151,37 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
-        /// Save brain state to disk
+        /// Save brain state to disk with enhanced partitioning
         /// </summary>
         public async Task SaveAsync()
         {
-            Console.WriteLine("💾 Saving brain state...");
+            Console.WriteLine("💾 Saving brain state with enhanced partitioning...");
+            
+            // Create brain context for partitioning decisions
+            var allNeurons = new Dictionary<Guid, HybridNeuron>();
+            foreach (var cluster in _loadedClusters.Values)
+            {
+                var neurons = await cluster.GetNeuronsAsync();
+                foreach (var neuron in neurons.Values)
+                {
+                    allNeurons[neuron.Id] = neuron;
+                }
+            }
+            
+            var context = new BrainContext
+            {
+                AllNeurons = allNeurons,
+                AnalysisTime = DateTime.UtcNow
+            };
             
             // Save feature mappings
             var featureMappingSnapshot = _featureMapper.CreateSnapshot();
             await _storage.SaveFeatureMappingsAsync(featureMappingSnapshot);
             
-            // Save loaded clusters
+            // Save loaded clusters with enhanced partitioning
             foreach (var cluster in _loadedClusters.Values)
             {
+                await _enhancedStorage.SaveClusterWithPartitioningAsync(cluster, context);
                 await cluster.PersistAndUnloadAsync();
             }
             
@@ -173,18 +193,21 @@ namespace GreyMatter.Core
             var synapseSnapshots = _synapses.Values.Select(s => s.CreateSnapshot()).ToList();
             await _storage.SaveSynapsesAsync(synapseSnapshots);
             
-            Console.WriteLine("✅ Brain state saved");
+            Console.WriteLine("✅ Brain state saved with hierarchical partitioning");
         }
 
         /// <summary>
-        /// Cleanup - unload old clusters and prune weak connections
+        /// Cleanup - unload old clusters and prune weak connections with memory consolidation
         /// </summary>
         public async Task MaintenanceAsync()
         {
-            Console.WriteLine("🧹 Running brain maintenance...");
+            Console.WriteLine("🧹 Running brain maintenance with memory consolidation...");
             
             int unloadedClusters = 0;
             int prunedSynapses = 0;
+            
+            // Run memory consolidation to reorganize partitions
+            await _enhancedStorage.ConsolidateMemoryPartitions();
             
             // Unload old clusters
             var clustersToUnload = _loadedClusters.Values
@@ -216,7 +239,7 @@ namespace GreyMatter.Core
                 synapse.Age(TimeSpan.FromHours(1));
             }
             
-            Console.WriteLine($"🧹 Maintenance complete: unloaded {unloadedClusters} clusters, pruned {prunedSynapses} synapses");
+            Console.WriteLine($"🧹 Maintenance complete: consolidated memory, unloaded {unloadedClusters} clusters, pruned {prunedSynapses} synapses");
         }
 
         /// <summary>
@@ -234,6 +257,26 @@ namespace GreyMatter.Core
                 TotalNeuronsCreated = TotalNeuronsCreated,
                 StorageSizeFormatted = storageStats.TotalSizeFormatted,
                 UptimeFormatted = FormatTimeSpan(DateTime.UtcNow - CreatedAt)
+            };
+        }
+
+        /// <summary>
+        /// Get enhanced brain statistics with partition analysis
+        /// </summary>
+        public async Task<EnhancedBrainStats> GetEnhancedStatsAsync()
+        {
+            var baseStats = await GetStatsAsync();
+            var storageStats = await _enhancedStorage.GetEnhancedStorageStatsAsync();
+            
+            return new EnhancedBrainStats
+            {
+                BaseStats = baseStats,
+                StorageStats = storageStats,
+                PartitionEfficiency = storageStats.HierarchicalEfficiency,
+                TopPartitions = storageStats.PartitionStats
+                    .OrderByDescending(p => p.Value.ClusterCount)
+                    .Take(5)
+                    .ToDictionary(p => p.Key, p => p.Value)
             };
         }
 
@@ -262,7 +305,27 @@ namespace GreyMatter.Core
         {
             var allClusters = new List<NeuronCluster>(_loadedClusters.Values);
             
+            // Use enhanced storage to find conceptually similar clusters
+            var similarClusters = await _enhancedStorage.FindSimilarClusters(concepts, 0.5);
+            
             // Load additional clusters if needed
+            if (allClusters.Count < 3 && similarClusters.Any())
+            {
+                foreach (var clusterRef in similarClusters.Take(5))
+                {
+                    if (!_loadedClusters.ContainsKey(clusterRef.ClusterId))
+                    {
+                        var cluster = new NeuronCluster(
+                            clusterRef.PartitionPath.Primary, 
+                            _storage.LoadClusterAsync, 
+                            _storage.SaveClusterAsync);
+                        _loadedClusters[cluster.ClusterId] = cluster;
+                        allClusters.Add(cluster);
+                    }
+                }
+            }
+            
+            // Fallback to legacy cluster index search if needed
             if (allClusters.Count < 3)
             {
                 var clusterIndex = await _storage.LoadClusterIndexAsync();
@@ -448,5 +511,13 @@ namespace GreyMatter.Core
         public int TotalNeuronsCreated { get; set; }
         public string StorageSizeFormatted { get; set; } = "";
         public string UptimeFormatted { get; set; } = "";
+    }
+
+    public class EnhancedBrainStats
+    {
+        public BrainStats BaseStats { get; set; } = new();
+        public EnhancedStorageStats StorageStats { get; set; } = new();
+        public double PartitionEfficiency { get; set; }
+        public Dictionary<string, PartitionStats> TopPartitions { get; set; } = new();
     }
 }
