@@ -11,6 +11,28 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            // Parse configuration from command line
+            var config = BrainConfiguration.FromCommandLine(args);
+            
+            // Check for help or configuration display
+            if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h"))
+            {
+                BrainConfiguration.DisplayUsage();
+                return;
+            }
+            
+            // Validate and setup paths
+            try
+            {
+                config.ValidateAndSetup();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Configuration Error: {ex.Message}");
+                BrainConfiguration.DisplayUsage();
+                return;
+            }
+            
             // Check for demo modes
             if (args.Length > 0 && args[0] == "--developmental-demo")
             {
@@ -20,21 +42,28 @@ namespace GreyMatter
             
             if (args.Length > 0 && args[0] == "--emotional-demo")
             {
-                await RunEmotionalIntelligenceDemo(args.Skip(1).ToArray());
+                await RunEmotionalIntelligenceDemo(args.Skip(1).ToArray(), config);
+                return;
+            }
+            
+            // Interactive conversation mode
+            if (config.InteractiveMode)
+            {
+                await RunInteractiveMode(config);
                 return;
             }
             
             // Enhanced consciousness demo (default)
-            await RunConsciousnessDemo(args);
+            await RunConsciousnessDemo(args, config);
         }
         
-        static async Task RunConsciousnessDemo(string[] args)
+        static async Task RunConsciousnessDemo(string[] args, BrainConfiguration config)
         {
             Console.WriteLine("🧠🌟 **ENHANCED CONSCIOUSNESS DEMONSTRATION**");
             Console.WriteLine("==================================================");
             Console.WriteLine("Advanced consciousness with emotional processing and goal formation\n");
 
-            var brain = new BrainInJar();
+            var brain = new BrainInJar(config.BrainDataPath);
             await brain.InitializeAsync();
 
             Console.WriteLine("📊 Initial Brain Status:");
@@ -176,13 +205,13 @@ namespace GreyMatter
             await brain.SaveAsync();
         }
 
-        static async Task RunEmotionalIntelligenceDemo(string[] args)
+        static async Task RunEmotionalIntelligenceDemo(string[] args, BrainConfiguration config)
         {
             Console.WriteLine("💖🧠 **EMOTIONAL INTELLIGENCE DEMONSTRATION**");
             Console.WriteLine("=============================================");
             Console.WriteLine("Focused demonstration of emotional processing and goal formation\n");
 
-            var brain = new BrainInJar();
+            var brain = new BrainInJar(config.BrainDataPath);
             await brain.InitializeAsync();
 
             Console.WriteLine("📊 Brain Status:");
@@ -286,6 +315,40 @@ namespace GreyMatter
             Console.WriteLine("   ✅ Emotional intelligence in action");
 
             await brain.SaveAsync();
+        }
+
+        /// <summary>
+        /// Run interactive conversation mode
+        /// </summary>
+        static async Task RunInteractiveMode(BrainConfiguration config)
+        {
+            Console.WriteLine("🧠💬 **INTERACTIVE BRAIN CONVERSATION**");
+            Console.WriteLine("=======================================");
+            Console.WriteLine("Initializing conversational brain with advanced consciousness...\n");
+
+            var brain = new BrainInJar(config.BrainDataPath);
+            await brain.InitializeAsync();
+
+            Console.WriteLine("📊 Brain Status:");
+            var initialStats = await brain.GetStatsAsync();
+            Console.WriteLine($"   Age: {await brain.GetBrainAgeAsync()}");
+            Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
+            Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}");
+
+            // Start consciousness
+            await brain.AwakeConsciousnessAsync();
+            
+            // Allow brain to stabilize
+            await Task.Delay(2000);
+
+            // Start interactive conversation
+            var conversation = new InteractiveConversation(brain, config);
+            await conversation.StartConversationAsync();
+
+            // Stop consciousness gracefully
+            await brain.SleepConsciousnessAsync();
+            
+            Console.WriteLine("👋 Session ended. Brain consciousness stopped.");
         }
     }
 }
