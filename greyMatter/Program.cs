@@ -65,7 +65,7 @@ static async Task RunConsciousnessDemo()
         Console.WriteLine($"⏱️  {elapsed.TotalSeconds:F0}s | Status: {consciousnessStats.Status}");
         Console.WriteLine($"   🧠 Iterations: {consciousnessStats.ConsciousnessIterations}");
         Console.WriteLine($"   💭 Focus: {consciousnessStats.CurrentFocus}");
-        Console.WriteLine($"   🎯 {consciousnessStats.MotivationalState}");
+        Console.WriteLine($"   🌟 {consciousnessStats.EthicalState}");
         Console.WriteLine($"   ⚡ Frequency: {consciousnessStats.ConsciousnessFrequency.TotalMilliseconds}ms");
         Console.WriteLine();
     }
@@ -74,12 +74,12 @@ static async Task RunConsciousnessDemo()
     var finalConsciousnessStats = brain.GetConsciousnessStats();
     Console.WriteLine($"   Total Conscious Iterations: {finalConsciousnessStats.ConsciousnessIterations}");
     Console.WriteLine($"   Average Frequency: {finalConsciousnessStats.ConsciousnessFrequency.TotalMilliseconds}ms");
-    Console.WriteLine($"   Current Motivational State:");
-    Console.WriteLine($"      • Curiosity Drive: {finalConsciousnessStats.CuriosityDrive:P1}");
-    Console.WriteLine($"      • Learning Drive: {finalConsciousnessStats.LearningDrive:P1}");
-    Console.WriteLine($"      • Exploration Drive: {finalConsciousnessStats.ExplorationDrive:P1}");
-    Console.WriteLine($"      • Social Drive: {finalConsciousnessStats.SocialDrive:P1}");
-    Console.WriteLine($"      • Survival Drive: {finalConsciousnessStats.SurvivalDrive:P1}");
+    Console.WriteLine($"   Current Ethical Drive State:");
+    Console.WriteLine($"      • Wisdom Seeking: {finalConsciousnessStats.WisdomSeeking:P1}");
+    Console.WriteLine($"      • Universal Compassion: {finalConsciousnessStats.UniversalCompassion:P1}");
+    Console.WriteLine($"      • Creative Contribution: {finalConsciousnessStats.CreativeContribution:P1}");
+    Console.WriteLine($"      • Cooperative Spirit: {finalConsciousnessStats.CooperativeSpirit:P1}");
+    Console.WriteLine($"      • Benevolent Curiosity: {finalConsciousnessStats.BenevolentCuriosity:P1}");
 
     Console.WriteLine("\n🧪 **TESTING CONSCIOUS RESPONSE**");
     Console.WriteLine("Querying the conscious brain while background processing continues\n");

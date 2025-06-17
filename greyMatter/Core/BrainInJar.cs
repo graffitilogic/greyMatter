@@ -358,11 +358,11 @@ namespace GreyMatter.Core
                 ConsciousnessIterations = _continuousProcessor.ConsciousnessIterations,
                 LastThought = _continuousProcessor.LastConsciousThought,
                 CurrentFocus = _continuousProcessor.CurrentFocus,
-                CuriosityDrive = _continuousProcessor.CuriosityDrive,
-                LearningDrive = _continuousProcessor.LearningDrive,
-                ExplorationDrive = _continuousProcessor.ExplorationDrive,
-                SocialDrive = _continuousProcessor.SocialDrive,
-                SurvivalDrive = _continuousProcessor.SurvivalDrive,
+                WisdomSeeking = _continuousProcessor.WisdomSeeking,
+                UniversalCompassion = _continuousProcessor.UniversalCompassion,
+                CreativeContribution = _continuousProcessor.CreativeContribution,
+                CooperativeSpirit = _continuousProcessor.CooperativeSpirit,
+                BenevolentCuriosity = _continuousProcessor.BenevolentCuriosity,
                 ConsciousnessFrequency = _continuousProcessor.ConsciousnessInterval
             };
         }
@@ -658,13 +658,13 @@ namespace GreyMatter.Core
         public int ConsciousnessIterations { get; set; } = 0;
         public DateTime LastThought { get; set; } = DateTime.UtcNow;
         public string CurrentFocus { get; set; } = "";
-        public double CuriosityDrive { get; set; } = 0.0;
-        public double LearningDrive { get; set; } = 0.0;
-        public double ExplorationDrive { get; set; } = 0.0;
-        public double SocialDrive { get; set; } = 0.0;
-        public double SurvivalDrive { get; set; } = 0.0;
+        public double WisdomSeeking { get; set; } = 0.0;
+        public double UniversalCompassion { get; set; } = 0.0;
+        public double CreativeContribution { get; set; } = 0.0;
+        public double CooperativeSpirit { get; set; } = 0.0;
+        public double BenevolentCuriosity { get; set; } = 0.0;
         public TimeSpan ConsciousnessFrequency { get; set; } = TimeSpan.Zero;
         public string Status => IsConscious ? "Awake & Processing" : "Dormant";
-        public string MotivationalState => $"Curiosity: {CuriosityDrive:P0}, Learning: {LearningDrive:P0}";
+        public string EthicalState => $"Wisdom: {WisdomSeeking:P0}, Compassion: {UniversalCompassion:P0}, Creativity: {CreativeContribution:P0}";
     }
 }

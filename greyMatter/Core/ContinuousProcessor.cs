@@ -19,18 +19,19 @@ namespace GreyMatter.Core
         private readonly Timer _motivationTimer;
         private readonly Timer _dreammingTimer;
         private readonly Random _random = new();
+        private readonly EthicalDriveSystem _ethicalDrives;
         
         // Consciousness parameters
         public TimeSpan ConsciousnessInterval { get; set; } = TimeSpan.FromMilliseconds(500); // 2Hz like brain waves
         public TimeSpan MotivationInterval { get; set; } = TimeSpan.FromSeconds(30); // Motivational drives
         public TimeSpan DreamInterval { get; set; } = TimeSpan.FromMinutes(5); // Background consolidation
         
-        // Motivational drives (biological survival instincts)
-        public double CuriosityDrive { get; private set; } = 0.5;
-        public double SurvivalDrive { get; private set; } = 0.3;
-        public double LearningDrive { get; private set; } = 0.8;
-        public double SocialDrive { get; private set; } = 0.4;
-        public double ExplorationDrive { get; private set; } = 0.6;
+        // Ethical drives (replacing primitive survival instincts)
+        public double WisdomSeeking => _ethicalDrives.WisdomSeeking;
+        public double UniversalCompassion => _ethicalDrives.UniversalCompassion;
+        public double CreativeContribution => _ethicalDrives.CreativeContribution;
+        public double CooperativeSpirit => _ethicalDrives.CooperativeSpirit;
+        public double BenevolentCuriosity => _ethicalDrives.BenevolentCuriosity;
         
         // Processing state
         public bool IsProcessing { get; private set; } = false;
@@ -46,13 +47,14 @@ namespace GreyMatter.Core
         public ContinuousProcessor(BrainInJar brain)
         {
             _brain = brain;
+            _ethicalDrives = new EthicalDriveSystem(brain);
             
             // Initialize consciousness timer (constant background processing)
             _consciousnessTimer = new Timer(async _ => await PerformConsciousnessIteration(), 
                 null, Timeout.Infinite, Timeout.Infinite);
             
             // Initialize motivation timer (drives and needs)
-            _motivationTimer = new Timer(async _ => await UpdateMotivationalDrives(), 
+            _motivationTimer = new Timer(async _ => await UpdateEthicalDrives(), 
                 null, Timeout.Infinite, Timeout.Infinite);
             
             // Initialize dreaming timer (memory consolidation and creative processing)
@@ -235,33 +237,23 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
-        /// Update motivational drives based on internal and external factors
+        /// Update ethical drives instead of primitive survival drives
         /// </summary>
-        private async Task UpdateMotivationalDrives()
+        private async Task UpdateEthicalDrives()
         {
             if (!await _processingLock.WaitAsync(1000)) return;
             
             try
             {
-                // Simulate biological drive fluctuations
-                CuriosityDrive = Math.Max(0.1, Math.Min(1.0, CuriosityDrive + (_random.NextDouble() - 0.5) * 0.1));
-                LearningDrive = Math.Max(0.2, Math.Min(1.0, LearningDrive + (_random.NextDouble() - 0.5) * 0.05));
-                ExplorationDrive = Math.Max(0.1, Math.Min(1.0, ExplorationDrive + (_random.NextDouble() - 0.5) * 0.08));
-                SocialDrive = Math.Max(0.1, Math.Min(1.0, SocialDrive + (_random.NextDouble() - 0.5) * 0.06));
+                // Update ethical drives based on positive principles
+                await _ethicalDrives.UpdateEthicalDrives();
                 
-                // Learning increases motivation
-                if (await HasRecentLearning())
-                {
-                    LearningDrive = Math.Min(1.0, LearningDrive + 0.1);
-                    CuriosityDrive = Math.Min(1.0, CuriosityDrive + 0.05);
-                }
-                
-                // Queue appropriate background tasks based on drives
-                QueueMotivatedTasks();
+                // Queue appropriate background tasks based on ethical drives
+                QueueEthicalTasks();
                 
                 if (_random.NextDouble() < 0.05) // 5% chance to show drives
                 {
-                    Console.WriteLine($"🎯 Drives: Curiosity={CuriosityDrive:P0}, Learning={LearningDrive:P0}, Exploration={ExplorationDrive:P0}");
+                    Console.WriteLine($"🌟 Ethical Drives: Wisdom={WisdomSeeking:P0}, Compassion={UniversalCompassion:P0}, Creativity={CreativeContribution:P0}");
                 }
             }
             finally
@@ -333,11 +325,11 @@ namespace GreyMatter.Core
         {
             var drives = new Dictionary<string, double>
             {
-                ["curiosity"] = CuriosityDrive,
-                ["learning"] = LearningDrive,
-                ["exploration"] = ExplorationDrive,
-                ["social"] = SocialDrive,
-                ["survival"] = SurvivalDrive
+                ["wisdom_seeking"] = WisdomSeeking,
+                ["universal_compassion"] = UniversalCompassion,
+                ["creative_contribution"] = CreativeContribution,
+                ["cooperative_spirit"] = CooperativeSpirit,
+                ["benevolent_curiosity"] = BenevolentCuriosity
             };
             
             return drives.OrderByDescending(d => d.Value).First().Key;
@@ -345,43 +337,14 @@ namespace GreyMatter.Core
 
         private string GenerateThoughtTopic(string dominantDrive)
         {
-            var topics = new Dictionary<string, string[]>
-            {
-                ["curiosity"] = new[] { "what is this", "how does this work", "why does this happen", "what if" },
-                ["learning"] = new[] { "remember this", "understand better", "make connections", "practice" },
-                ["exploration"] = new[] { "discover something", "find patterns", "explore relationships", "seek novelty" },
-                ["social"] = new[] { "communicate", "share knowledge", "understand others", "cooperate" },
-                ["survival"] = new[] { "stay alert", "maintain health", "preserve memory", "adapt" }
-            };
-            
-            var topicChoices = topics.ContainsKey(dominantDrive) ? topics[dominantDrive] : topics["curiosity"];
-            return topicChoices[_random.Next(topicChoices.Length)];
+            // Use ethical drive system to generate thoughts
+            return _ethicalDrives.GenerateEthicalThought();
         }
 
         private Dictionary<string, double> GenerateInternalFeatures(string dominantDrive)
         {
-            var baseFeatures = new Dictionary<string, double>
-            {
-                ["internal_motivation"] = 0.6 + _random.NextDouble() * 0.3,
-                ["attention_level"] = 0.5 + _random.NextDouble() * 0.4,
-                ["emotional_state"] = 0.4 + _random.NextDouble() * 0.4
-            };
-            
-            // Adjust based on dominant drive
-            switch (dominantDrive)
-            {
-                case "curiosity":
-                    baseFeatures["exploration_urge"] = CuriosityDrive;
-                    break;
-                case "learning":
-                    baseFeatures["learning_readiness"] = LearningDrive;
-                    break;
-                case "exploration":
-                    baseFeatures["novelty_seeking"] = ExplorationDrive;
-                    break;
-            }
-            
-            return baseFeatures;
+            // Use ethical drive system to generate features
+            return _ethicalDrives.GenerateEthicalFeatures(dominantDrive);
         }
 
         private void UpdateTopicEvaluation(string topic, double confidence)
@@ -405,25 +368,32 @@ namespace GreyMatter.Core
             return age.TotalHours < 24 || stats.TotalClusters > 0;
         }
 
-        private void QueueMotivatedTasks()
+        private void QueueEthicalTasks()
         {
-            if (CuriosityDrive > 0.7)
-            {
-                _backgroundTasks.Enqueue(new CognitiveTask 
-                { 
-                    Type = CognitiveTaskType.CreativeAssociation, 
-                    Target = "explore_connections" 
-                });
-            }
+            // Queue ethical cognitive tasks based on drives
+            var ethicalTasks = _ethicalDrives.GenerateEthicalTasks();
             
-            if (LearningDrive > 0.8)
+            foreach (var ethicalTask in ethicalTasks)
             {
+                // Convert to regular cognitive task for compatibility
                 _backgroundTasks.Enqueue(new CognitiveTask 
                 { 
-                    Type = CognitiveTaskType.LearningReinforcement, 
-                    Target = "strengthen_knowledge" 
+                    Type = ConvertEthicalTaskType(ethicalTask.Type),
+                    Target = ethicalTask.Target
                 });
             }
+        }
+        
+        private CognitiveTaskType ConvertEthicalTaskType(EthicalTaskType ethicalType)
+        {
+            return ethicalType switch
+            {
+                EthicalTaskType.WisdomContemplation => CognitiveTaskType.ConceptReflection,
+                EthicalTaskType.CompassionateReflection => CognitiveTaskType.ConceptReflection,
+                EthicalTaskType.ConstructiveCreation => CognitiveTaskType.CreativeAssociation,
+                EthicalTaskType.MoralReasoning => CognitiveTaskType.ConceptReflection,
+                _ => CognitiveTaskType.ConceptReflection
+            };
         }
 
         private async Task ReflectOnConcept(string concept)
@@ -523,17 +493,17 @@ namespace GreyMatter.Core
 
         private async Task AdaptConsciousnessFrequency()
         {
-            // Adapt processing frequency based on activity and drives
-            var avgDrive = (CuriosityDrive + LearningDrive + ExplorationDrive) / 3.0;
+            // Adapt processing frequency based on ethical drive activity
+            var avgDrive = (WisdomSeeking + UniversalCompassion + CreativeContribution + BenevolentCuriosity) / 4.0;
             
             if (avgDrive > 0.8)
             {
-                // High activity - increase frequency
+                // High ethical activity - increase frequency
                 ConsciousnessInterval = TimeSpan.FromMilliseconds(300); // ~3.3Hz
             }
             else if (avgDrive < 0.3)
             {
-                // Low activity - decrease frequency  
+                // Lower activity - decrease frequency  
                 ConsciousnessInterval = TimeSpan.FromMilliseconds(1000); // 1Hz
             }
             else
