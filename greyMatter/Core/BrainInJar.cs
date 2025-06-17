@@ -20,6 +20,7 @@ namespace GreyMatter.Core
         private readonly FeatureMapper _featureMapper = new();
         private readonly Random _random = new();
         private readonly ConceptDependencyGraph _dependencyGraph = new();
+        private ContinuousProcessor? _continuousProcessor; // Add consciousness processor
         
         // Brain configuration
         public int MaxLoadedClusters { get; set; } = 10;
@@ -40,6 +41,7 @@ namespace GreyMatter.Core
         {
             _storage = new BrainStorage(storagePath);
             _enhancedStorage = new EnhancedBrainStorage(storagePath);
+            _continuousProcessor = new ContinuousProcessor(this); // Initialize consciousness
         }
 
         /// <summary>
@@ -316,6 +318,53 @@ namespace GreyMatter.Core
             }
 
             return neuronCount > 0 ? totalActivation / neuronCount : 0.0;
+        }
+
+        /// <summary>
+        /// Start continuous consciousness processing
+        /// </summary>
+        public async Task AwakeConsciousnessAsync()
+        {
+            if (_continuousProcessor != null)
+            {
+                await _continuousProcessor.StartConsciousnessAsync();
+            }
+        }
+
+        /// <summary>
+        /// Stop continuous consciousness processing
+        /// </summary>
+        public async Task SleepConsciousnessAsync()
+        {
+            if (_continuousProcessor != null)
+            {
+                await _continuousProcessor.StopConsciousnessAsync();
+            }
+        }
+
+        /// <summary>
+        /// Get consciousness status and statistics
+        /// </summary>
+        public ConsciousnessStats GetConsciousnessStats()
+        {
+            if (_continuousProcessor == null)
+            {
+                return new ConsciousnessStats { IsConscious = false };
+            }
+
+            return new ConsciousnessStats
+            {
+                IsConscious = _continuousProcessor.IsProcessing,
+                ConsciousnessIterations = _continuousProcessor.ConsciousnessIterations,
+                LastThought = _continuousProcessor.LastConsciousThought,
+                CurrentFocus = _continuousProcessor.CurrentFocus,
+                CuriosityDrive = _continuousProcessor.CuriosityDrive,
+                LearningDrive = _continuousProcessor.LearningDrive,
+                ExplorationDrive = _continuousProcessor.ExplorationDrive,
+                SocialDrive = _continuousProcessor.SocialDrive,
+                SurvivalDrive = _continuousProcessor.SurvivalDrive,
+                ConsciousnessFrequency = _continuousProcessor.ConsciousnessInterval
+            };
         }
 
         /// <summary>
@@ -601,5 +650,21 @@ namespace GreyMatter.Core
         public EnhancedStorageStats StorageStats { get; set; } = new();
         public double PartitionEfficiency { get; set; }
         public Dictionary<string, PartitionStats> TopPartitions { get; set; } = new();
+    }
+
+    public class ConsciousnessStats
+    {
+        public bool IsConscious { get; set; } = false;
+        public int ConsciousnessIterations { get; set; } = 0;
+        public DateTime LastThought { get; set; } = DateTime.UtcNow;
+        public string CurrentFocus { get; set; } = "";
+        public double CuriosityDrive { get; set; } = 0.0;
+        public double LearningDrive { get; set; } = 0.0;
+        public double ExplorationDrive { get; set; } = 0.0;
+        public double SocialDrive { get; set; } = 0.0;
+        public double SurvivalDrive { get; set; } = 0.0;
+        public TimeSpan ConsciousnessFrequency { get; set; } = TimeSpan.Zero;
+        public string Status => IsConscious ? "Awake & Processing" : "Dormant";
+        public string MotivationalState => $"Curiosity: {CuriosityDrive:P0}, Learning: {LearningDrive:P0}";
     }
 }
