@@ -86,8 +86,9 @@ namespace GreyMatter.Core
             response.EmotionalWeights = emotionalProfile;
             
             // Calculate dominant emotions
-            response.DominantEmotion = emotionalProfile.OrderByDescending(kv => kv.Value).First().Key;
-            response.EmotionalIntensity = emotionalProfile.Values.Max();
+            response.DominantEmotion = emotionalProfile.Any() ? 
+                emotionalProfile.OrderByDescending(kv => kv.Value).First().Key : "curiosity";
+            response.EmotionalIntensity = emotionalProfile.Any() ? emotionalProfile.Values.Max() : 0.5;
             
             // Generate emotional reasoning
             response.EmotionalReasoning = await GenerateEmotionalReasoning(experience, emotionalProfile);
@@ -174,7 +175,9 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task<string> GenerateEmotionalReasoning(string experience, Dictionary<string, double> emotionalProfile)
         {
-            var dominant = emotionalProfile.OrderByDescending(kv => kv.Value).First();
+            var dominant = emotionalProfile.Any() ? 
+                emotionalProfile.OrderByDescending(kv => kv.Value).First() :
+                new KeyValuePair<string, double>("curiosity", 0.5);
             
             var reasoning = dominant.Key switch
             {
@@ -495,7 +498,14 @@ namespace GreyMatter.Core
                 ["gratitude"] = Gratitude
             };
             
-            return emotions.OrderByDescending(kv => kv.Value).First().Key;
+            // Ensure we have valid emotions and return safely
+            if (emotions.Any() && emotions.Values.Any(v => v > 0))
+            {
+                return emotions.OrderByDescending(kv => kv.Value).First().Key;
+            }
+            
+            // Fallback to curiosity if no emotions are active
+            return "curiosity";
         }
         
         private double CalculateEmotionalComplexity()

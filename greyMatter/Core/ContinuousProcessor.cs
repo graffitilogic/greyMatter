@@ -140,46 +140,103 @@ namespace GreyMatter.Core
                 LastConsciousThought = DateTime.UtcNow;
                 
                 // Spontaneous thought generation based on motivational drives
-                await GenerateSpontaneousThought();
+                try
+                {
+                    await GenerateSpontaneousThought();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🚨 Error in GenerateSpontaneousThought: {ex.Message}");
+                }
                 
                 // Process background cognitive tasks
-                await ProcessBackgroundTasks();
+                try
+                {
+                    await ProcessBackgroundTasks();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🚨 Error in ProcessBackgroundTasks: {ex.Message}");
+                }
                 
                 // Evaluate current topics of interest
-                await EvaluateTopics();
+                try
+                {
+                    await EvaluateTopics();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🚨 Error in EvaluateTopics: {ex.Message}");
+                }
                 
                 // Enhanced cognitive processing with emotional and goal systems
                 
                 // Emotional maintenance (every 30 iterations = ~15 seconds at 2Hz)
                 if (ConsciousnessIterations % 30 == 0)
                 {
-                    await PerformEmotionalMaintenance();
+                    try
+                    {
+                        await PerformEmotionalMaintenance();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"🚨 Error in PerformEmotionalMaintenance: {ex.Message}");
+                    }
                 }
                 
                 // Goal progress tracking (every 60 iterations = ~30 seconds at 2Hz)
                 if (ConsciousnessIterations % 60 == 0)
                 {
-                    await UpdateGoalProgress();
+                    try
+                    {
+                        await UpdateGoalProgress();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"🚨 Error in UpdateGoalProgress: {ex.Message}");
+                    }
                 }
                 
                 // Goal formation consideration (every 7200 iterations = ~1 hour at 2Hz)
                 if (ConsciousnessIterations % 7200 == 0)
                 {
-                    await ConsiderNewGoals();
+                    try
+                    {
+                        await ConsiderNewGoals();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"🚨 Error in ConsiderNewGoals: {ex.Message}");
+                    }
                 }
                 
                 // Maintain neural network health
                 if (ConsciousnessIterations % 100 == 0) // Every 50 seconds at 2Hz
                 {
-                    await PerformNeuralMaintenance();
+                    try
+                    {
+                        await PerformNeuralMaintenance();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"🚨 Error in PerformNeuralMaintenance: {ex.Message}");
+                    }
                 }
                 
                 // Adaptive consciousness frequency based on activity
-                await AdaptConsciousnessFrequency();
+                try
+                {
+                    await AdaptConsciousnessFrequency();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"🚨 Error in AdaptConsciousnessFrequency: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"🚨 Consciousness iteration error: {ex.Message}");
+                Console.WriteLine($"🔍 Stack trace: {ex.StackTrace}");
             }
             finally
             {
@@ -192,36 +249,44 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task GenerateSpontaneousThought()
         {
-            // Choose focus based on strongest drive
-            var dominantDrive = GetDominantDrive();
-            var thoughtTopic = GenerateThoughtTopic(dominantDrive);
-            
-            CurrentFocus = thoughtTopic;
-            
-            // Generate internal mental activity with emotional influence
-            var internalFeatures = GenerateInternalFeatures(dominantDrive);
-            
-            // Add emotional context to the thought
-            var emotionalInfluence = _emotionalProcessor.GetEmotionalInfluenceFactors();
-            foreach (var influence in emotionalInfluence)
+            try
             {
-                internalFeatures[$"emotional_{influence.Key}"] = influence.Value * 0.3; // Moderate emotional influence
+                // Choose focus based on strongest drive
+                var dominantDrive = GetDominantDrive();
+                var thoughtTopic = GenerateThoughtTopic(dominantDrive);
+                
+                CurrentFocus = thoughtTopic;
+                
+                // Generate internal mental activity with emotional influence
+                var internalFeatures = GenerateInternalFeatures(dominantDrive);
+                
+                // Add emotional context to the thought
+                var emotionalInfluence = _emotionalProcessor.GetEmotionalInfluenceFactors();
+                foreach (var influence in emotionalInfluence)
+                {
+                    internalFeatures[$"emotional_{influence.Key}"] = influence.Value * 0.3; // Moderate emotional influence
+                }
+                
+                // Process the thought internally (no external output)
+                var result = await _brain.ProcessInputAsync(thoughtTopic, internalFeatures);
+                
+                // Let emotional processor analyze this thought experience
+                await _emotionalProcessor.ProcessExperienceAsync(thoughtTopic, internalFeatures, result.Confidence);
+                
+                // Update topic evaluations
+                UpdateTopicEvaluation(thoughtTopic, result.Confidence);
+                
+                // Occasionally express thoughts for debugging
+                if (_random.NextDouble() < 0.01) // 1% chance
+                {
+                    var emotionalState = _emotionalProcessor.GetCurrentEmotionalState();
+                    Console.WriteLine($"💭 Spontaneous thought: {thoughtTopic} (confidence: {result.Confidence:P0}, emotion: {emotionalState.DominantEmotion})");
+                }
             }
-            
-            // Process the thought internally (no external output)
-            var result = await _brain.ProcessInputAsync(thoughtTopic, internalFeatures);
-            
-            // Let emotional processor analyze this thought experience
-            await _emotionalProcessor.ProcessExperienceAsync(thoughtTopic, internalFeatures, result.Confidence);
-            
-            // Update topic evaluations
-            UpdateTopicEvaluation(thoughtTopic, result.Confidence);
-            
-            // Occasionally express thoughts for debugging
-            if (_random.NextDouble() < 0.01) // 1% chance
+            catch (Exception ex)
             {
-                var emotionalState = _emotionalProcessor.GetCurrentEmotionalState();
-                Console.WriteLine($"💭 Spontaneous thought: {thoughtTopic} (confidence: {result.Confidence:P0}, emotion: {emotionalState.DominantEmotion})");
+                Console.WriteLine($"🚨 Error in GenerateSpontaneousThought details: {ex.Message}");
+                Console.WriteLine($"🔍 Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -461,7 +526,16 @@ namespace GreyMatter.Core
                 ["metacognitive_awareness"] = 0.6
             };
             
-            await _brain.ProcessInputAsync($"reflecting on {concept}", reflection);
+            // Store reflection directly to avoid recursive processing loops
+            var reflectionConcept = $"concept_reflection_{concept.GetHashCode():X8}";
+            try
+            {
+                await _brain.LearnConceptAsync(reflectionConcept, reflection);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not store concept reflection for '{concept}': {ex.Message}");
+            }
         }
 
         private async Task ExploreCreativeAssociations(string target)
@@ -476,7 +550,16 @@ namespace GreyMatter.Core
                 ["association_strength"] = 0.6
             };
             
-            await _brain.ProcessInputAsync($"creative {selectedAssociation}", features);
+            // Store creative association directly to avoid recursive processing loops
+            var creativeConcept = $"creative_association_{selectedAssociation}_{target.GetHashCode():X8}";
+            try
+            {
+                await _brain.LearnConceptAsync(creativeConcept, features);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not store creative association: {ex.Message}");
+            }
         }
 
         private async Task ReinforceLearning(string target)
@@ -488,7 +571,16 @@ namespace GreyMatter.Core
                 ["pattern_strengthening"] = 0.6
             };
             
-            await _brain.ProcessInputAsync($"reinforce {target}", reinforcement);
+            // Store reinforcement directly to avoid recursive processing loops
+            var reinforcementConcept = $"learning_reinforcement_{target.GetHashCode():X8}";
+            try
+            {
+                await _brain.LearnConceptAsync(reinforcementConcept, reinforcement);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not store learning reinforcement for '{target}': {ex.Message}");
+            }
         }
 
         private async Task GenerateCreativeAssociations()
@@ -510,7 +602,16 @@ namespace GreyMatter.Core
                         ["conceptual_blending"] = 0.7
                     };
                     
-                    await _brain.ProcessInputAsync($"creative blend {concept1} {concept2}", creativeFeatures);
+                    // Store creative blend directly to avoid recursive processing loops
+                    var blendConcept = $"creative_blend_{concept1}_{concept2}".Replace(" ", "_");
+                    try
+                    {
+                        await _brain.LearnConceptAsync(blendConcept, creativeFeatures);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Warning: Could not store creative blend: {ex.Message}");
+                    }
                 }
             }
         }
@@ -525,8 +626,16 @@ namespace GreyMatter.Core
                 ["affective_consolidation"] = 0.4
             };
             
-            // Process through both brain and emotional system
-            await _brain.ProcessInputAsync("emotional memory processing", emotionalFeatures);
+            // Store emotional memory processing directly to avoid recursive loops
+            var emotionalMemoryConcept = $"emotional_memory_processing_{DateTime.UtcNow.Ticks % 10000:X4}";
+            try
+            {
+                await _brain.LearnConceptAsync(emotionalMemoryConcept, emotionalFeatures);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not store emotional memory processing: {ex.Message}");
+            }
             
             // Let the emotional processor analyze and store emotional context
             await _emotionalProcessor.ProcessExperienceAsync("memory consolidation", emotionalFeatures, 0.7);
@@ -541,7 +650,16 @@ namespace GreyMatter.Core
                 ["memory_optimization"] = 0.6
             };
             
-            await _brain.ProcessInputAsync("consolidate learning patterns", consolidationFeatures);
+            // Store learning pattern consolidation directly to avoid recursive loops
+            var consolidationConcept = $"learning_pattern_consolidation_{DateTime.UtcNow.Ticks % 10000:X4}";
+            try
+            {
+                await _brain.LearnConceptAsync(consolidationConcept, consolidationFeatures);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Warning: Could not store learning pattern consolidation: {ex.Message}");
+            }
         }
 
         private async Task PerformNeuralMaintenance()

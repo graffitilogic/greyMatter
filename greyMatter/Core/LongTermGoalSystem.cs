@@ -140,7 +140,8 @@ namespace GreyMatter.Core
                 }
             }
             
-            alignment.OverallAlignment = alignment.GoalContributions.Values.Max();
+            alignment.OverallAlignment = alignment.GoalContributions.Values.Any() ? 
+                alignment.GoalContributions.Values.Max() : 0.0;
             alignment.AlignedGoalCount = alignment.GoalContributions.Count(kv => kv.Value > 0.2);
             
             return alignment;

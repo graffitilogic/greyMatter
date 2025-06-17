@@ -108,6 +108,14 @@ namespace GreyMatter.Core
         {
             var dominantDrive = GetDominantEthicalDrive();
             var ethicalThoughts = GetEthicalThoughts(dominantDrive);
+            
+            // Safety check for empty thoughts array
+            if (ethicalThoughts == null || ethicalThoughts.Length == 0)
+            {
+                // Fallback to default contemplative thought
+                return "contemplating existence and purpose";
+            }
+            
             return ethicalThoughts[_random.Next(ethicalThoughts.Length)];
         }
         
@@ -254,7 +262,14 @@ namespace GreyMatter.Core
                 ["ethical_reflection"] = EthicalReflection
             };
             
-            return drives.OrderByDescending(d => d.Value).First().Key;
+            // Ensure we have valid drives and return safely
+            if (drives.Any() && drives.Values.Any(v => v > 0))
+            {
+                return drives.OrderByDescending(d => d.Value).First().Key;
+            }
+            
+            // Fallback to wisdom seeking if no drives are active
+            return "wisdom_seeking";
         }
         
         private string[] GetEthicalThoughts(string dominantDrive)

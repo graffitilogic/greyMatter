@@ -149,10 +149,9 @@ namespace GreyMatter.Core
             result.Confidence = CalculateConfidence(neuronOutputs);
             
             // Enhanced: Integrate emotional processing if consciousness is active
-            // BUT avoid recursive loops for emotional context inputs and goal reflections
+            // BUT avoid recursive loops for internal consciousness processing
             if (_continuousProcessor != null && _continuousProcessor.IsProcessing && 
-                !input.StartsWith("emotional_context_") && !input.StartsWith("emotional_memory_") &&
-                !input.StartsWith("reflect on goal strategy:") && !input.StartsWith("goal_reflection_"))
+                !IsInternalConsciousnessInput(input))
             {
                 // Let the emotional processor analyze this experience
                 var emotionalProcessor = _continuousProcessor.GetEmotionalProcessor();
@@ -172,6 +171,21 @@ namespace GreyMatter.Core
             Console.WriteLine($"💭 Generated response with confidence {result.Confidence:F2}");
             
             return result;
+        }
+
+        /// <summary>
+        /// Check if input is from internal consciousness processing to prevent recursive loops
+        /// </summary>
+        private bool IsInternalConsciousnessInput(string input)
+        {
+            return input.StartsWith("emotional_context_") || input.StartsWith("emotional_memory_") ||
+                   input.StartsWith("reflect on goal strategy:") || input.StartsWith("goal_reflection_") ||
+                   input.StartsWith("reflecting on ") || input.StartsWith("concept_reflection_") ||
+                   input.StartsWith("creative ") || input.StartsWith("creative_association_") ||
+                   input.StartsWith("creative_blend_") || input.StartsWith("reinforce ") || 
+                   input.StartsWith("learning_reinforcement_") || input.StartsWith("emotional memory processing") ||
+                   input.StartsWith("emotional_memory_processing_") || input.StartsWith("consolidate learning patterns") ||
+                   input.StartsWith("learning_pattern_consolidation_") || input.StartsWith("memory consolidation");
         }
 
         /// <summary>
