@@ -86,9 +86,14 @@ namespace GreyMatter.Core
             
             // Get neurons for this concept
             var conceptNeurons = await cluster.FindNeuronsByConcept(concept);
-            if (conceptNeurons.Count < 3) // Need more neurons for this concept
+            
+            // Dynamic neuron allocation based on concept complexity
+            var requiredNeurons = CalculateRequiredNeurons(concept, features);
+            
+            if (conceptNeurons.Count < requiredNeurons)
             {
-                var newNeurons = await cluster.GrowForConcept(concept, 5);
+                var neuronsToAdd = requiredNeurons - conceptNeurons.Count;
+                var newNeurons = await cluster.GrowForConcept(concept, neuronsToAdd);
                 conceptNeurons.AddRange(newNeurons);
                 result.NeuronsCreated = newNeurons.Count;
                 TotalNeuronsCreated += newNeurons.Count;
@@ -526,6 +531,7 @@ namespace GreyMatter.Core
             }
             
             return allClusters
+                .Where(c => c != null)
                 .OrderByDescending(c => c.CalculateRelevance(concepts))
                 .ToList();
         }
@@ -658,6 +664,140 @@ namespace GreyMatter.Core
                 return $"{timeSpan.Hours}h {timeSpan.Minutes}m";
             else
                 return $"{timeSpan.Minutes}m {timeSpan.Seconds}s";
+        }
+        
+        /// <summary>
+        /// Calculate required neurons based on concept complexity
+        /// More complex concepts need more neurons for proper representation
+        /// </summary>
+        private int CalculateRequiredNeurons(string concept, Dictionary<string, double> features)
+        {
+            var baseNeurons = 3; // Minimum for any concept (increased from 2)
+            var complexityScore = 0.0;
+            
+            // 1. Feature-based complexity with weighted importance
+            complexityScore += features.Count * 0.8; // More features = more complexity
+            
+            // 2. High-value features need exponentially more representation
+            var highValueFeatures = features.Values.Count(v => v > 0.8);
+            var mediumValueFeatures = features.Values.Count(v => v > 0.6 && v <= 0.8);
+            complexityScore += highValueFeatures * 3.5; // Strong features
+            complexityScore += mediumValueFeatures * 1.8; // Medium features
+            
+            // 3. Semantic complexity based on feature patterns
+            var semanticComplexity = CalculateSemanticComplexity(concept, features);
+            complexityScore += semanticComplexity;
+            
+            // 4. Morphological complexity
+            var morphologicalComplexity = CalculateMorphologicalComplexity(concept);
+            complexityScore += morphologicalComplexity;
+            
+            // 5. Cognitive load based on abstraction level
+            var abstractionComplexity = CalculateAbstractionComplexity(features);
+            complexityScore += abstractionComplexity;
+            
+            // 6. Network integration complexity (how many connections this concept likely needs)
+            var networkComplexity = CalculateNetworkComplexity(concept, features);
+            complexityScore += networkComplexity;
+            
+            // Convert complexity score to neuron count with natural scaling
+            var neuronsNeeded = (int)Math.Ceiling(baseNeurons + (complexityScore * 1.2));
+            
+            // Ensure reasonable range with better distribution: 3-35 neurons per concept
+            return Math.Max(3, Math.Min(35, neuronsNeeded));
+        }
+
+        private double CalculateSemanticComplexity(string concept, Dictionary<string, double> features)
+        {
+            double complexity = 0.0;
+            
+            // Abstract concepts need more representational power
+            var abstractFeatures = new[] { "philosophical", "abstract", "emotional", "metaphor", "concept", 
+                                         "psychological_states", "cognitive_process", "epistemological" };
+            complexity += abstractFeatures.Count(af => features.ContainsKey(af)) * 4.5;
+            
+            // Complex semantic relations
+            var semanticRelations = new[] { "semantic_relation", "conceptual_mapping", "hierarchical", 
+                                          "paradigmatic", "syntagmatic", "metaphor" };
+            complexity += semanticRelations.Count(sr => features.ContainsKey(sr)) * 3.8;
+            
+            // Grammatical complexity
+            var grammarFeatures = new[] { "syntax", "morphology", "phonetic_pattern", "tense", "aspect", 
+                                        "modality", "subordination", "embedding" };
+            complexity += grammarFeatures.Count(gf => features.ContainsKey(gf)) * 3.2;
+            
+            // Discourse and pragmatic complexity
+            var discourseFeatures = new[] { "narrative", "argument", "coherence", "pragmatic", 
+                                          "speech_act", "conversational" };
+            complexity += discourseFeatures.Count(df => features.ContainsKey(df)) * 4.0;
+            
+            return complexity;
+        }
+
+        private double CalculateMorphologicalComplexity(string concept)
+        {
+            double complexity = 0.0;
+            
+            // Length-based complexity (non-linear scaling)
+            if (concept.Length > 15) complexity += 4.5;
+            else if (concept.Length > 10) complexity += 2.8;
+            else if (concept.Length > 6) complexity += 1.5;
+            
+            // Compound concepts need more neural resources
+            if (concept.Contains("_")) 
+                complexity += concept.Count(c => c == '_') * 2.5; // Multiple compounds
+            if (concept.Contains(" ")) 
+                complexity += concept.Count(c => c == ' ') * 2.8; // Multi-word expressions
+            
+            // Morphological patterns
+            var morphologicalMarkers = new[] { "ing", "ed", "er", "est", "ly", "tion", "sion", "ness", "ment", "ful" };
+            complexity += morphologicalMarkers.Count(marker => concept.Contains(marker)) * 1.8;
+            
+            return complexity;
+        }
+
+        private double CalculateAbstractionComplexity(Dictionary<string, double> features)
+        {
+            double complexity = 0.0;
+            
+            // Highly abstract concepts need more neurons for flexible representation
+            if (features.ContainsKey("abstract") && features["abstract"] > 0.8) complexity += 6.0;
+            if (features.ContainsKey("philosophical") && features["philosophical"] > 0.7) complexity += 5.5;
+            if (features.ContainsKey("theoretical") && features["theoretical"] > 0.7) complexity += 4.8;
+            
+            // Concrete concepts are generally simpler
+            if (features.ContainsKey("concrete") && features["concrete"] > 0.8) complexity -= 1.5;
+            
+            return complexity;
+        }
+
+        private double CalculateNetworkComplexity(string concept, Dictionary<string, double> features)
+        {
+            double complexity = 0.0;
+            
+            // Function words have many connections but simple individual representation
+            if (features.ContainsKey("function_word"))
+            {
+                complexity += 2.0; // Important for connectivity but individually simple
+            }
+            
+            // Content words need more individual representation
+            if (features.ContainsKey("content_word"))
+            {
+                complexity += 3.5; // Rich semantic content
+            }
+            
+            // Central concepts in semantic networks need more resources
+            var centralConcepts = new[] { "emotion", "time", "space", "person", "action", "state", "property" };
+            if (centralConcepts.Any(cc => concept.Contains(cc) || features.ContainsKey(cc)))
+                complexity += 4.2;
+            
+            // Meta-cognitive concepts need substantial representation
+            var metacognitive = new[] { "thinking", "knowing", "learning", "understanding", "memory" };
+            if (metacognitive.Any(mc => concept.Contains(mc) || features.ContainsKey(mc)))
+                complexity += 5.0;
+            
+            return complexity;
         }
     }
 
