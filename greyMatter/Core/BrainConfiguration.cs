@@ -164,6 +164,11 @@ namespace GreyMatter.Core
             Console.WriteLine("🧠 **BRAIN CONFIGURATION OPTIONS**");
             Console.WriteLine("==================================");
             Console.WriteLine();
+            Console.WriteLine("Demo Modes:");
+            Console.WriteLine("  --developmental-demo         Run developmental learning demonstration");
+            Console.WriteLine("  --emotional-demo             Run emotional intelligence demonstration");
+            Console.WriteLine("  --language-foundations       Run foundational language learning");
+            Console.WriteLine();
             Console.WriteLine("Storage Configuration:");
             Console.WriteLine("  --brain-data, -bd <path>     Brain data storage location");
             Console.WriteLine("  --training-data, -td <path>  Training data root directory");
@@ -174,6 +179,9 @@ namespace GreyMatter.Core
             Console.WriteLine("  --voice, -v                  Enable voice synthesis");
             Console.WriteLine();
             Console.WriteLine("Examples:");
+            Console.WriteLine("  # Run language foundations training");
+            Console.WriteLine("  dotnet run -- --language-foundations");
+            Console.WriteLine();
             Console.WriteLine("  # Use external drive for storage");
             Console.WriteLine("  dotnet run -- -wd /Volumes/MyDrive");
             Console.WriteLine();

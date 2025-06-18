@@ -13,8 +13,7 @@ namespace GreyMatter.Core
     /// </summary>
     public class BrainInJar : IBrainInterface
     {
-        private readonly BrainStorage _storage;
-        private readonly EnhancedBrainStorage _enhancedStorage;
+        private readonly EnhancedBrainStorage _storage; // Use only enhanced storage
         private readonly Dictionary<Guid, NeuronCluster> _loadedClusters = new();
         private readonly Dictionary<Guid, Synapse> _synapses = new();
         private readonly FeatureMapper _featureMapper = new();
@@ -39,8 +38,7 @@ namespace GreyMatter.Core
 
         public BrainInJar(string storagePath = "brain_data")
         {
-            _storage = new BrainStorage(storagePath);
-            _enhancedStorage = new EnhancedBrainStorage(storagePath);
+            _storage = new EnhancedBrainStorage(storagePath);
             _continuousProcessor = new ContinuousProcessor(this); // Initialize consciousness
         }
 
@@ -216,10 +214,9 @@ namespace GreyMatter.Core
             var featureMappingSnapshot = _featureMapper.CreateSnapshot();
             await _storage.SaveFeatureMappingsAsync(featureMappingSnapshot);
             
-            // Save loaded clusters with enhanced partitioning
+            // Save loaded clusters (single location, no duplication)
             foreach (var cluster in _loadedClusters.Values)
             {
-                await _enhancedStorage.SaveClusterWithPartitioningAsync(cluster, context);
                 await cluster.PersistAndUnloadAsync();
             }
             
@@ -245,7 +242,7 @@ namespace GreyMatter.Core
             int prunedSynapses = 0;
             
             // Run memory consolidation to reorganize partitions
-            await _enhancedStorage.ConsolidateMemoryPartitions();
+            await _storage.ConsolidateMemoryPartitions();
             
             // Unload old clusters
             var clustersToUnload = _loadedClusters.Values
@@ -304,7 +301,7 @@ namespace GreyMatter.Core
         public async Task<EnhancedBrainStats> GetEnhancedStatsAsync()
         {
             var baseStats = await GetStatsAsync();
-            var storageStats = await _enhancedStorage.GetEnhancedStorageStatsAsync();
+            var storageStats = await _storage.GetEnhancedStorageStatsAsync();
             
             return new EnhancedBrainStats
             {
@@ -486,7 +483,7 @@ namespace GreyMatter.Core
             var allClusters = new List<NeuronCluster>(_loadedClusters.Values);
             
             // Use enhanced storage to find conceptually similar clusters
-            var similarClusters = await _enhancedStorage.FindSimilarClusters(concepts, 0.5);
+            var similarClusters = await _storage.FindSimilarClusters(concepts, 0.5);
             
             // Load additional clusters if needed
             if (allClusters.Count < 3 && similarClusters.Any())
