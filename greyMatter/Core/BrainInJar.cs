@@ -668,130 +668,252 @@ namespace GreyMatter.Core
         
         /// <summary>
         /// Calculate required neurons based on concept complexity
-        /// Enhanced biologically-realistic allocation with computational efficiency scaling
+        /// EMERGENT, STOCHASTIC, BIOLOGICALLY-REALISTIC allocation
         /// 
         /// BIOLOGICAL BASIS:
-        /// - Simple concepts: 1,000-10,000 neurons (e.g., "apple", "red") 
-        /// - Complex concepts: 10,000-100,000+ neurons (e.g., "justice", "democracy")
-        /// - Multi-modal concepts: 50,000-500,000+ neurons across regions
+        /// - Neural competition for resources (scarce cortical real estate)
+        /// - Stochastic developmental processes (genetic + environmental noise)
+        /// - Non-linear emergence from neural interactions
+        /// - Context-dependent plasticity and adaptation
+        /// - Dynamic resource allocation based on current brain state
         /// 
         /// COMPUTATIONAL SCALING:
         /// - CPU speed advantage: ~2,000,000x faster than biological neurons
-        /// - Our efficiency target: 50-200x fewer neurons than biology
-        /// - Result: 20-2,000 neurons per concept (vs biological 1K-100K+)
-        /// - Still massive computational headroom for realistic modeling
+        /// - Target: 50-5,000 neurons per concept (vs biological 1K-500K+)
+        /// - Massive variability for emergence: ±200-500% variation allowed
+        /// - Resource competition: concepts compete for finite neural pools
         /// </summary>
         private int CalculateRequiredNeurons(string concept, Dictionary<string, double> features)
         {
-            var baseNeurons = 20; // Increased baseline for better biological realism
-            var complexityScore = 0.0;
+            // === BIOLOGICAL STOCHASTICITY & EMERGENCE ===
+            var random = new Random(concept.GetHashCode() + DateTime.Now.Millisecond); // Concept-specific but variable seed
             
-            // === BIOLOGICAL ENCODING FACTORS ===
+            // Base allocation with developmental variability (biological: ±50-200% variation)
+            var baseNeurons = 50 + random.Next(-20, 80); // 30-130 baseline with stochastic variation
+            var emergenceScore = 0.0;
             
-            // 1. Concept frequency (high-frequency = more efficient encoding)
-            var frequencyBonus = CalculateFrequencyBonus(concept);
-            complexityScore -= frequencyBonus; // Frequent words use fewer neurons
+            // === DYNAMIC NEURAL COMPETITION ===
+            // Concepts compete for finite neural resources (biological reality)
+            var totalNeuronsInUse = _loadedClusters.Values.Sum(c => c.NeuronCount);
+            var resourcePressure = Math.Max(0.5, Math.Min(3.0, totalNeuronsInUse / 10000.0)); // Pressure increases with usage
             
-            // 2. Feature dimensionality (biological: distributed representation)
-            var featureDimensionality = features.Count * 2.5; // Increased for realism
-            complexityScore += featureDimensionality;
+            // === STOCHASTIC COMPLEXITY FACTORS ===
             
-            // 3. Semantic richness (multi-cortical area involvement)
-            var semanticRichness = features.Values.Sum() * 3.0; // Enhanced
-            complexityScore += semanticRichness;
+            // 1. Frequency with biological noise (high-frequency ≠ uniform allocation)
+            var frequencyFactor = CalculateStochasticFrequency(concept, random);
+            emergenceScore -= frequencyFactor; // More efficient, but with variability
             
-            // 4. Abstraction level (abstract concepts = more cortical areas)
-            var abstractionLevel = CalculateAbstractionLevel(features);
-            complexityScore += abstractionLevel * 15.0; // Significantly more for abstracts
+            // 2. Feature interactions (non-linear, emergent)
+            var featureEmergence = CalculateFeatureEmergence(features, random);
+            emergenceScore += featureEmergence;
             
-            // 5. Processing complexity (syntactic, morphological, pragmatic)
-            var processingComplexity = CalculateProcessingComplexity(concept, features);
-            complexityScore += processingComplexity * 2.0; // Enhanced weight
+            // 3. Semantic network position (dynamic based on current brain state)
+            var networkPosition = CalculateNetworkPosition(concept, random);
+            emergenceScore += networkPosition;
             
-            // 6. Network connectivity (hubs need more representation)
-            var connectivityDemand = CalculateConnectivityDemand(concept, features);
-            complexityScore += connectivityDemand * 1.5;
+            // 4. Developmental timing effects (concepts learned at different "ages" vary)
+            var developmentalFactor = CalculateDevelopmentalVariation(concept, random);
+            emergenceScore += developmentalFactor;
             
-            // 7. Multi-modal demands (concepts with sensory/motor features)
-            var multiModalDemand = CalculateMultiModalDemand(features);
-            complexityScore += multiModalDemand * 12.0; // Multi-modal concepts expensive
+            // 5. Contextual plasticity (current brain state influences allocation)
+            var contextualDemand = CalculateContextualDemand(concept, features, random);
+            emergenceScore += contextualDemand;
             
-            // Convert to neuron count with enhanced biological scaling
-            var neuronsNeeded = (int)Math.Ceiling(baseNeurons + (complexityScore * 2.8));
+            // 6. Stochastic gene expression simulation (biological: identical twins differ)
+            var geneticVariation = (random.NextDouble() - 0.5) * 50.0; // ±25 neurons random variation
+            emergenceScore += geneticVariation;
             
-            // Enhanced realistic range: 20-2,000 neurons (vs biological 1K-100K+)
-            // Simple concepts: 20-100 neurons (50-500x efficiency vs biology)
-            // Complex concepts: 200-2,000 neurons (50-250x efficiency vs biology)
-            // Still computationally efficient with massive biological realism
-            return Math.Max(20, Math.Min(2000, neuronsNeeded));
+            // === NON-LINEAR EMERGENCE CALCULATION ===
+            // Biological: neural allocation follows power laws, not linear scaling
+            var powerLawExponent = 1.3 + (random.NextDouble() * 0.4); // 1.3-1.7 (biological range)
+            var emergentComplexity = Math.Pow(Math.Abs(emergenceScore), powerLawExponent) * Math.Sign(emergenceScore);
+            
+            // Apply resource pressure (scarcity breeds efficiency and competition)
+            var adjustedComplexity = emergentComplexity / resourcePressure;
+            
+            // === FINAL ALLOCATION WITH MASSIVE VARIABILITY ===
+            var neuronsNeeded = (int)Math.Ceiling(baseNeurons + adjustedComplexity);
+            
+            // Biologically realistic range: 50-5,000 neurons (vs biological 1K-500K+)
+            // MASSIVE VARIATION: ±200-500% possible (essential for emergence)
+            // Simple concepts: 50-800 neurons (huge variation)
+            // Complex concepts: 200-5,000 neurons (massive variation)
+            // Competition effects: scarce resources create adaptive pressure
+            return Math.Max(50, Math.Min(5000, neuronsNeeded));
         }
 
-        private double CalculateFrequencyBonus(string concept)
+        /// <summary>
+        /// STOCHASTIC FREQUENCY CALCULATION
+        /// Biological: Even high-frequency words show massive individual variation
+        /// </summary>
+        private double CalculateStochasticFrequency(string concept, Random random)
         {
-            // Enhanced frequency-based neural efficiency (biological: frequent words have denser, more efficient encoding)
+            // Base frequency categories with biological variation
+            var tier1Words = new[] { "the", "of", "and", "a", "to", "in", "is", "you", "that", "it", "he", "was", "for", "on", "are", "as", "with", "his", "they", "I", "at", "be", "this", "have", "from", "or", "one", "had", "by", "word", "but", "not", "what", "all", "were", "we", "when", "your", "can", "said", "there", "each", "which", "she", "do", "how", "their", "if", "will", "up", "other", "about", "out", "many", "then", "them", "these", "so", "some", "her", "would", "make", "like", "into", "him", "time", "has", "two", "more", "go", "no", "way", "could", "my", "than", "first", "water", "been", "call", "who", "its", "now", "find", "long", "down", "day", "did", "get", "come", "made", "may", "part" };
             
-            // Tier 1: Ultra-high frequency (top 100 words) - maximum efficiency
-            var tier1Words = new[] { "the", "of", "and", "a", "to", "in", "is", "you", "that", "it", "he", "was", "for", "on", "are", "as", "with", "his", "they", "I", "at", "be", "this", "have", "from", "or", "one", "had", "by", "word", "but", "not", "what", "all", "were", "we", "when", "your", "can", "said", "there", "each", "which", "she", "do", "how", "their", "if", "will", "up", "other", "about", "out", "many", "then", "them", "these", "so", "some", "her", "would", "make", "like", "into", "him", "time", "has", "two", "more", "go", "no", "way", "could", "my", "than", "first", "water", "been", "call", "who", "its", "now", "find", "long", "down", "day", "did", "get", "come", "made", "may", "part", "over", "new", "sound", "take", "only", "little", "work", "know", "place", "year", "live", "me", "back", "give", "most", "very", "after", "thing", "our", "just", "name", "good", "sentence", "man", "think", "say", "great", "where", "help", "through", "much", "before", "line", "right", "too", "mean", "old", "any", "same", "tell", "boy", "follow", "came", "want", "show", "also", "around", "form", "three", "small", "set", "put", "end", "why", "again", "turn", "here", "off", "went", "well", "need", "should", "home", "big", "give", "air", "read", "hand", "high", "such", "because", "turn", "here", "off", "went", "well", "need", "should", "home", "big", "give", "air", "read", "hand", "high", "such", "because" };
+            var baseEfficiency = 0.0;
+            if (tier1Words.Contains(concept.ToLowerInvariant())) 
+                baseEfficiency = 15.0; // High efficiency baseline
+            else if (concept.Length <= 6) 
+                baseEfficiency = 8.0;  // Medium efficiency
+            else if (concept.Length <= 4) 
+                baseEfficiency = 5.0;  // Some efficiency
             
-            // Tier 2: High frequency (top 1000 words) - significant efficiency
-            var tier2Bonus = concept.Length <= 6 && char.IsLower(concept[0]); // Common short words
+            // BIOLOGICAL STOCHASTICITY: ±50-200% variation even for identical concepts
+            var variationFactor = 0.5 + (random.NextDouble() * 1.5); // 0.5x to 2.0x multiplier
+            var noiseAddition = (random.NextDouble() - 0.5) * 10.0; // ±5 neurons noise
             
-            if (tier1Words.Contains(concept.ToLowerInvariant())) return 8.0; // Maximum efficiency
-            if (tier2Bonus) return 4.0; // High efficiency
-            if (concept.Length <= 4) return 2.0; // Short words generally frequent
-            
-            return 0.0; // No frequency bonus
+            return (baseEfficiency * variationFactor) + noiseAddition;
         }
 
-        private double CalculateAbstractionLevel(Dictionary<string, double> features)
+        /// <summary>
+        /// EMERGENT FEATURE INTERACTIONS
+        /// Biological: Features interact non-linearly, creating emergent complexity
+        /// </summary>
+        private double CalculateFeatureEmergence(Dictionary<string, double> features, Random random)
         {
-            var abstractFeatures = new[] { "philosophical", "abstract", "metaphysical", "conceptual", "theoretical", "metaphor", "cognitive_process", "mental_state", "emotional", "spiritual", "existential" };
-            var concreteFeatures = new[] { "concrete", "physical", "tangible", "visible", "material", "spatial", "sensory" };
+            if (features.Count == 0) return random.NextDouble() * 20.0; // Base variability
             
-            var abstractScore = abstractFeatures.Sum(af => features.ContainsKey(af) ? features[af] : 0.0);
-            var concreteScore = concreteFeatures.Sum(cf => features.ContainsKey(cf) ? features[cf] : 0.0);
+            var emergence = 0.0;
             
-            // Abstract concepts need more neural representation (biology: involves more cortical areas)
-            return Math.Max(0, abstractScore - concreteScore * 0.5);
+            // 1. Non-linear feature interactions (biological: network effects)
+            var featureProduct = 1.0;
+            var featureSum = 0.0;
+            foreach (var feature in features.Values.Take(8)) // Limit to prevent explosion
+            {
+                featureProduct *= (1.0 + feature * 0.1); // Multiplicative interactions
+                featureSum += feature;
+            }
+            
+            // Emergent complexity from feature interactions
+            emergence += Math.Log(featureProduct) * 25.0; // Log scaling for realism
+            emergence += featureSum * (2.0 + random.NextDouble() * 3.0); // Stochastic linear component
+            
+            // 2. Feature conflict/harmony effects
+            var featureConflicts = CalculateFeatureConflicts(features, random);
+            emergence += featureConflicts;
+            
+            // 3. Dimensional curse effects (high-dimensional spaces are weird)
+            if (features.Count > 10)
+                emergence += (features.Count - 10) * random.NextDouble() * 8.0;
+            
+            // 4. Stochastic resonance effects
+            emergence += (random.NextDouble() - 0.5) * 40.0; // ±20 neurons random emergence
+            
+            return emergence;
         }
 
-        private double CalculateProcessingComplexity(string concept, Dictionary<string, double> features)
+        /// <summary>
+        /// DYNAMIC NETWORK POSITION
+        /// Biological: Position in semantic network affects resource needs
+        /// </summary>
+        private double CalculateNetworkPosition(string concept, Random random)
         {
-            double complexity = 0.0;
+            var position = 0.0;
             
-            // Morphological complexity (longer words, affixes)
-            if (concept.Length > 12) complexity += 2.0;
-            if (concept.Length > 8) complexity += 1.0;
-            if (concept.Contains("_")) complexity += 1.5; // Compound concepts
+            // 1. Hub vs. peripheral concepts (biological: hubs need more resources)
+            var hubness = concept.Length < 8 ? random.NextDouble() * 30.0 : random.NextDouble() * 15.0;
+            position += hubness;
             
-            // Linguistic complexity markers
-            var complexFeatures = new[] { "academic", "scientific", "technical", "formal", "rare", "advanced", "sophisticated", "complex" };
-            complexity += complexFeatures.Count(cf => features.ContainsKey(cf)) * 1.5;
+            // 2. Network density around this concept
+            var localDensity = random.NextDouble() * 25.0; // Simulated local connectivity
+            position += localDensity;
             
-            // Pragmatic and discourse complexity
-            var pragmaticFeatures = new[] { "pragmatic", "discourse", "speech_act", "politeness", "implicature", "coherence" };
-            complexity += pragmaticFeatures.Count(pf => features.ContainsKey(pf)) * 2.0;
+            // 3. Cross-domain bridging (concepts that bridge domains need more resources)
+            var bridging = random.NextDouble() < 0.3 ? random.NextDouble() * 40.0 : 0.0;
+            position += bridging;
             
-            return complexity;
+            // 4. Dynamic network evolution effects
+            position += (random.NextDouble() - 0.5) * 30.0; // Network is constantly changing
+            
+            return position;
         }
 
-        private double CalculateConnectivityDemand(string concept, Dictionary<string, double> features)
+        /// <summary>
+        /// DEVELOPMENTAL VARIATION
+        /// Biological: When concepts are learned affects their neural representation
+        /// </summary>
+        private double CalculateDevelopmentalVariation(string concept, Random random)
         {
-            double connectivity = 0.0;
+            var variation = 0.0;
             
-            // Semantic network hubs need more connections
-            var hubFeatures = new[] { "semantic_relation", "category", "hierarchical", "network", "connection", "relationship", "association" };
-            connectivity += hubFeatures.Count(hf => features.ContainsKey(hf)) * 2.5;
+            // 1. Critical period effects (earlier = more plastic, variable allocation)
+            var earlyLearning = concept.Length <= 6 && !concept.Contains("_");
+            if (earlyLearning)
+                variation += random.NextDouble() * 60.0; // High plasticity, high variation
+            else
+                variation += random.NextDouble() * 25.0; // Later learning, more constrained
             
-            // Emotional and social concepts have high connectivity
-            var socialFeatures = new[] { "social", "emotional", "interpersonal", "cultural", "cooperative", "empathy" };
-            connectivity += socialFeatures.Count(sf => features.ContainsKey(sf)) * 1.8;
+            // 2. Maturational constraints (simulated "age" effects)
+            var maturationNoise = (random.NextDouble() - 0.5) * 35.0;
+            variation += maturationNoise;
             
-            // Core cognitive concepts connect to many others
-            var coreFeatures = new[] { "fundamental", "essential", "basic", "learning", "memory", "knowledge" };
-            connectivity += coreFeatures.Count(cf => features.ContainsKey(cf)) * 2.2;
+            // 3. Experience-dependent plasticity
+            var experienceEffect = random.NextDouble() * 20.0;
+            variation += experienceEffect;
             
-            return connectivity;
+            return variation;
+        }
+
+        /// <summary>
+        /// CONTEXTUAL DEMAND
+        /// Biological: Current brain state influences resource allocation
+        /// </summary>
+        private double CalculateContextualDemand(string concept, Dictionary<string, double> features, Random random)
+        {
+            var demand = 0.0;
+            
+            // 1. Current cognitive load (simulated)
+            var cognitiveLoad = _loadedClusters.Count > 100 ? random.NextDouble() * 30.0 : random.NextDouble() * 15.0;
+            demand += cognitiveLoad;
+            
+            // 2. Attention state simulation
+            var attentionFocus = random.NextDouble() < 0.4 ? random.NextDouble() * 25.0 : random.NextDouble() * 10.0;
+            demand += attentionFocus;
+            
+            // 3. Emotional/motivational state effects
+            var emotionalContext = features.ContainsKey("emotional") ? random.NextDouble() * 35.0 : random.NextDouble() * 10.0;
+            demand += emotionalContext;
+            
+            // 4. Working memory pressure
+            var workingMemoryPressure = (random.NextDouble() - 0.5) * 20.0;
+            demand += workingMemoryPressure;
+            
+            return demand;
+        }
+
+        /// <summary>
+        /// FEATURE CONFLICTS AND HARMONIES
+        /// Biological: Conflicting features require more neural arbitration
+        /// </summary>
+        private double CalculateFeatureConflicts(Dictionary<string, double> features, Random random)
+        {
+            var conflicts = 0.0;
+            
+            // Known semantic conflicts (biology: require more neural arbitration)
+            var conflictPairs = new[]
+            {
+                ("abstract", "concrete"),
+                ("positive", "negative"), 
+                ("simple", "complex"),
+                ("rational", "emotional"),
+                ("individual", "collective"),
+                ("static", "dynamic")
+            };
+            
+            foreach (var (feat1, feat2) in conflictPairs)
+            {
+                if (features.ContainsKey(feat1) && features.ContainsKey(feat2))
+                {
+                    var conflictStrength = features[feat1] * features[feat2];
+                    conflicts += conflictStrength * random.NextDouble() * 15.0; // Conflicts need arbitration
+                }
+            }
+            
+            // Random semantic tensions
+            conflicts += random.NextDouble() * 25.0;
+            
+            return conflicts;
         }
 
         private double CalculateMultiModalDemand(Dictionary<string, double> features)
