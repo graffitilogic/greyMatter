@@ -728,10 +728,19 @@ namespace GreyMatter.Core
 
         private double CalculateFrequencyBonus(string concept)
         {
-            // High-frequency words get more efficient neural encoding (biological reality)
-            var highFrequencyWords = new[] { "the", "a", "is", "to", "and", "of", "in", "you", "that", "it", "he", "was", "for", "on", "are", "as", "with", "his", "they", "I", "at", "be", "this", "have", "from", "or", "one", "had", "by", "word", "but", "not", "what", "all", "were", "we", "when", "your", "can", "said", "there", "each", "which", "she", "do", "how", "their", "if", "will", "up", "other", "about", "out", "many", "then", "them", "these", "so", "some", "her", "would", "make", "like", "into", "him", "time", "has", "two", "more", "go", "no", "way", "could", "my", "than", "first", "water", "been", "call", "who", "its", "now", "find", "long", "down", "day", "did", "get", "come", "made", "may", "part" };
+            // Enhanced frequency-based neural efficiency (biological: frequent words have denser, more efficient encoding)
             
-            return highFrequencyWords.Contains(concept.ToLowerInvariant()) ? 3.0 : 0.0;
+            // Tier 1: Ultra-high frequency (top 100 words) - maximum efficiency
+            var tier1Words = new[] { "the", "of", "and", "a", "to", "in", "is", "you", "that", "it", "he", "was", "for", "on", "are", "as", "with", "his", "they", "I", "at", "be", "this", "have", "from", "or", "one", "had", "by", "word", "but", "not", "what", "all", "were", "we", "when", "your", "can", "said", "there", "each", "which", "she", "do", "how", "their", "if", "will", "up", "other", "about", "out", "many", "then", "them", "these", "so", "some", "her", "would", "make", "like", "into", "him", "time", "has", "two", "more", "go", "no", "way", "could", "my", "than", "first", "water", "been", "call", "who", "its", "now", "find", "long", "down", "day", "did", "get", "come", "made", "may", "part", "over", "new", "sound", "take", "only", "little", "work", "know", "place", "year", "live", "me", "back", "give", "most", "very", "after", "thing", "our", "just", "name", "good", "sentence", "man", "think", "say", "great", "where", "help", "through", "much", "before", "line", "right", "too", "mean", "old", "any", "same", "tell", "boy", "follow", "came", "want", "show", "also", "around", "form", "three", "small", "set", "put", "end", "why", "again", "turn", "here", "off", "went", "well", "need", "should", "home", "big", "give", "air", "read", "hand", "high", "such", "because", "turn", "here", "off", "went", "well", "need", "should", "home", "big", "give", "air", "read", "hand", "high", "such", "because" };
+            
+            // Tier 2: High frequency (top 1000 words) - significant efficiency
+            var tier2Bonus = concept.Length <= 6 && char.IsLower(concept[0]); // Common short words
+            
+            if (tier1Words.Contains(concept.ToLowerInvariant())) return 8.0; // Maximum efficiency
+            if (tier2Bonus) return 4.0; // High efficiency
+            if (concept.Length <= 4) return 2.0; // Short words generally frequent
+            
+            return 0.0; // No frequency bonus
         }
 
         private double CalculateAbstractionLevel(Dictionary<string, double> features)
@@ -783,6 +792,37 @@ namespace GreyMatter.Core
             connectivity += coreFeatures.Count(cf => features.ContainsKey(cf)) * 2.2;
             
             return connectivity;
+        }
+
+        private double CalculateMultiModalDemand(Dictionary<string, double> features)
+        {
+            double multiModalScore = 0.0;
+            
+            // Visual cortex involvement (objects, colors, spatial)
+            var visualFeatures = new[] { "visual", "color", "shape", "spatial", "image", "bright", "dark", "visible", "appearance", "size", "form" };
+            multiModalScore += visualFeatures.Count(vf => features.ContainsKey(vf)) * 2.0;
+            
+            // Auditory cortex involvement (sounds, music, speech)
+            var auditoryFeatures = new[] { "sound", "music", "loud", "quiet", "noise", "voice", "audio", "acoustic", "hearing", "phonetic" };
+            multiModalScore += auditoryFeatures.Count(af => features.ContainsKey(af)) * 2.0;
+            
+            // Motor cortex involvement (movement, action, manipulation)
+            var motorFeatures = new[] { "movement", "action", "motor", "manipulation", "gesture", "physical_action", "body_part", "motion", "kinesthetic" };
+            multiModalScore += motorFeatures.Count(mf => features.ContainsKey(mf)) * 2.5;
+            
+            // Somatosensory involvement (touch, texture, temperature)
+            var somatosensoryFeatures = new[] { "touch", "texture", "temperature", "tactile", "soft", "hard", "smooth", "rough", "pressure", "sensation" };
+            multiModalScore += somatosensoryFeatures.Count(sf => features.ContainsKey(sf)) * 1.8;
+            
+            // Olfactory/gustatory involvement (smell, taste)
+            var chemicalFeatures = new[] { "smell", "taste", "flavor", "odor", "scent", "sweet", "bitter", "sour", "salty", "aromatic" };
+            multiModalScore += chemicalFeatures.Count(cf => features.ContainsKey(cf)) * 1.5;
+            
+            // Cross-modal integration (concepts requiring multiple sensory modalities)
+            var crossModalFeatures = new[] { "experience", "environment", "interaction", "perception", "sensation", "multi_sensory" };
+            multiModalScore += crossModalFeatures.Count(cmf => features.ContainsKey(cmf)) * 3.0;
+            
+            return multiModalScore;
         }
     }
 
