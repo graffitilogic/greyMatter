@@ -60,8 +60,8 @@ namespace GreyMatter.Storage
             // Update partition metadata
             await UpdatePartitionMetadata(clusterPartition, cluster);
             
-            // Also save to legacy location for backward compatibility
-            await SaveClusterAsync(cluster.ConceptDomain + "_" + cluster.ClusterId.ToString("N") + ".cluster", snapshots);
+            // NOTE: Removed legacy dual-save to prevent file duplication
+            // Enhanced storage now handles all persistence needs
         }
 
         /// <summary>
@@ -344,6 +344,17 @@ namespace GreyMatter.Storage
                 WriteIndented = false,
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             };
+        }
+
+        /// <summary>
+        /// Hide base implementation to prevent dual saving
+        /// Use only single storage location in hierarchical structure
+        /// </summary>
+        public new async Task SaveClusterAsync(string identifier, List<NeuronSnapshot> neurons)
+        {
+            // Use base storage for simple saves (no hierarchical partitioning)
+            // This prevents duplication while maintaining compatibility
+            await base.SaveClusterAsync(identifier, neurons);
         }
     }
 
