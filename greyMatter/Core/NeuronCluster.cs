@@ -410,6 +410,16 @@ namespace GreyMatter.Core
             if (!_isLoaded || _neurons.Count == 0) return 0.0;
             return _neurons.Values.Where(n => n.HasPendingStm).Sum(n => n.StmSalience);
         }
+
+        /// <summary>
+        /// Mark cluster membership/metadata as persisted (clears dirty flag).
+        /// Use when external storage handles persistence (e.g., membership-only saves).
+        /// </summary>
+        public void MarkMembershipPersisted()
+        {
+            _isDirty = false;
+            LastModified = DateTime.UtcNow;
+        }
     }
 
     /// <summary>

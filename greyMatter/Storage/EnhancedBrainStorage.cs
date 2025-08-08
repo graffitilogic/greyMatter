@@ -51,7 +51,7 @@ namespace GreyMatter.Storage
                 await sem.WaitAsync();
                 tasks.Add(Task.Run(async () =>
                 {
-                    try { await SaveClusterWithPartitioningAsync(cluster, context); }
+                    try { await SaveClusterMembershipOnlyAsync(cluster, context); }
                     finally { sem.Release(); }
                 }));
             }
@@ -74,7 +74,7 @@ namespace GreyMatter.Storage
         }
 
         /// <summary>
-        /// Save cluster using neurobiologically-inspired partitioning
+        /// Save cluster using neurobiologically-inspired partitioning (full save: membership + bank upsert)
         /// </summary>
         public async Task SaveClusterWithPartitioningAsync(NeuronCluster cluster, BrainContext context)
         {
@@ -110,6 +110,86 @@ namespace GreyMatter.Storage
             
             // Update partition metadata
             await UpdatePartitionMetadata(clusterPartition, cluster);
+        }
+
+        /// <summary>
+        /// Save only the cluster membership and metadata (no neuron bank updates).
+        /// </summary>
+        public async Task SaveClusterMembershipOnlyAsync(NeuronCluster cluster, BrainContext context)
+        {
+            var clusterPartition = await AnalyzeClusterPartition(cluster, context);
+            var hierarchicalPath = Path.Combine(_hierarchicalBasePath, clusterPartition.FullPath);
+            Directory.CreateDirectory(hierarchicalPath);
+
+            var clusterFileName = $"{cluster.ConceptDomain}_{cluster.ClusterId:N}.cluster";
+            var fullPath = Path.Combine(hierarchicalPath, clusterFileName);
+
+            var neurons = await cluster.GetNeuronsAsync();
+            var neuronIds = neurons.Keys.ToList();
+
+            var clusterData = new PartitionedClusterData
+            {
+                NeuronIds = neuronIds,
+                Neurons = new List<NeuronSnapshot>(),
+                PartitionPath = clusterPartition,
+                Metadata = CreateClusterMetadata(cluster, clusterPartition),
+                SavedAt = DateTime.UtcNow
+            };
+
+            await WriteJsonFastAsync(fullPath, clusterData, CompressClusters);
+            await UpdatePartitionMetadata(clusterPartition, cluster);
+
+            // Clear dirty flag since membership/metadata saved
+            cluster.MarkMembershipPersisted();
+        }
+
+        /// <summary>
+        /// Save only neuron bank updates for a cluster (changed neurons only, no membership write).
+        /// </summary>
+        public async Task SaveClusterBankOnlyAsync(NeuronCluster cluster, IEnumerable<HybridNeuron> changedNeurons, BrainContext context)
+        {
+            var clusterPartition = await AnalyzeClusterPartition(cluster, context);
+            // Upsert ONLY the changed neurons to reduce write amplification
+            await _globalNeuronStore.SaveOrUpdateNeuronsAsync(clusterPartition, changedNeurons);
+        }
+
+        /// <summary>
+        /// Batch-update neuron banks by grouping changes per partition to minimize rewrites.
+        /// </summary>
+        public async Task SaveNeuronBanksInBatchesAsync(IEnumerable<(NeuronCluster Cluster, IEnumerable<HybridNeuron> Changed)> changes, BrainContext context)
+        {
+            // Group by partition path string
+            var byPartition = new Dictionary<string, (PartitionPath Path, List<HybridNeuron> Neurons)>();
+            foreach (var (cluster, changed) in changes)
+            {
+                var partition = await AnalyzeClusterPartition(cluster, context);
+                var key = partition.FullPath;
+                if (!byPartition.TryGetValue(key, out var entry))
+                {
+                    entry = (partition, new List<HybridNeuron>());
+                    byPartition[key] = entry;
+                }
+                // Deduplicate by neuron Id within the partition batch
+                var existing = entry.Neurons.ToDictionary(n => n.Id, n => n);
+                foreach (var n in changed)
+                {
+                    existing[n.Id] = n;
+                }
+                byPartition[key] = (entry.Path, existing.Values.ToList());
+            }
+
+            var sem = new SemaphoreSlim(MaxParallelSaves);
+            var tasks = new List<Task>();
+            foreach (var kvp in byPartition.Values)
+            {
+                await sem.WaitAsync();
+                tasks.Add(Task.Run(async () =>
+                {
+                    try { await _globalNeuronStore.SaveOrUpdateNeuronsAsync(kvp.Path, kvp.Neurons); }
+                    finally { sem.Release(); }
+                }));
+            }
+            await Task.WhenAll(tasks);
         }
 
         private async Task WriteJsonFastAsync<T>(string fullPath, T obj, bool compress)
@@ -454,6 +534,49 @@ namespace GreyMatter.Storage
             // Use base storage for simple saves (no hierarchical partitioning)
             // This prevents duplication while maintaining compatibility
             await base.SaveClusterAsync(identifier, neurons);
+        }
+
+        /// <summary>
+        /// Inspect a cluster's membership vs hydrated neuron count from the bank.
+        /// Returns (membershipCount, hydratedCount). If file missing, returns (0,0).
+        /// </summary>
+        public async Task<(int membershipCount, int hydratedCount)> InspectClusterMembershipAsync(NeuronCluster cluster, BrainContext context)
+        {
+            // Try find partition from metadata first
+            PartitionPath partition;
+            if (_partitionMetadata.TryGetValue(cluster.ClusterId.ToString(), out var meta))
+            {
+                partition = meta.PartitionPath;
+            }
+            else
+            {
+                partition = await AnalyzeClusterPartition(cluster, context);
+            }
+
+            var dir = Path.Combine(_hierarchicalBasePath, partition.FullPath);
+            var baseName = $"{cluster.ConceptDomain}_{cluster.ClusterId:N}.cluster";
+            var pathJson = Path.Combine(dir, baseName);
+            var pathGz = pathJson + ".gz";
+
+            PartitionedClusterData? data = null;
+            if (File.Exists(pathGz))
+            {
+                await using var fs = File.OpenRead(pathGz);
+                await using var gz = new GZipStream(fs, CompressionMode.Decompress);
+                data = await JsonSerializer.DeserializeAsync<PartitionedClusterData>(gz, GetJsonOptions());
+            }
+            else if (File.Exists(pathJson))
+            {
+                var json = await File.ReadAllTextAsync(pathJson);
+                data = JsonSerializer.Deserialize<PartitionedClusterData>(json, GetJsonOptions());
+            }
+
+            if (data == null)
+                return (0, 0);
+
+            var ids = data.NeuronIds ?? new List<Guid>();
+            var hydrated = await _globalNeuronStore.LoadNeuronsAsync(partition, ids);
+            return (ids.Count, hydrated.Count);
         }
     }
 

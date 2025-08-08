@@ -39,6 +39,39 @@ namespace GreyMatter.Core
 
         private BrainConfiguration? _configForLogging; // to access verbosity during save
 
+        // Reporting config and state
+        private int _reportingInterval = 1000; // items per report block
+        private double _reportingSampleRate = 0.02; // 2% of items for detailed logs
+        private readonly Random _reportRand = new Random();
+        private long _learnEvents = 0;
+        private int _blockConcepts = 0;
+        private int _blockNeurons = 0;
+        private readonly HashSet<Guid> _blockClusters = new();
+
+        private bool ShouldSampleLog() => _reportRand.NextDouble() <= _reportingSampleRate;
+        private void ReportSampler(string concept, int neuronsUsed, Guid clusterId)
+        {
+            if (ShouldSampleLog())
+            {
+                Console.WriteLine($"🎓 Learning concept: {concept}");
+                Console.WriteLine($"✅ Learned '{concept}' using {neuronsUsed} neurons in cluster {clusterId:N}");
+            }
+        }
+        private void AccumulateReportBlock(string concept, int neuronsUsed, Guid clusterId)
+        {
+            _learnEvents++;
+            _blockConcepts++;
+            _blockNeurons += neuronsUsed;
+            _blockClusters.Add(clusterId);
+            if (_learnEvents % Math.Max(1, _reportingInterval) == 0)
+            {
+                Console.WriteLine($"📊 Block: {_blockConcepts} concepts, {_blockNeurons} neurons, {_blockClusters.Count} clusters");
+                _blockConcepts = 0;
+                _blockNeurons = 0;
+                _blockClusters.Clear();
+            }
+        }
+
         public BrainInJar(string storagePath = "brain_data")
         {
             _storage = new EnhancedBrainStorage(storagePath);
@@ -79,8 +112,7 @@ namespace GreyMatter.Core
         /// </summary>
         public async Task<LearningResult> LearnConceptAsync(string concept, Dictionary<string, double> features)
         {
-            Console.WriteLine($"🎓 Learning concept: {concept}");
-            
+            // Reduce IO: sample logs instead of always writing
             var result = new LearningResult { Concept = concept };
             
             // Find or create relevant cluster
@@ -113,8 +145,10 @@ namespace GreyMatter.Core
             
             result.Success = true;
             result.NeuronsInvolved = conceptNeurons.Count;
-            
-            Console.WriteLine($"✅ Learned '{concept}' using {result.NeuronsInvolved} neurons in cluster {result.ClusterId:N}");
+
+            // Reporting sampler and block summary
+            ReportSampler(concept, result.NeuronsInvolved, result.ClusterId);
+            AccumulateReportBlock(concept, result.NeuronsInvolved, result.ClusterId);
             
             return result;
         }
@@ -124,7 +158,7 @@ namespace GreyMatter.Core
         /// </summary>
         public async Task<ProcessingResult> ProcessInputAsync(string input, Dictionary<string, double> features)
         {
-            Console.WriteLine($"🤔 Processing input: {input}");
+            if (ShouldSampleLog()) Console.WriteLine($"🤔 Processing input: {input}");
             
             var result = new ProcessingResult { Input = input };
             var activatedClusters = new List<Guid>();
@@ -174,7 +208,7 @@ namespace GreyMatter.Core
                 }
             }
             
-            Console.WriteLine($"💭 Generated response with confidence {result.Confidence:F2}");
+            if (ShouldSampleLog()) Console.WriteLine($"💭 Generated response with confidence {result.Confidence:F2}");
             
             return result;
         }
@@ -248,23 +282,17 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved feature mappings in {sw.Elapsed.TotalSeconds:F2}s");
             
-            // Persist changed neurons per cluster partition via EnhancedBrainStorage path
+            // Persist changed neurons to neuron banks ONLY (batched by partition)
             sw.Restart();
-            int neuronBatches = 0, neuronsPersisted = 0;
-            foreach (var kvp in changedByCluster)
-            {
-                var cluster = _loadedClusters[kvp.Key];
-                // Route through storage to place in correct partition bank
-                await _storage.SaveClusterWithPartitioningAsync(cluster, context); // persists bank + membership
-                neuronBatches++;
-                neuronsPersisted += kvp.Value.Count;
-            }
+            var changeTuples = changedByCluster.Select(kvp => (_loadedClusters[kvp.Key], kvp.Value.AsEnumerable()));
+            await _storage.SaveNeuronBanksInBatchesAsync(changeTuples, context);
+            var neuronsPersisted = changedByCluster.Sum(kvp => kvp.Value.Count);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   💾 Persisted neuron banks for {neuronBatches} clusters; ~{neuronsPersisted} neurons updated in {sw.Elapsed.TotalSeconds:F2}s");
-            
-            // Filter clusters to only those with unsaved membership changes (approx: those we touched)
+                Console.WriteLine($"   💾 Persisted neuron banks in batches; ~{neuronsPersisted} neurons updated in {sw.Elapsed.TotalSeconds:F2}s");
+
+            // Determine clusters requiring membership/metadata save
             var dirtyClusters = _loadedClusters.Values
-                .Where(c => changedByCluster.ContainsKey(c.ClusterId) || c.HasUnsavedChanges)
+                .Where(c => c.HasUnsavedChanges)
                 .Distinct()
                 .ToList();
             if ((_configForLogging?.Verbosity ?? 0) > 0)
@@ -293,6 +321,12 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Total save time {swTotal.Elapsed.TotalSeconds:F2}s");
             Console.WriteLine("✅ Brain state saved with hierarchical partitioning");
+
+            // Optional quick integrity sampler when verbose
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+            {
+                try { await RunIntegritySamplerAsync(5); } catch { /* best effort */ }
+            }
         }
 
         /// <summary>
@@ -1011,6 +1045,25 @@ namespace GreyMatter.Core
             _configForLogging = config;
             _storage.MaxParallelSaves = config.MaxParallelSaves;
             _storage.CompressClusters = config.CompressClusters;
+            // Optionally allow overrides via config env vars later
+        }
+
+        /// <summary>
+        /// Sample a few clusters to validate membership vs bank hydration.
+        /// </summary>
+        public async Task RunIntegritySamplerAsync(int sampleClusters = 5)
+        {
+            var sw = Stopwatch.StartNew();
+            var clusters = _loadedClusters.Values.OrderBy(_ => _reportRand.Next()).Take(Math.Max(1, sampleClusters)).ToList();
+            int ok = 0, bad = 0;
+            foreach (var c in clusters)
+            {
+                var neurons = await c.GetNeuronsAsync();
+                var ctx = new BrainContext { AllNeurons = neurons, AnalysisTime = DateTime.UtcNow };
+                var (m, h) = await _storage.InspectClusterMembershipAsync(c, ctx);
+                if (m == h) ok++; else bad++;
+            }
+            Console.WriteLine($"🔎 Integrity sampler: OK={ok}, Mismatch={bad} in {sw.Elapsed.TotalSeconds:F2}s");
         }
     }
 
