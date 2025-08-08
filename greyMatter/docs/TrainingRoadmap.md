@@ -61,10 +61,10 @@ Purpose: Document a realistic path from current prototype to a measurable "toddl
 - Track concept mastery via `GetConceptMasteryLevelAsync`.
 
 ## Deliverables (near-term)
-- [ ] Update README to reflect prototype status and roadmap link.
-- [ ] Extend setup script with dataset downloads (Gutenberg/Tatoeba/WordNet/ConceptNet).
-- [ ] Implement `CurriculumCompiler` + `EnvironmentalLearner` skeletons.
-- [ ] Implement `EvalHarness` with basic cloze testing.
+- [x] Update README to reflect prototype status and roadmap link.
+- [x] Extend setup script with dataset downloads (Gutenberg/Tatoeba/WordNet/ConceptNet).
+- [x] Implement `CurriculumCompiler` + `EnvironmentalLearner` skeletons.
+- [x] Implement `EvalHarness` with basic cloze testing.
 - [ ] Add attribution/LICENSING notes in `docs/Datasets.md`.
 
 ## Risks & Mitigations
@@ -73,5 +73,5 @@ Purpose: Document a realistic path from current prototype to a measurable "toddl
 - Over-claiming → keep README conservative, track metrics in `docs/Results.md`.
 
 ## Notes
-- CHILDES/TalkBank is excellent but has CC BY-NC-SA; use for research, don’t redistribute.
+- CHILDES/TalkBank is excellent but has CC BY-NC-SA; use locally for research/personal learning but don’t redistribute in this repo.
 - Optional: Later add a tiny local Q&A model to generate augmentations and checks.
