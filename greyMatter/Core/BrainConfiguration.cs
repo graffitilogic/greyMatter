@@ -233,6 +233,7 @@ namespace GreyMatter.Core
             Console.WriteLine("  --emotional-demo             Run emotional intelligence demonstration");
             Console.WriteLine("  --language-foundations       Run foundational language learning");
             Console.WriteLine("  --comprehensive-language     Run comprehensive language training (2000+ words)");
+            Console.WriteLine("  --preschool-train            Compile a small curriculum, learn, and run a quick cloze baseline");
             Console.WriteLine();
             Console.WriteLine("Storage Configuration:");
             Console.WriteLine("  --brain-data, -bd <path>     Brain data storage location");
@@ -240,7 +241,7 @@ namespace GreyMatter.Core
             Console.WriteLine("  --working-drive, -wd <path>  Working drive for large-scale storage");
             Console.WriteLine("  env BRAIN_DATA_PATH          Override brain data path");
             Console.WriteLine("  env TRAINING_DATA_ROOT       Override training data path");
-            Console.WriteLine("  Defaults attempt NAS: \\\\doddnas\\jarvis\\brainData and \\\\doddnas\\jarvis\\trainData (or /Volumes/jarvis on macOS)");
+            Console.WriteLine("  Defaults attempt NAS: \\doddnas\\jarvis\\brainData and \\doddnas\\jarvis\\trainData (or /Volumes/jarvis on macOS)");
             Console.WriteLine();
             Console.WriteLine("Interactive Options:");
             Console.WriteLine("  --interactive, -i            Enable conversational mode");
@@ -248,7 +249,7 @@ namespace GreyMatter.Core
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  # Use NAS paths explicitly");
-            Console.WriteLine("  dotnet run -- -bd \\\\doddnas\\jarvis\\brainData -td \\\\doddnas\\jarvis\\trainData");
+            Console.WriteLine("  dotnet run -- -bd \\doddnas\\jarvis\\brainData -td \\doddnas\\jarvis\\trainData");
             Console.WriteLine();
             Console.WriteLine("  # Use macOS mount point");
             Console.WriteLine("  dotnet run -- -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData");

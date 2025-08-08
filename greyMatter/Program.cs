@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using GreyMatter.Core;
 using GreyMatter.Storage;
+using GreyMatter.Learning;
+using GreyMatter.Evaluations;
 
 namespace GreyMatter
 {
@@ -30,6 +32,13 @@ namespace GreyMatter
             {
                 Console.WriteLine($"❌ Configuration Error: {ex.Message}");
                 BrainConfiguration.DisplayUsage();
+                return;
+            }
+
+            // NEW: Preschool training pipeline (compile → learn → eval)
+            if (args.Length > 0 && args[0] == "--preschool-train")
+            {
+                await RunPreschoolTrain(config);
                 return;
             }
             
@@ -526,6 +535,43 @@ namespace GreyMatter
 
             // Stop consciousness gracefully
             await brain.SleepConsciousnessAsync();
+        }
+
+        private static async Task RunPreschoolTrain(BrainConfiguration config)
+        {
+            Console.WriteLine("🎒 **PRESCHOOL TRAINING PIPELINE**");
+            Console.WriteLine("=================================");
+            Console.WriteLine("Compiling a simple curriculum, learning from it, and running a quick cloze baseline.\n");
+
+            var brain = new BrainInJar(config.BrainDataPath);
+            await brain.InitializeAsync();
+
+            // Compile curriculum
+            Console.WriteLine("🧮 Compiling curriculum from datasets...");
+            var compiler = new CurriculumCompiler();
+            var curriculum = await compiler.CompileAsync(config, maxSentencesPerStage: 1000);
+
+            // Merge a small starter set across early stages
+            var lessons = new List<CurriculumCompiler.LessonItem>();
+            lessons.AddRange(curriculum.Stage1_WordsAndSimpleSV.Take(500));
+            lessons.AddRange(curriculum.Stage2_SVO.Take(500));
+            lessons.AddRange(curriculum.Stage3_Modifiers.Take(250));
+            Console.WriteLine($"   Curriculum sizes → S1:{curriculum.Stage1_WordsAndSimpleSV.Count} S2:{curriculum.Stage2_SVO.Count} S3:{curriculum.Stage3_Modifiers.Count}");
+
+            // Learn from lessons
+            Console.WriteLine("📘 Environmental learning (passive reading)...");
+            var learner = new EnvironmentalLearner(brain, config);
+            var learned = await learner.LearnAsync(lessons, maxItems: 800);
+            Console.WriteLine($"   Lessons ingested: {learned}");
+
+            // Quick cloze baseline
+            Console.WriteLine("🧪 Running cloze baseline on a small set...");
+            var evalSet = lessons.Select(l => l.Sentence).Take(200).ToList();
+            var acc = await EvalHarness.RunClozeAsync(brain, evalSet, max: 200);
+            Console.WriteLine($"   Cloze accuracy: {acc:P1} on {evalSet.Count} items");
+
+            await brain.SaveAsync();
+            Console.WriteLine("✅ Preschool training pipeline complete.");
         }
     }
 }
