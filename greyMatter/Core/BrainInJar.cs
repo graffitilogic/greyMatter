@@ -222,23 +222,25 @@ namespace GreyMatter.Core
                 AnalysisTime = DateTime.UtcNow
             };
 
-            // New: STM->LTM consolidation pass with budget
+            // STM->LTM consolidation with collection
             sw.Restart();
             int totalPromoted = 0;
             int clustersTouched = 0;
             int budgetPerCluster = Math.Max(5, Math.Min(50, (_configForLogging?.MaxParallelSaves ?? 1) * 5));
+            var changedByCluster = new Dictionary<Guid, List<HybridNeuron>>();
             foreach (var cluster in _loadedClusters.Values)
             {
-                var promoted = await cluster.ConsolidateStmAsync(budgetPerCluster);
-                if (promoted > 0)
+                var changed = await cluster.ConsolidateStmCollectAsync(budgetPerCluster);
+                if (changed.Count > 0)
                 {
-                    totalPromoted += promoted;
+                    totalPromoted += changed.Count;
                     clustersTouched++;
+                    changedByCluster[cluster.ClusterId] = changed;
                 }
             }
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   🧠 Consolidation: promoted {totalPromoted} neurons across {clustersTouched} clusters in {sw.Elapsed.TotalSeconds:F2}s (budget/cluster={budgetPerCluster})");
-            
+
             // Save feature mappings
             sw.Restart();
             var featureMappingSnapshot = _featureMapper.CreateSnapshot();
@@ -246,12 +248,29 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved feature mappings in {sw.Elapsed.TotalSeconds:F2}s");
             
-            // Filter clusters to only those with unsaved changes (LTM changed)
-            var dirtyClusters = _loadedClusters.Values.Where(c => c.HasUnsavedChanges).ToList();
+            // Persist changed neurons per cluster partition via EnhancedBrainStorage path
+            sw.Restart();
+            int neuronBatches = 0, neuronsPersisted = 0;
+            foreach (var kvp in changedByCluster)
+            {
+                var cluster = _loadedClusters[kvp.Key];
+                // Route through storage to place in correct partition bank
+                await _storage.SaveClusterWithPartitioningAsync(cluster, context); // persists bank + membership
+                neuronBatches++;
+                neuronsPersisted += kvp.Value.Count;
+            }
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   💾 Persisted neuron banks for {neuronBatches} clusters; ~{neuronsPersisted} neurons updated in {sw.Elapsed.TotalSeconds:F2}s");
+            
+            // Filter clusters to only those with unsaved membership changes (approx: those we touched)
+            var dirtyClusters = _loadedClusters.Values
+                .Where(c => changedByCluster.ContainsKey(c.ClusterId) || c.HasUnsavedChanges)
+                .Distinct()
+                .ToList();
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   🧮 Clusters: total={_loadedClusters.Count}, dirty={dirtyClusters.Count}, skipped={_loadedClusters.Count - dirtyClusters.Count}");
 
-            // Save loaded clusters in parallel with throttling
+            // Save clusters (membership + metadata) with throttling
             sw.Restart();
             await _storage.SaveClustersEfficientlyAsync(dirtyClusters, context);
             if ((_configForLogging?.Verbosity ?? 0) > 0)

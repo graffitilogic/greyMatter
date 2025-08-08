@@ -39,6 +39,9 @@ namespace GreyMatter.Core
         public HashSet<string> AssociatedConcepts { get; private set; } = new();
         public double ImportanceScore { get; private set; } = 0.0;
 
+        // New: Provisional flag (STM-only neuron not yet consolidated to LTM)
+        public bool IsProvisional { get; set; } = false;
+
         // --- New: Short-term learning (STM) buffers and salience tracking ---
         // Accumulates transient updates which can be consolidated into LTM
         public Dictionary<Guid, double> StmWeightDeltas { get; private set; } = new();
@@ -270,7 +273,8 @@ namespace GreyMatter.Core
                 InputWeights = InputWeights.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
                 Bias = Bias,
                 Threshold = Threshold,
-                LearningRate = LearningRate
+                LearningRate = LearningRate,
+                IsProvisional = IsProvisional
             };
         }
 
@@ -286,7 +290,8 @@ namespace GreyMatter.Core
                 LearningRate = snapshot.LearningRate,
                 ActivationCount = snapshot.ActivationCount,
                 LastUsed = snapshot.LastUsed,
-                ImportanceScore = snapshot.ImportanceScore
+                ImportanceScore = snapshot.ImportanceScore,
+                IsProvisional = snapshot.IsProvisional
             };
             
             neuron.InputWeights = snapshot.InputWeights.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
@@ -311,5 +316,6 @@ namespace GreyMatter.Core
         public double Bias { get; set; }
         public double Threshold { get; set; }
         public double LearningRate { get; set; }
+        public bool IsProvisional { get; set; } = false;
     }
 }

@@ -176,14 +176,33 @@ namespace GreyMatter.Core
                     promoted++;
             }
 
-            if (promoted > 0)
-            {
-                _isDirty = true;
-                LastModified = DateTime.UtcNow;
-                UpdateClusterMetrics();
-            }
+            // Note: With global neuron store, LTM changes do not require cluster file rewrite.
+            // Do not mark cluster dirty here; neuron banks will be persisted separately.
 
             return promoted;
+        }
+
+        /// <summary>
+        /// Consolidate STM and collect neurons that had LTM changes. Does not mark cluster dirty.
+        /// </summary>
+        public async Task<List<HybridNeuron>> ConsolidateStmCollectAsync(int maxNeurons = 10, double epsilon = 1e-3)
+        {
+            await EnsureLoadedAsync();
+
+            var candidates = _neurons.Values
+                .Where(n => n.HasPendingStm)
+                .OrderByDescending(n => n.StmSalience)
+                .Take(Math.Max(0, maxNeurons))
+                .ToList();
+
+            var changed = new List<HybridNeuron>();
+            foreach (var n in candidates)
+            {
+                if (n.ConsolidateToLtm(epsilon))
+                    changed.Add(n);
+            }
+
+            return changed;
         }
 
         /// <summary>

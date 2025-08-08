@@ -26,11 +26,15 @@ namespace GreyMatter.Storage
 
         private bool _batchMode = false;
 
+        // New: Global neuron store per partition (Phase B)
+        private readonly GlobalNeuronStore _globalNeuronStore;
+
         public EnhancedBrainStorage(string basePath = "brain_data") : base(basePath)
         {
             _partitioner = new NeuroPartitioner();
             _hierarchicalBasePath = Path.Combine(basePath, "hierarchical");
             EnsureHierarchicalStructure();
+            _globalNeuronStore = new GlobalNeuronStore(_hierarchicalBasePath);
         }
 
         /// <summary>
@@ -85,20 +89,24 @@ namespace GreyMatter.Storage
             var clusterFileName = $"{cluster.ConceptDomain}_{cluster.ClusterId:N}.cluster";
             var fullPath = Path.Combine(hierarchicalPath, clusterFileName);
             
-            // Get neurons and create snapshots
+            // Get neurons and create membership list
             var neurons = await cluster.GetNeuronsAsync();
-            var snapshots = neurons.Values.Select(n => n.CreateSnapshot()).ToList();
+            var neuronIds = neurons.Keys.ToList();
             
-            // Save with enhanced metadata
+            // Save membership + metadata only (neurons stored in per-partition bank)
             var clusterData = new PartitionedClusterData
             {
-                Neurons = snapshots,
+                NeuronIds = neuronIds,
+                Neurons = new List<NeuronSnapshot>(),
                 PartitionPath = clusterPartition,
                 Metadata = CreateClusterMetadata(cluster, clusterPartition),
                 SavedAt = DateTime.UtcNow
             };
             
             await WriteJsonFastAsync(fullPath, clusterData, CompressClusters);
+
+            // Upsert neurons into partition bank (shared store)
+            await _globalNeuronStore.SaveOrUpdateNeuronsAsync(clusterPartition, neurons.Values);
             
             // Update partition metadata
             await UpdatePartitionMetadata(clusterPartition, cluster);
@@ -242,16 +250,37 @@ namespace GreyMatter.Storage
             
             foreach (var searchPath in searchPaths)
             {
-                var fullPath = Path.Combine(_hierarchicalBasePath, searchPath);
-                if (Directory.Exists(fullPath))
+                var fullPathDir = Path.Combine(_hierarchicalBasePath, searchPath);
+                if (!Directory.Exists(fullPathDir)) continue;
+
+                // Match both plain and gz files
+                var files = Directory.GetFiles(fullPathDir, $"*{clusterIdentifier}*.cluster*");
+                if (!files.Any()) continue;
+
+                var file = files.First();
+                PartitionedClusterData? data = null;
+                if (file.EndsWith(".gz", StringComparison.OrdinalIgnoreCase))
                 {
-                    var files = Directory.GetFiles(fullPath, $"*{clusterIdentifier}*");
-                    if (files.Any())
-                    {
-                        var json = await File.ReadAllTextAsync(files.First());
-                        return JsonSerializer.Deserialize<PartitionedClusterData>(json, GetJsonOptions());
-                    }
+                    await using var fs = File.OpenRead(file);
+                    await using var gz = new GZipStream(fs, CompressionMode.Decompress);
+                    data = await JsonSerializer.DeserializeAsync<PartitionedClusterData>(gz, GetJsonOptions());
                 }
+                else
+                {
+                    var json = await File.ReadAllTextAsync(file);
+                    data = JsonSerializer.Deserialize<PartitionedClusterData>(json, GetJsonOptions());
+                }
+
+                if (data == null) continue;
+
+                // If membership-only, hydrate neurons from bank
+                if ((data.Neurons == null || data.Neurons.Count == 0) && data.NeuronIds != null && data.NeuronIds.Count > 0)
+                {
+                    var loaded = await _globalNeuronStore.LoadNeuronsAsync(data.PartitionPath, data.NeuronIds);
+                    data.Neurons = loaded.Values.Select(n => n.CreateSnapshot()).ToList();
+                }
+
+                return data;
             }
             
             return null;
@@ -434,6 +463,7 @@ namespace GreyMatter.Storage
     public class PartitionedClusterData
     {
         public List<NeuronSnapshot> Neurons { get; set; } = new();
+        public List<Guid> NeuronIds { get; set; } = new();
         public PartitionPath PartitionPath { get; set; } = new();
         public ClusterMetadata Metadata { get; set; } = new();
         public DateTime SavedAt { get; set; }
