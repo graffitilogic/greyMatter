@@ -578,6 +578,42 @@ namespace GreyMatter.Storage
             var hydrated = await _globalNeuronStore.LoadNeuronsAsync(partition, ids);
             return (ids.Count, hydrated.Count);
         }
+
+        private string GetConceptCapacityPath() => Path.Combine(_hierarchicalBasePath, "concept_capacity.json");
+
+        /// <summary>
+        /// Load persisted concept capacity targets. Returns empty if not present.
+        /// </summary>
+        public async Task<Dictionary<string, int>> LoadConceptCapacitiesAsync()
+        {
+            var path = GetConceptCapacityPath();
+            if (!File.Exists(path)) return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                var json = await File.ReadAllTextAsync(path);
+                var dict = JsonSerializer.Deserialize<Dictionary<string, int>>(json, GetJsonOptions())
+                           ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                return new Dictionary<string, int>(dict, StringComparer.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            }
+        }
+
+        /// <summary>
+        /// Persist concept capacity targets atomically.
+        /// </summary>
+        public async Task SaveConceptCapacitiesAsync(Dictionary<string, int> capacities)
+        {
+            var path = GetConceptCapacityPath();
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            var json = JsonSerializer.Serialize(capacities, GetJsonOptions());
+            var tmp = path + ".tmp";
+            await File.WriteAllTextAsync(tmp, json);
+            if (File.Exists(path)) File.Delete(path);
+            File.Move(tmp, path, overwrite: true);
+        }
     }
 
     /// <summary>

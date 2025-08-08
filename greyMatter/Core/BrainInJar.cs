@@ -72,6 +72,87 @@ namespace GreyMatter.Core
             }
         }
 
+        // Adaptive concept capacity (Option B): load/save per-concept target counts; compute initial target from emergent model; apply slow EMA updates with hysteresis; use target for neuron growth to stabilize membership.
+        private Dictionary<string, int> _conceptCapacities = new(StringComparer.OrdinalIgnoreCase);
+        private const int MinConceptNeurons = 50;
+        private const int MaxConceptNeurons = 5000;
+        private const double CapacityEmaAlpha = 0.05; // slow adjustment
+        private const double CapacityHysteresis = 0.15; // 15% band before changes
+
+        // Stable hash for deterministic seeding across runs
+        private static int StableHash(string s)
+        {
+            unchecked
+            {
+                uint hash = 2166136261;
+                for (int i = 0; i < s.Length; i++)
+                {
+                    hash ^= s[i];
+                    hash *= 16777619;
+                }
+                return (int)(hash & 0x7FFFFFFF);
+            }
+        }
+
+        private int CalculateRequiredNeuronsDeterministic(string concept, Dictionary<string, double> features)
+        {
+            var seed = StableHash(concept);
+            var random = new Random(seed);
+            var baseNeurons = 50 + random.Next(-20, 80);
+            double emergenceScore = 0.0;
+
+            var frequencyFactor = CalculateStochasticFrequency(concept, random);
+            emergenceScore -= frequencyFactor;
+
+            var featureEmergence = CalculateFeatureEmergence(features, random);
+            emergenceScore += featureEmergence;
+
+            var networkPosition = CalculateNetworkPosition(concept, random);
+            emergenceScore += networkPosition;
+
+            var developmentalFactor = CalculateDevelopmentalVariation(concept, random);
+            emergenceScore += developmentalFactor;
+
+            var contextualDemand = CalculateContextualDemand(concept, features, random);
+            emergenceScore += contextualDemand;
+
+            var geneticVariation = (random.NextDouble() - 0.5) * 50.0;
+            emergenceScore += geneticVariation;
+
+            var powerLawExponent = 1.3 + (random.NextDouble() * 0.4);
+            var emergentComplexity = Math.Pow(Math.Abs(emergenceScore), powerLawExponent) * Math.Sign(emergenceScore);
+            var adjustedComplexity = emergentComplexity; // no resource pressure factor in base target
+            var neuronsNeeded = (int)Math.Ceiling(baseNeurons + adjustedComplexity);
+            return Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, neuronsNeeded));
+        }
+
+        private int GetTargetNeuronsForConcept(string concept, Dictionary<string, double> features)
+        {
+            if (_conceptCapacities.TryGetValue(concept, out var target))
+                return target;
+
+            // Initialize from deterministic emergent model
+            var baseTarget = CalculateRequiredNeuronsDeterministic(concept, features);
+            target = Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, baseTarget));
+            _conceptCapacities[concept] = target;
+            return target;
+        }
+
+        private void AdjustConceptCapacity(string concept, int observedNeurons, double demandSignal)
+        {
+            var current = _conceptCapacities.GetValueOrDefault(concept, Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, observedNeurons)));
+            var desired = (int)Math.Round(Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, observedNeurons * (0.8 + 0.4 * Math.Max(0.0, demandSignal)))));
+
+            var lower = (int)Math.Round(current * (1 - CapacityHysteresis));
+            var upper = (int)Math.Round(current * (1 + CapacityHysteresis));
+            if (desired < lower || desired > upper)
+            {
+                var updated = (int)Math.Round(current * (1 - CapacityEmaAlpha) + desired * CapacityEmaAlpha);
+                updated = Math.Clamp(updated, MinConceptNeurons, MaxConceptNeurons);
+                _conceptCapacities[concept] = updated;
+            }
+        }
+
         public BrainInJar(string storagePath = "brain_data")
         {
             _storage = new EnhancedBrainStorage(storagePath);
@@ -105,6 +186,9 @@ namespace GreyMatter.Core
             
             var stats = await _storage.GetStorageStatsAsync();
             Console.WriteLine($"Storage: {stats.ClusterCount} clusters, {stats.TotalSizeFormatted}");
+            
+            // Load concept capacities
+            _conceptCapacities = await _storage.LoadConceptCapacitiesAsync();
         }
 
         /// <summary>
@@ -121,16 +205,14 @@ namespace GreyMatter.Core
             
             // Get neurons for this concept
             var conceptNeurons = await cluster.FindNeuronsByConcept(concept);
-            
-            // Dynamic neuron allocation based on concept complexity
-            var requiredNeurons = CalculateRequiredNeurons(concept, features);
-            
-            if (conceptNeurons.Count < requiredNeurons)
+
+            // Use adaptive target capacity
+            var target = GetTargetNeuronsForConcept(concept, features);
+            if (conceptNeurons.Count < target)
             {
-                var neuronsToAdd = requiredNeurons - conceptNeurons.Count;
+                var neuronsToAdd = target - conceptNeurons.Count;
                 var newNeurons = await cluster.GrowForConcept(concept, neuronsToAdd);
                 conceptNeurons.AddRange(newNeurons);
-                result.NeuronsCreated = newNeurons.Count;
                 TotalNeuronsCreated += newNeurons.Count;
             }
             
@@ -140,6 +222,10 @@ namespace GreyMatter.Core
                 await TrainNeuronWithFeatures(neuron, features);
             }
             
+            // Adjust capacity slowly based on a crude demand signal (ratio of used to target clipped)
+            var demand = Math.Min(1.5, (double)conceptNeurons.Count / Math.Max(1, target));
+            AdjustConceptCapacity(concept, conceptNeurons.Count, demand);
+
             // Create connections between related concepts
             await CreateConceptualConnections(concept, features);
             
@@ -318,6 +404,8 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved {synapseSnapshots.Count} synapses in {sw.Elapsed.TotalSeconds:F2}s");
             
+            // Persist concept capacities at end of save
+            try { await _storage.SaveConceptCapacitiesAsync(_conceptCapacities); } catch { /* best effort */ }
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Total save time {swTotal.Elapsed.TotalSeconds:F2}s");
             Console.WriteLine("✅ Brain state saved with hierarchical partitioning");
