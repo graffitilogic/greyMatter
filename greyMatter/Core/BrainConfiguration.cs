@@ -88,22 +88,59 @@ namespace GreyMatter.Core
         /// </summary>
         public void ValidateAndSetup()
         {
-            // Use working drive for brain data if specified
+            // Environment variable overrides
+            var envBD = Environment.GetEnvironmentVariable("BRAIN_DATA_PATH");
+            var envTD = Environment.GetEnvironmentVariable("TRAINING_DATA_ROOT");
+            if (!string.IsNullOrWhiteSpace(envBD)) BrainDataPath = envBD!;
+            if (!string.IsNullOrWhiteSpace(envTD)) TrainingDataRoot = envTD!;
+
+            // If working drive specified, prefer that
             if (!string.IsNullOrEmpty(WorkingDrivePath))
             {
                 if (!Directory.Exists(WorkingDrivePath))
                 {
                     throw new DirectoryNotFoundException($"Working drive path not found: {WorkingDrivePath}");
                 }
-                
-                // Move brain data to working drive
                 BrainDataPath = Path.Combine(WorkingDrivePath, "brain_data");
                 TrainingDataRoot = Path.Combine(WorkingDrivePath, "training_library");
             }
+            else
+            {
+                // Prefer NAS defaults if user hasn't explicitly set paths
+                bool bdWasDefault = string.Equals(BrainDataPath, "brain_data", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(BrainDataPath);
+                bool tdWasDefault = string.Equals(TrainingDataRoot, "/tmp/brain_library", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(TrainingDataRoot);
+
+                if (bdWasDefault || tdWasDefault)
+                {
+                    var candidateRoots = new[]
+                    {
+                        @"\\\\doddnas\\jarvis",   // Preferred UNC
+                        @"\\\\dodnas\\jarvis",    // Alternate UNC (typo-safe)
+                        "/Volumes/jarvis"            // macOS mount point
+                    };
+
+                    foreach (var root in candidateRoots)
+                    {
+                        try
+                        {
+                            if (Directory.Exists(root))
+                            {
+                                if (bdWasDefault) BrainDataPath = Path.Combine(root, "brainData");
+                                if (tdWasDefault) TrainingDataRoot = Path.Combine(root, "trainData");
+                                break;
+                            }
+                        }
+                        catch
+                        {
+                            // Ignore and try next root
+                        }
+                    }
+                }
+            }
             
-            // Ensure directories exist
-            Directory.CreateDirectory(BrainDataPath);
-            Directory.CreateDirectory(TrainingDataRoot);
+            // Ensure directories exist; if creation fails, fall back to local
+            BrainDataPath = EnsureDirectoryOrFallback(BrainDataPath, "brain_data", "external brain data path");
+            TrainingDataRoot = EnsureDirectoryOrFallback(TrainingDataRoot, Path.Combine(Directory.GetCurrentDirectory(), "learning_datasets"), "external training data path");
             
             Console.WriteLine($"📁 Brain Data Path: {Path.GetFullPath(BrainDataPath)}");
             Console.WriteLine($"📚 Training Data Root: {Path.GetFullPath(TrainingDataRoot)}");
@@ -111,6 +148,33 @@ namespace GreyMatter.Core
             if (!string.IsNullOrEmpty(WorkingDrivePath))
             {
                 Console.WriteLine($"💾 Working Drive: {WorkingDrivePath}");
+            }
+        }
+
+        private string EnsureDirectoryOrFallback(string desiredPath, string fallbackRelative, string label)
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(desiredPath))
+                {
+                    Directory.CreateDirectory(desiredPath);
+                    return desiredPath;
+                }
+            }
+            catch
+            {
+                Console.WriteLine($"⚠️ Could not use {label}: '{desiredPath}'. Falling back to '{fallbackRelative}'.");
+            }
+
+            try
+            {
+                Directory.CreateDirectory(fallbackRelative);
+                return fallbackRelative;
+            }
+            catch
+            {
+                // Last resort: current directory
+                return Directory.GetCurrentDirectory();
             }
         }
         
@@ -174,15 +238,20 @@ namespace GreyMatter.Core
             Console.WriteLine("  --brain-data, -bd <path>     Brain data storage location");
             Console.WriteLine("  --training-data, -td <path>  Training data root directory");
             Console.WriteLine("  --working-drive, -wd <path>  Working drive for large-scale storage");
+            Console.WriteLine("  env BRAIN_DATA_PATH          Override brain data path");
+            Console.WriteLine("  env TRAINING_DATA_ROOT       Override training data path");
+            Console.WriteLine("  Defaults attempt NAS: \\\\doddnas\\jarvis\\brainData and \\\\doddnas\\jarvis\\trainData (or /Volumes/jarvis on macOS)");
             Console.WriteLine();
             Console.WriteLine("Interactive Options:");
             Console.WriteLine("  --interactive, -i            Enable conversational mode");
             Console.WriteLine("  --voice, -v                  Enable voice synthesis");
             Console.WriteLine();
             Console.WriteLine("Examples:");
-            Console.WriteLine("  # Run language foundations training");
-            Console.WriteLine("  dotnet run -- --language-foundations");
-            Console.WriteLine("  dotnet run -- --comprehensive-language");
+            Console.WriteLine("  # Use NAS paths explicitly");
+            Console.WriteLine("  dotnet run -- -bd \\\\doddnas\\jarvis\\brainData -td \\\\doddnas\\jarvis\\trainData");
+            Console.WriteLine();
+            Console.WriteLine("  # Use macOS mount point");
+            Console.WriteLine("  dotnet run -- -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData");
             Console.WriteLine();
             Console.WriteLine("  # Use external drive for storage");
             Console.WriteLine("  dotnet run -- -wd /Volumes/MyDrive");
