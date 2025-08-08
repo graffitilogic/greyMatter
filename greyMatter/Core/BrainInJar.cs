@@ -41,14 +41,15 @@ namespace GreyMatter.Core
 
         // Reporting config and state
         private int _reportingInterval = 1000; // items per report block
-        private double _reportingSampleRate = 0.02; // 2% of items for detailed logs
+        private double _reportingSampleRate = 0.005; // 0.5% detailed logs by default
         private readonly Random _reportRand = new Random();
         private long _learnEvents = 0;
         private int _blockConcepts = 0;
         private int _blockNeurons = 0;
         private readonly HashSet<Guid> _blockClusters = new();
+        private readonly Stopwatch _learnSw = Stopwatch.StartNew();
 
-        private bool ShouldSampleLog() => _reportRand.NextDouble() <= _reportingSampleRate;
+        private bool ShouldSampleLog() => (_configForLogging?.Verbosity ?? 0) >= 2 && _reportRand.NextDouble() <= _reportingSampleRate;
         private void ReportSampler(string concept, int neuronsUsed, Guid clusterId)
         {
             if (ShouldSampleLog())
@@ -65,7 +66,9 @@ namespace GreyMatter.Core
             _blockClusters.Add(clusterId);
             if (_learnEvents % Math.Max(1, _reportingInterval) == 0)
             {
-                Console.WriteLine($"📊 Block: {_blockConcepts} concepts, {_blockNeurons} neurons, {_blockClusters.Count} clusters");
+                var elapsed = _learnSw.Elapsed;
+                var cps = _learnEvents > 0 ? _learnEvents / Math.Max(0.001, elapsed.TotalSeconds) : 0.0;
+                Console.WriteLine($"📊 Block: {_blockConcepts} concepts, {_blockNeurons} neurons, {_blockClusters.Count} clusters | total concepts: {_learnEvents} | elapsed {FormatTimeSpan(elapsed)} | rate {cps:F1} cps");
                 _blockConcepts = 0;
                 _blockNeurons = 0;
                 _blockClusters.Clear();

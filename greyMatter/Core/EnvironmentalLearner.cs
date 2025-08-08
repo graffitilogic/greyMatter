@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using GreyMatter.Core;
@@ -24,6 +25,18 @@ namespace GreyMatter.Core
         public async Task<int> LearnAsync(IEnumerable<CurriculumCompiler.LessonItem> lessons, int maxItems = 1000)
         {
             int count = 0;
+            // Determine total lessons if available
+            int totalLessons = -1;
+            if (lessons is ICollection<CurriculumCompiler.LessonItem> col)
+                totalLessons = Math.Min(maxItems, col.Count);
+
+            // Progress tracking
+            var sw = Stopwatch.StartNew();
+            int batchInterval = 50; // lessons per progress update
+            int nextReport = batchInterval;
+            long conceptOps = 0;
+            var uniqueConcepts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             foreach (var lesson in lessons)
             {
                 if (count >= maxItems) break;
@@ -53,11 +66,39 @@ namespace GreyMatter.Core
                 foreach (var key in conceptKeys)
                 {
                     await _brain.LearnConceptAsync(key, baseFeatures);
+                    conceptOps++;
+                    uniqueConcepts.Add(key);
                 }
 
                 count++;
+
+                // Batched progress output
+                if (count >= nextReport || (totalLessons > 0 && count == totalLessons))
+                {
+                    var elapsed = sw.Elapsed;
+                    var lessonsPerSec = count > 0 ? count / Math.Max(0.001, elapsed.TotalSeconds) : 0.0;
+                    string etaStr = "?";
+                    string pctStr = "n/a";
+                    string totalStr = totalLessons > 0 ? totalLessons.ToString() : "?";
+                    if (totalLessons > 0 && lessonsPerSec > 0.0001)
+                    {
+                        var remaining = Math.Max(0, totalLessons - count);
+                        var eta = TimeSpan.FromSeconds(remaining / lessonsPerSec);
+                        etaStr = FormatTime(eta);
+                        pctStr = ((double)count / totalLessons).ToString("P0");
+                    }
+                    Console.WriteLine($"   📦 Progress: {count}/{totalStr} lessons ({pctStr}) | concepts: {conceptOps} unique:{uniqueConcepts.Count} | elapsed {FormatTime(elapsed)} | rate {lessonsPerSec:F1} lps | ETA {etaStr}");
+                    nextReport += batchInterval;
+                }
             }
             return count;
+        }
+
+        private static string FormatTime(TimeSpan ts)
+        {
+            if (ts.TotalHours >= 1) return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+            if (ts.TotalMinutes >= 1) return $"{ts.Minutes}m {ts.Seconds}s";
+            return $"{ts.Seconds}s";
         }
 
         private static bool IsSafeConcept(string s)
