@@ -53,6 +53,20 @@ namespace GreyMatter.Core
             _saveFunction = saveFunc;
         }
 
+        // New: Construct from an existing known cluster Id (hydrate from hierarchical storage)
+        public NeuronCluster(string conceptDomain, Guid existingClusterId,
+                             Func<string, Task<List<NeuronSnapshot>>>? loadFunc = null,
+                             Func<string, List<NeuronSnapshot>, Task>? saveFunc = null)
+        {
+            ClusterId = existingClusterId;
+            ConceptDomain = conceptDomain.ToLowerInvariant();
+            // Use GUID as the identifier so storage loaders can resolve membership packs by id
+            _persistencePath = existingClusterId.ToString("D");
+            _loadFunction = loadFunc;
+            _saveFunction = saveFunc;
+            _isDirty = false;
+        }
+
         /// <summary>
         /// Get neurons, loading from disk if necessary
         /// </summary>

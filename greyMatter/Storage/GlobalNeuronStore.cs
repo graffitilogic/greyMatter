@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using GreyMatter.Core;
+using System.Collections.Concurrent;
+using System.Threading;
 
 namespace GreyMatter.Storage
 {
@@ -21,6 +23,10 @@ namespace GreyMatter.Storage
             WriteIndented = false,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
+
+        // Serialize writes per bank file to prevent concurrent writers thrashing the same partition
+        private static readonly ConcurrentDictionary<string, SemaphoreSlim> _bankLocks = new();
+        private static SemaphoreSlim GetBankLock(string bankPath) => _bankLocks.GetOrAdd(bankPath, _ => new SemaphoreSlim(1, 1));
 
         public GlobalNeuronStore(string hierarchicalBasePath)
         {
@@ -39,6 +45,7 @@ namespace GreyMatter.Storage
 
         /// <summary>
         /// Save or update the given neurons into the partition bank. Only provided neurons are updated.
+        /// Optimized to avoid rewriting the bank if nothing effectively changed.
         /// </summary>
         public async Task SaveOrUpdateNeuronsAsync(PartitionPath partition, IEnumerable<HybridNeuron> neurons)
         {
@@ -46,21 +53,50 @@ namespace GreyMatter.Storage
             Directory.CreateDirectory(dir);
             var bankPath = GetNeuronBankPath(partition);
 
-            // Load existing if present
-            var dict = new Dictionary<string, NeuronSnapshot>();
-            if (File.Exists(bankPath))
+            var bankLock = GetBankLock(bankPath);
+            await bankLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                dict = await ReadBankAsync(bankPath);
-            }
+                // Load existing if present
+                var dict = new Dictionary<string, NeuronSnapshot>();
+                if (File.Exists(bankPath))
+                {
+                    dict = await ReadBankAsync(bankPath).ConfigureAwait(false);
+                }
 
-            // Update entries
-            foreach (var n in neurons)
+                bool changed = false;
+
+                // Update entries
+                foreach (var n in neurons)
+                {
+                    var id = n.Id.ToString();
+                    var newSnap = n.CreateSnapshot();
+
+                    if (dict.TryGetValue(id, out var oldSnap))
+                    {
+                        if (!SnapshotsEqual(oldSnap, newSnap))
+                        {
+                            dict[id] = newSnap;
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        dict[id] = newSnap;
+                        changed = true;
+                    }
+                }
+
+                // Write back atomically only if something actually changed
+                if (changed)
+                {
+                    await WriteBankAsync(bankPath, dict).ConfigureAwait(false);
+                }
+            }
+            finally
             {
-                dict[n.Id.ToString()] = n.CreateSnapshot();
+                bankLock.Release();
             }
-
-            // Write back atomically
-            await WriteBankAsync(bankPath, dict);
         }
 
         /// <summary>
@@ -72,7 +108,7 @@ namespace GreyMatter.Storage
             var bankPath = GetNeuronBankPath(partition);
             if (!File.Exists(bankPath)) return result;
 
-            var dict = await ReadBankAsync(bankPath);
+            var dict = await ReadBankAsync(bankPath).ConfigureAwait(false);
             foreach (var id in ids)
             {
                 if (dict.TryGetValue(id.ToString(), out var snap))
@@ -87,7 +123,7 @@ namespace GreyMatter.Storage
         {
             await using var fs = File.OpenRead(bankPath);
             await using var gz = new GZipStream(fs, CompressionMode.Decompress);
-            var dict = await JsonSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz, _jsonOptions);
+            var dict = await JsonSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz, _jsonOptions).ConfigureAwait(false);
             return dict ?? new Dictionary<string, NeuronSnapshot>();
         }
 
@@ -99,11 +135,24 @@ namespace GreyMatter.Storage
             await using (var writer = new Utf8JsonWriter(gz, new JsonWriterOptions { Indented = false }))
             {
                 JsonSerializer.Serialize(writer, dict, _jsonOptions);
-                await writer.FlushAsync();
+                await writer.FlushAsync().ConfigureAwait(false);
             }
 
             if (File.Exists(bankPath)) File.Delete(bankPath);
             File.Move(tmp, bankPath, overwrite: true);
+        }
+
+        // Basic structural equality using deterministic JSON serialization
+        private bool SnapshotsEqual(NeuronSnapshot a, NeuronSnapshot b)
+        {
+            if (ReferenceEquals(a, b)) return true;
+            if (a is null || b is null) return false;
+            // Serialize to bytes for comparison. Assumes stable property ordering.
+            var bytesA = JsonSerializer.SerializeToUtf8Bytes(a, _jsonOptions);
+            var bytesB = JsonSerializer.SerializeToUtf8Bytes(b, _jsonOptions);
+            if (bytesA.Length != bytesB.Length) return false;
+            // Fast path for same reference equality handled above; now compare spans
+            return ((ReadOnlySpan<byte>)bytesA).SequenceEqual(bytesB);
         }
     }
 }

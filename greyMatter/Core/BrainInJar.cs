@@ -183,9 +183,11 @@ namespace GreyMatter.Core
             
             Console.WriteLine($"Loaded {_synapses.Count} synapses");
             
-            // Load cluster index but don't load clusters yet (lazy loading)
+            // Load cluster index (legacy) for counts
             var clusterIndex = await _storage.LoadClusterIndexAsync();
             Console.WriteLine($"Found {clusterIndex.Count} clusters in storage");
+            
+            // Note: partition metadata is loaded inside storage; we rely on GetStorageStatsAsync below for accurate size and counts.
             
             var stats = await _storage.GetStorageStatsAsync();
             Console.WriteLine($"Storage: {stats.ClusterCount} clusters, {stats.TotalSizeFormatted}");
@@ -657,6 +659,17 @@ namespace GreyMatter.Core
             if (bestCluster != null && bestCluster.CalculateRelevance(new[] { concept }) > ConceptSimilarityThreshold)
             {
                 return bestCluster;
+            }
+            
+            // Try storage metadata lookup for a stable cluster to avoid creating duplicates
+            var similar = _storage.FindSimilarClusters(new[] { concept }, 0.5);
+            var chosen = similar.FirstOrDefault();
+            if (chosen != null)
+            {
+                // Hydrate a cluster handle with the known ID and domain; lazy load will use storage
+                var existing = new NeuronCluster(chosen.ConceptDomain, chosen.ClusterId, _storage.LoadClusterAsync, _storage.SaveClusterAsync);
+                _loadedClusters[existing.ClusterId] = existing;
+                return existing;
             }
             
             // Create new cluster
