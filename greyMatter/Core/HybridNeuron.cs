@@ -39,6 +39,14 @@ namespace GreyMatter.Core
         public HashSet<string> AssociatedConcepts { get; private set; } = new();
         public double ImportanceScore { get; private set; } = 0.0;
 
+        // --- New: Short-term learning (STM) buffers and salience tracking ---
+        // Accumulates transient updates which can be consolidated into LTM
+        public Dictionary<Guid, double> StmWeightDeltas { get; private set; } = new();
+        public double StmBiasDelta { get; private set; } = 0.0;
+        public double StmSalience { get; private set; } = 0.0; // magnitude-based salience
+        public DateTime LastTagTime { get; private set; } = DateTime.MinValue;
+        public bool HasPendingStm => StmWeightDeltas.Count > 0 || Math.Abs(StmBiasDelta) > 1e-9;
+
         public HybridNeuron(string conceptTag = "")
         {
             ConceptTag = conceptTag;
@@ -116,21 +124,70 @@ namespace GreyMatter.Core
 
         /// <summary>
         /// Learn by adjusting connection weights
+        /// Now defaults to recording Short-Term (STM) deltas; consolidation promotes to LTM.
         /// </summary>
         public void Learn(Guid inputNeuronId, double inputValue, double expectedOutput, double actualOutput)
         {
+            LearnStm(inputNeuronId, inputValue, expectedOutput, actualOutput);
+        }
+
+        /// <summary>
+        /// Record short-term delta and salience (eligibility trace style)
+        /// </summary>
+        public void LearnStm(Guid inputNeuronId, double inputValue, double expectedOutput, double actualOutput)
+        {
             double error = expectedOutput - actualOutput;
-            
-            if (!InputWeights.ContainsKey(inputNeuronId))
-                InputWeights[inputNeuronId] = 0.0;
-            
-            // Hebbian-inspired learning with error correction
-            double weightChange = LearningRate * error * inputValue;
-            InputWeights[inputNeuronId] += weightChange;
-            
-            // Prune very small weights to maintain sparsity
-            if (Math.Abs(InputWeights[inputNeuronId]) < 0.001)
-                InputWeights.Remove(inputNeuronId);
+            double delta = LearningRate * error * inputValue;
+
+            if (Math.Abs(delta) > 0)
+            {
+                if (!StmWeightDeltas.ContainsKey(inputNeuronId))
+                    StmWeightDeltas[inputNeuronId] = 0.0;
+                StmWeightDeltas[inputNeuronId] += delta;
+                StmSalience += Math.Abs(delta);
+                LastTagTime = DateTime.UtcNow;
+            }
+        }
+
+        /// <summary>
+        /// Consolidate STM into long-term weights if above epsilon; returns true if LTM changed.
+        /// </summary>
+        public bool ConsolidateToLtm(double epsilon = 1e-3)
+        {
+            bool changed = false;
+
+            if (Math.Abs(StmBiasDelta) >= epsilon)
+            {
+                Bias += StmBiasDelta;
+                StmBiasDelta = 0.0;
+                changed = true;
+            }
+
+            if (StmWeightDeltas.Count > 0)
+            {
+                // Apply deltas and prune tiny weights
+                foreach (var kvp in StmWeightDeltas)
+                {
+                    var id = kvp.Key;
+                    var d = kvp.Value;
+                    if (Math.Abs(d) < epsilon) continue;
+
+                    if (!InputWeights.ContainsKey(id))
+                        InputWeights[id] = 0.0;
+                    InputWeights[id] += d;
+
+                    if (Math.Abs(InputWeights[id]) < 0.001)
+                        InputWeights.Remove(id);
+
+                    changed = true;
+                }
+
+                // Clear STM buffer and decay salience
+                StmWeightDeltas.Clear();
+                StmSalience *= 0.5; // decay remaining salience
+            }
+
+            return changed;
         }
 
         /// <summary>

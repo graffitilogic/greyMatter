@@ -24,6 +24,8 @@ namespace GreyMatter.Storage
         public int MaxParallelSaves { get; set; } = 2; // keep low for NAS
         public bool CompressClusters { get; set; } = true; // gzip JSON payloads
 
+        private bool _batchMode = false;
+
         public EnhancedBrainStorage(string basePath = "brain_data") : base(basePath)
         {
             _partitioner = new NeuroPartitioner();
@@ -36,6 +38,7 @@ namespace GreyMatter.Storage
         /// </summary>
         public async Task SaveClustersEfficientlyAsync(IEnumerable<NeuronCluster> clusters, BrainContext context)
         {
+            _batchMode = true;
             var sem = new SemaphoreSlim(MaxParallelSaves);
             var tasks = new List<Task>();
 
@@ -50,6 +53,20 @@ namespace GreyMatter.Storage
             }
 
             await Task.WhenAll(tasks);
+
+            // Persist partition metadata once at the end of batch
+            await PersistPartitionMetadataAsync();
+            _batchMode = false;
+        }
+
+        private async Task PersistPartitionMetadataAsync()
+        {
+            var metadataPath = Path.Combine(_hierarchicalBasePath, "partition_metadata.json");
+            var json = JsonSerializer.Serialize(_partitionMetadata, GetJsonOptions());
+            var tmp = metadataPath + ".tmp";
+            await File.WriteAllTextAsync(tmp, json);
+            if (File.Exists(metadataPath)) File.Delete(metadataPath);
+            File.Move(tmp, metadataPath, overwrite: true);
         }
 
         /// <summary>
@@ -289,7 +306,13 @@ namespace GreyMatter.Storage
             var metadata = CreateClusterMetadata(cluster, partition);
             _partitionMetadata[cluster.ClusterId.ToString()] = metadata;
             
-            // Persist metadata
+            if (_batchMode)
+            {
+                // Defer persistence to end of batch
+                return;
+            }
+            
+            // Persist immediately when not in batch mode
             var metadataPath = Path.Combine(_hierarchicalBasePath, "partition_metadata.json");
             var json = JsonSerializer.Serialize(_partitionMetadata, GetJsonOptions());
             await File.WriteAllTextAsync(metadataPath, json);

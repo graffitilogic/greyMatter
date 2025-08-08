@@ -221,6 +221,23 @@ namespace GreyMatter.Core
                 AllNeurons = allNeurons,
                 AnalysisTime = DateTime.UtcNow
             };
+
+            // New: STM->LTM consolidation pass with budget
+            sw.Restart();
+            int totalPromoted = 0;
+            int clustersTouched = 0;
+            int budgetPerCluster = Math.Max(5, Math.Min(50, (_configForLogging?.MaxParallelSaves ?? 1) * 5));
+            foreach (var cluster in _loadedClusters.Values)
+            {
+                var promoted = await cluster.ConsolidateStmAsync(budgetPerCluster);
+                if (promoted > 0)
+                {
+                    totalPromoted += promoted;
+                    clustersTouched++;
+                }
+            }
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   🧠 Consolidation: promoted {totalPromoted} neurons across {clustersTouched} clusters in {sw.Elapsed.TotalSeconds:F2}s (budget/cluster={budgetPerCluster})");
             
             // Save feature mappings
             sw.Restart();
@@ -229,11 +246,16 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved feature mappings in {sw.Elapsed.TotalSeconds:F2}s");
             
+            // Filter clusters to only those with unsaved changes (LTM changed)
+            var dirtyClusters = _loadedClusters.Values.Where(c => c.HasUnsavedChanges).ToList();
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   🧮 Clusters: total={_loadedClusters.Count}, dirty={dirtyClusters.Count}, skipped={_loadedClusters.Count - dirtyClusters.Count}");
+
             // Save loaded clusters in parallel with throttling
             sw.Restart();
-            await _storage.SaveClustersEfficientlyAsync(_loadedClusters.Values, context);
+            await _storage.SaveClustersEfficientlyAsync(dirtyClusters, context);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   ⏱️  Saved {_loadedClusters.Count} clusters in {sw.Elapsed.TotalSeconds:F2}s (parallel={_storage.MaxParallelSaves}, gzip={_storage.CompressClusters})");
+                Console.WriteLine($"   ⏱️  Saved {dirtyClusters.Count} clusters in {sw.Elapsed.TotalSeconds:F2}s (parallel={_storage.MaxParallelSaves}, gzip={_storage.CompressClusters})");
             
             // Save cluster index
             sw.Restart();

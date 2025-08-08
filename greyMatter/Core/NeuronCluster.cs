@@ -31,6 +31,8 @@ namespace GreyMatter.Core
         // Persistence metadata
         private int _persistedNeuronCount = 0;
         private bool _isDirty = false;
+        public bool IsDirty => _isDirty;
+        public bool HasUnsavedChanges => _isDirty;
         private string _persistencePath = "";
         
         // Clustering parameters
@@ -146,59 +148,42 @@ namespace GreyMatter.Core
             
             // Update metrics
             TotalActivations += outputs.Count;
-            _isDirty = true;
+            // Note: do NOT mark cluster dirty on activation alone; STM remains in neurons
             
             return outputs;
         }
 
         /// <summary>
-        /// Grow cluster by adding new neurons for a concept
+        /// Promote short-term (STM) changes in neurons to long-term memory (LTM) with a budget.
+        /// Marks cluster dirty only if any neuron's LTM actually changed.
+        /// Returns number of neurons consolidated.
         /// </summary>
-        public async Task<List<HybridNeuron>> GrowForConcept(string concept, int targetSize = 10)
+        public async Task<int> ConsolidateStmAsync(int maxNeurons = 10, double epsilon = 1e-3)
         {
             await EnsureLoadedAsync();
-            
-            var existingNeurons = await FindNeuronsByConcept(concept);
-            var neuronsToCreate = Math.Max(0, targetSize - existingNeurons.Count);
-            
-            var newNeurons = new List<HybridNeuron>();
-            
-            for (int i = 0; i < neuronsToCreate; i++)
-            {
-                var newNeuron = new HybridNeuron(concept);
-                newNeuron.AssociateConcept(concept);
-                
-                // Create connections to existing neurons in cluster
-                await ConnectToExistingNeurons(newNeuron, existingNeurons);
-                
-                await AddNeuronAsync(newNeuron);
-                newNeurons.Add(newNeuron);
-            }
-            
-            UpdateClusterMetrics();
-            return newNeurons;
-        }
 
-        /// <summary>
-        /// Shrink cluster by removing least important neurons
-        /// </summary>
-        public async Task<int> ShrinkCluster(double importanceThreshold = 0.1)
-        {
-            await EnsureLoadedAsync();
-            
-            var neuronsToRemove = _neurons.Values
-                .Where(n => !n.ShouldPersist() || n.ImportanceScore < importanceThreshold)
-                .Select(n => n.Id)
+            // Choose top candidates by salience
+            var candidates = _neurons.Values
+                .Where(n => n.HasPendingStm)
+                .OrderByDescending(n => n.StmSalience)
+                .Take(Math.Max(0, maxNeurons))
                 .ToList();
-            
-            int removedCount = 0;
-            foreach (var neuronId in neuronsToRemove)
+
+            int promoted = 0;
+            foreach (var n in candidates)
             {
-                if (await RemoveNeuronAsync(neuronId))
-                    removedCount++;
+                if (n.ConsolidateToLtm(epsilon))
+                    promoted++;
             }
-            
-            return removedCount;
+
+            if (promoted > 0)
+            {
+                _isDirty = true;
+                LastModified = DateTime.UtcNow;
+                UpdateClusterMetrics();
+            }
+
+            return promoted;
         }
 
         /// <summary>
@@ -346,6 +331,65 @@ namespace GreyMatter.Core
                 LastModified = LastModified,
                 PersistencePath = _persistencePath
             };
+        }
+
+        /// <summary>
+        /// Grow cluster by adding new neurons for a concept
+        /// </summary>
+        public async Task<List<HybridNeuron>> GrowForConcept(string concept, int targetSize = 10)
+        {
+            await EnsureLoadedAsync();
+            
+            var existingNeurons = await FindNeuronsByConcept(concept);
+            var neuronsToCreate = Math.Max(0, targetSize - existingNeurons.Count);
+            
+            var newNeurons = new List<HybridNeuron>();
+            
+            for (int i = 0; i < neuronsToCreate; i++)
+            {
+                var newNeuron = new HybridNeuron(concept);
+                newNeuron.AssociateConcept(concept);
+                
+                // Create connections to existing neurons in cluster
+                await ConnectToExistingNeurons(newNeuron, existingNeurons);
+                
+                await AddNeuronAsync(newNeuron);
+                newNeurons.Add(newNeuron);
+            }
+            
+            UpdateClusterMetrics();
+            return newNeurons;
+        }
+
+        /// <summary>
+        /// Shrink cluster by removing least important neurons
+        /// </summary>
+        public async Task<int> ShrinkCluster(double importanceThreshold = 0.1)
+        {
+            await EnsureLoadedAsync();
+            
+            var neuronsToRemove = _neurons.Values
+                .Where(n => !n.ShouldPersist() || n.ImportanceScore < importanceThreshold)
+                .Select(n => n.Id)
+                .ToList();
+            
+            int removedCount = 0;
+            foreach (var neuronId in neuronsToRemove)
+            {
+                if (await RemoveNeuronAsync(neuronId))
+                    removedCount++;
+            }
+            
+            return removedCount;
+        }
+
+        /// <summary>
+        /// Sum of pending STM salience for neurons in this cluster.
+        /// </summary>
+        public double GetPendingStmSalience()
+        {
+            if (!_isLoaded || _neurons.Count == 0) return 0.0;
+            return _neurons.Values.Where(n => n.HasPendingStm).Sum(n => n.StmSalience);
         }
     }
 
