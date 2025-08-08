@@ -38,6 +38,21 @@ namespace GreyMatter.Core
         /// Enable voice synthesis for verbal responses
         /// </summary>
         public bool VoiceEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Verbosity level for logging: 0=normal, 1=verbose, 2=debug
+        /// </summary>
+        public int Verbosity { get; set; } = 0;
+
+        /// <summary>
+        /// Max parallel cluster saves (use low for NAS/spindles)
+        /// </summary>
+        public int MaxParallelSaves { get; set; } = 2;
+
+        /// <summary>
+        /// Compress cluster payloads (gzip) to reduce NAS I/O
+        /// </summary>
+        public bool CompressClusters { get; set; } = true;
         
         /// <summary>
         /// Create configuration from command line arguments
@@ -74,8 +89,35 @@ namespace GreyMatter.Core
                         break;
                         
                     case "--voice":
-                    case "-v":
+                        // Note: -v reused for verbosity; keep --voice explicit
                         config.VoiceEnabled = true;
+                        break;
+
+                    case "--verbosity":
+                    case "-log":
+                        if (i + 1 < args.Length && int.TryParse(args[i+1], out var v))
+                        {
+                            config.Verbosity = Math.Max(0, Math.Min(2, v));
+                            i++;
+                        }
+                        break;
+
+                    case "--max-parallel-saves":
+                    case "-mps":
+                        if (i + 1 < args.Length && int.TryParse(args[i+1], out var mps))
+                        {
+                            config.MaxParallelSaves = Math.Max(1, Math.Min(8, mps));
+                            i++;
+                        }
+                        break;
+
+                    case "--compress-clusters":
+                    case "-cc":
+                        if (i + 1 < args.Length && bool.TryParse(args[i+1], out var cc))
+                        {
+                            config.CompressClusters = cc;
+                            i++;
+                        }
                         break;
                 }
             }
@@ -93,6 +135,14 @@ namespace GreyMatter.Core
             var envTD = Environment.GetEnvironmentVariable("TRAINING_DATA_ROOT");
             if (!string.IsNullOrWhiteSpace(envBD)) BrainDataPath = envBD!;
             if (!string.IsNullOrWhiteSpace(envTD)) TrainingDataRoot = envTD!;
+
+            // Optional env overrides for perf/logging
+            var envVerb = Environment.GetEnvironmentVariable("VERBOSITY");
+            if (int.TryParse(envVerb, out var v)) Verbosity = Math.Max(0, Math.Min(2, v));
+            var envMps = Environment.GetEnvironmentVariable("MAX_PARALLEL_SAVES");
+            if (int.TryParse(envMps, out var mps)) MaxParallelSaves = Math.Max(1, Math.Min(8, mps));
+            var envCc = Environment.GetEnvironmentVariable("COMPRESS_CLUSTERS");
+            if (bool.TryParse(envCc, out var cc)) CompressClusters = cc;
 
             // If working drive specified, prefer that
             if (!string.IsNullOrEmpty(WorkingDrivePath))
@@ -148,6 +198,12 @@ namespace GreyMatter.Core
             if (!string.IsNullOrEmpty(WorkingDrivePath))
             {
                 Console.WriteLine($"💾 Working Drive: {WorkingDrivePath}");
+            }
+
+            if (Verbosity > 0)
+            {
+                Console.WriteLine($"🛠️  Save tuning → MaxParallelSaves={MaxParallelSaves}, CompressClusters={CompressClusters}");
+                Console.WriteLine($"🔊 Verbosity: {Verbosity}");
             }
         }
 
@@ -243,16 +299,22 @@ namespace GreyMatter.Core
             Console.WriteLine("  env TRAINING_DATA_ROOT       Override training data path");
             Console.WriteLine("  Defaults attempt NAS: \\doddnas\\jarvis\\brainData and \\doddnas\\jarvis\\trainData (or /Volumes/jarvis on macOS)");
             Console.WriteLine();
+            Console.WriteLine("Performance & Logging:");
+            Console.WriteLine("  --verbosity, -log <0|1|2>   Log level (0=normal,1=verbose,2=debug)");
+            Console.WriteLine("  --max-parallel-saves, -mps N Limit concurrent cluster saves (default 2)");
+            Console.WriteLine("  --compress-clusters, -cc <true|false>  Gzip cluster files (default true)");
+            Console.WriteLine("  env VERBOSITY, MAX_PARALLEL_SAVES, COMPRESS_CLUSTERS");
+            Console.WriteLine();
             Console.WriteLine("Interactive Options:");
             Console.WriteLine("  --interactive, -i            Enable conversational mode");
-            Console.WriteLine("  --voice, -v                  Enable voice synthesis");
+            Console.WriteLine("  --voice                      Enable voice synthesis");
             Console.WriteLine();
             Console.WriteLine("Examples:");
             Console.WriteLine("  # Use NAS paths explicitly");
             Console.WriteLine("  dotnet run -- -bd \\doddnas\\jarvis\\brainData -td \\doddnas\\jarvis\\trainData");
             Console.WriteLine();
-            Console.WriteLine("  # Use macOS mount point");
-            Console.WriteLine("  dotnet run -- -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData");
+            Console.WriteLine("  # macOS + verbose timings + tuned saves");
+            Console.WriteLine("  dotnet run -- --preschool-train -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData -log 1 -mps 1 -cc true");
             Console.WriteLine();
             Console.WriteLine("  # Use external drive for storage");
             Console.WriteLine("  dotnet run -- -wd /Volumes/MyDrive");

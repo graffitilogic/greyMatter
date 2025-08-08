@@ -544,6 +544,7 @@ namespace GreyMatter
             Console.WriteLine("Compiling a simple curriculum, learning from it, and running a quick cloze baseline.\n");
 
             var brain = new BrainInJar(config.BrainDataPath);
+            brain.AttachConfiguration(config);
             await brain.InitializeAsync();
 
             // Compile curriculum

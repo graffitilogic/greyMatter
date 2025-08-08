@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using GreyMatter.Core;
 using GreyMatter.Learning;
@@ -27,20 +28,54 @@ namespace GreyMatter.Core
             {
                 if (count >= maxItems) break;
 
-                var featureMap = new Dictionary<string, double>
+                // Map to small set of durable concepts, not per-sentence keys
+                var conceptKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var f in lesson.FocusConcepts)
+                {
+                    if (IsSafeConcept(f)) conceptKeys.Add(f);
+                }
+
+                // Add a simple pattern tag for structure (keeps cluster set tiny)
+                var pattern = ExtractPatternTag(lesson.Sentence);
+                if (pattern != null) conceptKeys.Add(pattern);
+
+                // Features for training
+                var baseFeatures = new Dictionary<string, double>
                 {
                     ["difficulty"] = lesson.Difficulty,
                     ["source:tatoeba_wiki"] = 1.0
                 };
                 foreach (var f in lesson.FocusConcepts)
                 {
-                    featureMap[$"focus:{f}"] = 1.0;
+                    baseFeatures[$"focus:{f}"] = 1.0;
                 }
 
-                var result = await _brain.LearnConceptAsync(lesson.Sentence, featureMap);
+                foreach (var key in conceptKeys)
+                {
+                    await _brain.LearnConceptAsync(key, baseFeatures);
+                }
+
                 count++;
             }
             return count;
+        }
+
+        private static bool IsSafeConcept(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            s = s.Trim();
+            if (s.Length > 32) return false; // avoid long strings
+            // allow alpha and simple hyphen/apostrophe
+            return Regex.IsMatch(s, "^[A-Za-z][A-Za-z\\-']*$");
+        }
+
+        private static string? ExtractPatternTag(string sentence)
+        {
+            var s = sentence.Trim();
+            if (Regex.IsMatch(s, "\\?$")) return "pattern:question";
+            if (Regex.IsMatch(s, "\\b[A-Za-z]+\\s+(is|are|runs|run|jumps|jump|sleeps|sleep)\\b", RegexOptions.IgnoreCase)) return "pattern:sv";
+            if (Regex.IsMatch(s, "\\b[A-Za-z]+\\s+(is|are|was|were|likes|like|has|have|sees|see|eats|eat|makes|make)\\s+[A-Za-z]+\\b", RegexOptions.IgnoreCase)) return "pattern:svo";
+            return null;
         }
     }
 }

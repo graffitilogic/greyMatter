@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using GreyMatter.Core;
@@ -35,6 +36,8 @@ namespace GreyMatter.Core
         public int TotalClustersCreated { get; private set; } = 0;
         public int TotalNeuronsCreated { get; private set; } = 0;
         public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+
+        private BrainConfiguration? _configForLogging; // to access verbosity during save
 
         public BrainInJar(string storagePath = "brain_data")
         {
@@ -197,8 +200,10 @@ namespace GreyMatter.Core
         public async Task SaveAsync()
         {
             Console.WriteLine("💾 Saving brain state with enhanced partitioning...");
-            
+            var swTotal = Stopwatch.StartNew();
+
             // Create brain context for partitioning decisions
+            var sw = Stopwatch.StartNew();
             var allNeurons = new Dictionary<Guid, HybridNeuron>();
             foreach (var cluster in _loadedClusters.Values)
             {
@@ -208,6 +213,8 @@ namespace GreyMatter.Core
                     allNeurons[neuron.Id] = neuron;
                 }
             }
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   ⏱️  Gathered neuron context in {sw.Elapsed.TotalSeconds:F2}s");
             
             var context = new BrainContext
             {
@@ -216,23 +223,34 @@ namespace GreyMatter.Core
             };
             
             // Save feature mappings
+            sw.Restart();
             var featureMappingSnapshot = _featureMapper.CreateSnapshot();
             await _storage.SaveFeatureMappingsAsync(featureMappingSnapshot);
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   ⏱️  Saved feature mappings in {sw.Elapsed.TotalSeconds:F2}s");
             
-            // Save loaded clusters (single location, no duplication)
-            foreach (var cluster in _loadedClusters.Values)
-            {
-                await cluster.PersistAndUnloadAsync();
-            }
+            // Save loaded clusters in parallel with throttling
+            sw.Restart();
+            await _storage.SaveClustersEfficientlyAsync(_loadedClusters.Values, context);
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   ⏱️  Saved {_loadedClusters.Count} clusters in {sw.Elapsed.TotalSeconds:F2}s (parallel={_storage.MaxParallelSaves}, gzip={_storage.CompressClusters})");
             
             // Save cluster index
+            sw.Restart();
             var clusterSnapshots = _loadedClusters.Values.Select(c => c.CreateSnapshot()).ToList();
             await _storage.SaveClusterIndexAsync(clusterSnapshots);
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   ⏱️  Saved cluster index in {sw.Elapsed.TotalSeconds:F2}s");
             
             // Save synapses
+            sw.Restart();
             var synapseSnapshots = _synapses.Values.Select(s => s.CreateSnapshot()).ToList();
             await _storage.SaveSynapsesAsync(synapseSnapshots);
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   ⏱️  Saved {synapseSnapshots.Count} synapses in {sw.Elapsed.TotalSeconds:F2}s");
             
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   ⏱️  Total save time {swTotal.Elapsed.TotalSeconds:F2}s");
             Console.WriteLine("✅ Brain state saved with hierarchical partitioning");
         }
 
@@ -488,7 +506,7 @@ namespace GreyMatter.Core
             var allClusters = new List<NeuronCluster>(_loadedClusters.Values);
             
             // Use enhanced storage to find conceptually similar clusters
-            var similarClusters = await _storage.FindSimilarClusters(concepts, 0.5);
+            var similarClusters = _storage.FindSimilarClusters(concepts, 0.5);
             
             // Load additional clusters if needed
             if (allClusters.Count < 3 && similarClusters.Any())
@@ -945,6 +963,13 @@ namespace GreyMatter.Core
             multiModalScore += crossModalFeatures.Count(cmf => features.ContainsKey(cmf)) * 3.0;
             
             return multiModalScore;
+        }
+
+        public void AttachConfiguration(BrainConfiguration config)
+        {
+            _configForLogging = config;
+            _storage.MaxParallelSaves = config.MaxParallelSaves;
+            _storage.CompressClusters = config.CompressClusters;
         }
     }
 

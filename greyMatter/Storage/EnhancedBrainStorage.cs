@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using GreyMatter.Core;
 
@@ -18,11 +20,36 @@ namespace GreyMatter.Storage
         private readonly string _hierarchicalBasePath;
         private readonly Dictionary<string, ClusterMetadata> _partitionMetadata = new();
 
+        // NEW: Save performance tuning
+        public int MaxParallelSaves { get; set; } = 2; // keep low for NAS
+        public bool CompressClusters { get; set; } = true; // gzip JSON payloads
+
         public EnhancedBrainStorage(string basePath = "brain_data") : base(basePath)
         {
             _partitioner = new NeuroPartitioner();
             _hierarchicalBasePath = Path.Combine(basePath, "hierarchical");
             EnsureHierarchicalStructure();
+        }
+
+        /// <summary>
+        /// Save multiple clusters efficiently with throttling & compression
+        /// </summary>
+        public async Task SaveClustersEfficientlyAsync(IEnumerable<NeuronCluster> clusters, BrainContext context)
+        {
+            var sem = new SemaphoreSlim(MaxParallelSaves);
+            var tasks = new List<Task>();
+
+            foreach (var cluster in clusters)
+            {
+                await sem.WaitAsync();
+                tasks.Add(Task.Run(async () =>
+                {
+                    try { await SaveClusterWithPartitioningAsync(cluster, context); }
+                    finally { sem.Release(); }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
         }
 
         /// <summary>
@@ -54,14 +81,34 @@ namespace GreyMatter.Storage
                 SavedAt = DateTime.UtcNow
             };
             
-            var json = JsonSerializer.Serialize(clusterData, GetJsonOptions());
-            await File.WriteAllTextAsync(fullPath, json);
+            await WriteJsonFastAsync(fullPath, clusterData, CompressClusters);
             
             // Update partition metadata
             await UpdatePartitionMetadata(clusterPartition, cluster);
-            
-            // NOTE: Removed legacy dual-save to prevent file duplication
-            // Enhanced storage now handles all persistence needs
+        }
+
+        private async Task WriteJsonFastAsync<T>(string fullPath, T obj, bool compress)
+        {
+            var options = GetJsonOptions();
+            var tmpPath = fullPath + ".tmp" + (compress ? ".gz" : "");
+            var finalPath = compress ? fullPath + ".gz" : fullPath;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(finalPath)!);
+
+            var fileMode = FileMode.Create;
+            const int bufferSize = 1 << 20; // 1MB buffer
+
+            await using (var fs = new FileStream(tmpPath, fileMode, FileAccess.Write, FileShare.None, bufferSize, useAsync: true))
+            await using (var stream = compress ? new GZipStream(fs, CompressionLevel.Fastest, leaveOpen: false) : fs as Stream)
+            await using (var writer = new Utf8JsonWriter(stream!, new JsonWriterOptions { Indented = false }))
+            {
+                JsonSerializer.Serialize(writer, obj, options);
+                await writer.FlushAsync();
+            }
+
+            // Atomic replace
+            if (File.Exists(finalPath)) File.Delete(finalPath);
+            File.Move(tmpPath, finalPath, overwrite: true);
         }
 
         /// <summary>
@@ -81,7 +128,7 @@ namespace GreyMatter.Storage
         /// <summary>
         /// Find clusters using biological similarity metrics
         /// </summary>
-        public async Task<List<ClusterReference>> FindSimilarClusters(
+        public List<ClusterReference> FindSimilarClusters(
             IEnumerable<string> concepts, 
             double similarityThreshold = 0.7)
         {
