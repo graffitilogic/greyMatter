@@ -28,6 +28,9 @@ namespace GreyMatter.Storage
         private static readonly ConcurrentDictionary<string, SemaphoreSlim> _bankLocks = new();
         private static SemaphoreSlim GetBankLock(string bankPath) => _bankLocks.GetOrAdd(bankPath, _ => new SemaphoreSlim(1, 1));
 
+        // In-memory cache of neuron banks per partition (path -> dict). Keeps latest loaded/written version.
+        private readonly ConcurrentDictionary<string, (DateTime loadedAt, Dictionary<string, NeuronSnapshot> dict)> _bankCache = new();
+
         public GlobalNeuronStore(string hierarchicalBasePath)
         {
             _hierarchicalBasePath = hierarchicalBasePath;
@@ -41,6 +44,17 @@ namespace GreyMatter.Storage
         private string GetNeuronBankPath(PartitionPath partition)
         {
             return Path.Combine(GetPartitionDir(partition), "neurons.bank.json.gz");
+        }
+
+        private async Task<Dictionary<string, NeuronSnapshot>> ReadBankCachedAsync(string bankPath)
+        {
+            if (_bankCache.TryGetValue(bankPath, out var entry))
+            {
+                return entry.dict;
+            }
+            var dict = await ReadBankAsync(bankPath).ConfigureAwait(false);
+            _bankCache[bankPath] = (DateTime.UtcNow, dict);
+            return dict;
         }
 
         /// <summary>
@@ -57,12 +71,10 @@ namespace GreyMatter.Storage
             await bankLock.WaitAsync().ConfigureAwait(false);
             try
             {
-                // Load existing if present
-                var dict = new Dictionary<string, NeuronSnapshot>();
-                if (File.Exists(bankPath))
-                {
-                    dict = await ReadBankAsync(bankPath).ConfigureAwait(false);
-                }
+                // Load existing (from cache if available)
+                var dict = File.Exists(bankPath)
+                    ? await ReadBankCachedAsync(bankPath).ConfigureAwait(false)
+                    : new Dictionary<string, NeuronSnapshot>();
 
                 bool changed = false;
 
@@ -91,6 +103,8 @@ namespace GreyMatter.Storage
                 if (changed)
                 {
                     await WriteBankAsync(bankPath, dict).ConfigureAwait(false);
+                    // Refresh cache timestamp (dict already updated in-place)
+                    _bankCache[bankPath] = (DateTime.UtcNow, dict);
                 }
             }
             finally
@@ -101,6 +115,7 @@ namespace GreyMatter.Storage
 
         /// <summary>
         /// Load specific neurons by ID from a partition. Returns map of ID to neuron.
+        /// Uses bank cache to avoid repeated full reads.
         /// </summary>
         public async Task<Dictionary<Guid, HybridNeuron>> LoadNeuronsAsync(PartitionPath partition, IEnumerable<Guid> ids)
         {
@@ -108,19 +123,29 @@ namespace GreyMatter.Storage
             var bankPath = GetNeuronBankPath(partition);
             if (!File.Exists(bankPath)) return result;
 
-            var dict = await ReadBankAsync(bankPath).ConfigureAwait(false);
-            foreach (var id in ids)
+            var bankLock = GetBankLock(bankPath);
+            await bankLock.WaitAsync().ConfigureAwait(false);
+            try
             {
-                if (dict.TryGetValue(id.ToString(), out var snap))
+                var dict = await ReadBankCachedAsync(bankPath).ConfigureAwait(false);
+                foreach (var id in ids)
                 {
-                    result[id] = HybridNeuron.FromSnapshot(snap);
+                    if (dict.TryGetValue(id.ToString(), out var snap))
+                    {
+                        result[id] = HybridNeuron.FromSnapshot(snap);
+                    }
                 }
+            }
+            finally
+            {
+                bankLock.Release();
             }
             return result;
         }
 
         private async Task<Dictionary<string, NeuronSnapshot>> ReadBankAsync(string bankPath)
         {
+            if (!File.Exists(bankPath)) return new Dictionary<string, NeuronSnapshot>();
             await using var fs = File.OpenRead(bankPath);
             await using var gz = new GZipStream(fs, CompressionMode.Decompress);
             var dict = await JsonSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz, _jsonOptions).ConfigureAwait(false);

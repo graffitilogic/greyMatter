@@ -43,6 +43,9 @@ namespace GreyMatter.Core
         private readonly Func<string, Task<List<NeuronSnapshot>>>? _loadFunction;
         private readonly Func<string, List<NeuronSnapshot>, Task>? _saveFunction;
 
+        // Track newly added neurons since last membership persistence
+        private readonly HashSet<Guid> _newNeuronIdsSincePersist = new();
+
         public NeuronCluster(string conceptDomain, 
                            Func<string, Task<List<NeuronSnapshot>>>? loadFunc = null,
                            Func<string, List<NeuronSnapshot>, Task>? saveFunc = null)
@@ -89,6 +92,7 @@ namespace GreyMatter.Core
             await EnsureLoadedAsync();
             
             _neurons[neuron.Id] = neuron;
+            _newNeuronIdsSincePersist.Add(neuron.Id);
             _isDirty = true;
             LastModified = DateTime.UtcNow;
             
@@ -451,7 +455,13 @@ namespace GreyMatter.Core
         {
             _isDirty = false;
             LastModified = DateTime.UtcNow;
+            _newNeuronIdsSincePersist.Clear();
         }
+
+        /// <summary>
+        /// Get the set of neuron IDs added since last membership persistence.
+        /// </summary>
+        public IReadOnlyCollection<Guid> GetNewNeuronIdsSincePersist() => _newNeuronIdsSincePersist;
     }
 
     /// <summary>

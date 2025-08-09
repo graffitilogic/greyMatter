@@ -250,37 +250,55 @@ namespace GreyMatter.Storage
 
                         foreach (var c in entry.Clusters)
                         {
-                            var neurons = await c.GetNeuronsAsync();
-                            var newIds = neurons.Keys.ToList();
                             var cid = c.ClusterId.ToString("N");
-
-                            bool changedThisCluster = false;
-                            if (pack.Membership.TryGetValue(cid, out var existingIds))
+                            // Try incremental update using newly added neuron ids
+                            var newlyAdded = c.GetNewNeuronIdsSincePersist();
+                            if (newlyAdded != null && newlyAdded.Count > 0)
                             {
-                                // Compare as sets to avoid order churn
-                                if (!SetEquals(existingIds, newIds))
+                                if (!pack.Membership.TryGetValue(cid, out var existingIds) || existingIds == null)
                                 {
-                                    pack.Membership[cid] = newIds;
+                                    existingIds = new List<Guid>();
+                                    pack.Membership[cid] = existingIds;
+                                }
+                                int before = existingIds.Count;
+                                // Merge unique new ids
+                                var set = new HashSet<Guid>(existingIds);
+                                foreach (var id in newlyAdded)
+                                {
+                                    if (set.Add(id)) existingIds.Add(id);
+                                }
+                                if (existingIds.Count != before)
+                                {
                                     packChanged = true;
-                                    changedThisCluster = true;
+                                    Interlocked.Increment(ref clustersChanged);
                                 }
                             }
                             else
                             {
-                                pack.Membership[cid] = newIds;
-                                packChanged = true;
-                                changedThisCluster = true;
-                            }
-
-                            if (changedThisCluster)
-                            {
-                                Interlocked.Increment(ref clustersChanged);
+                                // Fallback: full set comparison
+                                var neurons = await c.GetNeuronsAsync();
+                                var newIds = neurons.Keys.ToList();
+                                if (pack.Membership.TryGetValue(cid, out var existingIds2))
+                                {
+                                    if (!SetEquals(existingIds2, newIds))
+                                    {
+                                        pack.Membership[cid] = newIds;
+                                        packChanged = true;
+                                        Interlocked.Increment(ref clustersChanged);
+                                    }
+                                }
+                                else
+                                {
+                                    pack.Membership[cid] = newIds;
+                                    packChanged = true;
+                                    Interlocked.Increment(ref clustersChanged);
+                                }
                             }
 
                             // Update partition metadata for this cluster
                             await UpdatePartitionMetadata(entry.Path, c);
 
-                            // Clear dirty flag regardless; current membership is persisted (no-op if unchanged)
+                            // Clear dirty flag regardless; current membership is persisted (incremental or full)
                             c.MarkMembershipPersisted();
                         }
 
@@ -288,7 +306,6 @@ namespace GreyMatter.Storage
                         {
                             pack.SavedAt = DateTime.UtcNow;
                             await SaveMembershipPackAsync(entry.Path, pack);
-                            // refresh cache for this partition
                             _membershipPackCache2[entry.Path.FullPath] = (DateTime.UtcNow, pack);
                             Interlocked.Increment(ref packsWritten);
                         }
@@ -852,40 +869,29 @@ namespace GreyMatter.Storage
         /// </summary>
         public async Task<(int membershipCount, int hydratedCount)> InspectClusterMembershipAsync(NeuronCluster cluster, BrainContext context)
         {
-            // Try find partition from metadata first
-            PartitionPath partition;
-            if (_partitionMetadata.TryGetValue(cluster.ClusterId.ToString(), out var meta))
+            // Prefer partition from metadata
+            var key = cluster.ClusterId.ToString("N");
+            if (!_partitionMetadata.TryGetValue(key, out var meta))
             {
-                partition = meta.PartitionPath;
-            }
-            else
-            {
-                partition = await AnalyzeClusterPartition(cluster, context);
-            }
-
-            var dir = Path.Combine(_hierarchicalBasePath, partition.FullPath);
-            var baseName = $"{cluster.ConceptDomain}_{cluster.ClusterId:N}.cluster";
-            var pathJson = Path.Combine(dir, baseName);
-            var pathGz = pathJson + ".gz";
-
-            PartitionedClusterData? data = null;
-            if (File.Exists(pathGz))
-            {
-                await using var fs = File.OpenRead(pathGz);
-                await using var gz = new GZipStream(fs, CompressionMode.Decompress);
-                data = await JsonSerializer.DeserializeAsync<PartitionedClusterData>(gz, GetJsonOptions());
-            }
-            else if (File.Exists(pathJson))
-            {
-                var json = await File.ReadAllTextAsync(pathJson);
-                data = JsonSerializer.Deserialize<PartitionedClusterData>(json, GetJsonOptions());
+                // Analyze if missing (should be rare)
+                var analyzed = await AnalyzeClusterPartition(cluster, context);
+                meta = new ClusterMetadata
+                {
+                    ClusterId = cluster.ClusterId,
+                    ConceptDomain = cluster.ConceptDomain,
+                    PartitionPath = analyzed,
+                    AssociatedConcepts = cluster.AssociatedConcepts.ToList(),
+                    NeuronCount = cluster.NeuronCount,
+                    AverageImportance = cluster.AverageImportance,
+                    LastAccessed = cluster.LastAccessed,
+                    CreatedAt = cluster.CreatedAt
+                };
             }
 
-            if (data == null)
-                return (0, 0);
-
-            var ids = data.NeuronIds ?? new List<Guid>();
-            var hydrated = await _globalNeuronStore.LoadNeuronsAsync(partition, ids);
+            // Read membership from membership.pack (authoritative)
+            var pack = await LoadMembershipPackAsync(meta.PartitionPath);
+            var ids = pack.Membership.TryGetValue(key, out var list) ? list : new List<Guid>();
+            var hydrated = await _globalNeuronStore.LoadNeuronsAsync(meta.PartitionPath, ids);
             return (ids.Count, hydrated.Count);
         }
 
