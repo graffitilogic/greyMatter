@@ -83,9 +83,18 @@ namespace GreyMatter.Core
         // Adaptive concept capacity (Option B): load/save per-concept target counts; compute initial target from emergent model; apply slow EMA updates with hysteresis; use target for neuron growth to stabilize membership.
         private Dictionary<string, int> _conceptCapacities = new(StringComparer.OrdinalIgnoreCase);
         private const int MinConceptNeurons = 50;
-        private const int MaxConceptNeurons = 5000;
+        private const int MaxConceptNeurons = 600; // lowered from 5000 to rein in oversizing until staged growth lands
         private const double CapacityEmaAlpha = 0.05; // slow adjustment
         private const double CapacityHysteresis = 0.15; // 15% band before changes
+
+        // Concept→cluster cache to bypass repeated similarity lookups
+        private readonly Dictionary<string, Guid> _conceptClusterCache = new(StringComparer.OrdinalIgnoreCase);
+        // Per-run growth hit counters (simple frequency gating)
+        private readonly Dictionary<string, int> _conceptGrowthHits = new(StringComparer.OrdinalIgnoreCase);
+
+        // Growth controls (tunable)
+        private int MaxAddPerConceptPerRun = 64;        // cap growth per concept per run
+        private int GrowthHitThreshold = 3;             // require N hits before allowing growth
 
         // Stable hash for deterministic seeding across runs
         private static int StableHash(string s)
@@ -207,6 +216,10 @@ namespace GreyMatter.Core
             
             // Load concept capacities
             _conceptCapacities = await _storage.LoadConceptCapacitiesAsync();
+
+            // Reset per-run growth hits and cache
+            _conceptGrowthHits.Clear();
+            _conceptClusterCache.Clear();
         }
 
         /// <summary>
@@ -215,6 +228,10 @@ namespace GreyMatter.Core
         public async Task<LearningResult> LearnConceptAsync(string concept, Dictionary<string, double> features)
         {
             var result = new LearningResult { Concept = concept };
+
+            // Growth gating counter
+            var hits = _conceptGrowthHits.TryGetValue(concept, out var h) ? (h + 1) : 1;
+            _conceptGrowthHits[concept] = hits;
 
             // Timing buckets
             var tAll = Stopwatch.StartNew();
@@ -234,16 +251,30 @@ namespace GreyMatter.Core
             var tCapacity = Stopwatch.StartNew();
             var target = GetTargetNeuronsForConcept(concept, features);
             int grew = 0;
+
+            // Apply growth gating and per-run cap
             if (conceptNeurons.Count < target)
             {
-                var neuronsToAdd = target - conceptNeurons.Count;
-                var tGrow = Stopwatch.StartNew();
-                var newNeurons = await cluster.GrowForConcept(concept, neuronsToAdd);
-                tGrow.Stop();
-                conceptNeurons.AddRange(newNeurons);
-                TotalNeuronsCreated += newNeurons.Count;
-                grew = newNeurons.Count;
-                if (ShouldSampleLog()) Console.WriteLine($"   ◽ grow: +{grew} (target {target}) in {tGrow.Elapsed.TotalMilliseconds:F1} ms");
+                var needed = target - conceptNeurons.Count;
+                if (hits < GrowthHitThreshold)
+                {
+                    needed = 0; // defer growth until concept is seen enough times
+                }
+                else
+                {
+                    needed = Math.Min(needed, Math.Max(0, MaxAddPerConceptPerRun));
+                }
+                if (needed > 0)
+                {
+                    var tGrow = Stopwatch.StartNew();
+                    var newNeurons = await cluster.GrowForConcept(concept, conceptNeurons.Count + needed);
+                    tGrow.Stop();
+                    // GrowForConcept(targetSize) returns created neurons; ensure we track only added
+                    grew = newNeurons.Count;
+                    conceptNeurons.AddRange(newNeurons);
+                    TotalNeuronsCreated += grew;
+                    if (ShouldSampleLog()) Console.WriteLine($"   ◽ grow(gated): +{grew} (target {target}, hits {hits}) in {tGrow.Elapsed.TotalMilliseconds:F1} ms");
+                }
             }
             tCapacity.Stop();
 
@@ -716,15 +747,32 @@ namespace GreyMatter.Core
 
         private async Task<NeuronCluster> FindOrCreateClusterForConcept(string concept)
         {
+            // Fast path: cache
+            if (_conceptClusterCache.TryGetValue(concept, out var cachedId))
+            {
+                if (_loadedClusters.TryGetValue(cachedId, out var cachedCluster))
+                    return cachedCluster;
+                // Attempt to load from storage by GUID
+                Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
+                    _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
+                    {
+                        AllNeurons = new Dictionary<Guid, HybridNeuron>(),
+                        AnalysisTime = DateTime.UtcNow
+                    });
+                var clusterFromCache = new NeuronCluster(concept, cachedId, hierLoad, _storage.SaveClusterAsync);
+                _loadedClusters[cachedId] = clusterFromCache;
+                return clusterFromCache;
+            }
+
             // Look for existing cluster with high relevance
             var relevantClusters = await FindRelevantClusters(new[] { concept });
             var bestCluster = relevantClusters.FirstOrDefault();
-            
             if (bestCluster != null && bestCluster.CalculateRelevance(new[] { concept }) > ConceptSimilarityThreshold)
             {
+                _conceptClusterCache[concept] = bestCluster.ClusterId;
                 return bestCluster;
             }
-            
+
             // Try storage metadata lookup for a stable cluster to avoid creating duplicates
             var similar = _storage.FindSimilarClusters(new[] { concept }, 0.5);
             var chosen = similar.FirstOrDefault();
@@ -739,35 +787,54 @@ namespace GreyMatter.Core
                     });
                 var existing = new NeuronCluster(chosen.ConceptDomain, chosen.ClusterId, hierLoad, _storage.SaveClusterAsync);
                 _loadedClusters[existing.ClusterId] = existing;
+                _conceptClusterCache[concept] = existing.ClusterId;
                 return existing;
             }
-            
+
             // Create new cluster
             var newCluster = new NeuronCluster(concept, _storage.LoadClusterAsync, _storage.SaveClusterAsync);
             _loadedClusters[newCluster.ClusterId] = newCluster;
+            _conceptClusterCache[concept] = newCluster.ClusterId;
             TotalClustersCreated++;
-            
             return newCluster;
         }
 
         private async Task<List<NeuronCluster>> FindRelevantClusters(IEnumerable<string> concepts)
         {
             var allClusters = new List<NeuronCluster>(_loadedClusters.Values);
-            
+
+            // Seed with cached clusters for provided concepts
+            foreach (var c in concepts)
+            {
+                if (_conceptClusterCache.TryGetValue(c, out var cid))
+                {
+                    if (!_loadedClusters.TryGetValue(cid, out var cached))
+                    {
+                        // Lazy load cached cluster by GUID
+                        Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
+                            _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
+                            {
+                                AllNeurons = new Dictionary<Guid, HybridNeuron>(),
+                                AnalysisTime = DateTime.UtcNow
+                            });
+                        cached = new NeuronCluster(c, cid, hierLoad, _storage.SaveClusterAsync);
+                        _loadedClusters[cid] = cached;
+                    }
+                    allClusters.Add(cached);
+                }
+            }
+
             // Use enhanced storage to find conceptually similar clusters
             var similarClusters = _storage.FindSimilarClusters(concepts, 0.5);
-            
             // Load additional clusters if needed
             if (allClusters.Count < 3 && similarClusters.Any())
             {
-                // Hierarchical loader resolves by GUID using membership packs
                 Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
                     _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
                     {
                         AllNeurons = new Dictionary<Guid, HybridNeuron>(),
                         AnalysisTime = DateTime.UtcNow
                     });
-
                 foreach (var clusterRef in similarClusters.Take(5))
                 {
                     if (!_loadedClusters.ContainsKey(clusterRef.ClusterId))
