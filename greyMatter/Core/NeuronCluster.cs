@@ -284,6 +284,24 @@ namespace GreyMatter.Core
                     _neurons = snapshots.ToDictionary(s => s.Id, HybridNeuron.FromSnapshot);
                 }
                 
+                // Rebuild associated concepts from hydrated neurons to ensure stable similarity & metadata
+                AssociatedConcepts.Clear();
+                foreach (var n in _neurons.Values)
+                {
+                    if (n.AssociatedConcepts != null)
+                    {
+                        foreach (var c in n.AssociatedConcepts)
+                        {
+                            if (!string.IsNullOrWhiteSpace(c))
+                                AssociatedConcepts.Add(c.ToLowerInvariant());
+                        }
+                    }
+                    if (!string.IsNullOrWhiteSpace(n.ConceptTag))
+                    {
+                        AssociatedConcepts.Add(n.ConceptTag.ToLowerInvariant());
+                    }
+                }
+                
                 _isLoaded = true;
                 _isDirty = false;
                 LastAccessed = DateTime.UtcNow;

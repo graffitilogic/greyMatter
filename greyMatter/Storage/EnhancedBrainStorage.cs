@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using GreyMatter.Core;
 using System.Text.RegularExpressions;
+using System.Collections.Concurrent;
 
 namespace GreyMatter.Storage
 {
@@ -37,6 +38,13 @@ namespace GreyMatter.Storage
             public DateTime SavedAt { get; set; } = DateTime.UtcNow;
         }
 
+        // Fast lookup: concept -> clusters (built from metadata)
+        private readonly Dictionary<string, List<ClusterReference>> _conceptIndex = new(StringComparer.OrdinalIgnoreCase);
+        private bool _conceptIndexDirty = false;
+
+        // Cache membership packs per partition to avoid repeated disk reads
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime loadedAt, MembershipPack pack)> _membershipPackCache2 = new();
+
         public EnhancedBrainStorage(string basePath = "brain_data") : base(basePath)
         {
             _partitioner = new NeuroPartitioner();
@@ -45,6 +53,34 @@ namespace GreyMatter.Storage
             _globalNeuronStore = new GlobalNeuronStore(_hierarchicalBasePath);
             // Load partition metadata if present
             TryLoadPartitionMetadata();
+        }
+
+        private void BuildConceptIndexFromMetadata()
+        {
+            _conceptIndex.Clear();
+            foreach (var meta in _partitionMetadata.Values)
+            {
+                var cref = new ClusterReference
+                {
+                    ClusterId = meta.ClusterId,
+                    PartitionPath = meta.PartitionPath,
+                    Similarity = 1.0,
+                    LastAccessed = meta.LastAccessed,
+                    ConceptDomain = meta.ConceptDomain
+                };
+                foreach (var concept in meta.AssociatedConcepts)
+                {
+                    if (string.IsNullOrWhiteSpace(concept)) continue;
+                    if (!_conceptIndex.TryGetValue(concept, out var list))
+                    {
+                        list = new List<ClusterReference>();
+                        _conceptIndex[concept] = list;
+                    }
+                    // Avoid duplicates
+                    if (!list.Any(x => x.ClusterId == cref.ClusterId))
+                        list.Add(cref);
+                }
+            }
         }
 
         private void TryLoadPartitionMetadata()
@@ -60,7 +96,21 @@ namespace GreyMatter.Storage
                     {
                         _partitionMetadata.Clear();
                         foreach (var kvp in dict)
-                            _partitionMetadata[kvp.Key] = kvp.Value;
+                        {
+                            var key = kvp.Key;
+                            if (Guid.TryParse(key, out var gid))
+                            {
+                                // Normalize to 'N' format
+                                _partitionMetadata[gid.ToString("N")] = kvp.Value;
+                            }
+                            else
+                            {
+                                _partitionMetadata[key] = kvp.Value;
+                            }
+                        }
+                        // Build inverted index once
+                        BuildConceptIndexFromMetadata();
+                        _conceptIndexDirty = false;
                     }
                 }
             }
@@ -102,6 +152,63 @@ namespace GreyMatter.Storage
             File.Move(tmp, path, overwrite: true);
         }
 
+        // Public helper: get neuron IDs for a cluster via membership pack (no hydration)
+        public async Task<List<Guid>> GetClusterNeuronIdsAsync(Guid clusterId, int maxToReturn = 0)
+        {
+            var key = clusterId.ToString("N");
+            if (_partitionMetadata.TryGetValue(key, out var meta))
+            {
+                var pack = await GetMembershipPackCachedAsync(meta.PartitionPath);
+                if (pack.Membership.TryGetValue(key, out var ids))
+                {
+                    if (ids == null || ids.Count == 0) return new List<Guid>();
+                    if (maxToReturn > 0 && ids.Count > maxToReturn)
+                    {
+                        // return a simple random sample without allocation overhead
+                        var rnd = new Random(key.GetHashCode());
+                        var sample = new List<Guid>(maxToReturn);
+                        for (int i = 0; i < maxToReturn; i++)
+                        {
+                            sample.Add(ids[rnd.Next(ids.Count)]);
+                        }
+                        return sample;
+                    }
+                    return new List<Guid>(ids);
+                }
+            }
+            return new List<Guid>();
+        }
+
+        private async Task<MembershipPack> GetMembershipPackCachedAsync(PartitionPath partition)
+        {
+            var key = partition.FullPath;
+            if (_membershipPackCache2.TryGetValue(key, out var entry))
+            {
+                return entry.pack;
+            }
+            var pack = await LoadMembershipPackAsync(partition);
+            _membershipPackCache2[key] = (DateTime.UtcNow, pack);
+            return pack;
+        }
+
+        // Save metrics for instrumentation
+        public class SaveMetrics
+        {
+            public int ClustersExamined { get; set; }
+            public int ClustersChangedMembership { get; set; }
+            public int MembershipPacksWritten { get; set; }
+            public int MembershipPacksSkipped { get; set; }
+            public int NeuronBankPartitions { get; set; }
+            public int NeuronsUpserted { get; set; }
+        }
+        private SaveMetrics _lastSaveMetrics = new SaveMetrics();
+        public SaveMetrics GetAndResetLastSaveMetrics()
+        {
+            var snapshot = _lastSaveMetrics;
+            _lastSaveMetrics = new SaveMetrics();
+            return snapshot;
+        }
+
         /// <summary>
         /// Save multiple clusters efficiently with throttling & compression
         /// </summary>
@@ -123,6 +230,11 @@ namespace GreyMatter.Storage
                 groups[key] = entry;
             }
 
+            // Instrumentation counters
+            int clustersExamined = groups.Values.Sum(g => g.Clusters.Count);
+            int clustersChanged = 0;
+            int packsWritten = 0;
+
             // Write one membership pack per partition (only if changed)
             var sem = new SemaphoreSlim(MaxParallelSaves);
             var tasks = new List<Task>();
@@ -142,6 +254,7 @@ namespace GreyMatter.Storage
                             var newIds = neurons.Keys.ToList();
                             var cid = c.ClusterId.ToString("N");
 
+                            bool changedThisCluster = false;
                             if (pack.Membership.TryGetValue(cid, out var existingIds))
                             {
                                 // Compare as sets to avoid order churn
@@ -149,12 +262,19 @@ namespace GreyMatter.Storage
                                 {
                                     pack.Membership[cid] = newIds;
                                     packChanged = true;
+                                    changedThisCluster = true;
                                 }
                             }
                             else
                             {
                                 pack.Membership[cid] = newIds;
                                 packChanged = true;
+                                changedThisCluster = true;
+                            }
+
+                            if (changedThisCluster)
+                            {
+                                Interlocked.Increment(ref clustersChanged);
                             }
 
                             // Update partition metadata for this cluster
@@ -168,6 +288,9 @@ namespace GreyMatter.Storage
                         {
                             pack.SavedAt = DateTime.UtcNow;
                             await SaveMembershipPackAsync(entry.Path, pack);
+                            // refresh cache for this partition
+                            _membershipPackCache2[entry.Path.FullPath] = (DateTime.UtcNow, pack);
+                            Interlocked.Increment(ref packsWritten);
                         }
                     }
                     finally { sem.Release(); }
@@ -178,6 +301,18 @@ namespace GreyMatter.Storage
             // Persist partition metadata once at the end
             await this.PersistPartitionMetadataAsync();
             _batchMode = false;
+
+            // Publish metrics (merge with any neuron bank metrics gathered earlier)
+            var prior = _lastSaveMetrics;
+            _lastSaveMetrics = new SaveMetrics
+            {
+                ClustersExamined = clustersExamined,
+                ClustersChangedMembership = clustersChanged,
+                MembershipPacksWritten = packsWritten,
+                MembershipPacksSkipped = Math.Max(0, groups.Count - packsWritten),
+                NeuronBankPartitions = prior.NeuronBankPartitions,
+                NeuronsUpserted = prior.NeuronsUpserted
+            };
         }
 
         private static bool SetEquals(List<Guid> a, List<Guid> b)
@@ -294,6 +429,9 @@ namespace GreyMatter.Storage
                 byPartition[key] = (entry.Path, existing.Values.ToList());
             }
 
+            var partitionsCount = byPartition.Count;
+            var neuronsUpserted = byPartition.Values.Sum(v => v.Neurons.Count);
+
             var sem = new SemaphoreSlim(MaxParallelSaves);
             var tasks = new List<Task>();
             foreach (var kvp in byPartition.Values)
@@ -306,6 +444,10 @@ namespace GreyMatter.Storage
                 }));
             }
             await Task.WhenAll(tasks);
+
+            // Update metrics (merge with existing)
+            _lastSaveMetrics.NeuronBankPartitions = partitionsCount;
+            _lastSaveMetrics.NeuronsUpserted = neuronsUpserted;
         }
 
         private async Task WriteJsonFastAsync<T>(string fullPath, T obj, bool compress)
@@ -354,8 +496,26 @@ namespace GreyMatter.Storage
             double similarityThreshold = 0.7)
         {
             var results = new List<ClusterReference>();
-            
-            // Search through partition metadata for conceptually similar clusters
+
+            // Fast path: exact concept matches via inverted index
+            var set = new HashSet<Guid>();
+            foreach (var concept in concepts)
+            {
+                if (_conceptIndex.TryGetValue(concept, out var list))
+                {
+                    foreach (var r in list)
+                    {
+                        if (set.Add(r.ClusterId)) results.Add(r);
+                    }
+                }
+            }
+            if (results.Count > 0)
+            {
+                // Already exact/near matches
+                return results.OrderByDescending(r => r.Similarity).ToList();
+            }
+
+            // Fallback: scan metadata (rare)
             foreach (var partition in _partitionMetadata.Values)
             {
                 var similarity = CalculateConceptualSimilarity(concepts, partition.AssociatedConcepts);
@@ -445,10 +605,11 @@ namespace GreyMatter.Storage
             // First attempt: parse clusterId and use partition metadata + membership pack
             if (TryParseClusterId(clusterIdentifier, out var cid))
             {
-                if (_partitionMetadata.TryGetValue(cid.ToString(), out var meta))
+                var key = cid.ToString("N");
+                if (_partitionMetadata.TryGetValue(key, out var meta))
                 {
                     var pack = await LoadMembershipPackAsync(meta.PartitionPath);
-                    if (pack.Membership.TryGetValue(cid.ToString("N"), out var ids))
+                    if (pack.Membership.TryGetValue(key, out var ids))
                     {
                         var loaded = await _globalNeuronStore.LoadNeuronsAsync(meta.PartitionPath, ids);
                         return new PartitionedClusterData
@@ -462,7 +623,7 @@ namespace GreyMatter.Storage
                     }
                 }
             }
-
+            
             // Fallback: scan files as before
             var searchPaths = GenerateSearchPaths(clusterIdentifier);
             foreach (var searchPath in searchPaths)
@@ -542,7 +703,9 @@ namespace GreyMatter.Storage
         private async Task UpdatePartitionMetadata(PartitionPath partition, NeuronCluster cluster)
         {
             var metadata = CreateClusterMetadata(cluster, partition);
-            _partitionMetadata[cluster.ClusterId.ToString()] = metadata;
+            var key = cluster.ClusterId.ToString("N");
+            _partitionMetadata[key] = metadata;
+            _conceptIndexDirty = true; // defer rebuild
             
             if (_batchMode)
             {
@@ -554,6 +717,9 @@ namespace GreyMatter.Storage
             var metadataPath = Path.Combine(_hierarchicalBasePath, "partition_metadata.json");
             var json = JsonSerializer.Serialize(_partitionMetadata, GetJsonOptions());
             await File.WriteAllTextAsync(metadataPath, json);
+            // Rebuild index now for immediate consistency
+            BuildConceptIndexFromMetadata();
+            _conceptIndexDirty = false;
         }
 
         private async Task PersistPartitionMetadataAsync()
@@ -564,6 +730,11 @@ namespace GreyMatter.Storage
             await File.WriteAllTextAsync(tmp, json);
             if (File.Exists(metadataPath)) File.Delete(metadataPath);
             File.Move(tmp, metadataPath, overwrite: true);
+            if (_conceptIndexDirty)
+            {
+                BuildConceptIndexFromMetadata();
+                _conceptIndexDirty = false;
+            }
         }
 
         private double CalculateConceptualSimilarity(IEnumerable<string> concepts1, List<string> concepts2)
@@ -768,11 +939,40 @@ namespace GreyMatter.Storage
         private PartitionPath GetStablePartitionForCluster(NeuronCluster cluster, BrainContext context)
         {
             // Prefer previously assigned partition to avoid churn; fall back to analysis for new clusters
-            if (_partitionMetadata.TryGetValue(cluster.ClusterId.ToString(), out var meta))
+            var key = cluster.ClusterId.ToString("N");
+            if (_partitionMetadata.TryGetValue(key, out var meta))
             {
                 return meta.PartitionPath;
             }
             return AnalyzeClusterPartition(cluster, context).GetAwaiter().GetResult();
+        }
+
+        public new async Task<StorageStats> GetStorageStatsAsync()
+        {
+            // Start with base stats
+            var baseStats = await base.GetStorageStatsAsync();
+
+            // Include hierarchical folder size and count clusters from metadata
+            long hierSize = 0;
+            try
+            {
+                if (Directory.Exists(_hierarchicalBasePath))
+                {
+                    hierSize = new DirectoryInfo(_hierarchicalBasePath)
+                        .EnumerateFiles("*", SearchOption.AllDirectories)
+                        .Sum(f => f.Length);
+                }
+            }
+            catch { /* ignore */ }
+
+            var totalSize = baseStats.TotalSizeBytes + hierSize;
+            var count = Math.Max(baseStats.ClusterCount, _partitionMetadata.Count);
+
+            return new StorageStats
+            {
+                ClusterCount = count,
+                TotalSizeBytes = totalSize
+            };
         }
     }
 

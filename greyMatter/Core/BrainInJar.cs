@@ -49,6 +49,11 @@ namespace GreyMatter.Core
         private readonly HashSet<Guid> _blockClusters = new();
         private readonly Stopwatch _learnSw = Stopwatch.StartNew();
 
+        // Instrumentation aggregates (reset each reporting block)
+        private long _instrCount = 0;
+        private double _tFindMsSum = 0, _tLookupMsSum = 0, _tCapacityMsSum = 0, _tTrainMsSum = 0, _tSynMsSum = 0, _tTotalMsSum = 0;
+        private long _neuronsAddedSum = 0, _neuronsUsedSum = 0;
+
         private bool ShouldSampleLog() => (_configForLogging?.Verbosity ?? 0) >= 2 && _reportRand.NextDouble() <= _reportingSampleRate;
         private void ReportSampler(string concept, int neuronsUsed, Guid clusterId)
         {
@@ -132,28 +137,36 @@ namespace GreyMatter.Core
         private int GetTargetNeuronsForConcept(string concept, Dictionary<string, double> features)
         {
             if (_conceptCapacities.TryGetValue(concept, out var target))
-                return target;
+            {
+                return Math.Clamp(target, MinConceptNeurons, MaxConceptNeurons);
+            }
 
-            // Initialize from deterministic emergent model
+            // Initialize with deterministic base so it’s stable across runs
             var baseTarget = CalculateRequiredNeuronsDeterministic(concept, features);
-            target = Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, baseTarget));
-            _conceptCapacities[concept] = target;
-            return target;
+            baseTarget = Math.Clamp(baseTarget, MinConceptNeurons, MaxConceptNeurons);
+            _conceptCapacities[concept] = baseTarget;
+            return baseTarget;
         }
 
         private void AdjustConceptCapacity(string concept, int observedNeurons, double demandSignal)
         {
-            var current = _conceptCapacities.GetValueOrDefault(concept, Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, observedNeurons)));
-            var desired = (int)Math.Round(Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, observedNeurons * (0.8 + 0.4 * Math.Max(0.0, demandSignal)))));
+            // Use current target as anchor; adjust only if observed deviates beyond hysteresis band
+            var current = _conceptCapacities.GetValueOrDefault(concept, Math.Clamp(observedNeurons, MinConceptNeurons, MaxConceptNeurons));
+            current = Math.Clamp(current, MinConceptNeurons, MaxConceptNeurons);
 
-            var lower = (int)Math.Round(current * (1 - CapacityHysteresis));
-            var upper = (int)Math.Round(current * (1 + CapacityHysteresis));
-            if (desired < lower || desired > upper)
+            // Deviation relative to target
+            var ratio = (double)Math.Max(1, observedNeurons) / Math.Max(1, current);
+            var lowerRatio = 1.0 - CapacityHysteresis;
+            var upperRatio = 1.0 + CapacityHysteresis;
+
+            if (ratio < lowerRatio || ratio > upperRatio)
             {
+                // Nudge toward observed when outside the band
+                var desired = Math.Clamp(observedNeurons, MinConceptNeurons, MaxConceptNeurons);
                 var updated = (int)Math.Round(current * (1 - CapacityEmaAlpha) + desired * CapacityEmaAlpha);
-                updated = Math.Clamp(updated, MinConceptNeurons, MaxConceptNeurons);
-                _conceptCapacities[concept] = updated;
+                _conceptCapacities[concept] = Math.Clamp(updated, MinConceptNeurons, MaxConceptNeurons);
             }
+            // Else: keep capacity unchanged to avoid churn when on target
         }
 
         public BrainInJar(string storagePath = "brain_data")
@@ -201,46 +214,93 @@ namespace GreyMatter.Core
         /// </summary>
         public async Task<LearningResult> LearnConceptAsync(string concept, Dictionary<string, double> features)
         {
-            // Reduce IO: sample logs instead of always writing
             var result = new LearningResult { Concept = concept };
-            
+
+            // Timing buckets
+            var tAll = Stopwatch.StartNew();
+            var tFind = Stopwatch.StartNew();
+
             // Find or create relevant cluster
             var cluster = await FindOrCreateClusterForConcept(concept);
+            tFind.Stop();
             result.ClusterId = cluster.ClusterId;
-            
-            // Get neurons for this concept
-            var conceptNeurons = await cluster.FindNeuronsByConcept(concept);
 
-            // Use adaptive target capacity
+            // Get neurons for this concept
+            var tLookup = Stopwatch.StartNew();
+            var conceptNeurons = await cluster.FindNeuronsByConcept(concept);
+            tLookup.Stop();
+
+            // Capacity and growth
+            var tCapacity = Stopwatch.StartNew();
             var target = GetTargetNeuronsForConcept(concept, features);
+            int grew = 0;
             if (conceptNeurons.Count < target)
             {
                 var neuronsToAdd = target - conceptNeurons.Count;
+                var tGrow = Stopwatch.StartNew();
                 var newNeurons = await cluster.GrowForConcept(concept, neuronsToAdd);
+                tGrow.Stop();
                 conceptNeurons.AddRange(newNeurons);
                 TotalNeuronsCreated += newNeurons.Count;
+                grew = newNeurons.Count;
+                if (ShouldSampleLog()) Console.WriteLine($"   ◽ grow: +{grew} (target {target}) in {tGrow.Elapsed.TotalMilliseconds:F1} ms");
             }
-            
-            // Train the neurons with the features
+            tCapacity.Stop();
+
+            // Training pass
+            var tTrain = Stopwatch.StartNew();
             foreach (var neuron in conceptNeurons)
             {
                 await TrainNeuronWithFeatures(neuron, features);
             }
-            
-            // Adjust capacity slowly based on a crude demand signal (ratio of used to target clipped)
+            tTrain.Stop();
+
+            // Capacity adjust
+            var tAdjust = Stopwatch.StartNew();
             var demand = Math.Min(1.5, (double)conceptNeurons.Count / Math.Max(1, target));
             AdjustConceptCapacity(concept, conceptNeurons.Count, demand);
+            tAdjust.Stop();
 
-            // Create connections between related concepts
+            // Synapses
+            var tSyn = Stopwatch.StartNew();
             await CreateConceptualConnections(concept, features);
-            
+            tSyn.Stop();
+
             result.Success = true;
             result.NeuronsInvolved = conceptNeurons.Count;
 
-            // Reporting sampler and block summary
+            // Update instrumentation aggregates
+            tAll.Stop();
+            _instrCount++;
+            _tFindMsSum += tFind.Elapsed.TotalMilliseconds;
+            _tLookupMsSum += tLookup.Elapsed.TotalMilliseconds;
+            _tCapacityMsSum += tCapacity.Elapsed.TotalMilliseconds;
+            _tTrainMsSum += tTrain.Elapsed.TotalMilliseconds;
+            _tSynMsSum += tSyn.Elapsed.TotalMilliseconds;
+            _tTotalMsSum += tAll.Elapsed.TotalMilliseconds;
+            _neuronsAddedSum += grew;
+            _neuronsUsedSum += conceptNeurons.Count;
+
+            // Report (sampled)
             ReportSampler(concept, result.NeuronsInvolved, result.ClusterId);
             AccumulateReportBlock(concept, result.NeuronsInvolved, result.ClusterId);
-            
+
+            // Emit block-level perf summary
+            if (_learnEvents % Math.Max(1, _reportingInterval) == 0 && _instrCount > 0)
+            {
+                var avg = new Func<double, double>(x => x / _instrCount);
+                var addedPct = _neuronsUsedSum > 0 ? (100.0 * _neuronsAddedSum / (double)_neuronsUsedSum) : 0.0;
+                Console.WriteLine($"   🧪 Perf(avg over {_instrCount} concepts): find {avg(_tFindMsSum):F1} ms | lookup {avg(_tLookupMsSum):F1} ms | capacity {avg(_tCapacityMsSum):F1} ms | train {avg(_tTrainMsSum):F1} ms | syn {avg(_tSynMsSum):F1} ms | total {avg(_tTotalMsSum):F1} ms | neurons added/used { _neuronsAddedSum }/{ _neuronsUsedSum } ({addedPct:F1}% new)");
+                // reset
+                _instrCount = 0;
+                _tFindMsSum = _tLookupMsSum = _tCapacityMsSum = _tTrainMsSum = _tSynMsSum = _tTotalMsSum = 0;
+                _neuronsAddedSum = _neuronsUsedSum = 0;
+            }
+
+            if (ShouldSampleLog())
+            {
+                Console.WriteLine($"⏱️ learn concept '{concept}': find {tFind.Elapsed.TotalMilliseconds:F1} ms | lookup {tLookup.Elapsed.TotalMilliseconds:F1} ms | capacity {tCapacity.Elapsed.TotalMilliseconds:F1} ms | train {tTrain.Elapsed.TotalMilliseconds:F1} ms | syn {tSyn.Elapsed.TotalMilliseconds:F1} ms | total {tAll.Elapsed.TotalMilliseconds:F1} ms");
+            }
             return result;
         }
 
@@ -412,7 +472,11 @@ namespace GreyMatter.Core
             // Persist concept capacities at end of save
             try { await _storage.SaveConceptCapacitiesAsync(_conceptCapacities); } catch { /* best effort */ }
             if ((_configForLogging?.Verbosity ?? 0) > 0)
+            {
+                var m = _storage.GetAndResetLastSaveMetrics();
+                Console.WriteLine($"   📈 Save metrics: clustersExamined={m.ClustersExamined}, changedMembership={m.ClustersChangedMembership}, packsWritten={m.MembershipPacksWritten}, packsSkipped={m.MembershipPacksSkipped}, bankPartitions={m.NeuronBankPartitions}, neuronsUpserted={m.NeuronsUpserted}");
                 Console.WriteLine($"   ⏱️  Total save time {swTotal.Elapsed.TotalSeconds:F2}s");
+            }
             Console.WriteLine("✅ Brain state saved with hierarchical partitioning");
 
             // Optional quick integrity sampler when verbose
@@ -666,8 +730,14 @@ namespace GreyMatter.Core
             var chosen = similar.FirstOrDefault();
             if (chosen != null)
             {
-                // Hydrate a cluster handle with the known ID and domain; lazy load will use storage
-                var existing = new NeuronCluster(chosen.ConceptDomain, chosen.ClusterId, _storage.LoadClusterAsync, _storage.SaveClusterAsync);
+                // Use hierarchical loader that resolves by ClusterId via membership packs
+                Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
+                    _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
+                    {
+                        AllNeurons = new Dictionary<Guid, HybridNeuron>(),
+                        AnalysisTime = DateTime.UtcNow
+                    });
+                var existing = new NeuronCluster(chosen.ConceptDomain, chosen.ClusterId, hierLoad, _storage.SaveClusterAsync);
                 _loadedClusters[existing.ClusterId] = existing;
                 return existing;
             }
@@ -690,13 +760,22 @@ namespace GreyMatter.Core
             // Load additional clusters if needed
             if (allClusters.Count < 3 && similarClusters.Any())
             {
+                // Hierarchical loader resolves by GUID using membership packs
+                Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
+                    _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
+                    {
+                        AllNeurons = new Dictionary<Guid, HybridNeuron>(),
+                        AnalysisTime = DateTime.UtcNow
+                    });
+
                 foreach (var clusterRef in similarClusters.Take(5))
                 {
                     if (!_loadedClusters.ContainsKey(clusterRef.ClusterId))
                     {
                         var cluster = new NeuronCluster(
-                            clusterRef.PartitionPath.Primary, 
-                            _storage.LoadClusterAsync, 
+                            clusterRef.ConceptDomain,
+                            clusterRef.ClusterId,
+                            hierLoad,
                             _storage.SaveClusterAsync);
                         _loadedClusters[cluster.ClusterId] = cluster;
                         allClusters.Add(cluster);
