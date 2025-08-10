@@ -35,6 +35,17 @@ namespace GreyMatter
                 return;
             }
 
+            // NEW: Save-only utility mode
+            if (args.Length > 0 && args[0] == "--save-only")
+            {
+                var brain = new BrainInJar(config.BrainDataPath);
+                brain.AttachConfiguration(config);
+                await brain.InitializeAsync();
+                Console.WriteLine("💾 Saving brain state (save-only)...");
+                await brain.SaveAsync();
+                return;
+            }
+
             // NEW: Preschool training pipeline (compile → learn → eval)
             if (args.Length > 0 && args[0] == "--preschool-train")
             {

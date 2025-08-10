@@ -45,6 +45,86 @@ namespace GreyMatter.Storage
         // Cache membership packs per partition to avoid repeated disk reads
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (DateTime loadedAt, MembershipPack pack)> _membershipPackCache2 = new();
 
+        // Lightweight cached storage stats to avoid expensive NAS scans on startup
+        private class StatsCache
+        {
+            public int ClusterCount { get; set; }
+            public long BaseBytes { get; set; }
+            public long HierarchicalBytes { get; set; }
+            public DateTime LastUpdatedUtc { get; set; }
+        }
+
+        private StatsCache _statsCache = new StatsCache();
+        private Task? _statsRefreshTask;
+        private readonly object _statsLock = new();
+
+        private string GetStatsCachePath() => Path.Combine(_hierarchicalBasePath, "storage_stats.json");
+
+        private void TryLoadStatsCache()
+        {
+            try
+            {
+                var path = GetStatsCachePath();
+                if (File.Exists(path))
+                {
+                    var json = File.ReadAllText(path);
+                    var sc = JsonSerializer.Deserialize<StatsCache>(json, GetJsonOptions());
+                    if (sc != null) _statsCache = sc;
+                }
+            }
+            catch { /* ignore cache errors */ }
+        }
+
+        private async Task SaveStatsCacheAsync()
+        {
+            try
+            {
+                var path = GetStatsCachePath();
+                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                var json = JsonSerializer.Serialize(_statsCache, GetJsonOptions());
+                await File.WriteAllTextAsync(path, json);
+            }
+            catch { /* ignore cache errors */ }
+        }
+
+        private void StartBackgroundStatsRefreshIfNeeded()
+        {
+            lock (_statsLock)
+            {
+                if (_statsRefreshTask != null && !_statsRefreshTask.IsCompleted) return;
+                _statsRefreshTask = Task.Run(async () =>
+                {
+                    try
+                    {
+                        // Compute base stats via base implementation
+                        var baseStats = await base.GetStorageStatsAsync();
+                        // Compute hierarchical size
+                        long hierSize = 0;
+                        try
+                        {
+                            if (Directory.Exists(_hierarchicalBasePath))
+                            {
+                                hierSize = new DirectoryInfo(_hierarchicalBasePath)
+                                    .EnumerateFiles("*", SearchOption.AllDirectories)
+                                    .Sum(f => f.Length);
+                            }
+                        }
+                        catch { /* ignore */ }
+
+                        _statsCache = new StatsCache
+                        {
+                            ClusterCount = Math.Max(baseStats.ClusterCount, _partitionMetadata.Count),
+                            BaseBytes = baseStats.TotalSizeBytes,
+                            HierarchicalBytes = hierSize,
+                            LastUpdatedUtc = DateTime.UtcNow
+                        };
+                        await SaveStatsCacheAsync();
+                    }
+                    catch { /* ignore */ }
+                });
+            }
+        }
+
         public EnhancedBrainStorage(string basePath = "brain_data") : base(basePath)
         {
             _partitioner = new NeuroPartitioner();
@@ -53,6 +133,9 @@ namespace GreyMatter.Storage
             _globalNeuronStore = new GlobalNeuronStore(_hierarchicalBasePath);
             // Load partition metadata if present
             TryLoadPartitionMetadata();
+            // Load cached stats and kick a background refresh
+            TryLoadStatsCache();
+            StartBackgroundStatsRefreshIfNeeded();
         }
 
         private void BuildConceptIndexFromMetadata()
@@ -133,7 +216,42 @@ namespace GreyMatter.Storage
                 await using var fs = File.OpenRead(path);
                 await using var gz = new GZipStream(fs, CompressionMode.Decompress);
                 var pack = await JsonSerializer.DeserializeAsync<MembershipPack>(gz, GetJsonOptions());
-                return pack ?? new MembershipPack();
+                pack ??= new MembershipPack();
+
+                // Normalize keys to Guid "N" lowercase and de-duplicate Guid lists
+                var normalized = new Dictionary<string, List<Guid>>();
+                foreach (var kvp in pack.Membership)
+                {
+                    if (kvp.Key == null) continue;
+                    var key = Guid.TryParse(kvp.Key, out var gid)
+                        ? gid.ToString("N")
+                        : kvp.Key.Trim().ToLowerInvariant();
+
+                    var ids = kvp.Value ?? new List<Guid>();
+                    if (ids.Count > 1)
+                    {
+                        var set = new HashSet<Guid>(ids.Where(g => g != Guid.Empty));
+                        ids = set.ToList();
+                    }
+                    else if (ids.Count == 1 && ids[0] == Guid.Empty)
+                    {
+                        ids = new List<Guid>();
+                    }
+
+                    if (normalized.TryGetValue(key, out var existing))
+                    {
+                        // Merge with existing list, avoiding duplicates
+                        var set = new HashSet<Guid>(existing);
+                        foreach (var id in ids) set.Add(id);
+                        normalized[key] = set.ToList();
+                    }
+                    else
+                    {
+                        normalized[key] = ids;
+                    }
+                }
+                pack.Membership = normalized;
+                return pack;
             }
             catch { return new MembershipPack(); }
         }
@@ -752,6 +870,10 @@ namespace GreyMatter.Storage
                 BuildConceptIndexFromMetadata();
                 _conceptIndexDirty = false;
             }
+            // Also refresh cached cluster count fast; background refresh will correct sizes
+            _statsCache.ClusterCount = _partitionMetadata.Count;
+            _statsCache.LastUpdatedUtc = DateTime.UtcNow;
+            await SaveStatsCacheAsync();
         }
 
         private double CalculateConceptualSimilarity(IEnumerable<string> concepts1, List<string> concepts2)
@@ -955,29 +1077,48 @@ namespace GreyMatter.Storage
 
         public new async Task<StorageStats> GetStorageStatsAsync()
         {
-            // Start with base stats
-            var baseStats = await base.GetStorageStatsAsync();
+            // Fast path: use cached stats immediately to avoid blocking on NAS scans
+            if (_statsCache != null && _statsCache.LastUpdatedUtc != default)
+            {
+                // Keep cluster count in sync with metadata (no scan)
+                var clusterCount = Math.Max(_statsCache.ClusterCount, _partitionMetadata.Count);
+                var totalBytes = Math.Max(0, _statsCache.BaseBytes) + Math.Max(0, _statsCache.HierarchicalBytes);
+                // Kick a background refresh if needed (stale cache)
+                StartBackgroundStatsRefreshIfNeeded();
+                return await Task.FromResult(new StorageStats
+                {
+                    ClusterCount = clusterCount,
+                    TotalSizeBytes = totalBytes
+                });
+            }
 
-            // Include hierarchical folder size and count clusters from metadata
-            long hierSize = 0;
+            // Slow path (first run without cache): compute then cache
+            var baseStats = await base.GetStorageStatsAsync();
+            long hierSize2 = 0;
             try
             {
                 if (Directory.Exists(_hierarchicalBasePath))
                 {
-                    hierSize = new DirectoryInfo(_hierarchicalBasePath)
+                    hierSize2 = new DirectoryInfo(_hierarchicalBasePath)
                         .EnumerateFiles("*", SearchOption.AllDirectories)
                         .Sum(f => f.Length);
                 }
             }
             catch { /* ignore */ }
 
-            var totalSize = baseStats.TotalSizeBytes + hierSize;
-            var count = Math.Max(baseStats.ClusterCount, _partitionMetadata.Count);
+            _statsCache = new StatsCache
+            {
+                ClusterCount = Math.Max(baseStats.ClusterCount, _partitionMetadata.Count),
+                BaseBytes = baseStats.TotalSizeBytes,
+                HierarchicalBytes = hierSize2,
+                LastUpdatedUtc = DateTime.UtcNow
+            };
+            await SaveStatsCacheAsync();
 
             return new StorageStats
             {
-                ClusterCount = count,
-                TotalSizeBytes = totalSize
+                ClusterCount = _statsCache.ClusterCount,
+                TotalSizeBytes = _statsCache.BaseBytes + _statsCache.HierarchicalBytes
             };
         }
     }

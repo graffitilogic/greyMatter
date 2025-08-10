@@ -290,6 +290,7 @@ namespace GreyMatter.Core
             Console.WriteLine("  --language-foundations       Run foundational language learning");
             Console.WriteLine("  --comprehensive-language     Run comprehensive language training (2000+ words)");
             Console.WriteLine("  --preschool-train            Compile a small curriculum, learn, and run a quick cloze baseline");
+            Console.WriteLine("  --save-only                  Initialize and immediately save brain state (no learning)");
             Console.WriteLine();
             Console.WriteLine("Storage Configuration:");
             Console.WriteLine("  --brain-data, -bd <path>     Brain data storage location");
@@ -315,6 +316,9 @@ namespace GreyMatter.Core
             Console.WriteLine();
             Console.WriteLine("  # macOS + verbose timings + tuned saves");
             Console.WriteLine("  dotnet run -- --preschool-train -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData -log 1 -mps 1 -cc true");
+            Console.WriteLine();
+            Console.WriteLine("  # Save-only re-persist");
+            Console.WriteLine("  dotnet run -- --save-only -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData");
             Console.WriteLine();
             Console.WriteLine("  # Use external drive for storage");
             Console.WriteLine("  dotnet run -- -wd /Volumes/MyDrive");

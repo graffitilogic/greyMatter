@@ -46,6 +46,14 @@ namespace GreyMatter.Storage
             return Path.Combine(GetPartitionDir(partition), "neurons.bank.json.gz");
         }
 
+        // Normalize GUIDs to a canonical lowercase "N" format to avoid key drift across files
+        private static string NormalizeId(Guid id) => id.ToString("N");
+        private static string NormalizeId(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return string.Empty;
+            return Guid.TryParse(id, out var g) ? g.ToString("N") : id.Trim().ToLowerInvariant();
+        }
+
         private async Task<Dictionary<string, NeuronSnapshot>> ReadBankCachedAsync(string bankPath)
         {
             if (_bankCache.TryGetValue(bankPath, out var entry))
@@ -81,7 +89,7 @@ namespace GreyMatter.Storage
                 // Update entries
                 foreach (var n in neurons)
                 {
-                    var id = n.Id.ToString();
+                    var id = NormalizeId(n.Id);
                     var newSnap = n.CreateSnapshot();
 
                     if (dict.TryGetValue(id, out var oldSnap))
@@ -130,7 +138,8 @@ namespace GreyMatter.Storage
                 var dict = await ReadBankCachedAsync(bankPath).ConfigureAwait(false);
                 foreach (var id in ids)
                 {
-                    if (dict.TryGetValue(id.ToString(), out var snap))
+                    var key = NormalizeId(id);
+                    if (dict.TryGetValue(key, out var snap))
                     {
                         result[id] = HybridNeuron.FromSnapshot(snap);
                     }
@@ -148,8 +157,30 @@ namespace GreyMatter.Storage
             if (!File.Exists(bankPath)) return new Dictionary<string, NeuronSnapshot>();
             await using var fs = File.OpenRead(bankPath);
             await using var gz = new GZipStream(fs, CompressionMode.Decompress);
-            var dict = await JsonSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz, _jsonOptions).ConfigureAwait(false);
-            return dict ?? new Dictionary<string, NeuronSnapshot>();
+            var raw = await JsonSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz, _jsonOptions).ConfigureAwait(false);
+
+            // Re-key to normalized form; tolerate legacy keys and duplicates.
+            var dict = new Dictionary<string, NeuronSnapshot>();
+            if (raw != null)
+            {
+                foreach (var kvp in raw)
+                {
+                    var norm = NormalizeId(kvp.Key);
+                    if (string.IsNullOrEmpty(norm)) continue;
+                    if (dict.TryGetValue(norm, out var existing))
+                    {
+                        if (!SnapshotsEqual(existing, kvp.Value))
+                        {
+                            dict[norm] = kvp.Value; // last writer wins on conflict
+                        }
+                    }
+                    else
+                    {
+                        dict[norm] = kvp.Value;
+                    }
+                }
+            }
+            return dict;
         }
 
         private async Task WriteBankAsync(string bankPath, Dictionary<string, NeuronSnapshot> dict)

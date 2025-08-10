@@ -209,10 +209,17 @@ namespace GreyMatter.Core
             var clusterIndex = await _storage.LoadClusterIndexAsync();
             Console.WriteLine($"Found {clusterIndex.Count} clusters in storage");
             
-            // Note: partition metadata is loaded inside storage; we rely on GetStorageStatsAsync below for accurate size and counts.
-            
-            var stats = await _storage.GetStorageStatsAsync();
-            Console.WriteLine($"Storage: {stats.ClusterCount} clusters, {stats.TotalSizeFormatted}");
+            // Optional: fast cached stats to avoid slow scans
+            if ((_configForLogging?.Verbosity ?? 0) <= 1)
+            {
+                var stats = await _storage.GetStorageStatsAsync();
+                Console.WriteLine($"Storage: {stats.ClusterCount} clusters, {stats.TotalSizeFormatted}");
+            }
+            else
+            {
+                var stats = await _storage.GetStorageStatsAsync();
+                Console.WriteLine($"Storage: {stats.ClusterCount} clusters, {stats.TotalSizeFormatted}");
+            }
             
             // Load concept capacities
             _conceptCapacities = await _storage.LoadConceptCapacitiesAsync();
@@ -696,6 +703,8 @@ namespace GreyMatter.Core
             stats.CompletedGoals = goalStatus.CompletedGoalCount;
             stats.AverageGoalProgress = goalStatus.AverageProgress;
 
+            // Formatted summaries are computed via read-only properties now; no direct assignment needed
+            
             return stats;
         }
 
@@ -1377,9 +1386,18 @@ namespace GreyMatter.Core
         public int CompletedGoals { get; set; } = 0;
         public double AverageGoalProgress { get; set; } = 0.0;
         
+        // Provide formatted summaries expected by Program.cs
+        public string EthicalState =>
+            $"Wisdom {WisdomSeeking:P1} | Compassion {UniversalCompassion:P1} | Creative {CreativeContribution:P1} | Cooperative {CooperativeSpirit:P1} | Curiosity {BenevolentCuriosity:P1}";
+        
+        public string EmotionalStatus =>
+            (string.IsNullOrWhiteSpace(DominantEmotion)
+                ? $"Balance {EmotionalBalance:F2} | Clarity {EmotionalClarity:F2}"
+                : $"{DominantEmotion} | Balance {EmotionalBalance:F2} | Clarity {EmotionalClarity:F2}");
+        
+        public string GoalStatus =>
+            $"{ActiveGoals} active | {CompletedGoals} completed | Avg {AverageGoalProgress:P1}";
+        
         public string Status => IsConscious ? "Awake & Processing" : "Dormant";
-        public string EthicalState => $"Wisdom: {WisdomSeeking:P0}, Compassion: {UniversalCompassion:P0}, Creativity: {CreativeContribution:P0}";
-        public string EmotionalStatus => IsConscious ? $"{DominantEmotion} (Balance: {EmotionalBalance:P0})" : "Dormant";
-        public string GoalStatus => IsConscious ? $"{ActiveGoals} active, {CompletedGoals} completed" : "Dormant";
     }
 }
