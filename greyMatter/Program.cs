@@ -33,6 +33,12 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length > 0 && (args[0] == "--comprehensive" || args[0] == "--full-demo"))
+            {
+                ComprehensiveDemo.RunDemo();
+                return;
+            }
+            
             // Parse configuration from command line
             var config = BrainConfiguration.FromCommandLine(args);
             
@@ -47,6 +53,8 @@ namespace GreyMatter
                 Console.WriteLine("  --phase2-demo     Same as --enhanced-demo");
                 Console.WriteLine("  --text-demo       Run text learning demo (Phase 3)");
                 Console.WriteLine("  --phase3-demo     Same as --text-demo");
+                Console.WriteLine("  --comprehensive   Run complete demonstration (all phases)");
+                Console.WriteLine("  --full-demo       Same as --comprehensive");
                 return;
             }
             
