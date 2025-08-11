@@ -49,6 +49,50 @@ namespace greyMatter.Core
             LearnInternal(concept, relatedConcepts);
         }
 
+        /// <summary>
+        /// Learn a batch of concepts with rolled-up console output
+        /// </summary>
+        public void LearnBatch(IEnumerable<string> concepts, int reportingBatchSize = 50, int exampleSampleSize = 3)
+        {
+            var conceptList = concepts.ToList();
+            var totalConcepts = conceptList.Count;
+            var processed = 0;
+            var recentExamples = new List<string>();
+            var startTime = DateTime.Now;
+
+            foreach (var concept in conceptList)
+            {
+                LearnInternal(concept);
+                processed++;
+                
+                // Keep track of recent examples for sampling
+                recentExamples.Add(concept);
+                if (recentExamples.Count > exampleSampleSize)
+                {
+                    recentExamples.RemoveAt(0);
+                }
+
+                // Report progress at batch intervals or at the end
+                if (processed % reportingBatchSize == 0 || processed == totalConcepts)
+                {
+                    var elapsed = DateTime.Now - startTime;
+                    var conceptsPerSecond = processed / Math.Max(elapsed.TotalSeconds, 0.001);
+                    var percentComplete = (double)processed / totalConcepts * 100;
+                    
+                    Console.WriteLine($"Learning: {percentComplete:F1}% | " +
+                                    $"Batch: {conceptsPerSecond:F0} concepts/sec | " +
+                                    $"Total: {processed:N0}");
+                    
+                    // Show sample of recent concepts learned
+                    if (recentExamples.Any())
+                    {
+                        var examples = string.Join(", ", recentExamples.Take(exampleSampleSize));
+                        Console.WriteLine($"  Recent examples: {examples}");
+                    }
+                }
+            }
+        }
+
         private void LearnInternal(string concept, string[]? relatedConcepts = null)
         {
             // Get or create cluster for this concept

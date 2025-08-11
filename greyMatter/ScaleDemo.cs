@@ -225,11 +225,12 @@ namespace greyMatter
                 Console.WriteLine($"   📖 Processing {sourceName}: {conceptsToAdd} concepts (of {concepts.Count} available)");
                 
                 var stopwatch = Stopwatch.StartNew();
-                foreach (var concept in concepts.Take(conceptsToAdd))
-                {
-                    brain.Learn(concept);
-                    totalAdded++;
-                }
+                var conceptsToProcess = concepts.Take(conceptsToAdd);
+                
+                // Use batched learning with rolled-up console output
+                brain.LearnBatch(conceptsToProcess, reportingBatchSize: 25, exampleSampleSize: 3);
+                
+                totalAdded += conceptsToAdd;
                 stopwatch.Stop();
                 
                 Console.WriteLine($"      ✅ Processed in {stopwatch.ElapsedMilliseconds}ms");
