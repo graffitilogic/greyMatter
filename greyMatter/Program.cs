@@ -6,6 +6,7 @@ using GreyMatter.Core;
 using GreyMatter.Storage;
 using GreyMatter.Learning;
 using GreyMatter.Evaluations;
+using greyMatter;
 
 namespace GreyMatter
 {
@@ -13,6 +14,13 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            // Check for simple demo first
+            if (args.Length > 0 && (args[0] == "--simple-demo" || args[0] == "--original-vision"))
+            {
+                SimpleEphemeralDemo.RunDemo();
+                return;
+            }
+            
             // Parse configuration from command line
             var config = BrainConfiguration.FromCommandLine(args);
             
@@ -20,6 +28,9 @@ namespace GreyMatter
             if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h"))
             {
                 BrainConfiguration.DisplayUsage();
+                Console.WriteLine("\nAdditional options:");
+                Console.WriteLine("  --simple-demo     Run the original ephemeral brain concept demo");
+                Console.WriteLine("  --original-vision Same as --simple-demo");
                 return;
             }
             

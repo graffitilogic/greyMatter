@@ -26,133 +26,144 @@ Curriculum Lesson → Extract Concepts → For each concept: find/load cluster (
 
 ---
 ## 2. Recent State (Latest Run Snapshot)
-- Lessons ingested: 800 (≈17m total) → ~0.7–0.8 lessons/sec (regression; historical target 5–7 lps)
+- Lessons ingested: 800 (~8–10 min total) → ~1.3–1.7 lessons/sec
 - Concepts processed: 2,399 (unique ~723)
-- Clusters (active loaded): 727 (storage metadata reports 4,338 entries – historical bloat)
-- Neurons: Block logs show 1,574,669 (1k concepts) → 2,096,721 (2k concepts) → very high average neurons per concept (likely capacity oversizing)
-- Synapses: 57,573 persisted
-- Save Phase (improved but still heavy): ~38.35s total (neuron bank write dominated: 18.48s; cluster membership: 18.26s) with dirty clusters = 723/727
-- Integrity sampler (sample=5): OK; mismatch=0 (improved)
+- Clusters (active loaded): 727 (storage metadata reports ~4,338 entries)
+- Neurons (block logs): ~114k–150k per 1k concepts
+- Synapses persisted: ~115k–122k
+- Save phase: 31.7–40.2s total
+  - Neuron bank upserts: ~11–12s
+  - Membership/metadata (117 dirty of 727): ~19–26s
+- Integrity sampler (sample=5): previously Mismatch=5; fixes applied (see below); pending validation on next run
 - Cloze baseline: 24.7% (200 items)
+- Startup: first run can pause while computing storage stats; subsequent runs use cached stats; a shorter delay can still occur before the first learning step during on-demand hydration
 
-Key Observations:
-1. Training (ingestion) dominates elapsed time now; persistence optimizations shifted bottleneck.
-2. Dirty cluster count remains nearly total despite membership pack diff logic — suggests clusters mark dirty due to neuron growth every pass (capacity target reached late or target too high causing perpetual additions).
-3. Metadata inflation (4,338 vs ~727 active) inflates stats and may add overhead to similarity search.
-4. Capacity Model: Deterministic + EMA + hysteresis; initial targets appear large, driving huge neuron counts and slowing per-concept training loops.
-5. Synapse creation per concept may be amplifying overhead (50k+ synapses) without immediate accuracy benefit.
-6. ETA calculation during lessons uses simple projection (not rolling average) → misleading.
+Key Observations (current):
+1. Training latency now dominates elapsed time; persistence is improved but still significant at scale.
+2. Dirty clusters repeat at 117 between identical runs; this is expected with deterministic growth until capacities fully stabilize.
+3. Metadata inflation (4,338 vs ~727 active) persists and may bias stats and similarity search.
+4. Capacity targets likely oversized for some concepts, increasing per-concept training work.
+5. Occasional ~1 min delay before first concept in subsequent runs stems from initial hydration and environment reading.
+
+### 2.1 Implemented Fixes (this session)
+- Neuron identity restored on hydrate: HybridNeuron.FromSnapshot now sets Id from snapshot (prevents new GUIDs and repeat upserts).
+- Global neuron bank ID normalization: lowercase Guid("N") keys; bank re-key on read; normalized lookups to eliminate membership↔bank inconsistency.
+- Membership pack normalization: normalized cluster keys and de-duplicated Guid lists.
+- Cached storage stats: storage_stats.json with background refresh to avoid long NAS scans on startup; immediate cached display with later correction.
+- Incremental membership updates: merge only newly added neuron IDs when available; full compare as fallback.
+- Batched neuron-bank saves per partition with per-bank locks; skip no-op writes via snapshot equality.
+- Save-only CLI: `--save-only` initializes and persists without learning to verify churn and integrity quickly.
+- Consciousness stats API: added EthicalState, EmotionalStatus, GoalStatus properties used by Program.cs.
 
 ---
 ## 3. Root Cause Hypotheses for Slow Training
-- Excessive neuron growth per new concept (high base target) → O(N_neurons) weight init + training loops.
-- Repeated similarity lookups + loading overhead for each concept (concept index helps, but growth still heavy).
-- Large synapse set updating / enumerations (57k) adds overhead in memory & potential processing.
-- Capacity adjustments too slow (EMA alpha 0.05 + hysteresis 15%) causing continued growth churn before stabilization.
-- Lack of staged / lazy growth (allocating near final target immediately instead of incremental micro-batches) → early heavy cost.
-- Logging overhead minimal now; not primary.
-- Potential hidden N^2 behavior in cluster relevance calculations for many candidates.
+- Excessive neuron growth per new concept (high base target) → O(N) initialization and training.
+- Similarity lookups + hydration overhead on first touches per run.
+- Large synapse set adds overhead with limited immediate accuracy gains.
+- Capacity adjustments too slow (EMA/hysteresis) causing continued growth before stabilization.
+- Lack of staged/lazy growth (allocating near-final capacity upfront) increases early cost.
 
 ---
 ## 4. Immediate Tactical Remediations (Proposed)
 (Will be prioritized & instrumented before coding again.)
 1. Instrumentation Pass:
-   - Per-concept timing (cluster lookup, growth, training, synapse creation).
-   - Count neurons added vs reused; log distribution of target capacities.
-   - Track membership pack save skip/write ratio.
+   - Per-concept timings (cluster lookup, growth, training, synapses) with summary table.
+   - Count neurons added vs reused; track capacity targets distribution.
+   - Membership pack skip/write ratios.
 2. Capacity Model Revision:
-   - Lower initial base target (e.g., 60–120) + staged growth increments (e.g., grow in chunks of 50 until demand justifies).
-   - Demand-driven escalation: only increase after repeated activations (frequency counter or rolling activation score).
-   - Add upper bound throttle per run (cap max neurons added per concept per session).
+   - Lower initial targets (e.g., 60–120) and staged growth in chunks.
+   - Demand-driven escalation only after repeated activations.
+   - Per-run cap (already present) with tighter limits for A/B tests.
 3. Lazy Weight Initialization:
-   - Initialize weights only on first activation needed, not full feature set; or cap initial fan-in.
+   - Initialize limited fan-in; defer full weights until needed.
 4. Synapse Load Reduction:
-   - Temporarily disable or batch synapse creation (e.g., 1 per N concepts) until performance baseline restored.
+   - Temporarily reduce/defer synapse creation until baseline recovered.
 5. Relevance & Similarity Optimization:
-   - Cache per-concept last chosen cluster to shortcut search.
-   - Limit similarity checks to small candidate list via concept→cluster index directly.
-6. Dirty Flag Accuracy:
-   - Mark cluster dirty only if membership set changes (neuron added with new concept) rather than any neuron growth; decouple capacity expansion from membership if concept already present.
-7. Metadata Prune Tool:
-   - Offline pass: remove partition metadata entries for clusters not in membership packs.
+   - Prefer last chosen cluster cache; bound candidate set from concept index.
+6. Dirty Flag Semantics:
+   - Ensure membership dirty only when neuron membership changes (not when just weights change).
+7. Metadata Hygiene:
+   - Prune partition metadata entries that lack membership; rebuild index.
 8. Rolling ETA:
-   - Use exponential smoothing on lessons/sec (EMA) + remaining lessons for realistic ETA.
+   - Use EMA on lessons/sec for realistic ETA.
 
 ---
 ## 5. Medium-Term Roadmap
 Category: Performance
-- [ ] Add profiler hooks & summary table (avg ms per concept stage)
-- [ ] Implement staged neuron growth strategy
-- [ ] Introduce neuron reuse pools (reassign low-salience neurons)
-- [ ] Parallelize learning (bounded degree) with careful contention control
+- [ ] Profiler hooks & summary table (avg ms per concept stage)
+- [ ] Staged neuron growth strategy
+- [ ] Reuse pools for low-salience neurons
+- [ ] Bounded parallelism for learning with contention control
 
 Category: Persistence & Data Hygiene
 - [ ] Metadata vacuum & compaction
 - [ ] Membership pack write/skip instrumentation & reporting
-- [ ] Adaptive partition rebalancing based on cluster density
+- [ ] Adaptive partition rebalancing by density
 
 Category: Capacity & Homeostasis
 - [ ] Frequency-based demand metric (activation count decay)
-- [ ] Dynamic shrink (gradually reduce capacity if underused)
-- [ ] Concept aging / consolidation (merge low-activity clusters)
+- [ ] Dynamic shrink for underused concepts
+- [ ] Concept aging / consolidation
 
 Category: Evaluation
-- [ ] Larger cloze test with variance reporting
-- [ ] Per-concept mastery tracking integration in evaluation output
-- [ ] Benchmark suite (synthetic vs real dataset) + regression thresholds
+- [ ] Larger cloze test + variance reporting
+- [ ] Per-concept mastery tracking
+- [ ] Benchmark suite + regression thresholds
 
 Category: Integrity & Monitoring
-- [ ] Deep integrity scan (membership ↔ neuron bank cross-check)
-- [ ] Drift report: capacities vs actual neurons vs utilization
-- [ ] Alert on abnormal growth (e.g., concept > X neurons)
+- [ ] Deep integrity scan (membership ↔ neuron bank)
+- [ ] Drift report: capacities vs actual vs utilization
+- [ ] Alert on abnormal growth patterns
 
 Category: Developer Ergonomics
-- [ ] Central config file (JSON/YAML) for thresholds & rates
-- [ ] Verbosity tiers documented; add --perf flag
-- [ ] Script to run full pipeline + produce HTML summary
+- [ ] Central config file for thresholds & rates
+- [ ] Verbosity tiers doc; add --perf flag
+- [ ] Script: run pipeline → HTML summary
 
 Category: Future Expansion
-- [ ] Multi-modal feature channels (vision/audio placeholders)
-- [ ] Reinforcement signals + reward-modulated plasticity
-- [ ] Goal-conditioned retrieval + reflective rehearsal cycles
-- [ ] Emotional modulation gating learning rates
+- [ ] Multi-modal feature channels
+- [ ] Reward-modulated plasticity
+- [ ] Goal-conditioned retrieval + reflection cycles
+- [ ] Emotional modulation of learning rates
 
 ---
 ## 6. Known Issues (Tracking)
 | Issue | Impact | Plan |
 |-------|--------|------|
-| Slow ingestion (~0.7 lps) | High wall-clock time | Instrument + staged growth |
-| Dirty clusters ≈ total | Wasted membership checks | Refine dirty logic + reuse check |
-| Metadata inflation (4,338 entries) | Overstated stats, possible search overhead | Prune & rebuild index |
-| Oversized neuron counts | CPU intensive training | Lower initial target + incremental growth |
-| Misleading ETA calc | UX noise | Rolling average ETA |
-| High synapse count early | Extra overhead | Defer synapse creation |
+| Startup delay (first run) | Pause before stats printed | Cached stats + background refresh (done); consider deferring scan or prefetch warm-up |
+| ~1 min delay before first lesson | Hydration/env read | Pre-warm small working set; cap initial hydration |
+| Dirty clusters stable at 117/727 | Expected with deterministic growth | Option to freeze growth; tune hit threshold/cap; staged growth |
+| Metadata inflation (~4,338 entries) | Overstated stats; possible search overhead | Prune & rebuild index |
+| Capacity oversizing | CPU heavy training | Lower initial target + staged growth |
+| Integrity sampler showed 5 mismatches | Possible ID drift (now fixed) | Validate post-fix; save-only should show 0 |
 
 ---
 ## 7. Guiding Principles
 - Measure before optimizing (add instrumentation first).
 - Prefer lazy & incremental allocation.
-- Distinguish structural changes (membership) from param updates (weights) in persistence.
+- Separate structural changes (membership) from parameter updates (weights) in persistence.
 - Keep deterministic seeds for reproducibility while allowing controlled stochastic exploration.
 
 ---
 ## 8. Getting Started (Quick)
-1. Run setup scripts (datasets/resources) if needed.
-2. Execute program (default pipeline: compile curriculum → learn → evaluate → save).
-3. Check logs for per-block concept stats and save summary.
+1. Setup datasets/resources if needed.
+2. Typical preschool pipeline (macOS + tuned saves):
+   - `dotnet run -- --preschool-train -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData -log 1 -mps 2 -cc true`
+3. Validate persistence stability (no learning):
+   - `dotnet run -- --save-only -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData -log 2`
 
 ---
 ## 9. Next Session Plan
-1. Cool-down period (avoid change thrash).
-2. Add detailed timing instrumentation (no functional changes).
-3. Observe one full run; capture histogram of neuron additions per concept.
-4. Prototype staged capacity growth switch (config flag) and re-run.
-5. Only then: prune metadata + refine dirty flag semantics.
+1. Add detailed timing instrumentation (no functional changes).
+2. Observe a full run; capture histogram of neuron additions per concept.
+3. Prototype staged capacity growth flag and re-run.
+4. Add optional growth-freeze switch for churn validation.
+5. Prune metadata + refine dirty flag semantics.
 
 ---
 ## 10. Status Summary
-Persistence layer largely optimized (batching, caching, diffing). Primary bottleneck now is front-side training cost driven by aggressive neuron growth & capacity model. Next work will focus on measurement, staged allocation, and data hygiene before adding new cognitive features.
+Persistence layer is optimized (batching, caching, diffs, normalized IDs). Primary bottleneck is front-side training driven by aggressive neuron growth & capacity targets. Next work focuses on measurement, staged allocation, and data hygiene before adding new cognitive features.
 
 ---
 
-(README last updated after performance regression analysis; roadmap reflects immediate corrective focus.)
+(README updated with current metrics and recent fixes.)

@@ -293,6 +293,8 @@ namespace GreyMatter.Core
                 ImportanceScore = snapshot.ImportanceScore,
                 IsProvisional = snapshot.IsProvisional
             };
+            // Ensure identity is preserved across loads
+            neuron.Id = snapshot.Id;
             
             neuron.InputWeights = snapshot.InputWeights.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             neuron.AssociatedConcepts = snapshot.AssociatedConcepts.ToHashSet();
