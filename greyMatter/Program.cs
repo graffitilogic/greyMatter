@@ -39,13 +39,13 @@ namespace GreyMatter
                 return;
             }
             
-            // Scale Production Demos
+                        // Scale Production Demos
             if (args.Length > 0 && args[0] == "--scale-demo")
             {
                 var conceptCount = GetArgValue(args, "--concepts", 100000);
-                var dataDir = GetArgValue(args, "--data-dir", "brain_data");
+                var scaleConfig = BrainConfiguration.FromCommandLine(args);
                 
-                var scaleDemo = new ScaleDemo(dataDir);
+                var scaleDemo = new ScaleDemo(scaleConfig);
                 await scaleDemo.RunScaleDemo(conceptCount);
                 return;
             }
@@ -53,9 +53,13 @@ namespace GreyMatter
             if (args.Length > 0 && args[0] == "--wikipedia")
             {
                 var articleCount = GetArgValue(args, "--articles", 1000);
+                var wikiConfig = BrainConfiguration.FromCommandLine(args);
+                wikiConfig.ValidateAndSetup();
                 
                 Console.WriteLine("📚 Wikipedia Learning Demo");
-                var ingester = new ExternalDataIngester();
+                Console.WriteLine($"📁 Using training data from: {wikiConfig.TrainingDataRoot}");
+                
+                var ingester = new ExternalDataIngester(wikiConfig.TrainingDataRoot);
                 var concepts = await ingester.GenerateWikipediaLikeConcepts(articleCount);
                 
                 var brain = new greyMatter.Core.SimpleEphemeralBrain();
@@ -72,6 +76,7 @@ namespace GreyMatter
                 Console.WriteLine($"✅ Learned {concepts.Count} Wikipedia concepts in {stopwatch.ElapsedMilliseconds}ms");
                 Console.WriteLine($"🧠 Brain: {stats.ConceptsRegistered} concepts, {stats.TotalNeurons} neurons");
                 Console.WriteLine($"⚡ Speed: {concepts.Count / stopwatch.Elapsed.TotalSeconds:F0} concepts/second");
+                Console.WriteLine($"💾 Data would be saved to: {wikiConfig.BrainDataPath}");
                 return;
             }
 

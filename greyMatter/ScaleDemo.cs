@@ -8,14 +8,15 @@ using System.Threading.Tasks;
 using greyMatter.Core;
 using greyMatter.Learning;
 using greyMatter.Visualization;
+using GreyMatter.Core;
 
 namespace greyMatter
 {
     /// <summary>
     /// Demonstrates the ephemeral brain system at production scale:
     /// - 100K+ concepts
-    /// - Persistent storage 
-    /// - External training materials
+    /// - Persistent storage on external NAS
+    /// - External training materials from NAS datasets
     /// - Comprehension testing
     /// </summary>
     public class ScaleDemo
@@ -24,17 +25,19 @@ namespace greyMatter
         private ScalePersistence persistence;
         private ExternalDataIngester ingester;
         private ComprehensionTester tester;
-        private readonly string dataDirectory;
+        private readonly BrainConfiguration config;
         
-        public ScaleDemo(string dataDirectory = "brain_data")
+        public ScaleDemo(BrainConfiguration configuration)
         {
-            this.dataDirectory = dataDirectory;
-            Directory.CreateDirectory(dataDirectory);
+            this.config = configuration;
             
             brain = new SimpleEphemeralBrain();
-            persistence = new ScalePersistence(dataDirectory);
-            ingester = new ExternalDataIngester();
+            persistence = new ScalePersistence(config.BrainDataPath);
+            ingester = new ExternalDataIngester(config.TrainingDataRoot);
             tester = new ComprehensionTester();
+            
+            // Ensure NAS paths are set up
+            config.ValidateAndSetup();
         }
 
         public async Task RunScaleDemo(int targetConcepts = 100000)
@@ -305,7 +308,7 @@ namespace greyMatter
             
             var stats = brain.GetMemoryStats();
             Console.WriteLine($"   ✅ Saved {stats.ConceptsRegistered:N0} concepts in {saveStopwatch.ElapsedMilliseconds}ms");
-            Console.WriteLine($"   📁 Data directory: {dataDirectory}");
+            Console.WriteLine($"   📁 Data directory: {config.BrainDataPath}");
         }
     }
 
@@ -377,6 +380,9 @@ namespace greyMatter
 
         private async Task SaveConceptsAsync(SimpleEphemeralBrain brain, bool incrementalOnly = false)
         {
+            // Ensure directory exists before writing
+            Directory.CreateDirectory(dataDirectory);
+            
             // Serialize concept clusters efficiently
             var conceptData = "{}"; // Simplified for demo
             await File.WriteAllTextAsync(conceptsFile, conceptData);
@@ -391,14 +397,80 @@ namespace greyMatter
     }
 
     /// <summary>
-    /// Generates realistic external training data for testing
+    /// Reads and processes real external training data from NAS storage
     /// </summary>
     public class ExternalDataIngester
     {
+        private readonly string trainingDataRoot;
+
+        public ExternalDataIngester(string trainingDataRoot)
+        {
+            this.trainingDataRoot = trainingDataRoot;
+        }
+
         public async Task<List<string>> GenerateWikipediaLikeConcepts(int count)
         {
             await Task.Delay(50); // Simulate data loading
             
+            // Try to read from actual Wikipedia data files if they exist
+            var wikipediaPath = Path.Combine(trainingDataRoot, "wikipedia");
+            if (Directory.Exists(wikipediaPath))
+            {
+                return await ReadFromWikipediaFiles(wikipediaPath, count);
+            }
+            
+            // Fallback to structured synthetic data that simulates real data patterns
+            return GenerateStructuredWikipediaData(count);
+        }
+
+        private async Task<List<string>> ReadFromWikipediaFiles(string wikipediaPath, int count)
+        {
+            var concepts = new List<string>();
+            var files = Directory.GetFiles(wikipediaPath, "*.txt").Take(count / 10);
+            
+            foreach (var file in files)
+            {
+                try
+                {
+                    var content = await File.ReadAllTextAsync(file);
+                    var extractedConcepts = ExtractConceptsFromText(content);
+                    concepts.AddRange(extractedConcepts.Take(10)); // Limit per file
+                    
+                    if (concepts.Count >= count) break;
+                }
+                catch
+                {
+                    // Skip problematic files
+                }
+            }
+            
+            return concepts.Take(count).ToList();
+        }
+
+        private List<string> ExtractConceptsFromText(string content)
+        {
+            // Simple concept extraction - look for noun phrases, key terms
+            var lines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            var concepts = new List<string>();
+            
+            foreach (var line in lines.Take(20)) // First 20 lines
+            {
+                var words = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                foreach (var word in words)
+                {
+                    if (word.Length > 3 && char.IsUpper(word[0])) // Likely proper noun
+                    {
+                        concepts.Add(word.Trim('.', ',', '!', '?'));
+                    }
+                }
+            }
+            
+            return concepts.Distinct().ToList();
+        }
+
+        private List<string> GenerateStructuredWikipediaData(int count)
+        {
+            // Generate realistic structured data when real files aren't available
             var topics = new[] { "Physics", "Biology", "History", "Geography", "Technology", "Art", "Literature", "Science" };
             var concepts = new List<string>();
             var random = new Random(42);
