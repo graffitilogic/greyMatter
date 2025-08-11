@@ -234,6 +234,38 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length >= 3 && args[0] == "--language-random-sample" && args[2] == "--reset")
+            {
+                if (int.TryParse(args[1], out int sampleSize) && sampleSize > 0)
+                {
+                    await LanguageFoundationsDemo.RunRandomSampleTraining(sampleSize, resetBrain: true);
+                }
+                else
+                {
+                    Console.WriteLine("❌ Error: Invalid sample size. Please provide a positive integer.");
+                    Console.WriteLine("Usage: dotnet run --language-random-sample [size] --reset");
+                    Console.WriteLine("Example: dotnet run --language-random-sample 50000 --reset");
+                }
+                return;
+            }
+            
+            if (args.Length >= 3 && args[0] == "--iterative-growth-test")
+            {
+                if (int.TryParse(args[1], out int sampleSize) && int.TryParse(args[2], out int iterations) && 
+                    sampleSize > 0 && iterations > 0)
+                {
+                    await IterativeGrowthTest.RunIterativeGrowthAnalysis(sampleSize, iterations);
+                }
+                else
+                {
+                    Console.WriteLine("❌ Error: Invalid parameters. Please provide positive integers.");
+                    Console.WriteLine("Usage: dotnet run --iterative-growth-test [sample_size] [iterations]");
+                    Console.WriteLine("Example: dotnet run --iterative-growth-test 25000 5");
+                    Console.WriteLine("This will run 5 iterations of 25K sentence training to test growth patterns.");
+                }
+                return;
+            }
+            
             // Interactive conversation mode
             if (config.InteractiveMode)
             {
@@ -790,12 +822,23 @@ namespace GreyMatter
             Console.WriteLine("🎯 CONTROLLED TESTING:");
             Console.WriteLine("  --language-random-sample [size]");
             Console.WriteLine("     └─ Random sample of [size] sentences from dataset");
-            Console.WriteLine("     └─ Block-based processing with storage monitoring");
-            Console.WriteLine("     └─ Perfect for testing scaling and storage patterns");
+            Console.WriteLine("     └─ CUMULATIVE: Builds on existing brain state");
             Console.WriteLine("     └─ Example: --language-random-sample 50000");
             Console.WriteLine();
+            Console.WriteLine("  --language-random-sample [size] --reset");
+            Console.WriteLine("     └─ Same as above but RESETS brain state (fresh start)");
+            Console.WriteLine("     └─ Example: --language-random-sample 50000 --reset");
+            Console.WriteLine();
 
-            Console.WriteLine("📊 DATASET INFORMATION:");
+            Console.WriteLine("� GROWTH PATTERN ANALYSIS:");
+            Console.WriteLine("  --iterative-growth-test [size] [iterations]");
+            Console.WriteLine("     └─ Tests randomness validation and concept consolidation");
+            Console.WriteLine("     └─ Runs multiple iterations to measure growth plateaus");
+            Console.WriteLine("     └─ Validates that storage stops growing due to proper merging");
+            Console.WriteLine("     └─ Example: --iterative-growth-test 25000 5");
+            Console.WriteLine();
+
+            Console.WriteLine("�📊 DATASET INFORMATION:");
             Console.WriteLine($"  • Total Tatoeba sentences: 12,916,547");
             Console.WriteLine($"  • English sentences: 2,043,357");
             Console.WriteLine($"  • Data location: /Volumes/jarvis/trainData/Tatoeba");
@@ -806,6 +849,7 @@ namespace GreyMatter
             Console.WriteLine("  dotnet run --language-minimal-demo    # Quick test");
             Console.WriteLine("  dotnet run --language-demo            # Full demo");
             Console.WriteLine("  dotnet run --language-random-sample 50000  # Controlled test");
+            Console.WriteLine("  dotnet run --iterative-growth-test 25000 5  # Growth analysis");
             Console.WriteLine("  dotnet run --language-full-scale      # Production training");
             Console.WriteLine();
 

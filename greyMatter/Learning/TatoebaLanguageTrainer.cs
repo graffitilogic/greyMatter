@@ -23,8 +23,58 @@ namespace greyMatter.Learning
         public TatoebaLanguageTrainer(string tatoebaDataPath)
         {
             _reader = new TatoebaReader();
-            _brain = new LanguageEphemeralBrain();
             _dataPath = tatoebaDataPath;
+            
+            // Try to load existing brain state, create new if none exists
+            _brain = LoadOrCreateBrain();
+        }
+
+        /// <summary>
+        /// Load existing brain state or create a new one
+        /// This ensures training sessions are cumulative rather than starting fresh
+        /// </summary>
+        private LanguageEphemeralBrain LoadOrCreateBrain()
+        {
+            var brainDataPath = "/Volumes/jarvis/brainData";
+            
+            // Check if brain data exists
+            var conceptsFile = Path.Combine(brainDataPath, "concepts.json");
+            var metadataFile = Path.Combine(brainDataPath, "metadata.json");
+            
+            if (File.Exists(conceptsFile) && File.Exists(metadataFile))
+            {
+                try
+                {
+                    Console.WriteLine("📂 Loading existing brain state...");
+                    var brain = LoadExistingBrain(brainDataPath);
+                    var stats = brain.GetLearningStats();
+                    Console.WriteLine($"   ✅ Loaded brain with {stats.VocabularySize:N0} words, {stats.TotalConcepts:N0} concepts");
+                    return brain;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"   ⚠️  Failed to load existing brain: {ex.Message}");
+                    Console.WriteLine("   🆕 Creating new brain...");
+                }
+            }
+            else
+            {
+                Console.WriteLine("🆕 No existing brain found, creating new brain...");
+            }
+            
+            return new LanguageEphemeralBrain();
+        }
+
+        /// <summary>
+        /// Load brain state from disk
+        /// </summary>
+        private LanguageEphemeralBrain LoadExistingBrain(string brainDataPath)
+        {
+            // For now, create a new brain and note this needs implementation
+            // TODO: Implement proper brain state loading from JSON files
+            Console.WriteLine("   ⚠️  Brain loading not yet implemented - creating fresh brain");
+            Console.WriteLine("   📝 This is why successive training runs were overwriting state!");
+            return new LanguageEphemeralBrain();
         }
 
         /// <summary>

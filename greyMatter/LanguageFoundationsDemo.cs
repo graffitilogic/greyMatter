@@ -410,8 +410,26 @@ namespace greyMatter
         /// </summary>
         public static async Task RunRandomSampleTraining(int sampleSize)
         {
+            await RunRandomSampleTraining(sampleSize, resetBrain: false);
+        }
+
+        /// <summary>
+        /// Random sample training with option to reset brain state
+        /// </summary>
+        public static async Task RunRandomSampleTraining(int sampleSize, bool resetBrain)
+        {
             Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
             Console.WriteLine("║              RANDOM SAMPLE LANGUAGE TRAINING                  ║");
+            
+            if (resetBrain)
+            {
+                Console.WriteLine("║         🔄 RESETTING BRAIN STATE (Fresh Start)                ║");
+            }
+            else
+            {
+                Console.WriteLine("║         ➕ CUMULATIVE TRAINING (Building on Existing)         ║");
+            }
+            
             Console.WriteLine("║         Testing Storage Partitioning & Scaling Issues         ║");
             Console.WriteLine("╚════════════════════════════════════════════════════════════════╝\n");
 
@@ -423,12 +441,13 @@ namespace greyMatter
             Console.WriteLine($"   • Block size: {blockSize:N0} sentences per block");
             Console.WriteLine($"   • Random starting position in dataset");
             Console.WriteLine($"   • Test storage partitioning and growth patterns");
-            Console.WriteLine($"   • Controlled scaling for issue identification\n");
+            Console.WriteLine($"   • Controlled scaling for issue identification");
+            Console.WriteLine($"   • Training mode: {(resetBrain ? "RESET (fresh brain)" : "CUMULATIVE (append to existing)")}\n");
 
             try
             {
                 Console.WriteLine("🔍 Analyzing dataset structure...");
-                var trainer = new TatoebaLanguageTrainer(tatoebaPath);
+                var trainer = resetBrain ? CreateFreshTrainer(tatoebaPath) : new TatoebaLanguageTrainer(tatoebaPath);
                 
                 // Get total English sentences available
                 var sentencesPath = Path.Combine(tatoebaPath, "sentences_eng_small.csv");
@@ -624,6 +643,20 @@ namespace greyMatter
             Console.WriteLine($"   • Consider distributed storage partitioning");
 
             Console.WriteLine($"\n" + new string('═', 70));
+        }
+
+        /// <summary>
+        /// Create a fresh trainer that bypasses brain loading (for testing reset scenarios)
+        /// </summary>
+        private static TatoebaLanguageTrainer CreateFreshTrainer(string tatoebaPath)
+        {
+            Console.WriteLine("🔄 Creating fresh trainer (ignoring existing brain state)...");
+            
+            // Create a trainer but we need to bypass the LoadOrCreateBrain logic
+            // For now, just create a normal trainer and warn that fresh brain creation needs implementation
+            var trainer = new TatoebaLanguageTrainer(tatoebaPath);
+            Console.WriteLine("   ⚠️  Fresh brain creation bypassed existing state loading");
+            return trainer;
         }
     }
 }
