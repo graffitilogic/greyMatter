@@ -14,6 +14,13 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            // Check for semantic domain test
+            if (args.Length > 0 && (args[0] == "--semantic-test" || args[0] == "--test-domains"))
+            {
+                await SemanticDomainTest.RunTestAsync();
+                return;
+            }
+            
             // Check for simple demo first
             if (args.Length > 0 && (args[0] == "--simple-demo" || args[0] == "--original-vision"))
             {

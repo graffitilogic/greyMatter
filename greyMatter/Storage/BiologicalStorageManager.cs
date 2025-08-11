@@ -760,6 +760,16 @@ namespace GreyMatter.Storage
             await File.WriteAllTextAsync(indexPath, json);
         }
         
+        private async Task LoadConceptIndexAsync()
+        {
+            var indexPath = Path.Combine(_hippocampusPath, "concept_index.json");
+            if (File.Exists(indexPath))
+            {
+                var json = await File.ReadAllTextAsync(indexPath);
+                _conceptIndex = JsonSerializer.Deserialize<Dictionary<string, ConceptIndexEntry>>(json) ?? new();
+            }
+        }
+
         /// <summary>
         /// Generate a hash for concept clustering to distribute load
         /// </summary>
