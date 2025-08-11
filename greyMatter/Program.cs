@@ -21,6 +21,18 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length > 0 && (args[0] == "--enhanced-demo" || args[0] == "--phase2-demo"))
+            {
+                EnhancedEphemeralDemo.RunDemo();
+                return;
+            }
+            
+            if (args.Length > 0 && (args[0] == "--text-demo" || args[0] == "--phase3-demo"))
+            {
+                TextLearningDemo.RunDemo();
+                return;
+            }
+            
             // Parse configuration from command line
             var config = BrainConfiguration.FromCommandLine(args);
             
@@ -31,6 +43,10 @@ namespace GreyMatter
                 Console.WriteLine("\nAdditional options:");
                 Console.WriteLine("  --simple-demo     Run the original ephemeral brain concept demo");
                 Console.WriteLine("  --original-vision Same as --simple-demo");
+                Console.WriteLine("  --enhanced-demo   Run enhanced demo with Phase 2 features");
+                Console.WriteLine("  --phase2-demo     Same as --enhanced-demo");
+                Console.WriteLine("  --text-demo       Run text learning demo (Phase 3)");
+                Console.WriteLine("  --phase3-demo     Same as --text-demo");
                 return;
             }
             

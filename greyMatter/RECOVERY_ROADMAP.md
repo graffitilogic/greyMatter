@@ -12,10 +12,10 @@ The project has drifted from its core vision of ephemeral, FMRI-like neural clus
 **Goal**: Return to core concept with minimal viable implementation
 
 **Actions**:
-- [ ] Create `SimpleEphemeralBrain.cs` - new lightweight implementation
-- [ ] Implement basic cluster activation/deactivation (no complex persistence)
-- [ ] Add shared neuron pools between clusters
-- [ ] Simple in-memory persistence only
+- [x] Create `SimpleEphemeralBrain.cs` - new lightweight implementation
+- [x] Implement basic cluster activation/deactivation (no complex persistence)
+- [x] Add shared neuron pools between clusters
+- [x] Simple in-memory persistence only
 - [ ] Remove: hierarchical storage, membership packs, partition metadata, capacity management
 
 **Success Criteria**:
@@ -28,10 +28,10 @@ The project has drifted from its core vision of ephemeral, FMRI-like neural clus
 **Goal**: Prove the core Venn diagram concept works
 
 **Actions**:
-- [ ] `SharedNeuronPool.cs` - manages neuron sharing between clusters
-- [ ] `ClusterOverlapManager.cs` - determines which neurons to share
-- [ ] Similarity-based neuron assignment (red + fruit → apple uses neurons from both)
-- [ ] Visual logging of cluster overlaps
+- [x] `SharedNeuronPool.cs` - manages neuron sharing between clusters
+- [x] `ClusterOverlapManager.cs` - determines which neurons to share
+- [x] Similarity-based neuron assignment (red + fruit → apple uses neurons from both)
+- [x] Visual logging of cluster overlaps
 
 **Success Criteria**:
 - Learning "red apple" reuses neurons from both "red" and "apple" clusters
@@ -42,9 +42,9 @@ The project has drifted from its core vision of ephemeral, FMRI-like neural clus
 **Goal**: Measure if the concept learning actually works
 
 **Actions**:
-- [ ] Simple association test: given "apple" can recall "red"
-- [ ] Cluster activation visualization
-- [ ] Memory efficiency metrics (active vs total neurons)
+- [x] Simple association test: given "apple" can recall "red"
+- [x] Cluster activation visualization
+- [x] Memory efficiency metrics (active vs total neurons)
 
 ---
 
@@ -84,18 +84,18 @@ The project has drifted from its core vision of ephemeral, FMRI-like neural clus
 **Goal**: Learn from actual text, not hardcoded examples
 
 **Actions**:
-- [ ] Children's book parser (simple sentences)
-- [ ] Basic pattern extraction (noun-verb-object)
-- [ ] Incremental concept building
-- [ ] Track concept interconnections
+- [x] Children's book parser (simple sentences)
+- [x] Basic pattern extraction (noun-verb-object)
+- [x] Incremental concept building
+- [x] Track concept interconnections
 
 ### 3.2 Evaluation Harness
 **Goal**: Measure actual learning quality
 
 **Actions**:
-- [ ] Association strength tests
-- [ ] Concept retrieval accuracy
-- [ ] Pattern completion tasks
+- [x] Association strength tests
+- [x] Concept retrieval accuracy
+- [x] Pattern completion tasks
 - [ ] Compare to baseline (word2vec similarity)
 
 ---

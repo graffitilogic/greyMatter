@@ -49,7 +49,7 @@ namespace greyMatter.Core
             
             // Activate and train the cluster
             cluster.Activate();
-            cluster.Train();
+            cluster.Learn();
             
             Console.WriteLine($"Cluster '{concept}' now has {cluster.ActiveNeurons.Count} neurons");
             LogSharedNeurons(concept);
@@ -255,8 +255,8 @@ namespace greyMatter.Core
     public class ConceptCluster
     {
         public string Concept { get; }
-        public List<EphemeralNeuron> ActiveNeurons { get; private set; }
-        public double ActivationLevel { get; private set; }
+        public List<EphemeralNeuron> ActiveNeurons { get; protected set; }
+        public double ActivationLevel { get; protected set; }
         
         public ConceptCluster(string concept, List<EphemeralNeuron> initialNeurons)
         {
@@ -265,7 +265,7 @@ namespace greyMatter.Core
             ActivationLevel = 0.0;
         }
 
-        public void Activate()
+        public virtual void Activate()
         {
             ActivationLevel = 1.0;
             foreach (var neuron in ActiveNeurons)
@@ -274,13 +274,25 @@ namespace greyMatter.Core
             }
         }
 
-        public void PartialActivate(int sharedNeuronCount)
+        public virtual void BiologicalActivate()
+        {
+            // Enhanced activation considering fatigue
+            var availableNeurons = ActiveNeurons.Where(n => n.Fatigue < 0.8).ToList();
+            ActivationLevel = (double)availableNeurons.Count / ActiveNeurons.Count;
+            
+            foreach (var neuron in availableNeurons)
+            {
+                neuron.Activate();
+            }
+        }
+
+        public virtual void PartialActivate(int sharedNeuronCount)
         {
             // Activation level based on how many shared neurons are firing
             ActivationLevel = Math.Min(1.0, (double)sharedNeuronCount / ActiveNeurons.Count);
         }
 
-        public void Deactivate()
+        public virtual void Deactivate()
         {
             ActivationLevel = 0.0;
             foreach (var neuron in ActiveNeurons)
@@ -289,7 +301,7 @@ namespace greyMatter.Core
             }
         }
 
-        public void Train()
+        public virtual void Learn()
         {
             // Simple training: just mark that learning occurred
             foreach (var neuron in ActiveNeurons)
@@ -298,10 +310,33 @@ namespace greyMatter.Core
             }
         }
 
-        public void AddSharedNeurons(List<EphemeralNeuron> sharedNeurons)
+        public virtual void AddSharedNeurons(List<EphemeralNeuron> sharedNeurons)
         {
             ActiveNeurons.AddRange(sharedNeurons);
         }
+
+        public virtual void RemoveNeuron(EphemeralNeuron neuron)
+        {
+            ActiveNeurons.Remove(neuron);
+        }
+
+        public virtual void RestoreFromMetadata(ClusterMetadata metadata)
+        {
+            // Simple restoration - can be enhanced
+        }
+
+        public virtual void ApplyDecay()
+        {
+            ActivationLevel *= 0.95; // Gradual decay
+        }
+
+        public virtual void CreateSequenceConnection(ConceptCluster targetCluster)
+        {
+            // Base implementation - can be overridden
+        }
+
+        public double AverageStrength => ActiveNeurons.Count > 0 ? ActiveNeurons.Average(n => n.Strength) : 0.0;
+        public double AverageFatigue => ActiveNeurons.Count > 0 ? ActiveNeurons.Average(n => n.Fatigue) : 0.0;
     }
 
     /// <summary>
@@ -349,7 +384,7 @@ namespace greyMatter.Core
             }
         }
 
-        public override bool Equals(object obj)
+        public override bool Equals(object? obj)
         {
             return obj is EphemeralNeuron other && Id == other.Id;
         }
@@ -365,8 +400,11 @@ namespace greyMatter.Core
     /// </summary>
     public class ClusterMetadata
     {
-        public string Concept { get; set; }
+        public required string Concept { get; set; }
         public DateTime CreatedAt { get; set; }
         public int BaseSize { get; set; }
+        public DateTime LastAccessed { get; set; }
+        public int AccessCount { get; set; }
+        public double AverageStrength { get; set; }
     }
 }
