@@ -189,6 +189,24 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length > 0 && (args[0] == "--language-demo" || args[0] == "--phase1-language"))
+            {
+                await LanguageFoundationsDemo.RunDemo();
+                return;
+            }
+            
+            if (args.Length > 0 && args[0] == "--language-quick-test")
+            {
+                LanguageFoundationsDemo.RunQuickTest();
+                return;
+            }
+            
+            if (args.Length > 0 && args[0] == "--language-minimal-demo")
+            {
+                await LanguageFoundationsDemo.RunMinimalDemo();
+                return;
+            }
+            
             // Interactive conversation mode
             if (config.InteractiveMode)
             {
