@@ -228,8 +228,234 @@ namespace greyMatter.Core
                 TotalConcepts = GetActiveClusters().Count(),
                 AverageWordFrequency = _wordFrequencies.Count > 0 ? _wordFrequencies.Values.Average() : 0,
                 MostFrequentWords = GetTopWords(10),
-                WordAssociationCount = _wordAssociations.Sum(kvp => kvp.Value.Count)
+                WordAssociationCount = _wordAssociations.Sum(kvp => kvp.Value.Count),
+                TrainingSessions = GetActiveClusters().Count() // Placeholder until we track sessions properly
             };
+        }
+        
+        /// <summary>
+        /// Import vocabulary from biological storage
+        /// </summary>
+        public void ImportVocabulary(Dictionary<string, WordInfo> vocabulary)
+        {
+            foreach (var kvp in vocabulary)
+            {
+                var word = kvp.Key;
+                var wordInfo = kvp.Value;
+                
+                // Add to vocabulary network
+                _vocabulary.AddWord(word);
+                
+                // Update word frequencies
+                _wordFrequencies[word] = wordInfo.Frequency;
+                
+                // Learn the word concept silently to avoid triggering full learning pipeline
+                LearnSilently($"word_{word}");
+            }
+        }
+        
+        /// <summary>
+        /// Import language data (concepts, patterns, etc.) from biological storage
+        /// </summary>
+        public void ImportLanguageData(Dictionary<string, object> languageData)
+        {
+            foreach (var kvp in languageData)
+            {
+                var dataType = kvp.Key;
+                var data = kvp.Value;
+                
+                // Learn language concepts silently to restore brain state
+                LearnSilently($"language_data_{dataType}");
+                
+                // If this is sentence pattern data, we could reconstruct patterns
+                if (dataType.Contains("sentence_patterns") && data is Dictionary<string, object> patterns)
+                {
+                    foreach (var pattern in patterns.Keys)
+                    {
+                        LearnSilently($"sentence_pattern_{pattern}");
+                    }
+                }
+                
+                // If this is word association data, restore associations
+                if (dataType.Contains("word_associations") && data is Dictionary<string, object> associations)
+                {
+                    foreach (var assoc in associations)
+                    {
+                        if (assoc.Value is IEnumerable<string> words)
+                        {
+                            var wordSet = new HashSet<string>(words);
+                            _wordAssociations[assoc.Key] = wordSet;
+                        }
+                    }
+                }
+            }
+        }
+        
+        /// <summary>
+        /// Export current brain state for biological storage
+        /// </summary>
+        public Dictionary<string, WordInfo> ExportVocabulary()
+        {
+            var vocabulary = new Dictionary<string, WordInfo>();
+            
+            foreach (var kvp in _wordFrequencies)
+            {
+                var word = kvp.Key;
+                var frequency = kvp.Value;
+                
+                vocabulary[word] = new WordInfo
+                {
+                    Word = word,
+                    Frequency = frequency,
+                    FirstSeen = DateTime.UtcNow, // We don't track this yet, so use current time
+                    EstimatedType = EstimateWordType(word)
+                };
+            }
+            
+            return vocabulary;
+        }
+        
+        /// <summary>
+        /// Export language data for biological storage
+        /// </summary>
+        public Dictionary<string, object> ExportLanguageData()
+        {
+            var languageData = new Dictionary<string, object>();
+            
+            // Export word associations
+            languageData["word_associations"] = _wordAssociations.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value.ToList() as object
+            );
+            
+            // Export sentence patterns (basic implementation)
+            var sentencePatterns = new Dictionary<string, object>();
+            foreach (var clusterKvp in GetActiveClusters())
+            {
+                var cluster = clusterKvp.Value;
+                if (clusterKvp.Key.Contains("sentence"))
+                {
+                    sentencePatterns[clusterKvp.Key] = new
+                    {
+                        CreatedAt = DateTime.UtcNow,
+                        NeuronCount = cluster.ActiveNeurons.Count,
+                        Strength = cluster.ActivationLevel
+                    };
+                }
+            }
+            languageData["sentence_patterns"] = sentencePatterns;
+            
+            return languageData;
+        }
+
+        /// <summary>
+        /// Export individual neural concepts for semantic domain storage
+        /// This enables the biological storage manager to categorize concepts
+        /// into Huth's hierarchical semantic domain architecture
+        /// </summary>
+        public Dictionary<string, object> ExportNeuralConcepts()
+        {
+            var concepts = new Dictionary<string, object>();
+            
+            // Export all active neural clusters as individual concepts
+            foreach (var clusterKvp in GetActiveClusters())
+            {
+                var clusterId = clusterKvp.Key;
+                var cluster = clusterKvp.Value;
+                
+                // Create concept data structure
+                var conceptData = new
+                {
+                    Id = clusterId,
+                    Type = DetermineConceptType(clusterId),
+                    CreatedAt = DateTime.UtcNow,
+                    NeuronCount = cluster.ActiveNeurons.Count,
+                    ActivationLevel = cluster.ActivationLevel,
+                    ActiveNeurons = cluster.ActiveNeurons.ToList(),
+                    LastActivated = DateTime.UtcNow,
+                    ActivationHistory = new List<DateTime> { DateTime.UtcNow },
+                    AssociatedWords = GetWordsForCluster(clusterId),
+                    Context = GetClusterContext(clusterId)
+                };
+                
+                concepts[clusterId] = conceptData;
+            }
+            
+            return concepts;
+        }
+
+        /// <summary>
+        /// Determine the type of concept based on cluster ID and context
+        /// </summary>
+        private string DetermineConceptType(string clusterId)
+        {
+            if (clusterId.Contains("word_") || clusterId.Contains("vocab_"))
+                return "vocabulary";
+            if (clusterId.Contains("sentence_") || clusterId.Contains("phrase_"))
+                return "linguistic";
+            if (clusterId.Contains("pattern_") || clusterId.Contains("grammar_"))
+                return "syntactic";
+            if (clusterId.Contains("semantic_") || clusterId.Contains("meaning_"))
+                return "semantic";
+            if (clusterId.Contains("association_") || clusterId.Contains("relation_"))
+                return "associative";
+            
+            return "general";
+        }
+
+        /// <summary>
+        /// Get words associated with a neural cluster
+        /// </summary>
+        private List<string> GetWordsForCluster(string clusterId)
+        {
+            var words = new List<string>();
+            
+            // Check word associations for this cluster
+            foreach (var wordAssoc in _wordAssociations)
+            {
+                if (wordAssoc.Value.Any(assoc => assoc.Contains(clusterId)))
+                {
+                    words.Add(wordAssoc.Key);
+                }
+            }
+            
+            return words;
+        }
+
+        /// <summary>
+        /// Get contextual information for a cluster
+        /// </summary>
+        private Dictionary<string, object> GetClusterContext(string clusterId)
+        {
+            var context = new Dictionary<string, object>();
+            
+            // Add frequency information
+            var associatedWords = GetWordsForCluster(clusterId);
+            if (associatedWords.Any())
+            {
+                var avgFrequency = associatedWords.Average(word => 
+                    _vocabulary.GetWordInfo(word)?.Frequency ?? 0);
+                context["average_word_frequency"] = avgFrequency;
+                context["word_count"] = associatedWords.Count;
+            }
+            
+            // Add activation patterns
+            context["cluster_type"] = DetermineConceptType(clusterId);
+            context["creation_time"] = DateTime.UtcNow;
+            
+            return context;
+        }
+        
+        /// <summary>
+        /// Simple word type estimation (placeholder)
+        /// </summary>
+        private WordType EstimateWordType(string word)
+        {
+            // Very basic estimation - would need proper NLP in production
+            if (word.EndsWith("ing") || word.EndsWith("ed")) return WordType.Verb;
+            if (word.EndsWith("ly")) return WordType.Adverb;
+            if (word.EndsWith("tion") || word.EndsWith("ness")) return WordType.Noun;
+            return WordType.Unknown;
         }
     }
 
@@ -244,6 +470,7 @@ namespace greyMatter.Core
         public double AverageWordFrequency { get; set; }
         public List<(string word, int frequency)> MostFrequentWords { get; set; } = new();
         public int WordAssociationCount { get; set; }
+        public int TrainingSessions { get; set; }
     }
 
     /// <summary>

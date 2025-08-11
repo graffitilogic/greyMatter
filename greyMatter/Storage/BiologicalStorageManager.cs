@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using greyMatter.Core;
 
+
 namespace GreyMatter.Storage
 {
     /// <summary>
@@ -62,18 +63,87 @@ namespace GreyMatter.Storage
             // Hippocampus - sparse indices
             Directory.CreateDirectory(_hippocampusPath);
             
-            // Cortical columns - semantic clustering
+            // Cortical columns - semantic clustering based on Huth's semantic brain map
+            // Following the ~24 major semantic domains identified in cortical organization research
             var corticalDomains = new[]
             {
-                "language_structures/verbs",
-                "language_structures/nouns", 
-                "language_structures/sentence_patterns",
-                "semantic_domains/animals",
-                "semantic_domains/technology",
-                "semantic_domains/emotions",
-                "semantic_domains/spatial_relations",
-                "semantic_domains/temporal_relations",
-                "episodic_memories"
+                // === CONCRETE SEMANTIC DOMAINS ===
+                
+                // Living Things
+                "semantic_domains/living_things/animals/mammals",
+                "semantic_domains/living_things/animals/birds", 
+                "semantic_domains/living_things/animals/fish_marine",
+                "semantic_domains/living_things/animals/insects",
+                "semantic_domains/living_things/plants/trees",
+                "semantic_domains/living_things/plants/flowers",
+                "semantic_domains/living_things/humans/body_parts",
+                "semantic_domains/living_things/humans/family_relations",
+                
+                // Artifacts & Objects
+                "semantic_domains/artifacts/tools_instruments",
+                "semantic_domains/artifacts/vehicles/land_vehicles", 
+                "semantic_domains/artifacts/vehicles/watercraft",
+                "semantic_domains/artifacts/vehicles/aircraft",
+                "semantic_domains/artifacts/buildings_structures",
+                "semantic_domains/artifacts/clothing_textiles",
+                "semantic_domains/artifacts/food_nutrition",
+                "semantic_domains/artifacts/technology_electronics",
+                "semantic_domains/artifacts/weapons_military",
+                
+                // Natural World
+                "semantic_domains/natural_world/geography/landforms",
+                "semantic_domains/natural_world/geography/water_bodies", 
+                "semantic_domains/natural_world/weather_climate",
+                "semantic_domains/natural_world/materials_substances",
+                "semantic_domains/natural_world/colors_visual",
+                
+                // === ABSTRACT SEMANTIC DOMAINS ===
+                
+                // Mental/Cognitive
+                "semantic_domains/mental_cognitive/emotions_feelings",
+                "semantic_domains/mental_cognitive/thoughts_ideas",
+                "semantic_domains/mental_cognitive/knowledge_learning", 
+                "semantic_domains/mental_cognitive/memory_perception",
+                
+                // Social/Communication
+                "semantic_domains/social_communication/language_speech",
+                "semantic_domains/social_communication/social_relations",
+                "semantic_domains/social_communication/cultural_practices",
+                "semantic_domains/social_communication/politics_government",
+                
+                // Actions/Events
+                "semantic_domains/actions_events/physical_motion",
+                "semantic_domains/actions_events/mental_actions",
+                "semantic_domains/actions_events/social_interactions",
+                "semantic_domains/actions_events/work_occupations",
+                
+                // Properties/Attributes  
+                "semantic_domains/properties/spatial_relations",
+                "semantic_domains/properties/temporal_relations",
+                "semantic_domains/properties/quantity_measurement", 
+                "semantic_domains/properties/quality_evaluation",
+                
+                // === LANGUAGE STRUCTURE DOMAINS ===
+                
+                // Grammatical Categories
+                "language_structures/grammatical/verbs/action_verbs",
+                "language_structures/grammatical/verbs/mental_verbs", 
+                "language_structures/grammatical/verbs/motion_verbs",
+                "language_structures/grammatical/nouns/concrete_nouns",
+                "language_structures/grammatical/nouns/abstract_nouns",
+                "language_structures/grammatical/adjectives/descriptive",
+                "language_structures/grammatical/adjectives/evaluative",
+                "language_structures/grammatical/function_words",
+                
+                // Syntactic Patterns
+                "language_structures/syntactic/sentence_patterns",
+                "language_structures/syntactic/phrase_structures",
+                "language_structures/syntactic/grammatical_relations",
+                
+                // === EPISODIC & CONTEXTUAL ===
+                "episodic_memories/personal_experiences",
+                "episodic_memories/cultural_contexts",
+                "episodic_memories/temporal_sequences"
             };
             
             foreach (var domain in corticalDomains)
@@ -300,35 +370,94 @@ namespace GreyMatter.Storage
         
         /// <summary>
         /// Semantic domain classification for biological clustering
+        /// Based on Huth's semantic brain mapping research with hierarchical organization
         /// </summary>
         private string DetermineSemanticDomain(string word, WordInfo wordInfo)
         {
-            // Analyze word for semantic markers
             var lowerWord = word.ToLowerInvariant();
             
-            // Animal domain
-            if (IsAnimalWord(lowerWord)) return "semantic_domains/animals";
+            // === LIVING THINGS DOMAIN ===
             
-            // Technology domain  
-            if (IsTechnologyWord(lowerWord)) return "semantic_domains/technology";
+            // Animals - with subcategorization
+            if (IsMammal(lowerWord)) return "semantic_domains/living_things/animals/mammals";
+            if (IsBird(lowerWord)) return "semantic_domains/living_things/animals/birds";
+            if (IsFishOrMarine(lowerWord)) return "semantic_domains/living_things/animals/fish_marine";
+            if (IsInsect(lowerWord)) return "semantic_domains/living_things/animals/insects";
             
-            // Emotion domain
-            if (IsEmotionWord(lowerWord)) return "semantic_domains/emotions";
+            // Plants
+            if (IsTree(lowerWord)) return "semantic_domains/living_things/plants/trees";
+            if (IsFlowerOrPlant(lowerWord)) return "semantic_domains/living_things/plants/flowers";
             
-            // Spatial relations
-            if (IsSpatialWord(lowerWord)) return "semantic_domains/spatial_relations";
+            // Human-related
+            if (IsBodyPart(lowerWord)) return "semantic_domains/living_things/humans/body_parts";
+            if (IsFamilyRelation(lowerWord)) return "semantic_domains/living_things/humans/family_relations";
             
-            // Temporal relations
-            if (IsTemporalWord(lowerWord)) return "semantic_domains/temporal_relations";
+            // === ARTIFACTS & OBJECTS DOMAIN ===
             
-            // Default to language structures
-            return "language_structures";
+            // Vehicles - hierarchical
+            if (IsLandVehicle(lowerWord)) return "semantic_domains/artifacts/vehicles/land_vehicles";
+            if (IsWatercraft(lowerWord)) return "semantic_domains/artifacts/vehicles/watercraft";
+            if (IsAircraft(lowerWord)) return "semantic_domains/artifacts/vehicles/aircraft";
+            
+            // Tools and objects
+            if (IsToolOrInstrument(lowerWord)) return "semantic_domains/artifacts/tools_instruments";
+            if (IsBuildingOrStructure(lowerWord)) return "semantic_domains/artifacts/buildings_structures";
+            if (IsClothingOrTextile(lowerWord)) return "semantic_domains/artifacts/clothing_textiles";
+            if (IsFoodOrNutrition(lowerWord)) return "semantic_domains/artifacts/food_nutrition";
+            if (IsTechnologyOrElectronics(lowerWord)) return "semantic_domains/artifacts/technology_electronics";
+            if (IsWeaponOrMilitary(lowerWord)) return "semantic_domains/artifacts/weapons_military";
+            
+            // === NATURAL WORLD DOMAIN ===
+            
+            // Geography
+            if (IsLandform(lowerWord)) return "semantic_domains/natural_world/geography/landforms";
+            if (IsWaterBody(lowerWord)) return "semantic_domains/natural_world/geography/water_bodies";
+            if (IsWeatherOrClimate(lowerWord)) return "semantic_domains/natural_world/weather_climate";
+            if (IsMaterialOrSubstance(lowerWord)) return "semantic_domains/natural_world/materials_substances";
+            if (IsColorOrVisual(lowerWord)) return "semantic_domains/natural_world/colors_visual";
+            
+            // === ABSTRACT DOMAINS ===
+            
+            // Mental/Cognitive
+            if (IsEmotionOrFeeling(lowerWord)) return "semantic_domains/mental_cognitive/emotions_feelings";
+            if (IsThoughtOrIdea(lowerWord)) return "semantic_domains/mental_cognitive/thoughts_ideas";
+            if (IsKnowledgeOrLearning(lowerWord)) return "semantic_domains/mental_cognitive/knowledge_learning";
+            if (IsMemoryOrPerception(lowerWord)) return "semantic_domains/mental_cognitive/memory_perception";
+            
+            // Social/Communication
+            if (IsLanguageOrSpeech(lowerWord)) return "semantic_domains/social_communication/language_speech";
+            if (IsSocialRelation(lowerWord)) return "semantic_domains/social_communication/social_relations";
+            if (IsCulturalPractice(lowerWord)) return "semantic_domains/social_communication/cultural_practices";
+            if (IsPoliticsOrGovernment(lowerWord)) return "semantic_domains/social_communication/politics_government";
+            
+            // Actions/Events
+            if (IsPhysicalMotion(lowerWord)) return "semantic_domains/actions_events/physical_motion";
+            if (IsMentalAction(lowerWord)) return "semantic_domains/actions_events/mental_actions";
+            if (IsSocialInteraction(lowerWord)) return "semantic_domains/actions_events/social_interactions";
+            if (IsWorkOrOccupation(lowerWord)) return "semantic_domains/actions_events/work_occupations";
+            
+            // Properties/Attributes
+            if (IsSpatialRelation(lowerWord)) return "semantic_domains/properties/spatial_relations";
+            if (IsTemporalRelation(lowerWord)) return "semantic_domains/properties/temporal_relations";
+            if (IsQuantityOrMeasurement(lowerWord)) return "semantic_domains/properties/quantity_measurement";
+            if (IsQualityOrEvaluation(lowerWord)) return "semantic_domains/properties/quality_evaluation";
+            
+            // === LANGUAGE STRUCTURE FALLBACK ===
+            
+            // Grammatical categorization based on word type
+            return wordInfo.EstimatedType switch
+            {
+                WordType.Verb => DetermineVerbSubcategory(lowerWord),
+                WordType.Noun => DetermineNounSubcategory(lowerWord), 
+                WordType.Adjective => DetermineAdjectiveSubcategory(lowerWord),
+                _ => "language_structures/grammatical/function_words"
+            };
         }
         
         private string DetermineWordType(string word, WordInfo wordInfo)
         {
             // Analyze grammatical patterns from usage
-            var estimatedType = wordInfo.EstimatedType?.ToLowerInvariant();
+            var estimatedType = wordInfo.EstimatedType.ToString().ToLowerInvariant();
             
             return estimatedType switch
             {
@@ -363,29 +492,199 @@ namespace GreyMatter.Storage
         {
             return conceptType switch
             {
-                ConceptType.SentencePattern => "language_structures/sentence_patterns",
-                ConceptType.WordAssociation => "language_structures/associations", 
-                ConceptType.SemanticRelation => "semantic_domains/relations",
-                ConceptType.EpisodicMemory => "episodic_memories",
-                _ => "language_structures/general"
+                ConceptType.SentencePattern => "language_structures/syntactic/sentence_patterns",
+                ConceptType.WordAssociation => "semantic_domains/social_communication/language_speech/associations", 
+                ConceptType.SemanticRelation => "semantic_domains/properties/semantic_relations",
+                ConceptType.EpisodicMemory => "episodic_memories/personal_experiences",
+                _ => "language_structures/syntactic/general"
             };
         }
         
-        // Semantic classification helpers
-        private bool IsAnimalWord(string word) => 
-            new[] { "cat", "dog", "bird", "fish", "animal", "pet", "wild" }.Any(word.Contains);
-            
-        private bool IsTechnologyWord(string word) =>
-            new[] { "computer", "phone", "internet", "software", "digital", "tech" }.Any(word.Contains);
-            
-        private bool IsEmotionWord(string word) =>
-            new[] { "happy", "sad", "angry", "love", "hate", "feel", "emotion" }.Any(word.Contains);
-            
-        private bool IsSpatialWord(string word) =>
-            new[] { "on", "in", "under", "over", "beside", "near", "far", "here", "there" }.Any(word.Contains);
-            
-        private bool IsTemporalWord(string word) =>
-            new[] { "when", "then", "now", "before", "after", "during", "while", "time" }.Any(word.Contains);
+        // === LIVING THINGS CLASSIFICATION ===
+        
+        private bool IsMammal(string word) => 
+            new[] { "cat", "dog", "horse", "cow", "sheep", "pig", "elephant", "lion", "tiger", "bear", 
+                   "wolf", "deer", "rabbit", "mouse", "rat", "monkey", "human", "person", "man", "woman", "child" }.Any(word.Contains);
+        
+        private bool IsBird(string word) =>
+            new[] { "bird", "eagle", "hawk", "owl", "robin", "sparrow", "crow", "chicken", "duck", "goose", 
+                   "turkey", "pigeon", "parrot", "penguin", "ostrich", "swan", "flamingo" }.Any(word.Contains);
+        
+        private bool IsFishOrMarine(string word) =>
+            new[] { "fish", "shark", "whale", "dolphin", "salmon", "tuna", "cod", "bass", "trout", 
+                   "octopus", "squid", "crab", "lobster", "shrimp", "jellyfish", "starfish" }.Any(word.Contains);
+        
+        private bool IsInsect(string word) =>
+            new[] { "insect", "bug", "bee", "ant", "fly", "mosquito", "spider", "butterfly", "moth", 
+                   "beetle", "cricket", "grasshopper", "wasp", "termite" }.Any(word.Contains);
+        
+        private bool IsTree(string word) =>
+            new[] { "tree", "oak", "pine", "maple", "birch", "cedar", "willow", "palm", "fir", 
+                   "forest", "woods", "branch", "trunk", "bark", "leaf", "leaves" }.Any(word.Contains);
+        
+        private bool IsFlowerOrPlant(string word) =>
+            new[] { "flower", "plant", "rose", "tulip", "daisy", "sunflower", "lily", "orchid", 
+                   "grass", "bush", "shrub", "vine", "garden", "bloom", "petal" }.Any(word.Contains);
+        
+        private bool IsBodyPart(string word) =>
+            new[] { "head", "face", "eye", "ear", "nose", "mouth", "hand", "arm", "leg", "foot", 
+                   "finger", "toe", "heart", "brain", "lung", "stomach", "back", "chest", "shoulder" }.Any(word.Contains);
+        
+        private bool IsFamilyRelation(string word) =>
+            new[] { "family", "mother", "father", "parent", "child", "son", "daughter", "brother", "sister", 
+                   "grandmother", "grandfather", "aunt", "uncle", "cousin", "spouse", "husband", "wife" }.Any(word.Contains);
+        
+        // === ARTIFACTS & OBJECTS CLASSIFICATION ===
+        
+        private bool IsLandVehicle(string word) =>
+            new[] { "car", "truck", "bus", "motorcycle", "bicycle", "train", "subway", "taxi", 
+                   "van", "suv", "vehicle", "automobile", "scooter", "tractor" }.Any(word.Contains);
+        
+        private bool IsWatercraft(string word) =>
+            new[] { "boat", "ship", "yacht", "canoe", "kayak", "sailboat", "submarine", "ferry", 
+                   "cruise", "vessel", "raft", "barge", "speedboat" }.Any(word.Contains);
+        
+        private bool IsAircraft(string word) =>
+            new[] { "plane", "airplane", "aircraft", "jet", "helicopter", "drone", "glider", 
+                   "balloon", "rocket", "spaceship", "shuttle" }.Any(word.Contains);
+        
+        private bool IsToolOrInstrument(string word) =>
+            new[] { "tool", "hammer", "screwdriver", "wrench", "knife", "scissors", "saw", "drill", 
+                   "instrument", "equipment", "device", "machine", "apparatus" }.Any(word.Contains);
+        
+        private bool IsBuildingOrStructure(string word) =>
+            new[] { "house", "building", "home", "office", "school", "hospital", "church", "store", 
+                   "bridge", "tower", "wall", "roof", "door", "window", "room", "structure" }.Any(word.Contains);
+        
+        private bool IsClothingOrTextile(string word) =>
+            new[] { "clothes", "shirt", "pants", "dress", "shoe", "hat", "coat", "jacket", "sock", 
+                   "fabric", "cotton", "silk", "wool", "leather", "textile" }.Any(word.Contains);
+        
+        private bool IsFoodOrNutrition(string word) =>
+            new[] { "food", "eat", "bread", "meat", "fruit", "vegetable", "milk", "cheese", "egg", 
+                   "rice", "pasta", "soup", "meal", "dinner", "lunch", "breakfast", "nutrition" }.Any(word.Contains);
+        
+        private bool IsTechnologyOrElectronics(string word) =>
+            new[] { "computer", "phone", "internet", "software", "digital", "tech", "electronic", 
+                   "robot", "artificial", "data", "network", "system", "program", "app" }.Any(word.Contains);
+        
+        private bool IsWeaponOrMilitary(string word) =>
+            new[] { "weapon", "gun", "rifle", "sword", "knife", "bomb", "military", "army", "war", 
+                   "soldier", "battle", "fight", "defense", "attack" }.Any(word.Contains);
+        
+        // === NATURAL WORLD CLASSIFICATION ===
+        
+        private bool IsLandform(string word) =>
+            new[] { "mountain", "hill", "valley", "canyon", "cliff", "plain", "desert", "island", 
+                   "peninsula", "plateau", "cave", "rock", "stone", "soil", "earth" }.Any(word.Contains);
+        
+        private bool IsWaterBody(string word) =>
+            new[] { "ocean", "sea", "lake", "river", "stream", "pond", "waterfall", "bay", "gulf", 
+                   "beach", "shore", "coast", "water", "wave", "current" }.Any(word.Contains);
+        
+        private bool IsWeatherOrClimate(string word) =>
+            new[] { "weather", "rain", "snow", "sun", "wind", "storm", "cloud", "hot", "cold", 
+                   "warm", "cool", "climate", "temperature", "season", "winter", "summer" }.Any(word.Contains);
+        
+        private bool IsMaterialOrSubstance(string word) =>
+            new[] { "metal", "wood", "plastic", "glass", "paper", "concrete", "rubber", "oil", 
+                   "gas", "liquid", "solid", "chemical", "substance", "material" }.Any(word.Contains);
+        
+        private bool IsColorOrVisual(string word) =>
+            new[] { "color", "red", "blue", "green", "yellow", "black", "white", "orange", "purple", 
+                   "pink", "brown", "gray", "bright", "dark", "light", "visual", "see", "look" }.Any(word.Contains);
+        
+        // === ABSTRACT DOMAINS CLASSIFICATION ===
+        
+        private bool IsEmotionOrFeeling(string word) =>
+            new[] { "happy", "sad", "angry", "love", "hate", "fear", "joy", "excited", "nervous", 
+                   "calm", "worried", "proud", "ashamed", "emotion", "feeling", "mood" }.Any(word.Contains);
+        
+        private bool IsThoughtOrIdea(string word) =>
+            new[] { "think", "thought", "idea", "concept", "theory", "philosophy", "belief", 
+                   "opinion", "mind", "mental", "cognitive", "reason", "logic" }.Any(word.Contains);
+        
+        private bool IsKnowledgeOrLearning(string word) =>
+            new[] { "know", "learn", "study", "teach", "education", "school", "knowledge", 
+                   "information", "fact", "truth", "science", "research", "discovery" }.Any(word.Contains);
+        
+        private bool IsMemoryOrPerception(string word) =>
+            new[] { "remember", "memory", "forget", "recall", "recognize", "perceive", "sense", 
+                   "aware", "conscious", "attention", "focus", "notice" }.Any(word.Contains);
+        
+        private bool IsLanguageOrSpeech(string word) =>
+            new[] { "language", "speak", "talk", "say", "tell", "word", "sentence", "voice", 
+                   "communication", "conversation", "discuss", "explain", "describe" }.Any(word.Contains);
+        
+        private bool IsSocialRelation(string word) =>
+            new[] { "friend", "social", "relationship", "community", "group", "team", "society", 
+                   "culture", "people", "person", "human", "interaction", "cooperation" }.Any(word.Contains);
+        
+        private bool IsCulturalPractice(string word) =>
+            new[] { "culture", "tradition", "custom", "ritual", "ceremony", "festival", "art", 
+                   "music", "dance", "religion", "spiritual", "cultural", "ethnic" }.Any(word.Contains);
+        
+        private bool IsPoliticsOrGovernment(string word) =>
+            new[] { "government", "politics", "law", "legal", "court", "judge", "police", "vote", 
+                   "election", "democracy", "president", "minister", "political", "policy" }.Any(word.Contains);
+        
+        private bool IsPhysicalMotion(string word) =>
+            new[] { "move", "walk", "run", "jump", "climb", "swim", "fly", "drive", "travel", 
+                   "motion", "speed", "fast", "slow", "direction", "forward", "backward" }.Any(word.Contains);
+        
+        private bool IsMentalAction(string word) =>
+            new[] { "think", "decide", "choose", "plan", "imagine", "dream", "wonder", "consider", 
+                   "analyze", "solve", "create", "invent", "design", "mental", "cognitive" }.Any(word.Contains);
+        
+        private bool IsSocialInteraction(string word) =>
+            new[] { "meet", "greet", "talk", "discuss", "argue", "agree", "help", "cooperate", 
+                   "share", "give", "take", "exchange", "social", "interact" }.Any(word.Contains);
+        
+        private bool IsWorkOrOccupation(string word) =>
+            new[] { "work", "job", "career", "profession", "business", "office", "company", 
+                   "employee", "boss", "manager", "doctor", "teacher", "engineer", "lawyer" }.Any(word.Contains);
+        
+        private bool IsSpatialRelation(string word) =>
+            new[] { "on", "in", "under", "over", "beside", "near", "far", "here", "there", 
+                   "above", "below", "inside", "outside", "left", "right", "front", "back" }.Any(word.Contains);
+        
+        private bool IsTemporalRelation(string word) =>
+            new[] { "when", "then", "now", "before", "after", "during", "while", "time", 
+                   "early", "late", "soon", "yesterday", "today", "tomorrow", "past", "future" }.Any(word.Contains);
+        
+        private bool IsQuantityOrMeasurement(string word) =>
+            new[] { "number", "count", "measure", "size", "big", "small", "many", "few", "all", 
+                   "some", "more", "less", "most", "least", "quantity", "amount" }.Any(word.Contains);
+        
+        private bool IsQualityOrEvaluation(string word) =>
+            new[] { "good", "bad", "better", "best", "worse", "worst", "quality", "excellent", 
+                   "poor", "beautiful", "ugly", "perfect", "terrible", "amazing", "awful" }.Any(word.Contains);
+        
+        // === GRAMMATICAL SUBCATEGORIZATION ===
+        
+        private string DetermineVerbSubcategory(string word)
+        {
+            if (IsPhysicalMotion(word)) return "language_structures/grammatical/verbs/action_verbs";
+            if (IsMentalAction(word)) return "language_structures/grammatical/verbs/mental_verbs";
+            if (IsPhysicalMotion(word)) return "language_structures/grammatical/verbs/motion_verbs";
+            return "language_structures/grammatical/verbs/action_verbs";
+        }
+        
+        private string DetermineNounSubcategory(string word)
+        {
+            // Check if it's a concrete vs abstract noun
+            if (IsMammal(word) || IsBird(word) || IsToolOrInstrument(word) || IsBuildingOrStructure(word))
+                return "language_structures/grammatical/nouns/concrete_nouns";
+            if (IsEmotionOrFeeling(word) || IsThoughtOrIdea(word) || IsKnowledgeOrLearning(word))
+                return "language_structures/grammatical/nouns/abstract_nouns";
+            return "language_structures/grammatical/nouns/concrete_nouns";
+        }
+        
+        private string DetermineAdjectiveSubcategory(string word)
+        {
+            if (IsQualityOrEvaluation(word)) return "language_structures/grammatical/adjectives/evaluative";
+            return "language_structures/grammatical/adjectives/descriptive";
+        }
         
         // Index management methods
         private async Task UpdateVocabularyIndexAsync(string word, string clusterPath)
@@ -459,6 +758,15 @@ namespace GreyMatter.Storage
             var indexPath = Path.Combine(_hippocampusPath, "concept_index.json");
             var json = JsonSerializer.Serialize(_conceptIndex, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(indexPath, json);
+        }
+        
+        /// <summary>
+        /// Generate a hash for concept clustering to distribute load
+        /// </summary>
+        private string GetConceptHash(string conceptId)
+        {
+            var hash = conceptId.GetHashCode();
+            return Math.Abs(hash % 1000).ToString("D3"); // 000-999 for distribution
         }
         
         // Shared neuron management methods
@@ -724,6 +1032,85 @@ namespace GreyMatter.Storage
         }
         
         /// <summary>
+        /// Store language-specific data using biological organization
+        /// </summary>
+        public async Task StoreLanguageDataAsync(Dictionary<string, object> languageData)
+        {
+            foreach (var kvp in languageData)
+            {
+                var dataType = kvp.Key;
+                var data = kvp.Value;
+                
+                // Determine semantic domain for language data using Huth's hierarchical organization
+                var domain = dataType switch
+                {
+                    "sentence_patterns" => "language_structures/syntactic/sentence_patterns",
+                    "word_associations" => "semantic_domains/social_communication/language_speech/associations",
+                    "grammar_rules" => "language_structures/syntactic/grammatical_relations",
+                    "phrase_structures" => "language_structures/syntactic/phrase_structures",
+                    "semantic_relations" => "semantic_domains/properties/semantic_relations",
+                    "episodic_memories" => "episodic_memories/personal_experiences",
+                    _ => "language_structures/grammatical/function_words"
+                };
+                
+                var clusterPath = Path.Combine(_corticalColumnsPath, domain, $"{dataType}.json");
+                var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
+                
+                cluster.Concepts[dataType] = data;
+                cluster.LastModified = DateTime.UtcNow;
+                cluster.AccessCount++;
+                
+                await SaveConceptClusterAsync(clusterPath, cluster);
+                await UpdateConceptIndexAsync(dataType, clusterPath, ConceptType.General);
+            }
+        }
+        
+        /// <summary>
+        /// Load language data from biological storage
+        /// </summary>
+        public async Task<Dictionary<string, object>> LoadLanguageDataAsync()
+        {
+            var languageData = new Dictionary<string, object>();
+            
+            // Load from language structure domains following Huth's semantic organization
+            var languageDomains = new[]
+            {
+                "language_structures/syntactic/sentence_patterns",
+                "language_structures/syntactic/phrase_structures", 
+                "language_structures/syntactic/grammatical_relations",
+                "language_structures/grammatical/verbs",
+                "language_structures/grammatical/nouns",
+                "language_structures/grammatical/adjectives",
+                "language_structures/grammatical/function_words",
+                "semantic_domains/social_communication/language_speech/associations",
+                "semantic_domains/properties/semantic_relations",
+                "episodic_memories/personal_experiences"
+            };
+            
+            foreach (var domain in languageDomains)
+            {
+                var domainPath = Path.Combine(_corticalColumnsPath, domain);
+                if (!Directory.Exists(domainPath)) continue;
+                
+                var clusterFiles = Directory.GetFiles(domainPath, "*.json");
+                
+                foreach (var clusterFile in clusterFiles)
+                {
+                    var cluster = await LoadConceptClusterAsync(clusterFile);
+                    if (cluster?.Concepts != null)
+                    {
+                        foreach (var conceptKvp in cluster.Concepts)
+                        {
+                            languageData[conceptKvp.Key] = conceptKvp.Value;
+                        }
+                    }
+                }
+            }
+            
+            return languageData;
+        }
+        
+        /// <summary>
         /// Check if brain state exists in biological storage
         /// </summary>
         public bool HasExistingBrainState()
@@ -770,8 +1157,113 @@ namespace GreyMatter.Storage
             
             return stats;
         }
+        
+        /// <summary>
+        /// Store individual neural concepts using Huth's semantic domain categorization
+        /// This method analyzes each concept and routes it to the appropriate semantic domain
+        /// </summary>
+        public async Task StoreNeuralConceptsAsync(Dictionary<string, object> neuralConcepts)
+        {
+            foreach (var conceptKvp in neuralConcepts)
+            {
+                var conceptId = conceptKvp.Key;
+                var conceptData = conceptKvp.Value;
+                
+                // Determine semantic domain for this concept using Huth's hierarchical organization
+                var semanticDomain = DetermineSemanticDomainForConcept(conceptId, conceptData);
+                
+                // Create cluster path in the appropriate semantic domain
+                var clusterPath = Path.Combine(_corticalColumnsPath, semanticDomain, $"concepts_{GetConceptHash(conceptId)}.json");
+                
+                // Load existing concept cluster
+                var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
+                
+                // Add concept to cluster
+                cluster.Concepts[conceptId] = conceptData;
+                cluster.LastModified = DateTime.UtcNow;
+                cluster.AccessCount++;
+                
+                // Save cluster
+                await SaveConceptClusterAsync(clusterPath, cluster);
+                
+                // Update hippocampus index for cross-domain retrieval
+                await UpdateConceptIndexAsync(conceptId, clusterPath, ConceptType.Neural);
+            }
+        }
+
+        /// <summary>
+        /// Determine the semantic domain for a neural concept using Huth's hierarchical organization
+        /// Analyzes concept content to route to appropriate domain/subdomain
+        /// </summary>
+        private string DetermineSemanticDomainForConcept(string conceptId, object conceptData)
+        {
+            var conceptString = conceptId.ToLower();
+            var dataString = JsonSerializer.Serialize(conceptData).ToLower();
+            var combinedText = $"{conceptString} {dataString}";
+            
+            // Simplified semantic domain categorization
+            // Language and communication concepts
+            if (combinedText.Contains("word") || combinedText.Contains("language") || 
+                combinedText.Contains("speak") || combinedText.Contains("communication"))
+                return "semantic_domains/social_communication/language_speech";
+            
+            // Actions and events
+            if (combinedText.Contains("action") || combinedText.Contains("event") || 
+                combinedText.Contains("activity") || combinedText.Contains("work"))
+                return "semantic_domains/actions_events/general_actions";
+            
+            // Cognitive and mental processes
+            if (combinedText.Contains("think") || combinedText.Contains("memory") || 
+                combinedText.Contains("learn") || combinedText.Contains("knowledge"))
+                return "semantic_domains/mental_cognitive/general_cognitive";
+            
+            // Social interactions
+            if (combinedText.Contains("social") || combinedText.Contains("friend") || 
+                combinedText.Contains("family") || combinedText.Contains("relationship"))
+                return "semantic_domains/social_communication/social_relations";
+            
+            // Default: general concepts
+            return "semantic_domains/general_concepts";
+        }
+    }
+
+    /// <summary>
+    /// Shared neuron that can participate in multiple concepts and cortical columns
+    /// Enables biological realism through neural sharing across brain regions
+    /// </summary>
+    public class SharedNeuron
+    {
+        public int Id { get; set; }
+        public NeuronType Type { get; set; }
+        public Dictionary<int, double> WeightMap { get; set; } = new();
+        public HashSet<string> ActiveConcepts { get; set; } = new();
+        public DateTime LastActivated { get; set; }
+        public int ActivationCount { get; set; }
     }
     
+    /// <summary>
+    /// Biological concept stored with neural pointers instead of full neuron data
+    /// </summary>
+    public class BiologicalConcept
+    {
+        public string ConceptId { get; set; } = "";
+        public List<int> NeuronIds { get; set; } = new();
+        public string StorageColumn { get; set; } = "";
+        public double ActivationStrength { get; set; }
+        public DateTime LastAccessed { get; set; }
+    }
+    
+    /// <summary>
+    /// Cortical column for semantic clustering and efficient loading
+    /// </summary>
+    public class CorticalColumn
+    {
+        public string Specialization { get; set; } = "";
+        public List<string> ConceptIds { get; set; } = new();
+        public DateTime LastAccessed { get; set; }
+        public Dictionary<string, double> ConceptStrengths { get; set; } = new();
+    }
+
     // Supporting data structures
     public class VocabularyCluster
     {
@@ -800,7 +1292,8 @@ namespace GreyMatter.Storage
         WordAssociation,
         SemanticRelation,
         EpisodicMemory,
-        General
+        General,
+        Neural
     }
     
     public class NeuronLocationEntry

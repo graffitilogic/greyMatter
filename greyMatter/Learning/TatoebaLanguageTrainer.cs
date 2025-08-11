@@ -27,6 +27,10 @@ namespace greyMatter.Learning
             _reader = new TatoebaReader();
             _dataPath = tatoebaDataPath;
             
+            // Initialize biological storage manager
+            var brainDataPath = "/Volumes/jarvis/brainData";
+            _storageManager = new BiologicalStorageManager(brainDataPath);
+            
             // Try to load existing brain state, create new if none exists
             _brain = LoadOrCreateBrain();
         }
@@ -37,46 +41,97 @@ namespace greyMatter.Learning
         /// </summary>
         private LanguageEphemeralBrain LoadOrCreateBrain()
         {
-            var brainDataPath = "/Volumes/jarvis/brainData";
-            
-            // Check if brain data exists
-            var conceptsFile = Path.Combine(brainDataPath, "concepts.json");
-            var metadataFile = Path.Combine(brainDataPath, "metadata.json");
-            
-            if (File.Exists(conceptsFile) && File.Exists(metadataFile))
+            if (_storageManager.HasExistingBrainState())
             {
                 try
                 {
-                    Console.WriteLine("📂 Loading existing brain state...");
-                    var brain = LoadExistingBrain(brainDataPath);
+                    Console.WriteLine("📂 Loading existing brain state using biological storage...");
+                    var brain = LoadExistingBrain();
                     var stats = brain.GetLearningStats();
                     Console.WriteLine($"   ✅ Loaded brain with {stats.VocabularySize:N0} words, {stats.TotalConcepts:N0} concepts");
+                    Console.WriteLine($"   📊 Training sessions: {stats.TrainingSessions}");
                     return brain;
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"   ⚠️  Failed to load existing brain: {ex.Message}");
-                    Console.WriteLine("   🆕 Creating new brain...");
+                    Console.WriteLine("   🔄 Creating fresh brain instead");
                 }
             }
             else
             {
-                Console.WriteLine("🆕 No existing brain found, creating new brain...");
+                Console.WriteLine("📂 No existing brain state found - creating fresh brain");
             }
             
             return new LanguageEphemeralBrain();
         }
 
         /// <summary>
-        /// Load brain state from disk
+        /// Load existing brain state from biological storage
         /// </summary>
-        private LanguageEphemeralBrain LoadExistingBrain(string brainDataPath)
+        private LanguageEphemeralBrain LoadExistingBrain()
         {
-            // For now, create a new brain and note this needs implementation
-            // TODO: Implement proper brain state loading from JSON files
-            Console.WriteLine("   ⚠️  Brain loading not yet implemented - creating fresh brain");
-            Console.WriteLine("   📝 This is why successive training runs were overwriting state!");
-            return new LanguageEphemeralBrain();
+            var brain = new LanguageEphemeralBrain();
+            
+            // Load vocabulary from biological storage
+            var vocabulary = _storageManager.LoadVocabularyAsync().Result;
+            if (vocabulary.Any())
+            {
+                Console.WriteLine($"   📚 Loading {vocabulary.Count:N0} vocabulary entries...");
+                brain.ImportVocabulary(vocabulary);
+            }
+            
+            // Load language data (concepts, patterns, etc.)
+            var languageData = _storageManager.LoadLanguageDataAsync().Result;
+            if (languageData.Any())
+            {
+                Console.WriteLine($"   🧠 Loading {languageData.Count:N0} language concepts...");
+                brain.ImportLanguageData(languageData);
+            }
+            
+            return brain;
+        }
+        
+        /// <summary>
+        /// Save current brain state to biological storage
+        /// </summary>
+        public async Task SaveBrainStateAsync()
+        {
+            Console.WriteLine("💾 Saving brain state to biological storage...");
+            
+            try
+            {
+                // Export vocabulary and save
+                var vocabulary = _brain.ExportVocabulary();
+                await _storageManager.StoreVocabularyAsync(vocabulary);
+                Console.WriteLine($"   ✅ Saved {vocabulary.Count:N0} vocabulary entries");
+                
+                // Export language data and save
+                var languageData = _brain.ExportLanguageData();
+                await _storageManager.StoreLanguageDataAsync(languageData);
+                Console.WriteLine($"   ✅ Saved {languageData.Count:N0} language data entries");
+                
+                // Export individual neural concepts for semantic domain categorization
+                var neuralConcepts = _brain.ExportNeuralConcepts();
+                await _storageManager.StoreNeuralConceptsAsync(neuralConcepts);
+                Console.WriteLine($"   ✅ Saved {neuralConcepts.Count:N0} neural concepts to semantic domains");
+                
+                // Flush neuron pool to disk
+                await _storageManager.FlushNeuronPoolAsync();
+                Console.WriteLine("   ✅ Saved neural network state");
+                
+                // Get storage statistics
+                var stats = await _storageManager.GetStorageStatisticsAsync();
+                Console.WriteLine($"   📊 Total storage: {stats.TotalStorageSize / 1024 / 1024:F1} MB");
+                Console.WriteLine($"   📊 Neuron pool: {stats.TotalNeuronsInPool:N0} neurons");
+                
+                Console.WriteLine("💾 Brain state saved successfully!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Failed to save brain state: {ex.Message}");
+                throw;
+            }
         }
 
         /// <summary>
@@ -122,6 +177,9 @@ namespace greyMatter.Learning
 
             // Display learning results
             DisplayLearningResults(elapsed);
+            
+            // Save brain state to biological storage
+            SaveBrainStateAsync().Wait();
             
             // Test the learned capabilities
             TestLearnedCapabilities();
@@ -180,6 +238,9 @@ namespace greyMatter.Learning
             Console.WriteLine($"\n✅ Vocabulary foundation complete!");
             Console.WriteLine($"📊 Final vocabulary size: {_brain.VocabularySize:N0} words");
             Console.WriteLine($"📊 Processed {processedSentences:N0} sentences in {finalElapsed:mm\\:ss}");
+            
+            // Save brain state to biological storage
+            SaveBrainStateAsync().Wait();
             
             DisplayTopWords();
         }
