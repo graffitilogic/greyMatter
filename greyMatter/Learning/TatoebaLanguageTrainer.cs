@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using greyMatter.Core;
 using GreyMatter.Learning;
+using GreyMatter.Storage;
 
 namespace greyMatter.Learning
 {
@@ -16,6 +17,7 @@ namespace greyMatter.Learning
     {
         private readonly TatoebaReader _reader;
         private readonly LanguageEphemeralBrain _brain;
+        private readonly BiologicalStorageManager _storageManager;
         private readonly string _dataPath;
 
         public LanguageEphemeralBrain Brain => _brain;

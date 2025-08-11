@@ -79,6 +79,11 @@ namespace greyMatter.Core
         public int Frequency { get; set; }
         public DateTime FirstSeen { get; set; }
         public WordType EstimatedType { get; set; } = WordType.Unknown;
+        
+        // Biological storage extensions for shared neuron architecture
+        public int? ConceptNeuronId { get; set; }
+        public int? AttentionNeuronId { get; set; }
+        public List<int> AssociatedNeuronIds { get; set; } = new();
     }
 
     public enum WordType
