@@ -554,18 +554,21 @@ namespace greyMatter
             // Generate realistic structured data when real files aren't available
             var topics = new[] { "Physics", "Biology", "History", "Geography", "Technology", "Art", "Literature", "Science" };
             var concepts = new List<string>();
-            var random = new Random(42);
+            
+            // Use time-based seed to ensure uniqueness across runs
+            var runId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var random = new Random();
             
             for (int i = 0; i < count; i++)
             {
                 var topic = topics[random.Next(topics.Length)];
-                concepts.Add($"Wikipedia_{topic}_{i:D4}");
+                concepts.Add($"Wikipedia_{topic}_{runId}_{i:D4}");
                 
                 // Add related concepts
                 if (i % 5 == 0)
                 {
-                    concepts.Add($"{topic}_Overview");
-                    concepts.Add($"{topic}_Advanced");
+                    concepts.Add($"{topic}_Overview_{runId}");
+                    concepts.Add($"{topic}_Advanced_{runId}");
                 }
             }
             
@@ -578,12 +581,15 @@ namespace greyMatter
             
             var genres = new[] { "Fiction", "NonFiction", "Science", "History", "Biography", "Technical" };
             var concepts = new List<string>();
-            var random = new Random(43);
+            
+            // Use time-based seed to ensure uniqueness across runs
+            var runId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var random = new Random();
             
             for (int i = 0; i < count; i++)
             {
                 var genre = genres[random.Next(genres.Length)];
-                concepts.Add($"Book_{genre}_Chapter_{i:D3}");
+                concepts.Add($"Book_{genre}_{runId}_Chapter_{i:D3}");
             }
             
             return concepts;
@@ -595,12 +601,15 @@ namespace greyMatter
             
             var fields = new[] { "ComputerScience", "Mathematics", "Physics", "Chemistry", "Biology", "Psychology" };
             var concepts = new List<string>();
-            var random = new Random(44);
+            
+            // Use time-based seed to ensure uniqueness across runs
+            var runId = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var random = new Random();
             
             for (int i = 0; i < count; i++)
             {
                 var field = fields[random.Next(fields.Length)];
-                concepts.Add($"Academic_{field}_Paper_{i:D3}");
+                concepts.Add($"Academic_{field}_{runId}_Paper_{i:D3}");
             }
             
             return concepts;
