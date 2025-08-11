@@ -189,6 +189,12 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length > 0 && (args[0] == "--language-help" || args[0] == "--help-language"))
+            {
+                DisplayLanguageHelp();
+                return;
+            }
+            
             if (args.Length > 0 && (args[0] == "--language-demo" || args[0] == "--phase1-language"))
             {
                 await LanguageFoundationsDemo.RunDemo();
@@ -204,6 +210,27 @@ namespace GreyMatter
             if (args.Length > 0 && args[0] == "--language-minimal-demo")
             {
                 await LanguageFoundationsDemo.RunMinimalDemo();
+                return;
+            }
+            
+            if (args.Length > 0 && (args[0] == "--language-full-scale" || args[0] == "--language-production"))
+            {
+                await LanguageFoundationsDemo.RunFullScaleTraining();
+                return;
+            }
+            
+            if (args.Length >= 2 && args[0] == "--language-random-sample")
+            {
+                if (int.TryParse(args[1], out int sampleSize) && sampleSize > 0)
+                {
+                    await LanguageFoundationsDemo.RunRandomSampleTraining(sampleSize);
+                }
+                else
+                {
+                    Console.WriteLine("❌ Error: Invalid sample size. Please provide a positive integer.");
+                    Console.WriteLine("Usage: dotnet run --language-random-sample [size]");
+                    Console.WriteLine("Example: dotnet run --language-random-sample 50000");
+                }
                 return;
             }
             
@@ -729,6 +756,61 @@ namespace GreyMatter
             if (index >= 0 && index + 1 < args.Length)
                 return args[index + 1];
             return defaultValue;
+        }
+
+        static void DisplayLanguageHelp()
+        {
+            Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
+            Console.WriteLine("║                    LANGUAGE LEARNING OPTIONS                  ║");
+            Console.WriteLine("╚════════════════════════════════════════════════════════════════╝\n");
+
+            Console.WriteLine("🧪 TESTING & DEVELOPMENT:");
+            Console.WriteLine("  --language-quick-test");
+            Console.WriteLine("     └─ 5 sentences, silent output, instant results");
+            Console.WriteLine();
+
+            Console.WriteLine("  --language-minimal-demo");
+            Console.WriteLine("     └─ 100 sentences with progress tracking (~30 seconds)");
+            Console.WriteLine();
+
+            Console.WriteLine("📚 DEMONSTRATION TRAINING:");
+            Console.WriteLine("  --language-demo");
+            Console.WriteLine("     └─ 2,000 sentences, comprehensive demo (~5 minutes)");
+            Console.WriteLine();
+
+            Console.WriteLine("🏭 PRODUCTION TRAINING:");
+            Console.WriteLine("  --language-full-scale  (or --language-production)");
+            Console.WriteLine("     └─ ALL 2,043,357 English sentences from Tatoeba");
+            Console.WriteLine("     └─ Builds 50,000+ word vocabulary");
+            Console.WriteLine("     └─ Duration: 30-60 minutes");
+            Console.WriteLine("     └─ Requires: 8GB+ RAM, several hundred MB storage");
+            Console.WriteLine("     └─ Result: Production-ready language foundation");
+            Console.WriteLine();
+
+            Console.WriteLine("🎯 CONTROLLED TESTING:");
+            Console.WriteLine("  --language-random-sample [size]");
+            Console.WriteLine("     └─ Random sample of [size] sentences from dataset");
+            Console.WriteLine("     └─ Block-based processing with storage monitoring");
+            Console.WriteLine("     └─ Perfect for testing scaling and storage patterns");
+            Console.WriteLine("     └─ Example: --language-random-sample 50000");
+            Console.WriteLine();
+
+            Console.WriteLine("📊 DATASET INFORMATION:");
+            Console.WriteLine($"  • Total Tatoeba sentences: 12,916,547");
+            Console.WriteLine($"  • English sentences: 2,043,357");
+            Console.WriteLine($"  • Data location: /Volumes/jarvis/trainData/Tatoeba");
+            Console.WriteLine($"  • Brain storage: /Volumes/jarvis/brainData");
+            Console.WriteLine();
+
+            Console.WriteLine("🚀 QUICK START:");
+            Console.WriteLine("  dotnet run --language-minimal-demo    # Quick test");
+            Console.WriteLine("  dotnet run --language-demo            # Full demo");
+            Console.WriteLine("  dotnet run --language-random-sample 50000  # Controlled test");
+            Console.WriteLine("  dotnet run --language-full-scale      # Production training");
+            Console.WriteLine();
+
+            Console.WriteLine("💡 TIP: Start with --language-minimal-demo to verify everything works,");
+            Console.WriteLine("   then use --language-full-scale for production training.");
         }
     }
 }
