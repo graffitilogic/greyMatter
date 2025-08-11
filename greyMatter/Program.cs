@@ -42,7 +42,7 @@ namespace GreyMatter
                         // Scale Production Demos
             if (args.Length > 0 && args[0] == "--scale-demo")
             {
-                var conceptCount = GetArgValue(args, "--concepts", 100000);
+                var conceptCount = GetArgValue(args, "--target-concepts", 100000);
                 var scaleConfig = BrainConfiguration.FromCommandLine(args);
                 
                 var scaleDemo = new ScaleDemo(scaleConfig);

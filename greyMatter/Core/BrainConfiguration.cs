@@ -12,7 +12,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Path where brain data (neurons, clusters, synapses) is stored
         /// </summary>
-        public string BrainDataPath { get; set; } = "brain_data";
+        public string BrainDataPath { get; set; } = "/Volumes/jarvis/brainData";
         
         /// <summary>
         /// Root path for training data and learning resources
@@ -151,13 +151,13 @@ namespace GreyMatter.Core
                 {
                     throw new DirectoryNotFoundException($"Working drive path not found: {WorkingDrivePath}");
                 }
-                BrainDataPath = Path.Combine(WorkingDrivePath, "brain_data");
+                BrainDataPath = Path.Combine(WorkingDrivePath, "brainData");
                 TrainingDataRoot = Path.Combine(WorkingDrivePath, "training_library");
             }
             else
             {
                 // Prefer NAS defaults if user hasn't explicitly set paths
-                bool bdWasDefault = string.Equals(BrainDataPath, "brain_data", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(BrainDataPath);
+                bool bdWasDefault = string.Equals(BrainDataPath, "/Volumes/jarvis/brainData", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(BrainDataPath);
                 bool tdWasDefault = string.Equals(TrainingDataRoot, "/tmp/brain_library", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(TrainingDataRoot);
 
                 if (bdWasDefault || tdWasDefault)
@@ -189,8 +189,12 @@ namespace GreyMatter.Core
             }
             
             // Ensure directories exist; if creation fails, fall back to local
-            BrainDataPath = EnsureDirectoryOrFallback(BrainDataPath, "brain_data", "external brain data path");
-            TrainingDataRoot = EnsureDirectoryOrFallback(TrainingDataRoot, Path.Combine(Directory.GetCurrentDirectory(), "learning_datasets"), "external training data path");
+            var actualBrainPath = EnsureDirectoryOrFallback(BrainDataPath, "brainData", "external brain data path");
+            var actualTrainingPath = EnsureDirectoryOrFallback(TrainingDataRoot, Path.Combine(Directory.GetCurrentDirectory(), "learning_datasets"), "external training data path");
+            
+            // Update paths to reflect what's actually being used
+            BrainDataPath = actualBrainPath;
+            TrainingDataRoot = actualTrainingPath;
             
             Console.WriteLine($"📁 Brain Data Path: {Path.GetFullPath(BrainDataPath)}");
             Console.WriteLine($"📚 Training Data Root: {Path.GetFullPath(TrainingDataRoot)}");
@@ -214,12 +218,17 @@ namespace GreyMatter.Core
                 if (!string.IsNullOrWhiteSpace(desiredPath))
                 {
                     Directory.CreateDirectory(desiredPath);
+                    // Verify we can actually write to it
+                    var testFile = Path.Combine(desiredPath, ".write_test");
+                    File.WriteAllText(testFile, "test");
+                    File.Delete(testFile);
                     return desiredPath;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Could not use {label}: '{desiredPath}'. Falling back to '{fallbackRelative}'.");
+                Console.WriteLine($"⚠️  Could not use {label}: '{desiredPath}' - {ex.Message}");
+                Console.WriteLine($"    Falling back to '{fallbackRelative}'.");
             }
 
             try
@@ -227,8 +236,9 @@ namespace GreyMatter.Core
                 Directory.CreateDirectory(fallbackRelative);
                 return fallbackRelative;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"⚠️  Could not create fallback directory '{fallbackRelative}' - {ex.Message}");
                 // Last resort: current directory
                 return Directory.GetCurrentDirectory();
             }

@@ -223,6 +223,48 @@ namespace greyMatter.Core
         }
 
         /// <summary>
+        /// Get all active clusters for persistence
+        /// </summary>
+        public IReadOnlyDictionary<string, ConceptCluster> GetActiveClusters()
+        {
+            return _activeClusters;
+        }
+
+        /// <summary>
+        /// Get the neuron pool for persistence
+        /// </summary>
+        public SharedNeuronPool GetNeuronPool()
+        {
+            return _neuronPool;
+        }
+
+        /// <summary>
+        /// Restore clusters from persistence
+        /// </summary>
+        public void RestoreClusters(Dictionary<string, ConceptCluster> clusters)
+        {
+            _activeClusters.Clear();
+            foreach (var kvp in clusters)
+            {
+                _activeClusters[kvp.Key] = kvp.Value;
+                
+                // Also register in the concept registry
+                if (!_conceptRegistry.ContainsKey(kvp.Key))
+                {
+                    _conceptRegistry[kvp.Key] = new ClusterMetadata 
+                    { 
+                        Concept = kvp.Key,
+                        CreatedAt = DateTime.UtcNow,
+                        LastAccessed = DateTime.UtcNow,
+                        AccessCount = 1,
+                        BaseSize = kvp.Value.ActiveNeurons.Count,
+                        AverageStrength = 1.0
+                    };
+                }
+            }
+        }
+
+        /// <summary>
         /// Get comprehensive statistics about brain state and memory usage
         /// </summary>
         public BrainMemoryStats GetMemoryStats()

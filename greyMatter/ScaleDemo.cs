@@ -54,7 +54,7 @@ namespace greyMatter
             await ScaleTest(targetConcepts);
             
             // 3. External data ingestion
-            await IngestExternalData();
+            await IngestExternalData(targetConcepts);
             
             // 4. Comprehension testing
             await RunComprehensionTests();
@@ -193,25 +193,42 @@ namespace greyMatter
             return qualities[random.Next(qualities.Length)];
         }
 
-        private async Task IngestExternalData()
+        private async Task IngestExternalData(int targetConcepts)
         {
             Console.WriteLine("\n📚 Ingesting External Training Materials...");
             
+            // Check how many concepts we already have vs our target
+            var currentStats = brain.GetMemoryStats();
+            var remainingCapacity = Math.Max(0, targetConcepts + 1000 - currentStats.ConceptsRegistered); // Allow 1K buffer for external data
+            
+            if (remainingCapacity <= 0)
+            {
+                Console.WriteLine($"   ⏭️  Skipping external data - already at target ({currentStats.ConceptsRegistered:N0} concepts)");
+                return;
+            }
+            
+            Console.WriteLine($"   📊 Current: {currentStats.ConceptsRegistered:N0} concepts, adding up to {remainingCapacity:N0} more from external sources");
+            
             var sources = new[]
             {
-                ("Wikipedia Sample", await ingester.GenerateWikipediaLikeConcepts(1000)),
-                ("Book Excerpts", await ingester.GenerateBookLikeConcepts(500)),
-                ("Academic Papers", await ingester.GenerateAcademicConcepts(300))
+                ("Wikipedia Sample", await ingester.GenerateWikipediaLikeConcepts(Math.Min(600, remainingCapacity / 3))),
+                ("Book Excerpts", await ingester.GenerateBookLikeConcepts(Math.Min(300, remainingCapacity / 4))),
+                ("Academic Papers", await ingester.GenerateAcademicConcepts(Math.Min(200, remainingCapacity / 5)))
             };
             
+            var totalAdded = 0;
             foreach (var (sourceName, concepts) in sources)
             {
-                Console.WriteLine($"   📖 Processing {sourceName}: {concepts.Count} concepts");
+                if (totalAdded >= remainingCapacity) break;
+                
+                var conceptsToAdd = Math.Min(concepts.Count, remainingCapacity - totalAdded);
+                Console.WriteLine($"   📖 Processing {sourceName}: {conceptsToAdd} concepts (of {concepts.Count} available)");
                 
                 var stopwatch = Stopwatch.StartNew();
-                foreach (var concept in concepts)
+                foreach (var concept in concepts.Take(conceptsToAdd))
                 {
                     brain.Learn(concept);
+                    totalAdded++;
                 }
                 stopwatch.Stop();
                 
@@ -219,7 +236,7 @@ namespace greyMatter
             }
             
             var finalStats = brain.GetMemoryStats();
-            Console.WriteLine($"   🧠 Total after ingestion: {finalStats.ConceptsRegistered:N0} concepts");
+            Console.WriteLine($"   🧠 Total after ingestion: {finalStats.ConceptsRegistered:N0} concepts (+{totalAdded:N0} from external sources)");
         }
 
         private async Task RunComprehensionTests()
@@ -354,19 +371,37 @@ namespace greyMatter
                 var conceptsJson = await File.ReadAllTextAsync(conceptsFile);
                 var neuronsJson = await File.ReadAllTextAsync(neuronsFile);
                 
-                // Deserialize and restore brain state
-                // (Implementation would restore clusters and shared neurons)
+                // Deserialize concept data
+                var conceptData = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(conceptsJson);
+                if (conceptData == null || !conceptData.Any())
+                    return false;
                 
+                // Restore concepts by learning them again - this maintains the ephemeral
+                // brain's procedural generation while restoring the learned concept set
+                var restoredClusters = new Dictionary<string, ConceptCluster>();
+                
+                foreach (var kvp in conceptData)
+                {
+                    var conceptName = kvp.Key;
+                    // Re-learn the concept to restore the cluster with proper neural generation
+                    brain.LearnSilently(conceptName);
+                }
+                
+                Console.WriteLine($"   📚 Restored {conceptData.Count} concepts from persistent storage");
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                Console.WriteLine($"   ⚠️  Failed to load brain state: {ex.Message}");
                 return false;
             }
         }
 
         public async Task SaveBrain(SimpleEphemeralBrain brain)
         {
+            // Ensure directory exists before any parallel operations
+            Directory.CreateDirectory(dataDirectory);
+            
             var metadata = new
             {
                 SavedAt = DateTime.UtcNow,
@@ -396,16 +431,48 @@ namespace greyMatter
             // Ensure directory exists before writing
             Directory.CreateDirectory(dataDirectory);
             
-            // Serialize concept clusters efficiently
-            var conceptData = "{}"; // Simplified for demo
-            await File.WriteAllTextAsync(conceptsFile, conceptData);
+            // Serialize concept clusters with their essential data
+            var clusters = brain.GetActiveClusters();
+            var conceptData = new Dictionary<string, object>();
+            
+            foreach (var kvp in clusters)
+            {
+                var cluster = kvp.Value;
+                conceptData[kvp.Key] = new
+                {
+                    Concept = cluster.Concept,
+                    ActivationLevel = cluster.ActivationLevel,
+                    ActiveNeuronCount = cluster.ActiveNeurons.Count,
+                    // Store concept name for reconstruction - the ephemeral brain
+                    // will procedurally regenerate neurons when restored
+                    ConceptName = kvp.Key
+                };
+            }
+            
+            var json = JsonSerializer.Serialize(conceptData, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(conceptsFile, json);
         }
 
         private async Task SaveNeuronsAsync(SimpleEphemeralBrain brain)
         {
-            // Serialize shared neuron pool efficiently
-            var neuronData = "{}"; // Simplified for demo
-            await File.WriteAllTextAsync(neuronsFile, neuronData);
+            // Serialize shared neuron pool statistics
+            var neuronPool = brain.GetNeuronPool();
+            var neuronData = new
+            {
+                TotalNeurons = neuronPool.GetTotalNeuronCount(),
+                ActiveNeurons = neuronPool.GetActiveNeuronCount(),
+                SharedConnections = neuronPool.GetSharedConnectionCount(),
+                // Store summary statistics - actual neurons will be regenerated procedurally
+                Stats = new
+                {
+                    TotalCount = neuronPool.GetTotalNeuronCount(),
+                    ActiveCount = neuronPool.GetActiveNeuronCount(),
+                    SharedCount = neuronPool.GetSharedConnectionCount()
+                }
+            };
+            
+            var json = JsonSerializer.Serialize(neuronData, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(neuronsFile, json);
         }
     }
 
