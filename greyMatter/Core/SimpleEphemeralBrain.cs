@@ -30,10 +30,27 @@ namespace greyMatter.Core
         /// Learn a simple association: "this is red", "this is an apple"
         /// Creates or activates clusters and shares neurons between related concepts
         /// </summary>
-        public void Learn(string concept, string[] relatedConcepts = null)
+        public void Learn(string concept, string[]? relatedConcepts = null)
         {
             Console.WriteLine($"Learning: {concept}");
+            LearnInternal(concept, relatedConcepts);
             
+            // Show detailed output for verbose learning
+            var cluster = _activeClusters[concept];
+            Console.WriteLine($"Cluster '{concept}' now has {cluster.ActiveNeurons.Count} neurons");
+            LogSharedNeurons(concept);
+        }
+
+        /// <summary>
+        /// Learn silently without console output - for batch processing
+        /// </summary>
+        public void LearnSilently(string concept, string[]? relatedConcepts = null)
+        {
+            LearnInternal(concept, relatedConcepts);
+        }
+
+        private void LearnInternal(string concept, string[]? relatedConcepts = null)
+        {
             // Get or create cluster for this concept
             var cluster = GetOrCreateCluster(concept);
             
@@ -50,9 +67,6 @@ namespace greyMatter.Core
             // Activate and train the cluster
             cluster.Activate();
             cluster.Learn();
-            
-            Console.WriteLine($"Cluster '{concept}' now has {cluster.ActiveNeurons.Count} neurons");
-            LogSharedNeurons(concept);
         }
 
         /// <summary>

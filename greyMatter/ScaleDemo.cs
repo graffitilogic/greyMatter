@@ -145,6 +145,10 @@ namespace greyMatter
             var domains = new[] { "science", "nature", "technology", "art", "food", "transport", "emotion", "action" };
             var random = new Random(42 + batchOffset); // Deterministic for reproducibility
             
+            var conceptsLearned = 0;
+            var relatedConceptsCreated = 0;
+            var compoundConceptsCreated = 0;
+            
             for (int i = 0; i < batchSize; i++)
             {
                 var domain = domains[random.Next(domains.Length)];
@@ -155,20 +159,29 @@ namespace greyMatter
                 var relatedConcept = $"{domain}_category";
                 var qualityConcept = GenerateQualityConcept(random);
                 
-                // Learn the base concept
-                brain.Learn(baseConcept);
+                // Learn the base concept (silently)
+                brain.LearnSilently(baseConcept);
+                conceptsLearned++;
                 
                 // Create natural relationships
                 if (conceptIndex % 10 == 0) // Every 10th concept gets domain relationship
                 {
-                    brain.Learn(relatedConcept);
+                    brain.LearnSilently(relatedConcept);
+                    relatedConceptsCreated++;
                 }
                 
                 if (conceptIndex % 25 == 0) // Every 25th concept gets quality relationship
                 {
                     var compound = $"{qualityConcept} {baseConcept}";
-                    brain.Learn(compound);
+                    brain.LearnSilently(compound);
+                    compoundConceptsCreated++;
                 }
+            }
+            
+            // Only output batch summary
+            if (batchOffset % 5000 == 0) // Every 5 batches (5000 concepts)
+            {
+                Console.WriteLine($"      Batch {batchOffset / 1000}K: {conceptsLearned} base, {relatedConceptsCreated} related, {compoundConceptsCreated} compound concepts");
             }
             
             await Task.Delay(1); // Yield control to prevent blocking
