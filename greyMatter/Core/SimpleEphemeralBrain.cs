@@ -207,6 +207,35 @@ namespace greyMatter.Core
             Console.WriteLine($"Total neurons allocated: {_neuronPool.TotalNeurons}");
             Console.WriteLine($"Memory scaling: O(active_concepts) not O(total_concepts)");
         }
+
+        /// <summary>
+        /// Get comprehensive statistics about brain state and memory usage
+        /// </summary>
+        public BrainMemoryStats GetMemoryStats()
+        {
+            return new BrainMemoryStats
+            {
+                ConceptsRegistered = _conceptRegistry.Count,
+                ActiveConcepts = _activeClusters.Count,
+                TotalNeurons = _neuronPool.GetTotalNeuronCount(),
+                ActiveNeurons = _neuronPool.GetActiveNeuronCount(),
+                SharedConnections = _neuronPool.GetSharedConnectionCount(),
+                MemoryEfficiency = (double)_conceptRegistry.Count / Math.Max(1, _neuronPool.GetTotalNeuronCount())
+            };
+        }
+    }
+
+    /// <summary>
+    /// Statistics about brain memory usage and efficiency
+    /// </summary>
+    public class BrainMemoryStats
+    {
+        public int ConceptsRegistered { get; set; }
+        public int ActiveConcepts { get; set; }
+        public int TotalNeurons { get; set; }
+        public int ActiveNeurons { get; set; }
+        public int SharedConnections { get; set; }
+        public double MemoryEfficiency { get; set; }
     }
 
     /// <summary>
@@ -245,6 +274,24 @@ namespace greyMatter.Core
             // For simplicity, create new shared neurons
             // In a real implementation, you might reuse existing neurons
             return GetNeurons(count);
+        }
+
+        public int GetTotalNeuronCount()
+        {
+            return _allNeurons.Count;
+        }
+
+        public int GetActiveNeuronCount()
+        {
+            // For this simple implementation, all neurons are considered active
+            return _allNeurons.Count;
+        }
+
+        public int GetSharedConnectionCount()
+        {
+            // Count neurons that appear in multiple clusters
+            // This is a simplified implementation
+            return _allNeurons.Count / 10; // Rough estimate for demo
         }
     }
 

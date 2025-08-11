@@ -39,6 +39,77 @@ namespace GreyMatter
                 return;
             }
             
+            // Scale Production Demos
+            if (args.Length > 0 && args[0] == "--scale-demo")
+            {
+                var conceptCount = GetArgValue(args, "--concepts", 100000);
+                var dataDir = GetArgValue(args, "--data-dir", "brain_data");
+                
+                var scaleDemo = new ScaleDemo(dataDir);
+                await scaleDemo.RunScaleDemo(conceptCount);
+                return;
+            }
+
+            if (args.Length > 0 && args[0] == "--wikipedia")
+            {
+                var articleCount = GetArgValue(args, "--articles", 1000);
+                
+                Console.WriteLine("📚 Wikipedia Learning Demo");
+                var ingester = new ExternalDataIngester();
+                var concepts = await ingester.GenerateWikipediaLikeConcepts(articleCount);
+                
+                var brain = new greyMatter.Core.SimpleEphemeralBrain();
+                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+                
+                foreach (var concept in concepts)
+                {
+                    brain.Learn(concept);
+                }
+                
+                stopwatch.Stop();
+                var stats = brain.GetMemoryStats();
+                
+                Console.WriteLine($"✅ Learned {concepts.Count} Wikipedia concepts in {stopwatch.ElapsedMilliseconds}ms");
+                Console.WriteLine($"🧠 Brain: {stats.ConceptsRegistered} concepts, {stats.TotalNeurons} neurons");
+                Console.WriteLine($"⚡ Speed: {concepts.Count / stopwatch.Elapsed.TotalSeconds:F0} concepts/second");
+                return;
+            }
+
+            if (args.Length > 0 && args[0] == "--evaluation")
+            {
+                Console.WriteLine("🧪 Comprehension Evaluation Demo");
+                
+                // Load or create brain with test data
+                var brain = new greyMatter.Core.SimpleEphemeralBrain();
+                
+                // Quick learning for evaluation
+                var concepts = new[] { "red", "fruit", "apple", "science", "nature", "bright science", "red apple" };
+                foreach (var concept in concepts)
+                {
+                    brain.Learn(concept);
+                }
+                
+                var tester = new ComprehensionTester();
+                var tests = new[]
+                {
+                    ("Association Recall", await tester.TestAssociationRecall(brain)),
+                    ("Domain Knowledge", await tester.TestDomainKnowledge(brain)),
+                    ("Concept Completion", await tester.TestConceptCompletion(brain)),
+                    ("Semantic Similarity", await tester.TestSemanticSimilarity(brain))
+                };
+                
+                Console.WriteLine("📊 Test Results:");
+                foreach (var (testName, score) in tests)
+                {
+                    var grade = score >= 0.8 ? "🟢" : score >= 0.6 ? "🟡" : "🔴";
+                    Console.WriteLine($"   {grade} {testName}: {score:P1}");
+                }
+                
+                var overallScore = tests.Average(t => t.Item2);
+                Console.WriteLine($"🎯 Overall Score: {overallScore:P1}");
+                return;
+            }
+            
             // Parse configuration from command line
             var config = BrainConfiguration.FromCommandLine(args);
             
@@ -619,6 +690,22 @@ namespace GreyMatter
 
             await brain.SaveAsync();
             Console.WriteLine("✅ Preschool training pipeline complete.");
+        }
+
+        private static int GetArgValue(string[] args, string argName, int defaultValue)
+        {
+            var index = Array.IndexOf(args, argName);
+            if (index >= 0 && index + 1 < args.Length && int.TryParse(args[index + 1], out var value))
+                return value;
+            return defaultValue;
+        }
+
+        private static string GetArgValue(string[] args, string argName, string defaultValue)
+        {
+            var index = Array.IndexOf(args, argName);
+            if (index >= 0 && index + 1 < args.Length)
+                return args[index + 1];
+            return defaultValue;
         }
     }
 }
