@@ -16,7 +16,8 @@ namespace GreyMatter
             Console.WriteLine("Training then testing with debug output...");
             
             // Create a simple test to validate the trainable classifier directly
-            var classifier = new TrainableSemanticClassifier("./test_data/classifier");
+            var storageManager = new GreyMatter.Storage.SemanticStorageManager("./test_data/brain", "./test_data/classifier");
+            var classifier = new TrainableSemanticClassifier(storageManager);
             
             // Train with a simple example
             Console.WriteLine("🧠 Training with 'cat' -> 'living_things/animals/mammals'");

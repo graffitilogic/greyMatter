@@ -28,6 +28,9 @@ namespace GreyMatter.Storage
         private readonly string _workingMemoryPath;
         private readonly string _neuronPoolPath;
         
+        // Public property for training data root
+        public string TrainingDataRoot => _trainingDataRoot;
+        
         // Hippocampus indices for sparse routing
         private Dictionary<string, string> _vocabularyIndex;
         private Dictionary<string, ConceptIndexEntry> _conceptIndex;
@@ -63,17 +66,8 @@ namespace GreyMatter.Storage
             // Try to initialize pre-trained classifier (fallback to rule-based if model not available)
             try
             {
-                var modelPath = Path.Combine(_trainingDataRoot, "models", "sentence-transformer.onnx");
-                if (File.Exists(modelPath))
-                {
-                    _preTrainedClassifier = new PreTrainedSemanticClassifier(modelPath);
-                    Console.WriteLine("✅ Pre-trained semantic classifier loaded");
-                }
-                else
-                {
-                    Console.WriteLine("⚠️ Pre-trained model not found, using fallback rule-based classifier");
-                    Console.WriteLine($"   Expected: {modelPath}");
-                }
+                _preTrainedClassifier = new PreTrainedSemanticClassifier(this);
+                Console.WriteLine("✅ Pre-trained semantic classifier initialized");
             }
             catch (Exception ex)
             {

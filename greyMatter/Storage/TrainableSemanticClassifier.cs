@@ -63,9 +63,9 @@ namespace GreyMatter.Storage
             "properties/quality/evaluation"
         };
         
-        public TrainableSemanticClassifier(string classifierDataPath)
+        public TrainableSemanticClassifier(SemanticStorageManager storage)
         {
-            _classifierDataPath = classifierDataPath;
+            _classifierDataPath = Path.Combine(storage.TrainingDataRoot, "semantic_classifiers");
             _domainModels = new Dictionary<string, SemanticDomainModel>();
             _wordEmbeddings = new Dictionary<string, Dictionary<string, double>>();
             _domainExamples = new Dictionary<string, List<string>>();
@@ -125,6 +125,51 @@ namespace GreyMatter.Storage
             Console.WriteLine($"   Domains with examples: {_domainExamples.Count(d => d.Value.Count > 0)}");
         }
         
+        /// <summary>
+        /// Classify text into semantic domain (async version for interface compatibility)
+        /// </summary>
+        public async Task<string> ClassifyAsync(string text)
+        {
+            return await Task.FromResult(ClassifySemanticDomain(text));
+        }
+        
+        /// <summary>
+        /// Get confidence score for text classification (async version for interface compatibility)
+        /// </summary>
+        public async Task<double> GetConfidenceAsync(string text, string domain)
+        {
+            var domainScores = GetDomainScores(text);
+            var cleanDomain = domain.Replace("semantic_domains/", "");
+            
+            if (domainScores.TryGetValue(cleanDomain, out var confidence))
+            {
+                return await Task.FromResult(confidence);
+            }
+            
+            return await Task.FromResult(0.0);
+        }
+        
+        /// <summary>
+        /// Get raw domain scores for internal calculations
+        /// </summary>
+        private Dictionary<string, double> GetDomainScores(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return new Dictionary<string, double> { ["general_concepts"] = 0.5 };
+                
+            var features = ExtractFeatures(text.ToLower());
+            var domainScores = new Dictionary<string, double>();
+            
+            foreach (var domain in _semanticDomains)
+            {
+                var model = _domainModels[domain];
+                var score = CalculateDomainScore(features, model);
+                domainScores[domain] = score;
+            }
+            
+            return domainScores;
+        }
+
         /// <summary>
         /// Classify text into semantic domain using learned patterns
         /// </summary>
