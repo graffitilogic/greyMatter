@@ -12,7 +12,7 @@ namespace GreyMatter.Core
     /// </summary>
     public class EmotionalProcessor
     {
-        private readonly BrainInJar _brain;
+        private readonly Cerebro _brain;
         
         // Core Emotional States (based on neuroscience research)
         public double Joy { get; private set; } = 0.7;           // Positive energy, enthusiasm
@@ -45,7 +45,7 @@ namespace GreyMatter.Core
         public double EmotionalLearningRate { get; set; } = 0.1;
         public double BaselineRecoveryRate { get; set; } = 0.02;
         
-        public EmotionalProcessor(BrainInJar brain)
+        public EmotionalProcessor(Cerebro brain)
         {
             _brain = brain;
         }

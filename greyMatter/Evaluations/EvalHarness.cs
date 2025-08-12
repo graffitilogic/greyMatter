@@ -15,7 +15,7 @@ namespace GreyMatter.Evaluations
     {
         private static readonly char[] SplitDelims = new[] { ' ', '\t' };
 
-        public static async Task<double> RunClozeAsync(BrainInJar brain, IEnumerable<string> sentences, int max = 1000)
+        public static async Task<double> RunClozeAsync(Cerebro brain, IEnumerable<string> sentences, int max = 1000)
         {
             int total = 0;
             int correct = 0;

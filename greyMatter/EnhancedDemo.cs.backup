@@ -16,7 +16,7 @@ namespace GreyMatter
             Console.WriteLine("🧠🔬 Enhanced GreyMatter Demo - Neurobiological Storage & Partitioning");
             Console.WriteLine("=" + new string('=', 75));
 
-            var brain = new BrainInJar();
+            var brain = new Cerebro();
             await brain.InitializeAsync();
 
             // Demonstrate enhanced statistics

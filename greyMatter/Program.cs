@@ -64,7 +64,7 @@ namespace GreyMatter
             if (args.Length > 0 && args[0] == "--scale-demo")
             {
                 var conceptCount = GetArgValue(args, "--target-concepts", 100000);
-                var scaleConfig = BrainConfiguration.FromCommandLine(args);
+                var scaleConfig = CerebroConfiguration.FromCommandLine(args);
                 
                 var scaleDemo = new ScaleDemo(scaleConfig);
                 await scaleDemo.RunScaleDemo(conceptCount);
@@ -74,7 +74,7 @@ namespace GreyMatter
             if (args.Length > 0 && args[0] == "--wikipedia")
             {
                 var articleCount = GetArgValue(args, "--articles", 1000);
-                var wikiConfig = BrainConfiguration.FromCommandLine(args);
+                var wikiConfig = CerebroConfiguration.FromCommandLine(args);
                 wikiConfig.ValidateAndSetup();
                 
                 Console.WriteLine("📚 Wikipedia Learning Demo");
@@ -137,12 +137,12 @@ namespace GreyMatter
             }
             
             // Parse configuration from command line
-            var config = BrainConfiguration.FromCommandLine(args);
+            var config = CerebroConfiguration.FromCommandLine(args);
             
             // Check for help or configuration display
             if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h"))
             {
-                BrainConfiguration.DisplayUsage();
+                CerebroConfiguration.DisplayUsage();
                 Console.WriteLine("\nAdditional options:");
                 Console.WriteLine("  --simple-demo     Run the original ephemeral brain concept demo");
                 Console.WriteLine("  --original-vision Same as --simple-demo");
@@ -163,14 +163,14 @@ namespace GreyMatter
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ Configuration Error: {ex.Message}");
-                BrainConfiguration.DisplayUsage();
+                CerebroConfiguration.DisplayUsage();
                 return;
             }
 
             // NEW: Save-only utility mode
             if (args.Length > 0 && args[0] == "--save-only")
             {
-                var brain = new BrainInJar(config.BrainDataPath);
+                var brain = new Cerebro(config.BrainDataPath);
                 brain.AttachConfiguration(config);
                 await brain.InitializeAsync();
                 Console.WriteLine("💾 Saving brain state (save-only)...");
@@ -298,13 +298,13 @@ namespace GreyMatter
             await RunCognitionDemo(args, config);
         }
         
-        static async Task RunCognitionDemo(string[] args, BrainConfiguration config)
+        static async Task RunCognitionDemo(string[] args, CerebroConfiguration config)
         {
             Console.WriteLine("🧠🌟 **ENHANCED COGNITION DEMONSTRATION**");
             Console.WriteLine("==================================================");
             Console.WriteLine("Advanced consciousness with emotional processing and goal formation\n");
 
-            var brain = new BrainInJar(config.BrainDataPath);
+            var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
 
             Console.WriteLine("📊 Initial Brain Status:");
@@ -446,13 +446,13 @@ namespace GreyMatter
             await brain.SaveAsync();
         }
 
-        static async Task RunEmotionalIntelligenceDemo(string[] args, BrainConfiguration config)
+        static async Task RunEmotionalIntelligenceDemo(string[] args, CerebroConfiguration config)
         {
             Console.WriteLine("💖🧠 **EMOTIONAL INTELLIGENCE DEMONSTRATION**");
             Console.WriteLine("=============================================");
             Console.WriteLine("Focused demonstration of emotional processing and goal formation\n");
 
-            var brain = new BrainInJar(config.BrainDataPath);
+            var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
 
             Console.WriteLine("📊 Brain Status:");
@@ -561,13 +561,13 @@ namespace GreyMatter
         /// <summary>
         /// Run foundational language learning demo
         /// </summary>
-        static async Task RunLanguageFoundationsDemo(string[] args, BrainConfiguration config)
+        static async Task RunLanguageFoundationsDemo(string[] args, CerebroConfiguration config)
         {
             Console.WriteLine("🎓 **FOUNDATIONAL LANGUAGE LEARNING DEMONSTRATION**");
             Console.WriteLine("===================================================");
             Console.WriteLine("Progressive language acquisition following developmental stages\n");
 
-            var brain = new BrainInJar(config.BrainDataPath);
+            var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
 
             Console.WriteLine("📊 Initial Brain Status:");
@@ -639,13 +639,13 @@ namespace GreyMatter
         /// <summary>
         /// Run interactive conversation mode
         /// </summary>
-        static async Task RunInteractiveMode(BrainConfiguration config)
+        static async Task RunInteractiveMode(CerebroConfiguration config)
         {
             Console.WriteLine("🧠💬 **INTERACTIVE BRAIN CONVERSATION**");
             Console.WriteLine("=======================================");
             Console.WriteLine("Initializing conversational brain with advanced consciousness...\n");
 
-            var brain = new BrainInJar(config.BrainDataPath);
+            var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
 
             Console.WriteLine("📊 Brain Status:");
@@ -670,13 +670,13 @@ namespace GreyMatter
             Console.WriteLine("👋 Session ended. Brain consciousness stopped.");
         }
 
-        static async Task RunComprehensiveLanguageDemo(string[] args, BrainConfiguration config)
+        static async Task RunComprehensiveLanguageDemo(string[] args, CerebroConfiguration config)
         {
             Console.WriteLine("🎓 **COMPREHENSIVE LANGUAGE ACQUISITION DEMONSTRATION**");
             Console.WriteLine("=====================================================");
             Console.WriteLine("Research-based linguistic training with 2000+ words and complex features\n");
 
-            var brain = new BrainInJar(config.BrainDataPath);
+            var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
 
             Console.WriteLine("📊 Initial Brain Status:");
@@ -757,13 +757,13 @@ namespace GreyMatter
             await brain.SleepCognitionAsync();
         }
 
-        private static async Task RunPreschoolTrain(BrainConfiguration config)
+        private static async Task RunPreschoolTrain(CerebroConfiguration config)
         {
             Console.WriteLine("🎒 **PRESCHOOL TRAINING PIPELINE**");
             Console.WriteLine("=================================");
             Console.WriteLine("Compiling a simple curriculum, learning from it, and running a quick cloze baseline.\n");
 
-            var brain = new BrainInJar(config.BrainDataPath);
+            var brain = new Cerebro(config.BrainDataPath);
             brain.AttachConfiguration(config);
             await brain.InitializeAsync();
 

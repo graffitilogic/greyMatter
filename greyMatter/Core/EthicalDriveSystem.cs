@@ -14,7 +14,7 @@ namespace GreyMatter.Core
     /// </summary>
     public class EthicalDriveSystem
     {
-        private readonly BrainInJar _brain;
+        private readonly Cerebro _brain;
         private readonly Random _random = new();
         
         // POSITIVE DRIVES (inspired by Starfleet values)
@@ -47,7 +47,7 @@ namespace GreyMatter.Core
         public double Patience { get; private set; } = 0.75;              // Long-term thinking
         public double Mindfulness { get; private set; } = 0.8;            // Present awareness
         
-        public EthicalDriveSystem(BrainInJar brain)
+        public EthicalDriveSystem(Cerebro brain)
         {
             _brain = brain;
         }

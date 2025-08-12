@@ -179,7 +179,7 @@ dotnet run -- --evaluation --test-suite comprehensive
 ## 1. Current Architecture
 
 Components:
-- BrainInJar orchestrator: curriculum ingestion, adaptive concept capacity, consolidation, save pipeline.
+- Cerebro orchestrator: curriculum ingestion, adaptive concept capacity, consolidation, save pipeline.
 - NeuronCluster / HybridNeuron: concept-associated dynamic neuron populations with STM delta buffers and incremental LTM consolidation.
 - Hierarchical Storage (EnhancedBrainStorage):
   - Partition metadata (partition_metadata.json) with normalized GUID keys (N format)

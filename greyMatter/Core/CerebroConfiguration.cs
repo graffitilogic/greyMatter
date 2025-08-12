@@ -7,7 +7,7 @@ namespace GreyMatter.Core
     /// Configuration settings for the brain system
     /// Supports configurable storage paths and system parameters
     /// </summary>
-    public class BrainConfiguration
+    public class CerebroConfiguration
     {
         /// <summary>
         /// Path where brain data (neurons, clusters, synapses) is stored
@@ -57,9 +57,9 @@ namespace GreyMatter.Core
         /// <summary>
         /// Create configuration from command line arguments
         /// </summary>
-        public static BrainConfiguration FromCommandLine(string[] args)
+        public static CerebroConfiguration FromCommandLine(string[] args)
         {
-            var config = new BrainConfiguration();
+            var config = new CerebroConfiguration();
             
             for (int i = 0; i < args.Length; i++)
             {

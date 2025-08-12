@@ -38,7 +38,7 @@ namespace GreyMatter.Learning
             "a","an","the","and","or","to","of","in","is","it","i","you","he","she","we","they","on","at","for","with","as"
         };
 
-        public async Task<Curriculum> CompileAsync(BrainConfiguration config, int maxSentencesPerStage = 2000)
+        public async Task<Curriculum> CompileAsync(CerebroConfiguration config, int maxSentencesPerStage = 2000)
         {
             var curriculum = new Curriculum();
 

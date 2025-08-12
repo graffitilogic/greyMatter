@@ -13,10 +13,10 @@ namespace GreyMatter.Core
     /// </summary>
     public class LanguageFoundationsTrainer
     {
-        private readonly BrainInJar _brain;
-        private readonly BrainConfiguration _config;
+        private readonly Cerebro _brain;
+        private readonly CerebroConfiguration _config;
         
-        public LanguageFoundationsTrainer(BrainInJar brain, BrainConfiguration config)
+        public LanguageFoundationsTrainer(Cerebro brain, CerebroConfiguration config)
         {
             _brain = brain;
             _config = config;

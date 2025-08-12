@@ -23,7 +23,7 @@ The greyMatter neural network system has been successfully enhanced with biologi
   functional/general/plasticity/baseline/topology/peripheral/temporal/dormant/
   ```
 
-### **3. BrainInJar Integration**
+### **3. Cerebro Integration**
 - **Enhanced Methods**: `GetEnhancedStatsAsync()`, `MaintenanceAsync()` with consolidation
 - **Seamless Operation**: All existing HybridNeuron capabilities preserved
 - **Memory Consolidation**: Sleep-like processes for partition reorganization
@@ -90,7 +90,7 @@ Storage/
 └── StorageModels.cs            # Enhanced data structures
 
 Core/
-└── BrainInJar.cs              # Enhanced with partitioning integration
+└── Cerebro.cs              # Enhanced with partitioning integration
 
 brain_data/
 ├── hierarchical/              # NEW: Biological directory structure

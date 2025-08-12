@@ -95,9 +95,9 @@ public class NeuroPartitioner
 }
 ```
 
-### **3. Hierarchical BrainInJar Interface**
+### **3. Hierarchical Cerebro Interface**
 ```csharp
-public class BrainInJar : IBrainInterface
+public class Cerebro : IBrainInterface
 {
     - GetConceptMasteryLevelAsync() - tracks learning progress
     - GetBrainAgeAsync() - critical period analysis

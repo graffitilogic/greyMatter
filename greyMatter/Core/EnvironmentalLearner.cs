@@ -13,10 +13,10 @@ namespace GreyMatter.Core
     /// </summary>
     public class EnvironmentalLearner
     {
-        private readonly BrainInJar _brain;
-        private readonly BrainConfiguration _config;
+        private readonly Cerebro _brain;
+        private readonly CerebroConfiguration _config;
 
-        public EnvironmentalLearner(BrainInJar brain, BrainConfiguration config)
+        public EnvironmentalLearner(Cerebro brain, CerebroConfiguration config)
         {
             _brain = brain;
             _config = config;

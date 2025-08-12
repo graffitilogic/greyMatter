@@ -13,11 +13,11 @@ namespace GreyMatter.Core
     /// </summary>
     public class ComprehensiveLanguageTrainer
     {
-        private readonly BrainInJar _brain;
-        private readonly BrainConfiguration _config;
+        private readonly Cerebro _brain;
+        private readonly CerebroConfiguration _config;
         private readonly Random _random = new();
         
-        public ComprehensiveLanguageTrainer(BrainInJar brain, BrainConfiguration config)
+        public ComprehensiveLanguageTrainer(Cerebro brain, CerebroConfiguration config)
         {
             _brain = brain;
             _config = config;

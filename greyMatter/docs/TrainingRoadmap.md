@@ -3,7 +3,7 @@
 Purpose: Document a realistic path from current prototype to a measurable "toddler" learner without relying on large LLMs. This roadmap will evolve alongside the code.
 
 ## Current Reality (Aug 2025)
-- Architecture scaffolding exists (HybridNeuron, BrainInJar, storage, clustering, consolidation).
+- Architecture scaffolding exists (HybridNeuron, Cerebro, storage, clustering, consolidation).
 - Trainers are largely hardcoded demonstrations, not data-driven curricula.
 - Minimal ingestion/analysis exists; one streaming reader added for Simple English Wikipedia.
 - No end-to-end task/evaluation loop yet.
@@ -47,7 +47,7 @@ Purpose: Document a realistic path from current prototype to a measurable "toddl
   - concreteness: binned score
   - syntax: subject/verb/object flags if matched
   - frequency: moving frequency bins
-- Feed via `BrainInJar.LearnConceptAsync` for word, pattern, and sentence-level bindings.
+- Feed via `Cerebro.LearnConceptAsync` for word, pattern, and sentence-level bindings.
 - Add spaced repetition schedule.
 
 ### Phase 5 — Training Loops & Evaluation

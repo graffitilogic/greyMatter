@@ -120,7 +120,7 @@ public class CriticalPeriodManager
 ```csharp
 public class LearningScaffold
 {
-    public async Task<bool> CanLearnConcept(string concept, BrainInJar brain)
+    public async Task<bool> CanLearnConcept(string concept, Cerebro brain)
     {
         var conceptNode = await GetConceptNode(concept);
         

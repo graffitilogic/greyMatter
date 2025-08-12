@@ -11,13 +11,13 @@ namespace GreyMatter
     /// </summary>
     public class InteractiveConversation
     {
-        private readonly BrainInJar _brain;
-        private readonly BrainConfiguration _config;
+        private readonly Cerebro _brain;
+        private readonly CerebroConfiguration _config;
         private readonly Random _random = new();
         private readonly List<ConversationTurn> _conversationHistory = new();
         private bool _isRunning = false;
         
-        public InteractiveConversation(BrainInJar brain, BrainConfiguration config)
+        public InteractiveConversation(Cerebro brain, CerebroConfiguration config)
         {
             _brain = brain;
             _config = config;

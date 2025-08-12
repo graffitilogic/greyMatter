@@ -6,7 +6,7 @@ using GreyMatter.Core;
 Console.WriteLine("🧠 GreyMatter Neurobiological Partition Analysis");
 Console.WriteLine("================================================");
 
-var brain = new BrainInJar();
+var brain = new Cerebro();
 
 // Load existing brain state
 Console.WriteLine("📚 Loading brain state...");

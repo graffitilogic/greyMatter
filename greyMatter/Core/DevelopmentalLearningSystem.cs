@@ -12,7 +12,7 @@ namespace GreyMatter.Core
     /// </summary>
     public class DevelopmentalLearningSystem
     {
-        private readonly BrainInJar _brain;
+        private readonly Cerebro _brain;
         private readonly string _libraryPath;
         private readonly Dictionary<DevelopmentalStage, LearningCurriculum> _curricula;
         
@@ -24,7 +24,7 @@ namespace GreyMatter.Core
         private readonly Dictionary<string, double> _skillMastery = new();
         private readonly List<string> _availableResources = new();
         
-        public DevelopmentalLearningSystem(BrainInJar brain, string libraryPath)
+        public DevelopmentalLearningSystem(Cerebro brain, string libraryPath)
         {
             _brain = brain;
             _libraryPath = libraryPath;

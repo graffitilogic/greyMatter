@@ -25,9 +25,9 @@ namespace greyMatter
         private ScalePersistence persistence;
         private ExternalDataIngester ingester;
         private ComprehensionTester tester;
-        private readonly BrainConfiguration config;
+        private readonly CerebroConfiguration config;
         
-        public ScaleDemo(BrainConfiguration configuration)
+        public ScaleDemo(CerebroConfiguration configuration)
         {
             this.config = configuration;
             

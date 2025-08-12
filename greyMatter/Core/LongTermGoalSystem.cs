@@ -12,7 +12,7 @@ namespace GreyMatter.Core
     /// </summary>
     public class LongTermGoalSystem
     {
-        private readonly BrainInJar _brain;
+        private readonly Cerebro _brain;
         private readonly EmotionalProcessor _emotionalProcessor;
         private readonly EthicalDriveSystem _ethicalDrives;
         
@@ -42,7 +42,7 @@ namespace GreyMatter.Core
             "legacy_creation"           // Long-term positive impact
         };
         
-        public LongTermGoalSystem(BrainInJar brain, EmotionalProcessor emotionalProcessor, EthicalDriveSystem ethicalDrives)
+        public LongTermGoalSystem(Cerebro brain, EmotionalProcessor emotionalProcessor, EthicalDriveSystem ethicalDrives)
         {
             _brain = brain;
             _emotionalProcessor = emotionalProcessor;

@@ -14,7 +14,7 @@ namespace GreyMatter.Core
     /// </summary>
     public class ContinuousProcessor
     {
-        private readonly BrainInJar _brain;
+        private readonly Cerebro _brain;
         private readonly Timer _consciousnessTimer;
         private readonly Timer _motivationTimer;
         private readonly Timer _dreammingTimer;
@@ -55,7 +55,7 @@ namespace GreyMatter.Core
         private readonly Dictionary<string, TopicEvaluation> _topicEvaluations = new();
         private readonly SemaphoreSlim _processingLock = new(1, 1);
 
-        public ContinuousProcessor(BrainInJar brain, string libraryPath = "/mnt/nas/brain_library")
+        public ContinuousProcessor(Cerebro brain, string libraryPath = "/mnt/nas/brain_library")
         {
             _brain = brain;
             _ethicalDrives = new EthicalDriveSystem(brain);

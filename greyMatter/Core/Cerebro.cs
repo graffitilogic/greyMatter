@@ -9,10 +9,10 @@ using GreyMatter.Storage;
 namespace GreyMatter.Core
 {
     /// <summary>
-    /// BrainInJar: Main orchestrator for the SBIJ system
+    /// Cerebro: Main orchestrator for the SBIJ system
     /// Manages neuron clusters, learning, and dynamic scaling with hierarchical learning support
     /// </summary>
-    public class BrainInJar : IBrainInterface
+    public class Cerebro : IBrainInterface
     {
         private readonly EnhancedBrainStorage _storage; // Use only enhanced storage
         private readonly Dictionary<Guid, NeuronCluster> _loadedClusters = new();
@@ -37,7 +37,7 @@ namespace GreyMatter.Core
         public int TotalNeuronsCreated { get; private set; } = 0;
         public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
 
-        private BrainConfiguration? _configForLogging; // to access verbosity during save
+        private CerebroConfiguration? _configForLogging; // to access verbosity during save
 
         // Reporting config and state
         private int _reportingInterval = 1000; // items per report block
@@ -178,7 +178,7 @@ namespace GreyMatter.Core
             // Else: keep capacity unchanged to avoid churn when on target
         }
 
-        public BrainInJar(string storagePath = "brain_data")
+        public Cerebro(string storagePath = "brain_data")
         {
             _storage = new EnhancedBrainStorage(storagePath);
             _continuousProcessor = new ContinuousProcessor(this); // Initialize consciousness
@@ -1299,7 +1299,7 @@ namespace GreyMatter.Core
             return multiModalScore;
         }
 
-        public void AttachConfiguration(BrainConfiguration config)
+        public void AttachConfiguration(CerebroConfiguration config)
         {
             _configForLogging = config;
             _storage.MaxParallelSaves = config.MaxParallelSaves;

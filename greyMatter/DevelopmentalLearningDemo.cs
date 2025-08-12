@@ -15,7 +15,7 @@ namespace GreyMatter
 
             // Initialize the brain with developmental learning
             var libraryPath = args.Length > 0 ? args[0] : "/tmp/brain_library";
-            var brain = new BrainInJar(libraryPath);
+            var brain = new Cerebro(libraryPath);
             
             Console.WriteLine($"🧠 Initializing Brain with library at: {libraryPath}");
             Console.WriteLine($"📊 Brain Status: {await brain.GetStatsAsync()}");
