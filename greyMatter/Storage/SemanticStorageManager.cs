@@ -22,6 +22,7 @@ namespace GreyMatter.Storage
     public class SemanticStorageManager
     {
         private readonly string _brainDataPath;
+        private readonly string _trainingDataRoot;
         private readonly string _hippocampusPath;
         private readonly string _corticalColumnsPath;
         private readonly string _workingMemoryPath;
@@ -37,12 +38,14 @@ namespace GreyMatter.Storage
         private Dictionary<int, SharedNeuron> _neuronPool;
         private int _nextNeuronId;
         
-        // Trainable semantic classifier for learning-based categorization
-        private TrainableSemanticClassifier? _trainableClassifier;
+        // Pre-trained semantic classifier for learning-based categorization
+        private PreTrainedSemanticClassifier? _preTrainedClassifier;
+        private FallbackSemanticClassifier _fallbackClassifier;
         
-        public SemanticStorageManager(string brainDataPath)
+        public SemanticStorageManager(string brainDataPath, string trainingDataRoot = "/Volumes/jarvis/trainData")
         {
             _brainDataPath = brainDataPath;
+            _trainingDataRoot = trainingDataRoot;
             _hippocampusPath = Path.Combine(_brainDataPath, "hippocampus");
             _corticalColumnsPath = Path.Combine(_brainDataPath, "cortical_columns");
             _workingMemoryPath = Path.Combine(_brainDataPath, "working_memory");
@@ -54,8 +57,29 @@ namespace GreyMatter.Storage
             _clusterAccessTimes = new Dictionary<string, DateTime>();
             _neuronPool = new Dictionary<int, SharedNeuron>();
             
-            // Initialize trainable classifier for learning-based categorization
-            _trainableClassifier = new TrainableSemanticClassifier(Path.Combine(_brainDataPath, "classifier"));
+            // Initialize semantic classifiers
+            _fallbackClassifier = new FallbackSemanticClassifier();
+            
+            // Try to initialize pre-trained classifier (fallback to rule-based if model not available)
+            try
+            {
+                var modelPath = Path.Combine(_trainingDataRoot, "models", "sentence-transformer.onnx");
+                if (File.Exists(modelPath))
+                {
+                    _preTrainedClassifier = new PreTrainedSemanticClassifier(modelPath);
+                    Console.WriteLine("✅ Pre-trained semantic classifier loaded");
+                }
+                else
+                {
+                    Console.WriteLine("⚠️ Pre-trained model not found, using fallback rule-based classifier");
+                    Console.WriteLine($"   Expected: {modelPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to load pre-trained classifier: {ex.Message}");
+                Console.WriteLine("🔄 Using fallback rule-based classifier");
+            }
             
             InitializeStorageStructure();
             InitializeNeuronPool();
@@ -376,9 +400,43 @@ namespace GreyMatter.Storage
         
         /// <summary>
         /// Semantic domain classification for biological clustering
+        /// Uses pre-trained semantic embeddings when available, fallback to rule-based classification
         /// Based on Huth's semantic brain mapping research with hierarchical organization
         /// </summary>
         private string DetermineSemanticDomain(string word, WordInfo wordInfo)
+        {
+            // Try pre-trained classifier first
+            if (_preTrainedClassifier != null)
+            {
+                try
+                {
+                    var domain = _preTrainedClassifier.ClassifySemanticDomain(word);
+                    if (domain != "semantic_domains/general_concepts")
+                    {
+                        return domain.Replace("semantic_domains/", "");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Pre-trained classifier error: {ex.Message}");
+                }
+            }
+            
+            // Fallback to rule-based classification
+            var fallbackDomain = _fallbackClassifier.ClassifySemanticDomain(word);
+            if (fallbackDomain != "semantic_domains/general_concepts")
+            {
+                return fallbackDomain.Replace("semantic_domains/", "");
+            }
+            
+            // Final fallback to original rule-based logic
+            return DetermineSemanticDomainRuleBased(word, wordInfo);
+        }
+
+        /// <summary>
+        /// Original rule-based semantic domain classification as fallback
+        /// </summary>
+        private string DetermineSemanticDomainRuleBased(string word, WordInfo wordInfo)
         {
             var lowerWord = word.ToLowerInvariant();
             
@@ -1243,29 +1301,36 @@ namespace GreyMatter.Storage
         }
         
         /// <summary>
-        /// Train the semantic classifier with labeled examples
-        /// This allows the classifier to learn patterns instead of using hardcoded rules
+        /// Classify semantic domain using pre-trained model
+        /// No training required - uses semantic embeddings for intelligent categorization
         /// </summary>
-        public async Task TrainSemanticClassifierAsync(string conceptId, string targetDomain, object features)
+        public async Task<string> ClassifySemanticDomainAsync(string conceptId)
         {
-            if (_trainableClassifier != null)
+            // Try pre-trained classifier first
+            if (_preTrainedClassifier != null)
             {
-                // Train with a single example at a time
-                var labeledExample = new Dictionary<string, string> { [conceptId] = targetDomain };
-                await _trainableClassifier.TrainFromExamplesAsync(labeledExample);
+                try
+                {
+                    var domain = _preTrainedClassifier.ClassifySemanticDomain(conceptId);
+                    return await Task.FromResult(domain);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Pre-trained classifier error: {ex.Message}");
+                }
             }
+            
+            // Fallback to rule-based classification
+            var fallbackDomain = _fallbackClassifier.ClassifySemanticDomain(conceptId);
+            return await Task.FromResult(fallbackDomain);
         }
         
         /// <summary>
-        /// Get the predicted domain for a concept using the trained classifier
+        /// Get the predicted domain for a concept using semantic classification
         /// </summary>
         public Task<string> GetPredictedDomainAsync(string conceptId)
         {
-            if (_trainableClassifier != null)
-            {
-                return Task.FromResult(_trainableClassifier.ClassifySemanticDomain(conceptId));
-            }
-            return Task.FromResult("semantic_domains/general_concepts");
+            return ClassifySemanticDomainAsync(conceptId);
         }
     }
 

@@ -17,7 +17,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Root path for training data and learning resources
         /// </summary>
-        public string TrainingDataRoot { get; set; } = "/tmp/brain_library";
+        public string TrainingDataRoot { get; set; } = "/Volumes/jarvis/trainData";
         
         /// <summary>
         /// Working drive for large-scale storage (NAS, external drive, etc.)

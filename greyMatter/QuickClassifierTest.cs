@@ -13,21 +13,18 @@ namespace GreyMatter
         public static async Task RunAsync()
         {
             Console.WriteLine("🔍 Quick Classifier Test");
-            Console.WriteLine("Training then immediately testing classifier...");
+            Console.WriteLine("Testing pre-trained semantic classification...");
             
-            // Initialize the biological storage with trainable classifier
-            var storageManager = new SemanticStorageManager("./test_data/brain_structure");
+            // Initialize the semantic storage with pre-trained classifier
+            // Use NAS paths for proper data storage
+            var brainDataPath = "/Volumes/jarvis/brainData";
+            var trainingDataRoot = "/Volumes/jarvis/trainData";
+            var storageManager = new SemanticStorageManager(brainDataPath, trainingDataRoot);
             
-            // First train with a few examples
-            Console.WriteLine("🧠 Training with basic examples...");
-            await storageManager.TrainSemanticClassifierAsync("cat", "living_things/animals/mammals", "furry domestic pet");
-            await storageManager.TrainSemanticClassifierAsync("computer", "artifacts/technology/electronics", "digital device");
-            await storageManager.TrainSemanticClassifierAsync("car", "artifacts/vehicles/land_vehicles", "automobile");
+            Console.WriteLine("✅ Pre-trained classifier ready. Testing...");
             
-            Console.WriteLine("✅ Training complete. Now testing...");
-            
-            // Test the same examples
-            var testWords = new[] { "cat", "computer", "car", "dog", "robot" };
+            // Test various examples (no training needed!)
+            var testWords = new[] { "cat", "computer", "car", "dog", "robot", "airplane", "mountain" };
             
             foreach (var word in testWords)
             {

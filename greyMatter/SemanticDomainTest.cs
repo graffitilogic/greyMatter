@@ -18,7 +18,10 @@ namespace greyMatter
             Console.WriteLine(new string('=', 60));
             
             // Initialize biological storage manager
-            var storageManager = new SemanticStorageManager("/tmp/test_brain_storage");
+            // Use NAS paths for proper data storage
+            var brainDataPath = "/Volumes/jarvis/brainData";
+            var trainingDataRoot = "/Volumes/jarvis/trainData";
+            var storageManager = new SemanticStorageManager(brainDataPath, trainingDataRoot);
             
             // Test concept categorization with diverse examples
             var testConcepts = new Dictionary<string, object>

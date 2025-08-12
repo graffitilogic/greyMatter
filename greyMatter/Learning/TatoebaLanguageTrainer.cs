@@ -29,7 +29,8 @@ namespace greyMatter.Learning
             
             // Initialize biological storage manager
             var brainDataPath = "/Volumes/jarvis/brainData";
-            _storageManager = new SemanticStorageManager(brainDataPath);
+            var trainingDataRoot = "/Volumes/jarvis/trainData";
+            _storageManager = new SemanticStorageManager(brainDataPath, trainingDataRoot);
             
             // Try to load existing brain state, create new if none exists
             _brain = LoadOrCreateBrain();

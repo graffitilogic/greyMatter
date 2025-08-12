@@ -1,0 +1,33 @@
+# Build artifacts
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+
+# IDE files
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local data folders - all data should be on NAS
+test_data/
+data/
+models/
+brain_data/
+training_data/
+
+# Temporary files
+*.tmp
+*.log
+*.cache
+
+# User-specific files
+*.user
+*.suo

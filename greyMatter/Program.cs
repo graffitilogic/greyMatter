@@ -22,9 +22,9 @@ namespace GreyMatter
             }
             
             // Check for trainable semantic demo
-            else if (args.Length > 0 && args[0] == "--trainable-demo")
+            else if (args.Length > 0 && args[0] == "--pretrained-demo")
             {
-                await TrainableSemanticDemo.RunLearningDemoAsync();
+                await PreTrainedSemanticDemo.RunAsync();
             }
             else if (args.Length > 0 && args[0] == "--quick-test")
             {
