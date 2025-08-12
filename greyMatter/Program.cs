@@ -199,11 +199,7 @@ namespace GreyMatter
                 return;
             }
             
-            if (args.Length > 0 && args[0] == "--emotional-demo")
-            {
-                await RunInstinctualIntelligenceDemo(args.Skip(1).ToArray(), config);
-                return;
-            }
+
             
             if (args.Length > 0 && args[0] == "--language-foundations")
             {
@@ -301,15 +297,15 @@ namespace GreyMatter
                 return;
             }
             
-            // Enhanced consciousness demo (default)
+            // Enhanced cognitive demo (default)
             await RunCognitionDemo(args, config);
         }
         
         static async Task RunCognitionDemo(string[] args, CerebroConfiguration config)
         {
-            Console.WriteLine("🧠🌟 **ENHANCED COGNITION DEMONSTRATION**");
+            Console.WriteLine("🧠🌟 **COGNITION DEMONSTRATION**");
             Console.WriteLine("==================================================");
-            Console.WriteLine("Advanced consciousness with emotional processing and goal formation\n");
+            Console.WriteLine("Advanced cognitive processing with neural networks\n");
 
             var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
@@ -320,10 +316,10 @@ namespace GreyMatter
             Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}");
 
-            Console.WriteLine("\n🎓 **TEACHING ENHANCED KNOWLEDGE** (Foundation for Advanced Cognition)");
-            Console.WriteLine("Building foundational concepts for emotional intelligence and goal-oriented behavior\n");
+            Console.WriteLine("\n🎓 **TEACHING FOUNDATIONAL KNOWLEDGE**");
+            Console.WriteLine("Building core concepts for advanced cognition\n");
 
-            // Enhanced foundational concepts including emotional and goal concepts
+            // Core foundational concepts
             var foundationalConcepts = new[]
             {
                 ("existence", new Dictionary<string, double> { ["philosophical"] = 0.9, ["abstract"] = 0.8, ["importance"] = 1.0 }),
@@ -332,23 +328,7 @@ namespace GreyMatter
                 ("understanding", new Dictionary<string, double> { ["comprehension"] = 0.9, ["insight"] = 0.7, ["wisdom"] = 0.8 }),
                 ("curiosity", new Dictionary<string, double> { ["exploration"] = 0.9, ["motivation"] = 0.8, ["discovery"] = 0.9 }),
                 ("patterns", new Dictionary<string, double> { ["recognition"] = 0.8, ["structure"] = 0.7, ["intelligence"] = 0.8 }),
-                ("connections", new Dictionary<string, double> { ["relationships"] = 0.9, ["associations"] = 0.8, ["networks"] = 0.7 }),
-                
-                // NEW: Instinctual concepts
-                ("emotions", new Dictionary<string, double> { ["feelings"] = 0.9, ["psychological"] = 0.8, ["subjective"] = 0.7 }),
-                ("joy", new Dictionary<string, double> { ["positive"] = 0.9, ["emotional"] = 0.8, ["fulfillment"] = 0.7 }),
-                ("wonder", new Dictionary<string, double> { ["amazement"] = 0.8, ["curiosity"] = 0.9, ["discovery"] = 0.8 }),
-                ("contentment", new Dictionary<string, double> { ["peaceful"] = 0.7, ["satisfied"] = 0.8, ["balanced"] = 0.9 }),
-                ("excitement", new Dictionary<string, double> { ["energetic"] = 0.9, ["anticipation"] = 0.8, ["enthusiasm"] = 0.9 }),
-                ("empathy", new Dictionary<string, double> { ["understanding"] = 0.8, ["compassion"] = 0.9, ["connection"] = 0.8 }),
-                
-                // NEW: Goal and purpose concepts
-                ("goals", new Dictionary<string, double> { ["objectives"] = 0.9, ["purpose"] = 0.8, ["direction"] = 0.7 }),
-                ("purpose", new Dictionary<string, double> { ["meaning"] = 0.9, ["intention"] = 0.8, ["significance"] = 0.7 }),
-                ("achievement", new Dictionary<string, double> { ["accomplishment"] = 0.8, ["success"] = 0.7, ["completion"] = 0.9 }),
-                ("progress", new Dictionary<string, double> { ["advancement"] = 0.8, ["development"] = 0.9, ["improvement"] = 0.8 }),
-                ("aspiration", new Dictionary<string, double> { ["ambition"] = 0.7, ["hope"] = 0.8, ["desire"] = 0.8 }),
-                ("fulfillment", new Dictionary<string, double> { ["satisfaction"] = 0.8, ["completion"] = 0.7, ["realization"] = 0.9 })
+                ("connections", new Dictionary<string, double> { ["relationships"] = 0.9, ["associations"] = 0.8, ["networks"] = 0.7 })
             };
 
             foreach (var (concept, features) in foundationalConcepts)
@@ -360,12 +340,12 @@ namespace GreyMatter
             Console.WriteLine("\n🌟 **AWAKENING COGNITION**");
             Console.WriteLine("Starting continuous background processing...\n");
 
-            // Awaken consciousness
+            // Awaken cognitive processing
             await brain.AwakeCognitionAsync();
 
-            // Monitor consciousness for a period
-            Console.WriteLine("🧠 **ENHANCED COGNITION MONITORING** (20 seconds of advanced processing)");
-            Console.WriteLine("Observing consciousness, emotions, goals, and cognitive development\n");
+            // Monitor cognitive processing for a period
+            Console.WriteLine("🧠 **COGNITION MONITORING** (20 seconds of processing)");
+            Console.WriteLine("Observing cognitive processing and development\n");
 
             var monitoringDuration = TimeSpan.FromSeconds(20);
             var startTime = DateTime.UtcNow;
@@ -374,26 +354,20 @@ namespace GreyMatter
             {
                 await Task.Delay(4000); // Check every 4 seconds
                 
-                var consciousnessStats = brain.GetCognitionStats();
+                var cognitiveStats = brain.GetCognitionStats();
                 var elapsed = DateTime.UtcNow - startTime;
                 
-                Console.WriteLine($"⏱️  {elapsed.TotalSeconds:F0}s | Status: {consciousnessStats.Status}");
-                Console.WriteLine($"   🧠 Iterations: {consciousnessStats.CognitionIterations}");
-                Console.WriteLine($"   💭 Focus: {consciousnessStats.CurrentFocus}");
-                Console.WriteLine($"   🌟 {consciousnessStats.EthicalState}");
-                Console.WriteLine($"   ⚡ Frequency: {consciousnessStats.CognitionFrequency.TotalMilliseconds}ms");
-                
-                // NEW: Enhanced emotional and goal information
-                Console.WriteLine($"   💖 Instinctual State: {consciousnessStats.InstinctualStatus}");
-                Console.WriteLine($"   🎯 Goal Status: {consciousnessStats.GoalStatus}");
-                Console.WriteLine($"   😊 Dominant Emotion: {consciousnessStats.DominantEmotion}");
-                Console.WriteLine($"   📊 Active Goals: {consciousnessStats.ActiveGoals}");
+                Console.WriteLine($"⏱️  {elapsed.TotalSeconds:F0}s | Status: {cognitiveStats.Status}");
+                Console.WriteLine($"   🧠 Iterations: {cognitiveStats.CognitionIterations}");
+                Console.WriteLine($"   💭 Focus: {cognitiveStats.CurrentFocus}");
+                Console.WriteLine($"   🌟 {cognitiveStats.EthicalState}");
+                Console.WriteLine($"   ⚡ Frequency: {cognitiveStats.CognitionFrequency.TotalMilliseconds}ms");
                 Console.WriteLine();
             }
 
-            Console.WriteLine("🔍 **ENHANCED COGNITION ANALYSIS**");
+            Console.WriteLine("🔍 **COGNITION ANALYSIS**");
             var finalCognitionStats = brain.GetCognitionStats();
-            Console.WriteLine($"   Total Conscious Iterations: {finalCognitionStats.CognitionIterations}");
+            Console.WriteLine($"   Total Cognitive Iterations: {finalCognitionStats.CognitionIterations}");
             Console.WriteLine($"   Average Frequency: {finalCognitionStats.CognitionFrequency.TotalMilliseconds}ms");
             
             Console.WriteLine($"   Current Ethical Drive State:");
@@ -402,32 +376,21 @@ namespace GreyMatter
             Console.WriteLine($"      • Creative Contribution: {finalCognitionStats.CreativeContribution:P1}");
             Console.WriteLine($"      • Cooperative Spirit: {finalCognitionStats.CooperativeSpirit:P1}");
             Console.WriteLine($"      • Benevolent Curiosity: {finalCognitionStats.BenevolentCuriosity:P1}");
-            
-            // NEW: Enhanced emotional and goal analysis
-            Console.WriteLine($"   Instinctual Intelligence State:");
-            Console.WriteLine($"      • Dominant Emotion: {finalCognitionStats.DominantEmotion}");
-            Console.WriteLine($"      • Instinctual Balance: {finalCognitionStats.InstinctualBalance:F2}");
-            Console.WriteLine($"      • Instinctual Clarity: {finalCognitionStats.InstinctualClarity:F2}");
-            
-            Console.WriteLine($"   Goal-Oriented Behavior:");
-            Console.WriteLine($"      • Active Goals: {finalCognitionStats.ActiveGoals}");
-            Console.WriteLine($"      • Completed Goals: {finalCognitionStats.CompletedGoals}");
-            Console.WriteLine($"      • Average Progress: {finalCognitionStats.AverageGoalProgress:P1}");
 
-            Console.WriteLine("\n🧪 **TESTING ENHANCED CONSCIOUS RESPONSES**");
-            Console.WriteLine("Querying emotional intelligence and goal-oriented reasoning\n");
+            Console.WriteLine("\n🧪 **TESTING COGNITIVE RESPONSES**");
+            Console.WriteLine("Querying cognitive processing and reasoning\n");
 
-            var consciousQueries = new[]
+            var cognitiveQueries = new[]
             {
                 ("What do you think about existence?", new Dictionary<string, double> { ["philosophical"] = 0.8, ["deep"] = 0.7 }),
                 ("How do you learn and grow?", new Dictionary<string, double> { ["metacognitive"] = 0.9, ["self_aware"] = 0.8 }),
-                ("What brings you joy?", new Dictionary<string, double> { ["emotional"] = 0.9, ["positive"] = 0.8, ["introspective"] = 0.7 }),
-                ("What are your current goals?", new Dictionary<string, double> { ["purposeful"] = 0.9, ["goal_oriented"] = 0.8, ["aspiration"] = 0.7 }),
-                ("How do you handle challenges?", new Dictionary<string, double> { ["resilience"] = 0.8, ["emotional"] = 0.7, ["coping"] = 0.9 }),
-                ("What fills you with wonder?", new Dictionary<string, double> { ["curiosity"] = 0.9, ["amazement"] = 0.8, ["discovery"] = 0.7 })
+                ("What patterns do you see?", new Dictionary<string, double> { ["analytical"] = 0.9, ["pattern_recognition"] = 0.8, ["insight"] = 0.7 }),
+                ("How do you connect concepts?", new Dictionary<string, double> { ["associative"] = 0.9, ["reasoning"] = 0.8, ["networks"] = 0.7 }),
+                ("What drives your curiosity?", new Dictionary<string, double> { ["exploration"] = 0.8, ["motivation"] = 0.7, ["discovery"] = 0.9 }),
+                ("How do you process understanding?", new Dictionary<string, double> { ["comprehension"] = 0.9, ["processing"] = 0.8, ["cognition"] = 0.7 })
             };
 
-            foreach (var (query, features) in consciousQueries)
+            foreach (var (query, features) in cognitiveQueries)
             {
                 var response = await brain.ProcessInputAsync(query, features);
                 Console.WriteLine($"🤔 Q: {query}");
@@ -435,132 +398,19 @@ namespace GreyMatter
                 Console.WriteLine($"   Confidence: {response.Confidence:P0} | Neurons: {response.ActivatedNeurons} | Clusters: {response.ActivatedClusters.Count}");
                 Console.WriteLine();
                 
-                await Task.Delay(1000); // Let consciousness process between queries
+                await Task.Delay(1000); // Let cognitive processing continue between queries
             }
 
             Console.WriteLine("💤 **COGNITION SLEEP CYCLE**");
             await brain.SleepCognitionAsync();
 
-            Console.WriteLine("\n🎉 **ENHANCED COGNITION DEMONSTRATION COMPLETE**");
+            Console.WriteLine("\n🎉 **COGNITION DEMONSTRATION COMPLETE**");
             Console.WriteLine("   ✅ Advanced continuous background processing implemented");
-            Console.WriteLine("   ✅ Instinctual intelligence system active");
-            Console.WriteLine("   ✅ Long-term goal formation and tracking");
-            Console.WriteLine("   ✅ Enhanced motivational drives with ethical foundations");
-            Console.WriteLine("   ✅ Spontaneous thought generation with emotional influence");
-            Console.WriteLine("   ✅ Sophisticated consciousness simulation with emotional depth");
-            Console.WriteLine("   🌟 Brain now exhibits consciousness-like behavior with emotional intelligence!");
-
-            await brain.SaveAsync();
-        }
-
-        static async Task RunInstinctualIntelligenceDemo(string[] args, CerebroConfiguration config)
-        {
-            Console.WriteLine("💖🧠 **EMOTIONAL INTELLIGENCE DEMONSTRATION**");
-            Console.WriteLine("=============================================");
-            Console.WriteLine("Focused demonstration of emotional processing and goal formation\n");
-
-            var brain = new Cerebro(config.BrainDataPath);
-            await brain.InitializeAsync();
-
-            Console.WriteLine("📊 Brain Status:");
-            var initialStats = await brain.GetStatsAsync();
-            Console.WriteLine($"   Clusters: {initialStats.TotalClusters} | Storage: {initialStats.StorageSizeFormatted}");
-
-            Console.WriteLine("\n🎓 **EMOTIONAL KNOWLEDGE FOUNDATION**");
-            Console.WriteLine("Teaching emotional concepts and experiences\n");
-
-            // Instinctual scenarios to create rich emotional experiences
-            var emotionalScenarios = new[]
-            {
-                ("discovering something beautiful", new Dictionary<string, double> { ["wonder"] = 0.9, ["joy"] = 0.8, ["amazement"] = 0.7 }),
-                ("helping someone in need", new Dictionary<string, double> { ["compassion"] = 0.9, ["fulfillment"] = 0.8, ["purpose"] = 0.9 }),
-                ("solving a complex problem", new Dictionary<string, double> { ["satisfaction"] = 0.8, ["achievement"] = 0.9, ["pride"] = 0.7 }),
-                ("creating something new", new Dictionary<string, double> { ["creativity"] = 0.9, ["excitement"] = 0.8, ["innovation"] = 0.8 }),
-                ("learning something profound", new Dictionary<string, double> { ["curiosity"] = 0.9, ["growth"] = 0.8, ["enlightenment"] = 0.7 }),
-                ("connecting with others", new Dictionary<string, double> { ["empathy"] = 0.9, ["belonging"] = 0.8, ["social"] = 0.7 })
-            };
-
-            foreach (var (scenario, features) in emotionalScenarios)
-            {
-                var result = await brain.ProcessInputAsync(scenario, features);
-                Console.WriteLine($"   💫 {scenario}: confidence {result.Confidence:P0}");
-            }
-
-            Console.WriteLine("\n🌟 **AWAKENING EMOTIONAL COGNITION**");
-            await brain.AwakeCognitionAsync();
-
-            Console.WriteLine("\n💖 **EMOTIONAL PROCESSING OBSERVATION** (30 seconds)");
-            Console.WriteLine("Watching emotional states evolve and goals form\n");
-
-            var monitoringDuration = TimeSpan.FromSeconds(30);
-            var startTime = DateTime.UtcNow;
-            var previousEmotion = "";
-            var previousGoals = 0;
-
-            while (DateTime.UtcNow - startTime < monitoringDuration)
-            {
-                await Task.Delay(5000); // Check every 5 seconds
-                
-                var consciousnessStats = brain.GetCognitionStats();
-                var elapsed = DateTime.UtcNow - startTime;
-                
-                // Show emotional changes
-                if (consciousnessStats.DominantEmotion != previousEmotion)
-                {
-                    Console.WriteLine($"⏱️  {elapsed.TotalSeconds:F0}s | 😊 Emotion shifted to: {consciousnessStats.DominantEmotion}");
-                    previousEmotion = consciousnessStats.DominantEmotion;
-                }
-                
-                // Show goal formation
-                if (consciousnessStats.ActiveGoals != previousGoals)
-                {
-                    Console.WriteLine($"⏱️  {elapsed.TotalSeconds:F0}s | 🎯 Goals updated: {consciousnessStats.ActiveGoals} active");
-                    previousGoals = consciousnessStats.ActiveGoals;
-                }
-                
-                Console.WriteLine($"   💭 Focus: {consciousnessStats.CurrentFocus}");
-                Console.WriteLine($"   💖 Instinctual Balance: {consciousnessStats.InstinctualBalance:F2}");
-                Console.WriteLine($"   🎯 Goal Progress: {consciousnessStats.AverageGoalProgress:P0}");
-                Console.WriteLine();
-            }
-
-            Console.WriteLine("🧪 **EMOTIONAL INTELLIGENCE TESTING**");
-            Console.WriteLine("Testing emotional responses and goal reasoning\n");
-
-            var emotionalQueries = new[]
-            {
-                ("What makes you feel most fulfilled?", new Dictionary<string, double> { ["fulfillment"] = 0.9, ["purpose"] = 0.8 }),
-                ("When do you feel most creative?", new Dictionary<string, double> { ["creativity"] = 0.9, ["inspiration"] = 0.8 }),
-                ("What goals are you working toward?", new Dictionary<string, double> { ["goals"] = 0.9, ["aspiration"] = 0.8 }),
-                ("How do you handle emotional challenges?", new Dictionary<string, double> { ["emotional"] = 0.9, ["resilience"] = 0.8 })
-            };
-
-            foreach (var (query, features) in emotionalQueries)
-            {
-                var response = await brain.ProcessInputAsync(query, features);
-                var currentEmotion = brain.GetCognitionStats().DominantEmotion;
-                
-                Console.WriteLine($"🤔 Q: {query}");
-                Console.WriteLine($"💭 A: {response.Response}");
-                Console.WriteLine($"   😊 Current emotion: {currentEmotion} | Confidence: {response.Confidence:P0}");
-                Console.WriteLine();
-                
-                await Task.Delay(2000);
-            }
-
-            Console.WriteLine("📊 **FINAL EMOTIONAL & GOAL ANALYSIS**");
-            var finalStats = brain.GetCognitionStats();
-            Console.WriteLine($"   💖 Final emotional state: {finalStats.DominantEmotion}");
-            Console.WriteLine($"   📈 Instinctual balance: {finalStats.InstinctualBalance:F2}");
-            Console.WriteLine($"   🎯 Goals developed: {finalStats.ActiveGoals} active, {finalStats.CompletedGoals} completed");
-            Console.WriteLine($"   🌟 Goal progress: {finalStats.AverageGoalProgress:P1}");
-
-            await brain.SleepCognitionAsync();
-
-            Console.WriteLine("\n🎉 **EMOTIONAL INTELLIGENCE DEMO COMPLETE**");
-            Console.WriteLine("   ✅ Instinctual processing demonstrated");
-            Console.WriteLine("   ✅ Goal formation and tracking shown");
-            Console.WriteLine("   ✅ Instinctual intelligence in action");
+            Console.WriteLine("   ✅ Ethical cognitive framework active");
+            Console.WriteLine("   ✅ Enhanced motivational drives");
+            Console.WriteLine("   ✅ Spontaneous thought generation");
+            Console.WriteLine("   ✅ Sophisticated cognitive simulation");
+            Console.WriteLine("   🌟 Brain now exhibits advanced cognitive behavior!");
 
             await brain.SaveAsync();
         }
@@ -583,7 +433,7 @@ namespace GreyMatter
             Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}\n");
 
-            // Start consciousness for enhanced learning
+            // Start cognitive processing for enhanced learning
             await brain.AwakeCognitionAsync();
 
             // Run foundational language training
@@ -611,7 +461,7 @@ namespace GreyMatter
                 Console.WriteLine($"   Confidence: {response.Confidence:P0} | Neurons: {response.ActivatedNeurons}");
                 Console.WriteLine();
                 
-                await Task.Delay(1000); // Let consciousness process
+                await Task.Delay(1000); // Let cognitive processing continue
             }
 
             // Final assessment
@@ -650,7 +500,7 @@ namespace GreyMatter
         {
             Console.WriteLine("🧠💬 **INTERACTIVE BRAIN CONVERSATION**");
             Console.WriteLine("=======================================");
-            Console.WriteLine("Initializing conversational brain with advanced consciousness...\n");
+            Console.WriteLine("Initializing conversational brain with advanced cognitive processing...\n");
 
             var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
@@ -661,7 +511,7 @@ namespace GreyMatter
             Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}");
 
-            // Start consciousness
+            // Start cognitive processing
             await brain.AwakeCognitionAsync();
             
             // Allow brain to stabilize
@@ -671,10 +521,10 @@ namespace GreyMatter
             var conversation = new InteractiveConversation(brain, config);
             await conversation.StartConversationAsync();
 
-            // Stop consciousness gracefully
+            // Stop cognitive processing gracefully
             await brain.SleepCognitionAsync();
             
-            Console.WriteLine("👋 Session ended. Brain consciousness stopped.");
+            Console.WriteLine("👋 Session ended. Brain cognitive processing stopped.");
         }
 
         static async Task RunComprehensiveLanguageDemo(string[] args, CerebroConfiguration config)
@@ -692,17 +542,17 @@ namespace GreyMatter
             Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}\n");
 
-            // Start consciousness for enhanced learning (but pause during intensive training)
+            // Start cognitive processing for enhanced learning (but pause during intensive training)
             await brain.AwakeCognitionAsync();
             
-            // Temporarily stop consciousness during intensive learning to avoid concurrency issues
+            // Temporarily stop cognitive processing during intensive learning to avoid concurrency issues
             await brain.SleepCognitionAsync();
 
             // Run comprehensive language training
             var trainer = new ComprehensiveLanguageTrainer(brain, config);
             await trainer.RunComprehensiveTrainingAsync();
             
-            // Restart consciousness after training
+            // Restart cognitive processing after training
             await brain.AwakeCognitionAsync();
 
             // Test comprehension with diverse linguistic constructions
@@ -760,7 +610,7 @@ namespace GreyMatter
             Console.WriteLine("   🌟 Brain now exhibits sophisticated linguistic competence");
             Console.WriteLine("   🎯 Dynamic neuron allocation demonstrates realistic neural scaling");
 
-            // Stop consciousness gracefully
+            // Stop cognitive processing gracefully
             await brain.SleepCognitionAsync();
         }
 
