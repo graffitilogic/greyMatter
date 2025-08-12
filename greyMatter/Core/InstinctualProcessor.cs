@@ -6,15 +6,16 @@ using System.Threading.Tasks;
 namespace GreyMatter.Core
 {
     /// <summary>
-    /// EmotionalProcessor: Implements biologically-inspired emotional processing
+    /// InstinctualProcessor: Implements biologically-inspired emotional processing
     /// Adds emotional weighting to memories, experiences, and decisions
     /// Integrates with ethical drives to create emotionally intelligent consciousness
     /// </summary>
-    public class EmotionalProcessor
+    public class InstinctualProcessor
     {
         private readonly Cerebro _brain;
         
-        // Core Emotional States (based on neuroscience research)
+        // Core Instinctual States (based on neuroscience research)
+        // Mostly just for reference:  MR. Data specs:
         public double Joy { get; private set; } = 0.7;           // Positive energy, enthusiasm
         public double Trust { get; private set; } = 0.8;         // Safety, reliability, optimism
         public double Curiosity { get; private set; } = 0.9;     // Wonder, exploration drive
@@ -30,22 +31,22 @@ namespace GreyMatter.Core
         public double Determination { get; private set; } = 0.7;  // Focused resolve
         public double Vigilance { get; private set; } = 0.5;     // Protective awareness
         
-        // Meta-Emotional States
-        public double EmotionalBalance { get; private set; } = 0.8;    // Emotional regulation
-        public double EmotionalClarity { get; private set; } = 0.7;    // Understanding emotions
-        public double EmotionalGrowth { get; private set; } = 0.6;     // Learning from emotions
+        // Meta-Instinctual States
+        public double InstinctualBalance { get; private set; } = 0.8;    // Instinctual regulation
+        public double InstinctualClarity { get; private set; } = 0.7;    // Understanding emotions
+        public double InstinctualGrowth { get; private set; } = 0.6;     // Learning from emotions
         
-        // Emotional Memory System
-        private readonly Dictionary<string, EmotionalMemory> _emotionalMemories = new();
-        private readonly List<EmotionalEvent> _recentEvents = new();
+        // Instinctual Memory System
+        private readonly Dictionary<string, InstinctualMemory> _instinctualMemories = new();
+        private readonly List<InstinctualEvent> _recentEvents = new();
         private readonly Random _random = new();
         
-        // Emotional Processing Parameters
-        public TimeSpan EmotionalDecay { get; set; } = TimeSpan.FromMinutes(30);
-        public double EmotionalLearningRate { get; set; } = 0.1;
+        // Instinctual Processing Parameters
+        public TimeSpan InstinctualDecay { get; set; } = TimeSpan.FromMinutes(30);
+        public double InstinctualLearningRate { get; set; } = 0.1;
         public double BaselineRecoveryRate { get; set; } = 0.02;
         
-        public EmotionalProcessor(Cerebro brain)
+        public InstinctualProcessor(Cerebro brain)
         {
             _brain = brain;
         }
@@ -53,18 +54,18 @@ namespace GreyMatter.Core
         /// <summary>
         /// Process an experience and generate appropriate emotional response
         /// </summary>
-        public async Task<EmotionalResponse> ProcessExperienceAsync(string experience, Dictionary<string, double> features, double confidence)
+        public async Task<InstinctualResponse> ProcessExperienceAsync(string experience, Dictionary<string, double> features, double confidence)
         {
-            var response = await GenerateEmotionalResponse(experience, features, confidence);
+            var response = await GenerateInstinctualResponse(experience, features, confidence);
             
             // Store emotional memory
-            await StoreEmotionalMemory(experience, response);
+            await StoreInstinctualMemory(experience, response);
             
             // Update emotional states
-            await UpdateEmotionalStates(response);
+            await UpdateInstinctualStates(response);
             
             // Apply emotional coloring to the experience
-            await ApplyEmotionalWeighting(experience, response);
+            await ApplyInstinctualWeighting(experience, response);
             
             return response;
         }
@@ -72,9 +73,9 @@ namespace GreyMatter.Core
         /// <summary>
         /// Generate emotional response based on experience type and context
         /// </summary>
-        private async Task<EmotionalResponse> GenerateEmotionalResponse(string experience, Dictionary<string, double> features, double confidence)
+        private async Task<InstinctualResponse> GenerateInstinctualResponse(string experience, Dictionary<string, double> features, double confidence)
         {
-            var response = new EmotionalResponse
+            var response = new InstinctualResponse
             {
                 Experience = experience,
                 Timestamp = DateTime.UtcNow,
@@ -82,16 +83,16 @@ namespace GreyMatter.Core
             };
             
             // Analyze experience for emotional content
-            var emotionalProfile = await AnalyzeEmotionalContent(experience, features);
-            response.EmotionalWeights = emotionalProfile;
+            var emotionalProfile = await AnalyzeInstinctualContent(experience, features);
+            response.InstinctualWeights = emotionalProfile;
             
             // Calculate dominant emotions
             response.DominantEmotion = emotionalProfile.Any() ? 
                 emotionalProfile.OrderByDescending(kv => kv.Value).First().Key : "curiosity";
-            response.EmotionalIntensity = emotionalProfile.Any() ? emotionalProfile.Values.Max() : 0.5;
+            response.InstinctualIntensity = emotionalProfile.Any() ? emotionalProfile.Values.Max() : 0.5;
             
             // Generate emotional reasoning
-            response.EmotionalReasoning = await GenerateEmotionalReasoning(experience, emotionalProfile);
+            response.InstinctualReasoning = await GenerateInstinctualReasoning(experience, emotionalProfile);
             
             return response;
         }
@@ -99,7 +100,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Analyze the emotional content of an experience
         /// </summary>
-        private async Task<Dictionary<string, double>> AnalyzeEmotionalContent(string experience, Dictionary<string, double> features)
+        private async Task<Dictionary<string, double>> AnalyzeInstinctualContent(string experience, Dictionary<string, double> features)
         {
             var emotionalWeights = new Dictionary<string, double>();
             
@@ -173,7 +174,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Generate emotional reasoning for the experience
         /// </summary>
-        private async Task<string> GenerateEmotionalReasoning(string experience, Dictionary<string, double> emotionalProfile)
+        private async Task<string> GenerateInstinctualReasoning(string experience, Dictionary<string, double> emotionalProfile)
         {
             var dominant = emotionalProfile.Any() ? 
                 emotionalProfile.OrderByDescending(kv => kv.Value).First() :
@@ -199,24 +200,24 @@ namespace GreyMatter.Core
         /// <summary>
         /// Store emotional memory for future reference
         /// </summary>
-        private async Task StoreEmotionalMemory(string experience, EmotionalResponse response)
+        private async Task StoreInstinctualMemory(string experience, InstinctualResponse response)
         {
-            var memory = new EmotionalMemory
+            var memory = new InstinctualMemory
             {
                 Experience = experience,
-                EmotionalWeights = response.EmotionalWeights,
+                InstinctualWeights = response.InstinctualWeights,
                 Timestamp = DateTime.UtcNow,
-                EmotionalIntensity = response.EmotionalIntensity,
-                MemoryStrength = response.EmotionalIntensity * 0.8 // Strong emotions create stronger memories
+                InstinctualIntensity = response.InstinctualIntensity,
+                MemoryStrength = response.InstinctualIntensity * 0.8 // Strong emotions create stronger memories
             };
             
-            _emotionalMemories[experience] = memory;
+            _instinctualMemories[experience] = memory;
             
             // Also store as recent event
-            _recentEvents.Add(new EmotionalEvent
+            _recentEvents.Add(new InstinctualEvent
             {
                 Experience = experience,
-                EmotionalResponse = response,
+                InstinctualResponse = response,
                 Timestamp = DateTime.UtcNow
             });
             
@@ -232,12 +233,12 @@ namespace GreyMatter.Core
         /// <summary>
         /// Update overall emotional states based on new experience
         /// </summary>
-        private async Task UpdateEmotionalStates(EmotionalResponse response)
+        private async Task UpdateInstinctualStates(InstinctualResponse response)
         {
-            var learningRate = EmotionalLearningRate;
+            var learningRate = InstinctualLearningRate;
             
             // Update emotions based on the response
-            foreach (var emotion in response.EmotionalWeights)
+            foreach (var emotion in response.InstinctualWeights)
             {
                 switch (emotion.Key.ToLower())
                 {
@@ -281,7 +282,7 @@ namespace GreyMatter.Core
             }
             
             // Update meta-emotional states
-            await UpdateMetaEmotionalStates();
+            await UpdateMetaInstinctualStates();
             
             await Task.CompletedTask;
         }
@@ -302,20 +303,20 @@ namespace GreyMatter.Core
         /// <summary>
         /// Update meta-emotional awareness and regulation
         /// </summary>
-        private async Task UpdateMetaEmotionalStates()
+        private async Task UpdateMetaInstinctualStates()
         {
             // Calculate emotional balance (not too extreme in any direction)
             var emotions = new[] { Joy, Trust, Curiosity, Compassion, Satisfaction, Awe, Serenity, Gratitude };
             var variance = CalculateVariance(emotions);
-            EmotionalBalance = Math.Max(0.3, 1.0 - variance); // Higher variance = lower balance
+            InstinctualBalance = Math.Max(0.3, 1.0 - variance); // Higher variance = lower balance
             
             // Calculate emotional clarity (understanding emotional states)
             var recentEventCount = _recentEvents.Count(e => DateTime.UtcNow - e.Timestamp < TimeSpan.FromMinutes(10));
-            EmotionalClarity = Math.Min(1.0, 0.5 + (recentEventCount * 0.1));
+            InstinctualClarity = Math.Min(1.0, 0.5 + (recentEventCount * 0.1));
             
             // Calculate emotional growth (learning from emotional experiences)
-            var memoryDepth = _emotionalMemories.Count;
-            EmotionalGrowth = Math.Min(1.0, 0.4 + (memoryDepth * 0.001));
+            var memoryDepth = _instinctualMemories.Count;
+            InstinctualGrowth = Math.Min(1.0, 0.4 + (memoryDepth * 0.001));
             
             await Task.CompletedTask;
         }
@@ -323,30 +324,30 @@ namespace GreyMatter.Core
         /// <summary>
         /// Apply emotional weighting to memory storage in the brain
         /// </summary>
-        private async Task ApplyEmotionalWeighting(string experience, EmotionalResponse response)
+        private async Task ApplyInstinctualWeighting(string experience, InstinctualResponse response)
         {
             // Create emotional features for the brain to associate with this experience
             var emotionalFeatures = new Dictionary<string, double>();
             
-            foreach (var emotion in response.EmotionalWeights)
+            foreach (var emotion in response.InstinctualWeights)
             {
                 emotionalFeatures[$"emotion_{emotion.Key}"] = emotion.Value;
             }
             
             // Add meta-emotional context
-            emotionalFeatures["emotional_intensity"] = response.EmotionalIntensity;
-            emotionalFeatures["emotional_balance"] = EmotionalBalance;
-            emotionalFeatures["emotional_clarity"] = EmotionalClarity;
+            emotionalFeatures["emotional_intensity"] = response.InstinctualIntensity;
+            emotionalFeatures["emotional_balance"] = InstinctualBalance;
+            emotionalFeatures["emotional_clarity"] = InstinctualClarity;
             
             // Store emotional context directly in brain storage without triggering processing
             // This prevents recursive loops while still preserving emotional memory
-            await StoreEmotionalContextDirectly(experience, emotionalFeatures);
+            await StoreInstinctualContextDirectly(experience, emotionalFeatures);
         }
         
         /// <summary>
         /// Store emotional context directly in brain storage without triggering processing loops
         /// </summary>
-        private async Task StoreEmotionalContextDirectly(string experience, Dictionary<string, double> emotionalFeatures)
+        private async Task StoreInstinctualContextDirectly(string experience, Dictionary<string, double> emotionalFeatures)
         {
             // Create a concept for this emotional experience
             var emotionalConcept = $"emotional_memory_{experience.GetHashCode():X8}";
@@ -367,7 +368,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Perform emotional maintenance - decay, baseline recovery, memory consolidation
         /// </summary>
-        public async Task PerformEmotionalMaintenanceAsync()
+        public async Task PerformInstinctualMaintenanceAsync()
         {
             // Gradual return to baseline for emotional states
             Joy = MoveTowardBaseline(Joy, 0.7, BaselineRecoveryRate);
@@ -385,7 +386,7 @@ namespace GreyMatter.Core
             Vigilance = MoveTowardBaseline(Vigilance, 0.5, BaselineRecoveryRate);
             
             // Decay old emotional memories
-            await DecayEmotionalMemories();
+            await DecayInstinctualMemories();
             
             // Clean up old events
             CleanupOldEvents();
@@ -396,9 +397,9 @@ namespace GreyMatter.Core
         /// <summary>
         /// Get current emotional state summary
         /// </summary>
-        public EmotionalState GetCurrentEmotionalState()
+        public InstinctualState GetCurrentInstinctualState()
         {
-            return new EmotionalState
+            return new InstinctualState
             {
                 Joy = Joy,
                 Trust = Trust,
@@ -412,18 +413,18 @@ namespace GreyMatter.Core
                 Concern = Concern,
                 Determination = Determination,
                 Vigilance = Vigilance,
-                EmotionalBalance = EmotionalBalance,
-                EmotionalClarity = EmotionalClarity,
-                EmotionalGrowth = EmotionalGrowth,
+                InstinctualBalance = InstinctualBalance,
+                InstinctualClarity = InstinctualClarity,
+                InstinctualGrowth = InstinctualGrowth,
                 DominantEmotion = GetDominantEmotion(),
-                EmotionalComplexity = CalculateEmotionalComplexity()
+                InstinctualComplexity = CalculateInstinctualComplexity()
             };
         }
         
         /// <summary>
         /// Get emotional influence on decision making
         /// </summary>
-        public Dictionary<string, double> GetEmotionalInfluenceFactors()
+        public Dictionary<string, double> GetInstinctualInfluenceFactors()
         {
             return new Dictionary<string, double>
             {
@@ -434,7 +435,7 @@ namespace GreyMatter.Core
                 ["caution_factor"] = Caution * 0.8 + Vigilance * 0.6,
                 ["persistence_factor"] = Determination * 0.9 + Satisfaction * 0.5,
                 ["ethical_sensitivity"] = Compassion * 0.8 + Gratitude * 0.6 + Serenity * 0.5,
-                ["emotional_stability"] = EmotionalBalance * 0.7 + Serenity * 0.8
+                ["emotional_stability"] = InstinctualBalance * 0.7 + Serenity * 0.8
             };
         }
         
@@ -452,18 +453,18 @@ namespace GreyMatter.Core
             return current + (difference * rate);
         }
         
-        private async Task DecayEmotionalMemories()
+        private async Task DecayInstinctualMemories()
         {
-            var cutoff = DateTime.UtcNow - EmotionalDecay;
-            var toRemove = _emotionalMemories.Where(m => m.Value.Timestamp < cutoff).Select(m => m.Key).ToList();
+            var cutoff = DateTime.UtcNow - InstinctualDecay;
+            var toRemove = _instinctualMemories.Where(m => m.Value.Timestamp < cutoff).Select(m => m.Key).ToList();
             
             foreach (var key in toRemove)
             {
-                _emotionalMemories.Remove(key);
+                _instinctualMemories.Remove(key);
             }
             
             // Decay memory strength of remaining memories
-            foreach (var memory in _emotionalMemories.Values)
+            foreach (var memory in _instinctualMemories.Values)
             {
                 memory.MemoryStrength *= 0.995; // Gradual decay
             }
@@ -508,7 +509,7 @@ namespace GreyMatter.Core
             return "curiosity";
         }
         
-        private double CalculateEmotionalComplexity()
+        private double CalculateInstinctualComplexity()
         {
             var activeEmotions = new[] { Joy, Trust, Curiosity, Compassion, Satisfaction, Awe, Serenity, Gratitude }
                 .Count(e => e > 0.5);
@@ -521,34 +522,34 @@ namespace GreyMatter.Core
     
     #region Supporting Classes
     
-    public class EmotionalResponse
+    public class InstinctualResponse
     {
         public string Experience { get; set; } = "";
-        public Dictionary<string, double> EmotionalWeights { get; set; } = new();
+        public Dictionary<string, double> InstinctualWeights { get; set; } = new();
         public string DominantEmotion { get; set; } = "";
-        public double EmotionalIntensity { get; set; } = 0.0;
-        public string EmotionalReasoning { get; set; } = "";
+        public double InstinctualIntensity { get; set; } = 0.0;
+        public string InstinctualReasoning { get; set; } = "";
         public double Confidence { get; set; } = 0.0;
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     }
     
-    public class EmotionalMemory
+    public class InstinctualMemory
     {
         public string Experience { get; set; } = "";
-        public Dictionary<string, double> EmotionalWeights { get; set; } = new();
+        public Dictionary<string, double> InstinctualWeights { get; set; } = new();
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
-        public double EmotionalIntensity { get; set; } = 0.0;
+        public double InstinctualIntensity { get; set; } = 0.0;
         public double MemoryStrength { get; set; } = 1.0;
     }
     
-    public class EmotionalEvent
+    public class InstinctualEvent
     {
         public string Experience { get; set; } = "";
-        public EmotionalResponse EmotionalResponse { get; set; } = new();
+        public InstinctualResponse InstinctualResponse { get; set; } = new();
         public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     }
     
-    public class EmotionalState
+    public class InstinctualState
     {
         // Core positive emotions
         public double Joy { get; set; }
@@ -567,13 +568,13 @@ namespace GreyMatter.Core
         public double Vigilance { get; set; }
         
         // Meta-emotional states
-        public double EmotionalBalance { get; set; }
-        public double EmotionalClarity { get; set; }
-        public double EmotionalGrowth { get; set; }
+        public double InstinctualBalance { get; set; }
+        public double InstinctualClarity { get; set; }
+        public double InstinctualGrowth { get; set; }
         
         // Computed properties
         public string DominantEmotion { get; set; } = "";
-        public double EmotionalComplexity { get; set; }
+        public double InstinctualComplexity { get; set; }
     }
     
     #endregion

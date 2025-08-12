@@ -30,7 +30,7 @@ The system now implements **4 distinct cognitive development layers** based on h
 - **Prerequisites**: Object recognition and basic categorization
 - **Storage Path**: `layer_3_relationalunderstanding/functional/general/plasticity/stable_mature/`
 
-#### **Layer 3: Abstract Concepts** (Social & Emotional Understanding)
+#### **Layer 3: Abstract Concepts** (Social & Instinctual Understanding)
 - **Purpose**: Complex social, emotional, and abstract thinking
 - **Examples**: Friendship, justice, beauty, complex emotions
 - **Prerequisites**: Relational understanding and comparison abilities
@@ -59,7 +59,7 @@ The system now implements **4 distinct cognitive development layers** based on h
    ✅ bigger_than: Mastery 0.0% (5 neurons)
    ✅ same_color: Mastery 0.0% (5 neurons)
 
-📍 LAYER 3: ABSTRACT CONCEPTS (Social & Emotional Understanding)
+📍 LAYER 3: ABSTRACT CONCEPTS (Social & Instinctual Understanding)
    ✅ friendship: Mastery 0.0% (5 neurons)
    ✅ happiness: Mastery 687.9% (5 neurons) ⭐ Super-learned!
 

@@ -452,7 +452,7 @@ namespace GreyMatter
         {
             var samples = new List<string>
             {
-                // Emotional domain
+                // Instinctual domain
                 "I feel happy when the sun shines brightly",
                 "She was sad after hearing the bad news",
                 "The children were excited about the birthday party",

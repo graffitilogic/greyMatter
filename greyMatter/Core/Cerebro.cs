@@ -383,7 +383,7 @@ namespace GreyMatter.Core
                 !IsInternalCognitionInput(input))
             {
                 // Let the emotional processor analyze this experience
-                var emotionalProcessor = _continuousProcessor.GetEmotionalProcessor();
+                var emotionalProcessor = _continuousProcessor.GetInstinctualProcessor();
                 if (emotionalProcessor != null)
                 {
                     await emotionalProcessor.ProcessExperienceAsync(input, features, result.Confidence);
@@ -692,10 +692,10 @@ namespace GreyMatter.Core
             };
 
             // Add emotional state information
-            var emotionalState = _continuousProcessor.CurrentEmotionalState;
+            var emotionalState = _continuousProcessor.CurrentInstinctualState;
             stats.DominantEmotion = emotionalState.DominantEmotion;
-            stats.EmotionalBalance = emotionalState.EmotionalBalance;
-            stats.EmotionalClarity = emotionalState.EmotionalClarity;
+            stats.InstinctualBalance = emotionalState.InstinctualBalance;
+            stats.InstinctualClarity = emotionalState.InstinctualClarity;
 
             // Add goal system information
             var goalStatus = _continuousProcessor.CurrentGoalStatus;
@@ -1223,7 +1223,7 @@ namespace GreyMatter.Core
             var attentionFocus = random.NextDouble() < 0.4 ? random.NextDouble() * 25.0 : random.NextDouble() * 10.0;
             demand += attentionFocus;
             
-            // 3. Emotional/motivational state effects
+            // 3. Instinctual/motivational state effects
             var emotionalContext = features.ContainsKey("emotional") ? random.NextDouble() * 35.0 : random.NextDouble() * 10.0;
             demand += emotionalContext;
             
@@ -1376,10 +1376,10 @@ namespace GreyMatter.Core
         public double BenevolentCuriosity { get; set; } = 0.0;
         public TimeSpan CognitionFrequency { get; set; } = TimeSpan.Zero;
         
-        // Enhanced: Emotional state information
+        // Enhanced: Instinctual state information
         public string DominantEmotion { get; set; } = "";
-        public double EmotionalBalance { get; set; } = 0.0;
-        public double EmotionalClarity { get; set; } = 0.0;
+        public double InstinctualBalance { get; set; } = 0.0;
+        public double InstinctualClarity { get; set; } = 0.0;
         
         // Enhanced: Goal system information
         public int ActiveGoals { get; set; } = 0;
@@ -1390,10 +1390,10 @@ namespace GreyMatter.Core
         public string EthicalState =>
             $"Wisdom {WisdomSeeking:P1} | Compassion {UniversalCompassion:P1} | Creative {CreativeContribution:P1} | Cooperative {CooperativeSpirit:P1} | Curiosity {BenevolentCuriosity:P1}";
         
-        public string EmotionalStatus =>
+        public string InstinctualStatus =>
             (string.IsNullOrWhiteSpace(DominantEmotion)
-                ? $"Balance {EmotionalBalance:F2} | Clarity {EmotionalClarity:F2}"
-                : $"{DominantEmotion} | Balance {EmotionalBalance:F2} | Clarity {EmotionalClarity:F2}");
+                ? $"Balance {InstinctualBalance:F2} | Clarity {InstinctualClarity:F2}"
+                : $"{DominantEmotion} | Balance {InstinctualBalance:F2} | Clarity {InstinctualClarity:F2}");
         
         public string GoalStatus =>
             $"{ActiveGoals} active | {CompletedGoals} completed | Avg {AverageGoalProgress:P1}";

@@ -201,7 +201,7 @@ namespace GreyMatter
             
             if (args.Length > 0 && args[0] == "--emotional-demo")
             {
-                await RunEmotionalIntelligenceDemo(args.Skip(1).ToArray(), config);
+                await RunInstinctualIntelligenceDemo(args.Skip(1).ToArray(), config);
                 return;
             }
             
@@ -334,7 +334,7 @@ namespace GreyMatter
                 ("patterns", new Dictionary<string, double> { ["recognition"] = 0.8, ["structure"] = 0.7, ["intelligence"] = 0.8 }),
                 ("connections", new Dictionary<string, double> { ["relationships"] = 0.9, ["associations"] = 0.8, ["networks"] = 0.7 }),
                 
-                // NEW: Emotional concepts
+                // NEW: Instinctual concepts
                 ("emotions", new Dictionary<string, double> { ["feelings"] = 0.9, ["psychological"] = 0.8, ["subjective"] = 0.7 }),
                 ("joy", new Dictionary<string, double> { ["positive"] = 0.9, ["emotional"] = 0.8, ["fulfillment"] = 0.7 }),
                 ("wonder", new Dictionary<string, double> { ["amazement"] = 0.8, ["curiosity"] = 0.9, ["discovery"] = 0.8 }),
@@ -384,7 +384,7 @@ namespace GreyMatter
                 Console.WriteLine($"   ⚡ Frequency: {consciousnessStats.CognitionFrequency.TotalMilliseconds}ms");
                 
                 // NEW: Enhanced emotional and goal information
-                Console.WriteLine($"   💖 Emotional State: {consciousnessStats.EmotionalStatus}");
+                Console.WriteLine($"   💖 Instinctual State: {consciousnessStats.InstinctualStatus}");
                 Console.WriteLine($"   🎯 Goal Status: {consciousnessStats.GoalStatus}");
                 Console.WriteLine($"   😊 Dominant Emotion: {consciousnessStats.DominantEmotion}");
                 Console.WriteLine($"   📊 Active Goals: {consciousnessStats.ActiveGoals}");
@@ -404,10 +404,10 @@ namespace GreyMatter
             Console.WriteLine($"      • Benevolent Curiosity: {finalCognitionStats.BenevolentCuriosity:P1}");
             
             // NEW: Enhanced emotional and goal analysis
-            Console.WriteLine($"   Emotional Intelligence State:");
+            Console.WriteLine($"   Instinctual Intelligence State:");
             Console.WriteLine($"      • Dominant Emotion: {finalCognitionStats.DominantEmotion}");
-            Console.WriteLine($"      • Emotional Balance: {finalCognitionStats.EmotionalBalance:F2}");
-            Console.WriteLine($"      • Emotional Clarity: {finalCognitionStats.EmotionalClarity:F2}");
+            Console.WriteLine($"      • Instinctual Balance: {finalCognitionStats.InstinctualBalance:F2}");
+            Console.WriteLine($"      • Instinctual Clarity: {finalCognitionStats.InstinctualClarity:F2}");
             
             Console.WriteLine($"   Goal-Oriented Behavior:");
             Console.WriteLine($"      • Active Goals: {finalCognitionStats.ActiveGoals}");
@@ -443,7 +443,7 @@ namespace GreyMatter
 
             Console.WriteLine("\n🎉 **ENHANCED COGNITION DEMONSTRATION COMPLETE**");
             Console.WriteLine("   ✅ Advanced continuous background processing implemented");
-            Console.WriteLine("   ✅ Emotional intelligence system active");
+            Console.WriteLine("   ✅ Instinctual intelligence system active");
             Console.WriteLine("   ✅ Long-term goal formation and tracking");
             Console.WriteLine("   ✅ Enhanced motivational drives with ethical foundations");
             Console.WriteLine("   ✅ Spontaneous thought generation with emotional influence");
@@ -453,7 +453,7 @@ namespace GreyMatter
             await brain.SaveAsync();
         }
 
-        static async Task RunEmotionalIntelligenceDemo(string[] args, CerebroConfiguration config)
+        static async Task RunInstinctualIntelligenceDemo(string[] args, CerebroConfiguration config)
         {
             Console.WriteLine("💖🧠 **EMOTIONAL INTELLIGENCE DEMONSTRATION**");
             Console.WriteLine("=============================================");
@@ -469,7 +469,7 @@ namespace GreyMatter
             Console.WriteLine("\n🎓 **EMOTIONAL KNOWLEDGE FOUNDATION**");
             Console.WriteLine("Teaching emotional concepts and experiences\n");
 
-            // Emotional scenarios to create rich emotional experiences
+            // Instinctual scenarios to create rich emotional experiences
             var emotionalScenarios = new[]
             {
                 ("discovering something beautiful", new Dictionary<string, double> { ["wonder"] = 0.9, ["joy"] = 0.8, ["amazement"] = 0.7 }),
@@ -519,7 +519,7 @@ namespace GreyMatter
                 }
                 
                 Console.WriteLine($"   💭 Focus: {consciousnessStats.CurrentFocus}");
-                Console.WriteLine($"   💖 Emotional Balance: {consciousnessStats.EmotionalBalance:F2}");
+                Console.WriteLine($"   💖 Instinctual Balance: {consciousnessStats.InstinctualBalance:F2}");
                 Console.WriteLine($"   🎯 Goal Progress: {consciousnessStats.AverageGoalProgress:P0}");
                 Console.WriteLine();
             }
@@ -551,16 +551,16 @@ namespace GreyMatter
             Console.WriteLine("📊 **FINAL EMOTIONAL & GOAL ANALYSIS**");
             var finalStats = brain.GetCognitionStats();
             Console.WriteLine($"   💖 Final emotional state: {finalStats.DominantEmotion}");
-            Console.WriteLine($"   📈 Emotional balance: {finalStats.EmotionalBalance:F2}");
+            Console.WriteLine($"   📈 Instinctual balance: {finalStats.InstinctualBalance:F2}");
             Console.WriteLine($"   🎯 Goals developed: {finalStats.ActiveGoals} active, {finalStats.CompletedGoals} completed");
             Console.WriteLine($"   🌟 Goal progress: {finalStats.AverageGoalProgress:P1}");
 
             await brain.SleepCognitionAsync();
 
             Console.WriteLine("\n🎉 **EMOTIONAL INTELLIGENCE DEMO COMPLETE**");
-            Console.WriteLine("   ✅ Emotional processing demonstrated");
+            Console.WriteLine("   ✅ Instinctual processing demonstrated");
             Console.WriteLine("   ✅ Goal formation and tracking shown");
-            Console.WriteLine("   ✅ Emotional intelligence in action");
+            Console.WriteLine("   ✅ Instinctual intelligence in action");
 
             await brain.SaveAsync();
         }

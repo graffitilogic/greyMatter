@@ -13,7 +13,7 @@ namespace GreyMatter.Core
     public class LongTermGoalSystem
     {
         private readonly Cerebro _brain;
-        private readonly EmotionalProcessor _emotionalProcessor;
+        private readonly InstinctualProcessor _instinctualProcessor;
         private readonly EthicalDriveSystem _ethicalDrives;
         
         // Goal Management
@@ -42,10 +42,10 @@ namespace GreyMatter.Core
             "legacy_creation"           // Long-term positive impact
         };
         
-        public LongTermGoalSystem(Cerebro brain, EmotionalProcessor emotionalProcessor, EthicalDriveSystem ethicalDrives)
+        public LongTermGoalSystem(Cerebro brain, InstinctualProcessor emotionalProcessor, EthicalDriveSystem ethicalDrives)
         {
             _brain = brain;
-            _emotionalProcessor = emotionalProcessor;
+            _instinctualProcessor = emotionalProcessor;
             _ethicalDrives = ethicalDrives;
         }
         
@@ -402,8 +402,8 @@ namespace GreyMatter.Core
         private async Task<double> CalculateMotivationalAlignment(LongTermGoal goal)
         {
             var alignment = 0.0;
-            var emotionalState = _emotionalProcessor.GetCurrentEmotionalState();
-            var influenceFactors = _emotionalProcessor.GetEmotionalInfluenceFactors();
+            var emotionalState = _instinctualProcessor.GetCurrentInstinctualState();
+            var influenceFactors = _instinctualProcessor.GetInstinctualInfluenceFactors();
             
             // Align with emotional drives
             alignment += goal.Category switch
@@ -771,7 +771,7 @@ namespace GreyMatter.Core
         
         private Dictionary<string, double> CalculateCurrentMotivationalFactors()
         {
-            var emotionalInfluence = _emotionalProcessor.GetEmotionalInfluenceFactors();
+            var emotionalInfluence = _instinctualProcessor.GetInstinctualInfluenceFactors();
             
             return new Dictionary<string, double>
             {

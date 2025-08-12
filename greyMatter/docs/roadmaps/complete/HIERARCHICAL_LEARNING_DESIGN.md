@@ -28,7 +28,7 @@ Based on human cognitive development, we can implement a hierarchical learning s
 - Comparative concepts (bigger than, same as, different from)
 - Causal relationships (push causes movement)
 - Temporal sequences (before, after, during)
-- Emotional associations (happy colors, sad sounds)
+- Instinctual associations (happy colors, sad sounds)
 ```
 
 ### **Layer 3: Abstract Concepts** (Ages 3-7 years equivalent)

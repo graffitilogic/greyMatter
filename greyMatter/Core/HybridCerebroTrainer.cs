@@ -342,7 +342,7 @@ namespace GreyMatter.Core
                 ["social"] = "SocialCognitionCluster", 
                 ["visual"] = "VisualProcessingCluster",
                 ["motor"] = "MotorControlCluster",
-                ["emotional"] = "EmotionalProcessingCluster",
+                ["emotional"] = "InstinctualProcessingCluster",
                 ["mathematical"] = "QuantitativeCluster",
                 ["spatial"] = "SpatialReasoningCluster",
                 ["temporal"] = "TemporalProcessingCluster",

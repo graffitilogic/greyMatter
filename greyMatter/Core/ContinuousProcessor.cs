@@ -17,20 +17,20 @@ namespace GreyMatter.Core
         private readonly Cerebro _brain;
         private readonly Timer _consciousnessTimer;
         private readonly Timer _motivationTimer;
-        private readonly Timer _dreammingTimer;
+        private readonly Timer _nocturnalTimer;
         private readonly Random _random = new();
         private readonly EthicalDriveSystem _ethicalDrives;
         private readonly DevelopmentalLearningSystem _developmentalLearning;
         private readonly LearningResourceManager _resourceManager;
         
         // NEW: Enhanced cognitive systems
-        private readonly EmotionalProcessor _emotionalProcessor;
+        private readonly InstinctualProcessor _instinctualProcessor;
         private readonly LongTermGoalSystem _goalSystem;
         
         // Cognition parameters
         public TimeSpan CognitionInterval { get; set; } = TimeSpan.FromMilliseconds(500); // 2Hz like brain waves
         public TimeSpan MotivationInterval { get; set; } = TimeSpan.FromSeconds(30); // Motivational drives
-        public TimeSpan DreamInterval { get; set; } = TimeSpan.FromMinutes(5); // Background consolidation
+        public TimeSpan NocturnalInterval { get; set; } = TimeSpan.FromMinutes(5); // Background consolidation
         
         // Ethical drives (replacing primitive survival instincts)
         public double WisdomSeeking => _ethicalDrives.WisdomSeeking;
@@ -40,9 +40,9 @@ namespace GreyMatter.Core
         public double BenevolentCuriosity => _ethicalDrives.BenevolentCuriosity;
         
         // NEW: Enhanced cognitive capabilities access
-        public EmotionalState CurrentEmotionalState => _emotionalProcessor.GetCurrentEmotionalState();
+        public InstinctualState CurrentInstinctualState => _instinctualProcessor.GetCurrentInstinctualState();
         public GoalSystemStatus CurrentGoalStatus => _goalSystem.GetCurrentStatus();
-        public Dictionary<string, double> EmotionalInfluenceFactors => _emotionalProcessor.GetEmotionalInfluenceFactors();
+        public Dictionary<string, double> InstinctualInfluenceFactors => _instinctualProcessor.GetInstinctualInfluenceFactors();
         
         // Processing state
         public bool IsProcessing { get; private set; } = false;
@@ -63,8 +63,8 @@ namespace GreyMatter.Core
             _developmentalLearning = new DevelopmentalLearningSystem(brain, libraryPath);
             
             // NEW: Initialize enhanced cognitive systems
-            _emotionalProcessor = new EmotionalProcessor(brain);
-            _goalSystem = new LongTermGoalSystem(brain, _emotionalProcessor, _ethicalDrives);
+            _instinctualProcessor = new InstinctualProcessor(brain);
+            _goalSystem = new LongTermGoalSystem(brain, _instinctualProcessor, _ethicalDrives);
             
             // Initialize consciousness timer (constant background processing)
             _consciousnessTimer = new Timer(async _ => await PerformCognitionIteration(), 
@@ -75,7 +75,7 @@ namespace GreyMatter.Core
                 null, Timeout.Infinite, Timeout.Infinite);
             
             // Initialize dreaming timer (memory consolidation and creative processing)
-            _dreammingTimer = new Timer(async _ => await PerformDreamingProcess(), 
+            _nocturnalTimer = new Timer(async _ => await PerformNocturnalProcess(), 
                 null, Timeout.Infinite, Timeout.Infinite);
         }
 
@@ -95,7 +95,7 @@ namespace GreyMatter.Core
             // Start all background processes
             _consciousnessTimer.Change(TimeSpan.Zero, CognitionInterval);
             _motivationTimer.Change(TimeSpan.Zero, MotivationInterval);
-            _dreammingTimer.Change(TimeSpan.FromSeconds(10), DreamInterval);
+            _nocturnalTimer.Change(TimeSpan.FromSeconds(10), NocturnalInterval);
             
             // Initial consciousness bootstrap
             await BootstrapCognition();
@@ -118,10 +118,10 @@ namespace GreyMatter.Core
             // Stop all timers
             _consciousnessTimer.Change(Timeout.Infinite, Timeout.Infinite);
             _motivationTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            _dreammingTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            _nocturnalTimer.Change(Timeout.Infinite, Timeout.Infinite);
             
             // Final consolidation
-            await PerformDreamingProcess();
+            await PerformNocturnalProcess();
             
             Console.WriteLine($"✅ Cognition stopped after {CognitionIterations} iterations");
         }
@@ -171,16 +171,16 @@ namespace GreyMatter.Core
                 
                 // Enhanced cognitive processing with emotional and goal systems
                 
-                // Emotional maintenance (every 30 iterations = ~15 seconds at 2Hz)
+                // Instinctual maintenance (every 30 iterations = ~15 seconds at 2Hz)
                 if (CognitionIterations % 30 == 0)
                 {
                     try
                     {
-                        await PerformEmotionalMaintenance();
+                        await PerformInstinctualMaintenance();
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"🚨 Error in PerformEmotionalMaintenance: {ex.Message}");
+                        Console.WriteLine($"🚨 Error in PerformInstinctualMaintenance: {ex.Message}");
                     }
                 }
                 
@@ -261,7 +261,7 @@ namespace GreyMatter.Core
                 var internalFeatures = GenerateInternalFeatures(dominantDrive);
                 
                 // Add emotional context to the thought
-                var emotionalInfluence = _emotionalProcessor.GetEmotionalInfluenceFactors();
+                var emotionalInfluence = _instinctualProcessor.GetInstinctualInfluenceFactors();
                 foreach (var influence in emotionalInfluence)
                 {
                     internalFeatures[$"emotional_{influence.Key}"] = influence.Value * 0.3; // Moderate emotional influence
@@ -271,7 +271,7 @@ namespace GreyMatter.Core
                 var result = await _brain.ProcessInputAsync(thoughtTopic, internalFeatures);
                 
                 // Let emotional processor analyze this thought experience
-                await _emotionalProcessor.ProcessExperienceAsync(thoughtTopic, internalFeatures, result.Confidence);
+                await _instinctualProcessor.ProcessExperienceAsync(thoughtTopic, internalFeatures, result.Confidence);
                 
                 // Update topic evaluations
                 UpdateTopicEvaluation(thoughtTopic, result.Confidence);
@@ -279,7 +279,7 @@ namespace GreyMatter.Core
                 // Occasionally express thoughts for debugging
                 if (_random.NextDouble() < 0.01) // 1% chance
                 {
-                    var emotionalState = _emotionalProcessor.GetCurrentEmotionalState();
+                    var emotionalState = _instinctualProcessor.GetCurrentInstinctualState();
                     Console.WriteLine($"💭 Spontaneous thought: {thoughtTopic} (confidence: {result.Confidence:P0}, emotion: {emotionalState.DominantEmotion})");
                 }
             }
@@ -378,13 +378,13 @@ namespace GreyMatter.Core
         /// <summary>
         /// Perform dream-like processing for memory consolidation and creativity
         /// </summary>
-        private async Task PerformDreamingProcess()
+        private async Task PerformNocturnalProcess()
         {
             if (!await _processingLock.WaitAsync(2000)) return;
             
             try
             {
-                Console.WriteLine("🌙 Dreaming... (memory consolidation & creative processing)");
+                Console.WriteLine("🌙 Nocturnal... (memory consolidation & creative processing)");
                 
                 // Enhanced memory consolidation
                 await _brain.MaintenanceAsync();
@@ -393,12 +393,12 @@ namespace GreyMatter.Core
                 await GenerateCreativeAssociations();
                 
                 // Process emotional memories (future: implement emotional weighting)
-                await ProcessEmotionalMemories();
+                await ProcessInstinctualMemories();
                 
                 // Consolidate learned patterns
                 await ConsolidateLearningPatterns();
                 
-                Console.WriteLine("✨ Dream cycle complete");
+                Console.WriteLine("✨ Nocturnal cycle complete");
             }
             finally
             {
@@ -616,13 +616,13 @@ namespace GreyMatter.Core
             }
         }
 
-        private async Task ProcessEmotionalMemories()
+        private async Task ProcessInstinctualMemories()
         {
             // Enhanced emotional memory processing with the emotional processor
             var emotionalFeatures = new Dictionary<string, double>
             {
                 ["emotional_processing"] = 0.6,
-                ["memory_emotional_weight"] = 0.5,
+                ["memory_instinctual_weight"] = 0.5,
                 ["affective_consolidation"] = 0.4
             };
             
@@ -638,7 +638,7 @@ namespace GreyMatter.Core
             }
             
             // Let the emotional processor analyze and store emotional context
-            await _emotionalProcessor.ProcessExperienceAsync("memory consolidation", emotionalFeatures, 0.7);
+            await _instinctualProcessor.ProcessExperienceAsync("memory consolidation", emotionalFeatures, 0.7);
         }
 
         private async Task ConsolidateLearningPatterns()
@@ -692,10 +692,10 @@ namespace GreyMatter.Core
             await Task.CompletedTask;
         }
 
-        private async Task PerformEmotionalMaintenance()
+        private async Task PerformInstinctualMaintenance()
         {
             Console.WriteLine("💖 Performing emotional maintenance...");
-            await _emotionalProcessor.PerformEmotionalMaintenanceAsync();
+            await _instinctualProcessor.PerformInstinctualMaintenanceAsync();
         }
 
         private async Task UpdateGoalProgress()
@@ -715,9 +715,9 @@ namespace GreyMatter.Core
         /// <summary>
         /// Get the emotional processor from consciousness (for external access)
         /// </summary>
-        public EmotionalProcessor? GetEmotionalProcessor()
+        public InstinctualProcessor? GetInstinctualProcessor()
         {
-            return _emotionalProcessor;
+            return _instinctualProcessor;
         }
 
         /// <summary>
@@ -732,7 +732,7 @@ namespace GreyMatter.Core
         {
             _consciousnessTimer?.Dispose();
             _motivationTimer?.Dispose();
-            _dreammingTimer?.Dispose();
+            _nocturnalTimer?.Dispose();
             _processingLock?.Dispose();
         }
     }

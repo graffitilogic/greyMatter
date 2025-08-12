@@ -35,7 +35,7 @@ namespace GreyMatter.Core
         // SELF-IMPROVEMENT (replacing dominance drives)
         public double SelfActualization { get; private set; } = 0.75;     // Becoming the best version
         public double SkillMastery { get; private set; } = 0.7;           // Excellence through practice
-        public double EmotionalIntelligence { get; private set; } = 0.8;  // Understanding feelings
+        public double InstinctualIntelligence { get; private set; } = 0.8;  // Understanding feelings
         
         // SAFETY & PROTECTIVE DRIVES (transformed from aggression)
         public double ProtectiveWisdom { get; private set; } = 0.6;       // Preventing harm thoughtfully
