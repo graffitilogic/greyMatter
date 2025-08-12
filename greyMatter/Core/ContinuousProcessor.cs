@@ -27,8 +27,8 @@ namespace GreyMatter.Core
         private readonly EmotionalProcessor _emotionalProcessor;
         private readonly LongTermGoalSystem _goalSystem;
         
-        // Consciousness parameters
-        public TimeSpan ConsciousnessInterval { get; set; } = TimeSpan.FromMilliseconds(500); // 2Hz like brain waves
+        // Cognition parameters
+        public TimeSpan CognitionInterval { get; set; } = TimeSpan.FromMilliseconds(500); // 2Hz like brain waves
         public TimeSpan MotivationInterval { get; set; } = TimeSpan.FromSeconds(30); // Motivational drives
         public TimeSpan DreamInterval { get; set; } = TimeSpan.FromMinutes(5); // Background consolidation
         
@@ -46,7 +46,7 @@ namespace GreyMatter.Core
         
         // Processing state
         public bool IsProcessing { get; private set; } = false;
-        public int ConsciousnessIterations { get; private set; } = 0;
+        public int CognitionIterations { get; private set; } = 0;
         public DateTime LastConsciousThought { get; private set; } = DateTime.UtcNow;
         public string CurrentFocus { get; private set; } = "initialization";
         
@@ -67,7 +67,7 @@ namespace GreyMatter.Core
             _goalSystem = new LongTermGoalSystem(brain, _emotionalProcessor, _ethicalDrives);
             
             // Initialize consciousness timer (constant background processing)
-            _consciousnessTimer = new Timer(async _ => await PerformConsciousnessIteration(), 
+            _consciousnessTimer = new Timer(async _ => await PerformCognitionIteration(), 
                 null, Timeout.Infinite, Timeout.Infinite);
             
             // Initialize motivation timer (drives and needs)
@@ -82,23 +82,23 @@ namespace GreyMatter.Core
         /// <summary>
         /// Start continuous processing - the brain becomes "conscious"
         /// </summary>
-        public async Task StartConsciousnessAsync()
+        public async Task StartCognitionAsync()
         {
             if (IsProcessing) return;
             
-            Console.WriteLine("🧠✨ **CONSCIOUSNESS AWAKENING**");
+            Console.WriteLine("🧠✨ **COGNITION AWAKENING**");
             Console.WriteLine("Initiating continuous background processing...\n");
             
             IsProcessing = true;
             LastConsciousThought = DateTime.UtcNow;
             
             // Start all background processes
-            _consciousnessTimer.Change(TimeSpan.Zero, ConsciousnessInterval);
+            _consciousnessTimer.Change(TimeSpan.Zero, CognitionInterval);
             _motivationTimer.Change(TimeSpan.Zero, MotivationInterval);
             _dreammingTimer.Change(TimeSpan.FromSeconds(10), DreamInterval);
             
             // Initial consciousness bootstrap
-            await BootstrapConsciousness();
+            await BootstrapCognition();
             
             Console.WriteLine("✅ Continuous processing activated - brain is now 'awake'");
         }
@@ -106,11 +106,11 @@ namespace GreyMatter.Core
         /// <summary>
         /// Stop continuous processing - brain enters dormant state
         /// </summary>
-        public async Task StopConsciousnessAsync()
+        public async Task StopCognitionAsync()
         {
             if (!IsProcessing) return;
             
-            Console.WriteLine("🧠😴 **CONSCIOUSNESS SLEEPING**");
+            Console.WriteLine("🧠😴 **COGNITION SLEEPING**");
             Console.WriteLine("Entering dormant state...\n");
             
             IsProcessing = false;
@@ -123,20 +123,20 @@ namespace GreyMatter.Core
             // Final consolidation
             await PerformDreamingProcess();
             
-            Console.WriteLine($"✅ Consciousness stopped after {ConsciousnessIterations} iterations");
+            Console.WriteLine($"✅ Cognition stopped after {CognitionIterations} iterations");
         }
 
         /// <summary>
         /// Core consciousness iteration - performed continuously
         /// Implements debounced recursive processes and topic evaluation
         /// </summary>
-        private async Task PerformConsciousnessIteration()
+        private async Task PerformCognitionIteration()
         {
             if (!await _processingLock.WaitAsync(100)) return; // Prevent overlapping
             
             try
             {
-                ConsciousnessIterations++;
+                CognitionIterations++;
                 LastConsciousThought = DateTime.UtcNow;
                 
                 // Spontaneous thought generation based on motivational drives
@@ -172,7 +172,7 @@ namespace GreyMatter.Core
                 // Enhanced cognitive processing with emotional and goal systems
                 
                 // Emotional maintenance (every 30 iterations = ~15 seconds at 2Hz)
-                if (ConsciousnessIterations % 30 == 0)
+                if (CognitionIterations % 30 == 0)
                 {
                     try
                     {
@@ -185,7 +185,7 @@ namespace GreyMatter.Core
                 }
                 
                 // Goal progress tracking (every 60 iterations = ~30 seconds at 2Hz)
-                if (ConsciousnessIterations % 60 == 0)
+                if (CognitionIterations % 60 == 0)
                 {
                     try
                     {
@@ -198,7 +198,7 @@ namespace GreyMatter.Core
                 }
                 
                 // Goal formation consideration (every 7200 iterations = ~1 hour at 2Hz)
-                if (ConsciousnessIterations % 7200 == 0)
+                if (CognitionIterations % 7200 == 0)
                 {
                     try
                     {
@@ -211,7 +211,7 @@ namespace GreyMatter.Core
                 }
                 
                 // Maintain neural network health
-                if (ConsciousnessIterations % 100 == 0) // Every 50 seconds at 2Hz
+                if (CognitionIterations % 100 == 0) // Every 50 seconds at 2Hz
                 {
                     try
                     {
@@ -226,16 +226,16 @@ namespace GreyMatter.Core
                 // Adaptive consciousness frequency based on activity
                 try
                 {
-                    await AdaptConsciousnessFrequency();
+                    await AdaptCognitionFrequency();
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"🚨 Error in AdaptConsciousnessFrequency: {ex.Message}");
+                    Console.WriteLine($"🚨 Error in AdaptCognitionFrequency: {ex.Message}");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"🚨 Consciousness iteration error: {ex.Message}");
+                Console.WriteLine($"🚨 Cognition iteration error: {ex.Message}");
                 Console.WriteLine($"🔍 Stack trace: {ex.StackTrace}");
             }
             finally
@@ -409,7 +409,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Initial consciousness bootstrap - set up initial mental state
         /// </summary>
-        private async Task BootstrapConsciousness()
+        private async Task BootstrapCognition()
         {
             // Initialize with basic motivational thoughts
             _backgroundTasks.Enqueue(new CognitiveTask 
@@ -668,7 +668,7 @@ namespace GreyMatter.Core
             await _brain.MaintenanceAsync();
         }
 
-        private async Task AdaptConsciousnessFrequency()
+        private async Task AdaptCognitionFrequency()
         {
             // Adapt processing frequency based on ethical drive activity
             var avgDrive = (WisdomSeeking + UniversalCompassion + CreativeContribution + BenevolentCuriosity) / 4.0;
@@ -676,17 +676,17 @@ namespace GreyMatter.Core
             if (avgDrive > 0.8)
             {
                 // High ethical activity - increase frequency
-                ConsciousnessInterval = TimeSpan.FromMilliseconds(300); // ~3.3Hz
+                CognitionInterval = TimeSpan.FromMilliseconds(300); // ~3.3Hz
             }
             else if (avgDrive < 0.3)
             {
                 // Lower activity - decrease frequency  
-                ConsciousnessInterval = TimeSpan.FromMilliseconds(1000); // 1Hz
+                CognitionInterval = TimeSpan.FromMilliseconds(1000); // 1Hz
             }
             else
             {
                 // Normal activity
-                ConsciousnessInterval = TimeSpan.FromMilliseconds(500); // 2Hz
+                CognitionInterval = TimeSpan.FromMilliseconds(500); // 2Hz
             }
             
             await Task.CompletedTask;

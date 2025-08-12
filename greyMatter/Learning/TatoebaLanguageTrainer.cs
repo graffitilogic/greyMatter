@@ -17,7 +17,7 @@ namespace greyMatter.Learning
     {
         private readonly TatoebaReader _reader;
         private readonly LanguageEphemeralBrain _brain;
-        private readonly BiologicalStorageManager _storageManager;
+        private readonly SemanticStorageManager _storageManager;
         private readonly string _dataPath;
 
         public LanguageEphemeralBrain Brain => _brain;
@@ -29,7 +29,7 @@ namespace greyMatter.Learning
             
             // Initialize biological storage manager
             var brainDataPath = "/Volumes/jarvis/brainData";
-            _storageManager = new BiologicalStorageManager(brainDataPath);
+            _storageManager = new SemanticStorageManager(brainDataPath);
             
             // Try to load existing brain state, create new if none exists
             _brain = LoadOrCreateBrain();

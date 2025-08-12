@@ -9,7 +9,7 @@ namespace greyMatter
     /// Phase 1 Language Learning Demo - Foundation Sentence Pattern Learning
     /// This demonstrates the bridge from synthetic concepts to real language understanding
     /// </summary>
-    public class LanguageFoundationsDemo
+    public class __LanguageFoundationsDemo
     {
         public static async Task RunDemo()
         {

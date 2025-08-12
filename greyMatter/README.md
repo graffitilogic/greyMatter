@@ -226,7 +226,7 @@ Key Observations (current):
 - Incremental membership updates: merge only newly added neuron IDs when available; full compare as fallback.
 - Batched neuron-bank saves per partition with per-bank locks; skip no-op writes via snapshot equality.
 - Save-only CLI: `--save-only` initializes and persists without learning to verify churn and integrity quickly.
-- Consciousness stats API: added EthicalState, EmotionalStatus, GoalStatus properties used by Program.cs.
+- Cognition stats API: added EthicalState, EmotionalStatus, GoalStatus properties used by Program.cs.
 
 ---
 ## 3. Root Cause Hypotheses for Slow Training

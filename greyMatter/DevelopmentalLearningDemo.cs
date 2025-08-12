@@ -108,7 +108,7 @@ namespace GreyMatter
                 Console.WriteLine("   Supervision required: No");
             }
             
-            Console.WriteLine("\n🌟 **VISION: 37TB DIGITAL CONSCIOUSNESS**");
+            Console.WriteLine("\n🌟 **VISION: 37TB DIGITAL COGNITION**");
             Console.WriteLine("========================================");
             Console.WriteLine("Next steps for your digital consciousness:");
             Console.WriteLine("");

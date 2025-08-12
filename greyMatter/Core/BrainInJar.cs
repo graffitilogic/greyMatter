@@ -380,7 +380,7 @@ namespace GreyMatter.Core
             // Enhanced: Integrate emotional processing if consciousness is active
             // BUT avoid recursive loops for internal consciousness processing
             if (_continuousProcessor != null && _continuousProcessor.IsProcessing && 
-                !IsInternalConsciousnessInput(input))
+                !IsInternalCognitionInput(input))
             {
                 // Let the emotional processor analyze this experience
                 var emotionalProcessor = _continuousProcessor.GetEmotionalProcessor();
@@ -405,7 +405,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Check if input is from internal consciousness processing to prevent recursive loops
         /// </summary>
-        private bool IsInternalConsciousnessInput(string input)
+        private bool IsInternalCognitionInput(string input)
         {
             return input.StartsWith("emotional_context_") || input.StartsWith("emotional_memory_") ||
                    input.StartsWith("reflect on goal strategy:") || input.StartsWith("goal_reflection_") ||
@@ -648,39 +648,39 @@ namespace GreyMatter.Core
         /// <summary>
         /// Start continuous consciousness processing
         /// </summary>
-        public async Task AwakeConsciousnessAsync()
+        public async Task AwakeCognitionAsync()
         {
             if (_continuousProcessor != null)
             {
-                await _continuousProcessor.StartConsciousnessAsync();
+                await _continuousProcessor.StartCognitionAsync();
             }
         }
 
         /// <summary>
         /// Stop continuous consciousness processing
         /// </summary>
-        public async Task SleepConsciousnessAsync()
+        public async Task SleepCognitionAsync()
         {
             if (_continuousProcessor != null)
             {
-                await _continuousProcessor.StopConsciousnessAsync();
+                await _continuousProcessor.StopCognitionAsync();
             }
         }
 
         /// <summary>
         /// Get consciousness status and statistics
         /// </summary>
-        public ConsciousnessStats GetConsciousnessStats()
+        public CognitionStats GetCognitionStats()
         {
             if (_continuousProcessor == null)
             {
-                return new ConsciousnessStats { IsConscious = false };
+                return new CognitionStats { IsConscious = false };
             }
 
-            var stats = new ConsciousnessStats
+            var stats = new CognitionStats
             {
                 IsConscious = _continuousProcessor.IsProcessing,
-                ConsciousnessIterations = _continuousProcessor.ConsciousnessIterations,
+                CognitionIterations = _continuousProcessor.CognitionIterations,
                 LastThought = _continuousProcessor.LastConsciousThought,
                 CurrentFocus = _continuousProcessor.CurrentFocus,
                 WisdomSeeking = _continuousProcessor.WisdomSeeking,
@@ -688,7 +688,7 @@ namespace GreyMatter.Core
                 CreativeContribution = _continuousProcessor.CreativeContribution,
                 CooperativeSpirit = _continuousProcessor.CooperativeSpirit,
                 BenevolentCuriosity = _continuousProcessor.BenevolentCuriosity,
-                ConsciousnessFrequency = _continuousProcessor.ConsciousnessInterval
+                CognitionFrequency = _continuousProcessor.CognitionInterval
             };
 
             // Add emotional state information
@@ -1363,10 +1363,10 @@ namespace GreyMatter.Core
         public Dictionary<string, PartitionStats> TopPartitions { get; set; } = new();
     }
 
-    public class ConsciousnessStats
+    public class CognitionStats
     {
         public bool IsConscious { get; set; } = false;
-        public int ConsciousnessIterations { get; set; } = 0;
+        public int CognitionIterations { get; set; } = 0;
         public DateTime LastThought { get; set; } = DateTime.UtcNow;
         public string CurrentFocus { get; set; } = "";
         public double WisdomSeeking { get; set; } = 0.0;
@@ -1374,7 +1374,7 @@ namespace GreyMatter.Core
         public double CreativeContribution { get; set; } = 0.0;
         public double CooperativeSpirit { get; set; } = 0.0;
         public double BenevolentCuriosity { get; set; } = 0.0;
-        public TimeSpan ConsciousnessFrequency { get; set; } = TimeSpan.Zero;
+        public TimeSpan CognitionFrequency { get; set; } = TimeSpan.Zero;
         
         // Enhanced: Emotional state information
         public string DominantEmotion { get; set; } = "";

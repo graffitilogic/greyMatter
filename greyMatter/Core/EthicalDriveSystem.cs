@@ -215,9 +215,9 @@ namespace GreyMatter.Core
         /// <summary>
         /// Get consciousness status with ethical drives
         /// </summary>
-        public EthicalConsciousnessStats GetEthicalStats()
+        public EthicalCognitionStats GetEthicalStats()
         {
-            return new EthicalConsciousnessStats
+            return new EthicalCognitionStats
             {
                 // Primary Virtues
                 WisdomSeeking = WisdomSeeking,
@@ -425,7 +425,7 @@ namespace GreyMatter.Core
         public Dictionary<string, double> Parameters { get; set; } = new();
     }
     
-    public class EthicalConsciousnessStats
+    public class EthicalCognitionStats
     {
         // Primary Virtues
         public double WisdomSeeking { get; set; } = 0.0;

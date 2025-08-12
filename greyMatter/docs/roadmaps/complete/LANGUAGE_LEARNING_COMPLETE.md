@@ -227,7 +227,7 @@ Real Sentences (Tatoeba) → Sentence Analysis → Vocabulary Building → Neura
 **Critical Path**: Solve the brain state overwriting issue and prepare for massive scaling
 
 **Week 1: Biological Storage Foundation**
-1. **Complete BiologicalStorageManager implementation**
+1. **Complete SemanticStorageManager implementation**
    - Finish hippocampus indexing system
    - Implement cortical column semantic clustering  
    - Add working memory management

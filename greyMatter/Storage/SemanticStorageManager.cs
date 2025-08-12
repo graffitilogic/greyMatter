@@ -19,7 +19,7 @@ namespace GreyMatter.Storage
     /// - Neural Pointers: Concepts reference neurons by ID, enabling shared representations
     /// - Hippocampus Index: Sparse routing to find neurons and concepts quickly
     /// </summary>
-    public class BiologicalStorageManager
+    public class SemanticStorageManager
     {
         private readonly string _brainDataPath;
         private readonly string _hippocampusPath;
@@ -37,7 +37,10 @@ namespace GreyMatter.Storage
         private Dictionary<int, SharedNeuron> _neuronPool;
         private int _nextNeuronId;
         
-        public BiologicalStorageManager(string brainDataPath)
+        // Trainable semantic classifier for learning-based categorization
+        private TrainableSemanticClassifier? _trainableClassifier;
+        
+        public SemanticStorageManager(string brainDataPath)
         {
             _brainDataPath = brainDataPath;
             _hippocampusPath = Path.Combine(_brainDataPath, "hippocampus");
@@ -50,6 +53,9 @@ namespace GreyMatter.Storage
             _neuronLocationIndex = new Dictionary<int, NeuronLocationEntry>();
             _clusterAccessTimes = new Dictionary<string, DateTime>();
             _neuronPool = new Dictionary<int, SharedNeuron>();
+            
+            // Initialize trainable classifier for learning-based categorization
+            _trainableClassifier = new TrainableSemanticClassifier(Path.Combine(_brainDataPath, "classifier"));
             
             InitializeStorageStructure();
             InitializeNeuronPool();
@@ -1234,6 +1240,32 @@ namespace GreyMatter.Storage
             
             // Default: general concepts
             return "semantic_domains/general_concepts";
+        }
+        
+        /// <summary>
+        /// Train the semantic classifier with labeled examples
+        /// This allows the classifier to learn patterns instead of using hardcoded rules
+        /// </summary>
+        public async Task TrainSemanticClassifierAsync(string conceptId, string targetDomain, object features)
+        {
+            if (_trainableClassifier != null)
+            {
+                // Train with a single example at a time
+                var labeledExample = new Dictionary<string, string> { [conceptId] = targetDomain };
+                await _trainableClassifier.TrainFromExamplesAsync(labeledExample);
+            }
+        }
+        
+        /// <summary>
+        /// Get the predicted domain for a concept using the trained classifier
+        /// </summary>
+        public Task<string> GetPredictedDomainAsync(string conceptId)
+        {
+            if (_trainableClassifier != null)
+            {
+                return Task.FromResult(_trainableClassifier.ClassifySemanticDomain(conceptId));
+            }
+            return Task.FromResult("semantic_domains/general_concepts");
         }
     }
 

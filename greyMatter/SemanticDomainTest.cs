@@ -18,7 +18,7 @@ namespace greyMatter
             Console.WriteLine(new string('=', 60));
             
             // Initialize biological storage manager
-            var storageManager = new BiologicalStorageManager("/tmp/test_brain_storage");
+            var storageManager = new SemanticStorageManager("/tmp/test_brain_storage");
             
             // Test concept categorization with diverse examples
             var testConcepts = new Dictionary<string, object>

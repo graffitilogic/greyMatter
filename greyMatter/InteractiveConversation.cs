@@ -158,7 +158,7 @@ namespace GreyMatter
         /// </summary>
         private string GenerateBrainInitiatedMessage()
         {
-            var consciousnessStats = _brain.GetConsciousnessStats();
+            var consciousnessStats = _brain.GetCognitionStats();
             
             var starters = new[]
             {
@@ -182,7 +182,7 @@ namespace GreyMatter
         /// </summary>
         private string GenerateConversationalResponse(string userInput, ProcessingResult result)
         {
-            var consciousnessStats = _brain.GetConsciousnessStats();
+            var consciousnessStats = _brain.GetCognitionStats();
             
             // Base response on confidence and emotional state
             if (result.Confidence > 0.7)

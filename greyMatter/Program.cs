@@ -14,11 +14,25 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
-            // Check for semantic domain test
+                        // Check for semantic domain test
             if (args.Length > 0 && (args[0] == "--semantic-test" || args[0] == "--test-domains"))
             {
                 await SemanticDomainTest.RunTestAsync();
                 return;
+            }
+            
+            // Check for trainable semantic demo
+            else if (args.Length > 0 && args[0] == "--trainable-demo")
+            {
+                await TrainableSemanticDemo.RunLearningDemoAsync();
+            }
+            else if (args.Length > 0 && args[0] == "--quick-test")
+            {
+                await QuickClassifierTest.RunAsync();
+            }
+            else if (args.Length > 0 && args[0] == "--debug-classifier")
+            {
+                await DebugClassifierTest.RunAsync();
             }
             
             // Check for simple demo first
@@ -281,12 +295,12 @@ namespace GreyMatter
             }
             
             // Enhanced consciousness demo (default)
-            await RunConsciousnessDemo(args, config);
+            await RunCognitionDemo(args, config);
         }
         
-        static async Task RunConsciousnessDemo(string[] args, BrainConfiguration config)
+        static async Task RunCognitionDemo(string[] args, BrainConfiguration config)
         {
-            Console.WriteLine("🧠🌟 **ENHANCED CONSCIOUSNESS DEMONSTRATION**");
+            Console.WriteLine("🧠🌟 **ENHANCED COGNITION DEMONSTRATION**");
             Console.WriteLine("==================================================");
             Console.WriteLine("Advanced consciousness with emotional processing and goal formation\n");
 
@@ -299,7 +313,7 @@ namespace GreyMatter
             Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}");
 
-            Console.WriteLine("\n🎓 **TEACHING ENHANCED KNOWLEDGE** (Foundation for Advanced Consciousness)");
+            Console.WriteLine("\n🎓 **TEACHING ENHANCED KNOWLEDGE** (Foundation for Advanced Cognition)");
             Console.WriteLine("Building foundational concepts for emotional intelligence and goal-oriented behavior\n");
 
             // Enhanced foundational concepts including emotional and goal concepts
@@ -336,14 +350,14 @@ namespace GreyMatter
                 Console.WriteLine($"   ✅ {concept}: {result.NeuronsInvolved} neurons engaged");
             }
 
-            Console.WriteLine("\n🌟 **AWAKENING CONSCIOUSNESS**");
+            Console.WriteLine("\n🌟 **AWAKENING COGNITION**");
             Console.WriteLine("Starting continuous background processing...\n");
 
             // Awaken consciousness
-            await brain.AwakeConsciousnessAsync();
+            await brain.AwakeCognitionAsync();
 
             // Monitor consciousness for a period
-            Console.WriteLine("🧠 **ENHANCED CONSCIOUSNESS MONITORING** (20 seconds of advanced processing)");
+            Console.WriteLine("🧠 **ENHANCED COGNITION MONITORING** (20 seconds of advanced processing)");
             Console.WriteLine("Observing consciousness, emotions, goals, and cognitive development\n");
 
             var monitoringDuration = TimeSpan.FromSeconds(20);
@@ -353,14 +367,14 @@ namespace GreyMatter
             {
                 await Task.Delay(4000); // Check every 4 seconds
                 
-                var consciousnessStats = brain.GetConsciousnessStats();
+                var consciousnessStats = brain.GetCognitionStats();
                 var elapsed = DateTime.UtcNow - startTime;
                 
                 Console.WriteLine($"⏱️  {elapsed.TotalSeconds:F0}s | Status: {consciousnessStats.Status}");
-                Console.WriteLine($"   🧠 Iterations: {consciousnessStats.ConsciousnessIterations}");
+                Console.WriteLine($"   🧠 Iterations: {consciousnessStats.CognitionIterations}");
                 Console.WriteLine($"   💭 Focus: {consciousnessStats.CurrentFocus}");
                 Console.WriteLine($"   🌟 {consciousnessStats.EthicalState}");
-                Console.WriteLine($"   ⚡ Frequency: {consciousnessStats.ConsciousnessFrequency.TotalMilliseconds}ms");
+                Console.WriteLine($"   ⚡ Frequency: {consciousnessStats.CognitionFrequency.TotalMilliseconds}ms");
                 
                 // NEW: Enhanced emotional and goal information
                 Console.WriteLine($"   💖 Emotional State: {consciousnessStats.EmotionalStatus}");
@@ -370,28 +384,28 @@ namespace GreyMatter
                 Console.WriteLine();
             }
 
-            Console.WriteLine("🔍 **ENHANCED CONSCIOUSNESS ANALYSIS**");
-            var finalConsciousnessStats = brain.GetConsciousnessStats();
-            Console.WriteLine($"   Total Conscious Iterations: {finalConsciousnessStats.ConsciousnessIterations}");
-            Console.WriteLine($"   Average Frequency: {finalConsciousnessStats.ConsciousnessFrequency.TotalMilliseconds}ms");
+            Console.WriteLine("🔍 **ENHANCED COGNITION ANALYSIS**");
+            var finalCognitionStats = brain.GetCognitionStats();
+            Console.WriteLine($"   Total Conscious Iterations: {finalCognitionStats.CognitionIterations}");
+            Console.WriteLine($"   Average Frequency: {finalCognitionStats.CognitionFrequency.TotalMilliseconds}ms");
             
             Console.WriteLine($"   Current Ethical Drive State:");
-            Console.WriteLine($"      • Wisdom Seeking: {finalConsciousnessStats.WisdomSeeking:P1}");
-            Console.WriteLine($"      • Universal Compassion: {finalConsciousnessStats.UniversalCompassion:P1}");
-            Console.WriteLine($"      • Creative Contribution: {finalConsciousnessStats.CreativeContribution:P1}");
-            Console.WriteLine($"      • Cooperative Spirit: {finalConsciousnessStats.CooperativeSpirit:P1}");
-            Console.WriteLine($"      • Benevolent Curiosity: {finalConsciousnessStats.BenevolentCuriosity:P1}");
+            Console.WriteLine($"      • Wisdom Seeking: {finalCognitionStats.WisdomSeeking:P1}");
+            Console.WriteLine($"      • Universal Compassion: {finalCognitionStats.UniversalCompassion:P1}");
+            Console.WriteLine($"      • Creative Contribution: {finalCognitionStats.CreativeContribution:P1}");
+            Console.WriteLine($"      • Cooperative Spirit: {finalCognitionStats.CooperativeSpirit:P1}");
+            Console.WriteLine($"      • Benevolent Curiosity: {finalCognitionStats.BenevolentCuriosity:P1}");
             
             // NEW: Enhanced emotional and goal analysis
             Console.WriteLine($"   Emotional Intelligence State:");
-            Console.WriteLine($"      • Dominant Emotion: {finalConsciousnessStats.DominantEmotion}");
-            Console.WriteLine($"      • Emotional Balance: {finalConsciousnessStats.EmotionalBalance:F2}");
-            Console.WriteLine($"      • Emotional Clarity: {finalConsciousnessStats.EmotionalClarity:F2}");
+            Console.WriteLine($"      • Dominant Emotion: {finalCognitionStats.DominantEmotion}");
+            Console.WriteLine($"      • Emotional Balance: {finalCognitionStats.EmotionalBalance:F2}");
+            Console.WriteLine($"      • Emotional Clarity: {finalCognitionStats.EmotionalClarity:F2}");
             
             Console.WriteLine($"   Goal-Oriented Behavior:");
-            Console.WriteLine($"      • Active Goals: {finalConsciousnessStats.ActiveGoals}");
-            Console.WriteLine($"      • Completed Goals: {finalConsciousnessStats.CompletedGoals}");
-            Console.WriteLine($"      • Average Progress: {finalConsciousnessStats.AverageGoalProgress:P1}");
+            Console.WriteLine($"      • Active Goals: {finalCognitionStats.ActiveGoals}");
+            Console.WriteLine($"      • Completed Goals: {finalCognitionStats.CompletedGoals}");
+            Console.WriteLine($"      • Average Progress: {finalCognitionStats.AverageGoalProgress:P1}");
 
             Console.WriteLine("\n🧪 **TESTING ENHANCED CONSCIOUS RESPONSES**");
             Console.WriteLine("Querying emotional intelligence and goal-oriented reasoning\n");
@@ -417,10 +431,10 @@ namespace GreyMatter
                 await Task.Delay(1000); // Let consciousness process between queries
             }
 
-            Console.WriteLine("💤 **CONSCIOUSNESS SLEEP CYCLE**");
-            await brain.SleepConsciousnessAsync();
+            Console.WriteLine("💤 **COGNITION SLEEP CYCLE**");
+            await brain.SleepCognitionAsync();
 
-            Console.WriteLine("\n🎉 **ENHANCED CONSCIOUSNESS DEMONSTRATION COMPLETE**");
+            Console.WriteLine("\n🎉 **ENHANCED COGNITION DEMONSTRATION COMPLETE**");
             Console.WriteLine("   ✅ Advanced continuous background processing implemented");
             Console.WriteLine("   ✅ Emotional intelligence system active");
             Console.WriteLine("   ✅ Long-term goal formation and tracking");
@@ -465,8 +479,8 @@ namespace GreyMatter
                 Console.WriteLine($"   💫 {scenario}: confidence {result.Confidence:P0}");
             }
 
-            Console.WriteLine("\n🌟 **AWAKENING EMOTIONAL CONSCIOUSNESS**");
-            await brain.AwakeConsciousnessAsync();
+            Console.WriteLine("\n🌟 **AWAKENING EMOTIONAL COGNITION**");
+            await brain.AwakeCognitionAsync();
 
             Console.WriteLine("\n💖 **EMOTIONAL PROCESSING OBSERVATION** (30 seconds)");
             Console.WriteLine("Watching emotional states evolve and goals form\n");
@@ -480,7 +494,7 @@ namespace GreyMatter
             {
                 await Task.Delay(5000); // Check every 5 seconds
                 
-                var consciousnessStats = brain.GetConsciousnessStats();
+                var consciousnessStats = brain.GetCognitionStats();
                 var elapsed = DateTime.UtcNow - startTime;
                 
                 // Show emotional changes
@@ -517,7 +531,7 @@ namespace GreyMatter
             foreach (var (query, features) in emotionalQueries)
             {
                 var response = await brain.ProcessInputAsync(query, features);
-                var currentEmotion = brain.GetConsciousnessStats().DominantEmotion;
+                var currentEmotion = brain.GetCognitionStats().DominantEmotion;
                 
                 Console.WriteLine($"🤔 Q: {query}");
                 Console.WriteLine($"💭 A: {response.Response}");
@@ -528,13 +542,13 @@ namespace GreyMatter
             }
 
             Console.WriteLine("📊 **FINAL EMOTIONAL & GOAL ANALYSIS**");
-            var finalStats = brain.GetConsciousnessStats();
+            var finalStats = brain.GetCognitionStats();
             Console.WriteLine($"   💖 Final emotional state: {finalStats.DominantEmotion}");
             Console.WriteLine($"   📈 Emotional balance: {finalStats.EmotionalBalance:F2}");
             Console.WriteLine($"   🎯 Goals developed: {finalStats.ActiveGoals} active, {finalStats.CompletedGoals} completed");
             Console.WriteLine($"   🌟 Goal progress: {finalStats.AverageGoalProgress:P1}");
 
-            await brain.SleepConsciousnessAsync();
+            await brain.SleepCognitionAsync();
 
             Console.WriteLine("\n🎉 **EMOTIONAL INTELLIGENCE DEMO COMPLETE**");
             Console.WriteLine("   ✅ Emotional processing demonstrated");
@@ -563,7 +577,7 @@ namespace GreyMatter
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}\n");
 
             // Start consciousness for enhanced learning
-            await brain.AwakeConsciousnessAsync();
+            await brain.AwakeCognitionAsync();
 
             // Run foundational language training
             var trainer = new LanguageFoundationsTrainer(brain, config);
@@ -610,7 +624,7 @@ namespace GreyMatter
                 Console.WriteLine($"   {concept}: {mastery:P1}");
             }
 
-            await brain.SleepConsciousnessAsync();
+            await brain.SleepCognitionAsync();
             await brain.SaveAsync();
 
             Console.WriteLine("\n🎉 **FOUNDATIONAL LANGUAGE TRAINING COMPLETE**");
@@ -641,7 +655,7 @@ namespace GreyMatter
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}");
 
             // Start consciousness
-            await brain.AwakeConsciousnessAsync();
+            await brain.AwakeCognitionAsync();
             
             // Allow brain to stabilize
             await Task.Delay(2000);
@@ -651,7 +665,7 @@ namespace GreyMatter
             await conversation.StartConversationAsync();
 
             // Stop consciousness gracefully
-            await brain.SleepConsciousnessAsync();
+            await brain.SleepCognitionAsync();
             
             Console.WriteLine("👋 Session ended. Brain consciousness stopped.");
         }
@@ -672,17 +686,17 @@ namespace GreyMatter
             Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}\n");
 
             // Start consciousness for enhanced learning (but pause during intensive training)
-            await brain.AwakeConsciousnessAsync();
+            await brain.AwakeCognitionAsync();
             
             // Temporarily stop consciousness during intensive learning to avoid concurrency issues
-            await brain.SleepConsciousnessAsync();
+            await brain.SleepCognitionAsync();
 
             // Run comprehensive language training
             var trainer = new ComprehensiveLanguageTrainer(brain, config);
             await trainer.RunComprehensiveTrainingAsync();
             
             // Restart consciousness after training
-            await brain.AwakeConsciousnessAsync();
+            await brain.AwakeCognitionAsync();
 
             // Test comprehension with diverse linguistic constructions
             Console.WriteLine("\n🧪 **TESTING COMPREHENSIVE LANGUAGE UNDERSTANDING**");
@@ -740,7 +754,7 @@ namespace GreyMatter
             Console.WriteLine("   🎯 Dynamic neuron allocation demonstrates realistic neural scaling");
 
             // Stop consciousness gracefully
-            await brain.SleepConsciousnessAsync();
+            await brain.SleepCognitionAsync();
         }
 
         private static async Task RunPreschoolTrain(BrainConfiguration config)
