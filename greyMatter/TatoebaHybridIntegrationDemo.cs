@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using GreyMatter.Core;
 using GreyMatter.Storage;
+using GreyMatter.Learning;
 using greyMatter.Learning;
+using greyMatter.Core;
 
 namespace GreyMatter
 {
@@ -19,6 +22,8 @@ namespace GreyMatter
         private HybridCerebroTrainer? _hybridTrainer;
         private TatoebaLanguageTrainer? _tatoebaTrainer;
         private SemanticStorageManager? _storage;
+        private SemanticStorageManager? _storageManager;
+        private PreTrainedSemanticClassifier? _preTrainedClassifier;
 
         public TatoebaHybridIntegrationDemo(string tatoebaDataPath = "/Volumes/jarvis/trainData/tatoeba")
         {
@@ -131,7 +136,7 @@ namespace GreyMatter
             try
             {
                 // Test data access through TatoebaLanguageTrainer
-                var testSentences = await GetSampleSentencesAsync(10);
+                var testSentences = await GetSampleSentencesAsync(10, randomSample: false); // Keep test sequential
                 
                 if (testSentences.Any())
                 {
@@ -167,7 +172,7 @@ namespace GreyMatter
             try
             {
                 // Get sample data for fair comparison
-                var sampleSentences = await GetSampleSentencesAsync(100);
+                var sampleSentences = await GetSampleSentencesAsync(100, randomSample: false); // Keep baseline consistent
                 
                 Console.WriteLine($"   📖 Training on {sampleSentences.Count} sentences for comparison");
 
@@ -234,7 +239,7 @@ namespace GreyMatter
 
             try
             {
-                var realSentences = await GetSampleSentencesAsync(500);
+                var realSentences = await GetSampleSentencesAsync(500, randomSample: true); // NOW USE RANDOM SAMPLING!
                 Console.WriteLine($"   📖 Processing {realSentences.Count} real sentences with hybrid training");
 
                 // Phase 1: Small batch training
@@ -380,13 +385,44 @@ namespace GreyMatter
         }
 
         /// <summary>
-        /// Get sample sentences from Tatoeba data
+        /// Get sample sentences from Tatoeba data with optional random sampling
         /// </summary>
-        private async Task<List<string>> GetSampleSentencesAsync(int count)
+        private async Task<List<string>> GetSampleSentencesAsync(int count, bool randomSample = false)
         {
             try
             {
-                var trainer = new TatoebaLanguageTrainer(_tatoebaDataPath);
+                var sentencesPath = Path.Combine(_tatoebaDataPath, "sentences.csv");
+                if (File.Exists(sentencesPath))
+                {
+                    var reader = new TatoebaReader();
+                    var sentences = reader.ReadEnglishSentences(sentencesPath);
+                    
+                    if (randomSample)
+                    {
+                        // Random sampling from the dataset
+                        var random = new Random();
+                        var sentenceList = sentences.ToList();
+                        var totalSentences = sentenceList.Count;
+                        
+                        Console.WriteLine($"   📊 Dataset contains {totalSentences:N0} English sentences");
+                        Console.WriteLine($"   🎲 Randomly sampling {count:N0} sentences...");
+                        
+                        var sampledSentences = sentenceList
+                            .OrderBy(x => random.Next())
+                            .Take(count)
+                            .ToList();
+                        
+                        return sampledSentences;
+                    }
+                    else
+                    {
+                        // Sequential sampling (original behavior)
+                        var sentenceList = sentences.Take(count).ToList();
+                        
+                        Console.WriteLine($"✅ Successfully accessed {sentenceList.Count} real Tatoeba sentences (sequential)");
+                        return sentenceList;
+                    }
+                }
                 
                 // Use fallback sample sentences with realistic training content
                 Console.WriteLine($"⚠️ Using fallback sample sentences for comprehensive demonstration");
@@ -522,12 +558,363 @@ namespace GreyMatter
         }
 
         /// <summary>
+        /// Large-scale hybrid training on complete Tatoeba dataset with optimized storage
+        /// </summary>
+        public async Task RunLargeScaleHybridTrainingAsync()
+        {
+            Console.WriteLine("🚀 **LARGE-SCALE HYBRID TRAINING**");
+            Console.WriteLine("=========================================");
+            Console.WriteLine("Processing complete Tatoeba dataset with:");
+            Console.WriteLine("• ONNX DistilBERT semantic classification");
+            Console.WriteLine("• Biological emergent neural learning");
+            Console.WriteLine("• Optimized batch storage operations");
+            Console.WriteLine("• Real-world sentence data");
+            Console.WriteLine();
+
+            try
+            {
+                // Initialize optimized systems
+                await InitializeOptimizedTrainingSystemAsync();
+                
+                // Process complete dataset in optimized batches
+                await ProcessCompleteDatasetAsync();
+                
+                // Comprehensive evaluation
+                await RunComprehensiveEvaluationAsync();
+                
+                Console.WriteLine("\n✅ Large-scale hybrid training completed successfully!");
+                Console.WriteLine("🎯 System ready for advanced language understanding tasks");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Large-scale training failed: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                throw;
+            }
+        }
+
+        private async Task InitializeOptimizedTrainingSystemAsync()
+        {
+            Console.WriteLine("🔧 Initializing Optimized Training System...");
+            
+            // Initialize with optimized settings for large-scale processing
+            _storageManager = new SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
+            _preTrainedClassifier = new PreTrainedSemanticClassifier(_storageManager);
+            _tatoebaTrainer = new TatoebaLanguageTrainer(_tatoebaDataPath);
+            
+            // Initialize Cerebro for hybrid training
+            _cerebro = new Cerebro();
+            
+            // Initialize hybrid trainer with optimized parameters for large datasets
+            _hybridTrainer = new HybridCerebroTrainer(
+                _cerebro,
+                _preTrainedClassifier,
+                new TrainableSemanticClassifier(_storageManager),
+                _storageManager,
+                semanticGuidanceStrength: 0.75,  // Strong semantic guidance for large datasets
+                biologicalVariationRate: 0.25,
+                enableBidirectionalLearning: true
+            );
+            
+            Console.WriteLine("✅ Optimized training system initialized");
+            Console.WriteLine($"   📁 Storage optimized for batch operations");
+            Console.WriteLine($"   🧠 Hybrid trainer configured for large-scale processing");
+        }
+
+        private async Task ProcessCompleteDatasetAsync()
+        {
+            Console.WriteLine("\n📖 Processing Complete Tatoeba Dataset...");
+            
+            var sentencesPath = Path.Combine(_tatoebaDataPath, "sentences.csv");
+            if (!File.Exists(sentencesPath))
+            {
+                Console.WriteLine($"⚠️ Tatoeba sentences file not found: {sentencesPath}");
+                Console.WriteLine("   Using demonstration data instead...");
+                await ProcessDemonstrationDatasetAsync();
+                return;
+            }
+            
+            var reader = new TatoebaReader();
+            var batchSize = 5000; // Optimized batch size for performance
+            var totalProcessed = 0;
+            var batch = new List<string>();
+            
+            Console.WriteLine($"🎯 Processing real Tatoeba data in batches of {batchSize:N0}");
+            
+            foreach (var sentence in reader.ReadEnglishSentences(sentencesPath))
+            {
+                batch.Add(sentence);
+                
+                if (batch.Count >= batchSize)
+                {
+                    // Process batch with hybrid training
+                    var result = await _hybridTrainer!.TrainBatchWithSemanticGuidanceAsync(batch.ToArray());
+                    totalProcessed += result.TotalInputs;
+                    
+                    Console.WriteLine($"   ✅ Processed batch: {totalProcessed:N0} sentences | " +
+                                    $"Success: {(double)result.SuccessfulResults / result.TotalInputs:P1} | " +
+                                    $"Avg confidence: {result.AverageSemanticConfidence:F3}");
+                    
+                    // Periodically save state to prevent data loss
+                    if (totalProcessed % 25000 == 0)
+                    {
+                        Console.WriteLine($"   💾 Checkpoint save at {totalProcessed:N0} sentences...");
+                        await _tatoebaTrainer!.SaveBrainStateAsync();
+                    }
+                    
+                    batch.Clear();
+                }
+                
+                // Safety limit for demo purposes (remove for true full-scale)
+                if (totalProcessed >= 100000) // Process 100K sentences for demonstration
+                {
+                    Console.WriteLine($"   🎯 Reached demonstration limit of {totalProcessed:N0} sentences");
+                    break;
+                }
+            }
+            
+            // Process remaining sentences in final batch
+            if (batch.Count > 0)
+            {
+                var result = await _hybridTrainer!.TrainBatchWithSemanticGuidanceAsync(batch.ToArray());
+                totalProcessed += result.TotalInputs;
+                Console.WriteLine($"   ✅ Final batch: {totalProcessed:N0} total sentences processed");
+            }
+            
+            Console.WriteLine($"\n📊 Dataset Processing Complete:");
+            Console.WriteLine($"   • Total sentences processed: {totalProcessed:N0}");
+            Console.WriteLine($"   • Average batch size: {batchSize:N0}");
+            Console.WriteLine($"   • Storage optimizations enabled");
+        }
+
+        private async Task ProcessDemonstrationDatasetAsync()
+        {
+            Console.WriteLine("📝 Using comprehensive demonstration dataset...");
+            var sentences = GenerateComprehensiveSampleSentences(50000);
+            
+            var batchSize = 5000;
+            for (int i = 0; i < sentences.Count; i += batchSize)
+            {
+                var batch = sentences.Skip(i).Take(batchSize).ToArray();
+                var result = await _hybridTrainer!.TrainBatchWithSemanticGuidanceAsync(batch);
+                
+                Console.WriteLine($"   ✅ Demo batch {(i / batchSize) + 1}: {result.TotalInputs} sentences | " +
+                                $"Success: {(double)result.SuccessfulResults / result.TotalInputs:P1}");
+            }
+        }
+
+        private async Task RunComprehensiveEvaluationAsync()
+        {
+            Console.WriteLine("\n📈 Running Comprehensive Evaluation...");
+            
+            // Test vocabulary size and diversity
+            var vocabulary = _tatoebaTrainer!.Brain.ExportVocabulary();
+            Console.WriteLine($"   📚 Vocabulary learned: {vocabulary.Count:N0} words");
+            
+            // Test concept formation
+            var concepts = _tatoebaTrainer.Brain.ExportNeuralConcepts();
+            Console.WriteLine($"   🧠 Neural concepts formed: {concepts.Count:N0}");
+            
+            // Test storage efficiency
+            var stats = await _storageManager!.GetStorageStatisticsAsync();
+            Console.WriteLine($"   💾 Total storage size: {stats.TotalStorageSize / 1024 / 1024:F1} MB");
+            Console.WriteLine($"   🔗 Neurons in pool: {stats.TotalNeuronsInPool:N0}");
+            
+            // Save final state
+            Console.WriteLine("\n💾 Saving optimized brain state...");
+            await _tatoebaTrainer.SaveBrainStateAsync();
+            
+            Console.WriteLine("✅ Comprehensive evaluation completed");
+        }
+
+        /// <summary>
         /// Entry point for running the integration demo
         /// </summary>
         public static async Task RunIntegrationDemoAsync()
         {
             var demo = new TatoebaHybridIntegrationDemo();
             await demo.RunTatoebaHybridIntegrationAsync();
+        }
+
+        /// <summary>
+        /// Random sampling hybrid training for varied datasets
+        /// </summary>
+        public async Task RunRandomSamplingHybridTrainingAsync()
+        {
+            Console.WriteLine("🎲 **RANDOM SAMPLING HYBRID TRAINING**");
+            Console.WriteLine("=====================================");
+            Console.WriteLine("• Uses random sampling from complete 2M+ sentence dataset");
+            Console.WriteLine("• Different sentences each run for varied training");
+            Console.WriteLine("• Same 500 sentence count as regular hybrid training");
+            Console.WriteLine();
+
+            try
+            {
+                // Initialize system
+                await InitializeIntegratedSystemAsync();
+                
+                // Use random sampling for varied training data
+                var randomSentences = await GetSampleSentencesAsync(500, randomSample: true);
+                Console.WriteLine($"   📖 Processing {randomSentences.Count} randomly selected sentences");
+
+                // Run hybrid training with random data
+                var result = await _hybridTrainer!.TrainBatchWithSemanticGuidanceAsync(randomSentences);
+                
+                Console.WriteLine($"\n📊 Random Sampling Results:");
+                Console.WriteLine($"   • Sentences processed: {result.TotalInputs:N0}");
+                Console.WriteLine($"   • Success rate: {(double)result.SuccessfulResults / result.TotalInputs:P1}");
+                Console.WriteLine($"   • Average confidence: {result.AverageSemanticConfidence:F3}");
+                
+                // Save results
+                await _tatoebaTrainer!.SaveBrainStateAsync();
+                Console.WriteLine("   ✅ Random sampling training state saved");
+                
+                Console.WriteLine("\n✅ Random sampling hybrid training completed!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Random sampling training failed: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Sized hybrid training with specified sentence count
+        /// </summary>
+        public async Task RunSizedHybridTrainingAsync(int sentenceCount)
+        {
+            Console.WriteLine($"📊 **{sentenceCount:N0} SENTENCE HYBRID TRAINING**");
+            Console.WriteLine("=====================================");
+            Console.WriteLine($"• Processing {sentenceCount:N0} randomly selected sentences");
+            Console.WriteLine("• Optimized batch processing for efficiency");
+            Console.WriteLine("• Real Tatoeba data with hybrid learning");
+            Console.WriteLine();
+
+            try
+            {
+                // Initialize system
+                await InitializeOptimizedTrainingSystemAsync();
+                
+                // Get random sample of specified size
+                var sentences = await GetSampleSentencesAsync(sentenceCount, randomSample: true);
+                Console.WriteLine($"   📖 Processing {sentences.Count:N0} randomly selected sentences");
+
+                // Process in optimized batches
+                var batchSize = Math.Min(1000, sentenceCount / 10); // Adaptive batch size
+                var totalProcessed = 0;
+                
+                for (int i = 0; i < sentences.Count; i += batchSize)
+                {
+                    var batch = sentences.Skip(i).Take(batchSize).ToArray();
+                    var result = await _hybridTrainer!.TrainBatchWithSemanticGuidanceAsync(batch);
+                    totalProcessed += result.TotalInputs;
+                    
+                    var progress = (double)totalProcessed / sentences.Count;
+                    Console.WriteLine($"   ✅ Progress: {progress:P1} | " +
+                                    $"Batch: {result.TotalInputs} sentences | " +
+                                    $"Success: {(double)result.SuccessfulResults / result.TotalInputs:P1}");
+                }
+                
+                Console.WriteLine($"\n📊 {sentenceCount:N0} Sentence Training Results:");
+                Console.WriteLine($"   • Total processed: {totalProcessed:N0}");
+                Console.WriteLine($"   • Batch size: {batchSize:N0}");
+                Console.WriteLine($"   • Dataset coverage: {(double)sentenceCount / 1988463:P2}");
+                
+                // Save results
+                await _tatoebaTrainer!.SaveBrainStateAsync();
+                Console.WriteLine("   ✅ Training state saved");
+                
+                Console.WriteLine($"\n✅ {sentenceCount:N0} sentence hybrid training completed!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ {sentenceCount:N0} sentence training failed: {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Complete dataset hybrid training - processes ALL Tatoeba sentences
+        /// </summary>
+        public async Task RunCompleteDatasetHybridTrainingAsync()
+        {
+            Console.WriteLine("🌍 **COMPLETE DATASET HYBRID TRAINING**");
+            Console.WriteLine("=======================================");
+            Console.WriteLine("• Processing ALL 1,988,463 English sentences");
+            Console.WriteLine("• Full utilization of Tatoeba dataset");
+            Console.WriteLine("• This will take substantial time and storage");
+            Console.WriteLine();
+
+            try
+            {
+                // Initialize system
+                await InitializeOptimizedTrainingSystemAsync();
+                
+                // Process the complete dataset
+                var sentencesPath = Path.Combine(_tatoebaDataPath, "sentences.csv");
+                if (!File.Exists(sentencesPath))
+                {
+                    Console.WriteLine($"⚠️ Tatoeba sentences file not found: {sentencesPath}");
+                    return;
+                }
+                
+                var reader = new TatoebaReader();
+                var batchSize = 10000; // Larger batches for efficiency
+                var totalProcessed = 0;
+                var batch = new List<string>();
+                
+                Console.WriteLine($"🎯 Processing complete dataset in batches of {batchSize:N0}");
+                
+                foreach (var sentence in reader.ReadEnglishSentences(sentencesPath))
+                {
+                    batch.Add(sentence);
+                    
+                    if (batch.Count >= batchSize)
+                    {
+                        // Process batch
+                        var result = await _hybridTrainer!.TrainBatchWithSemanticGuidanceAsync(batch.ToArray());
+                        totalProcessed += result.TotalInputs;
+                        
+                        var progress = (double)totalProcessed / 1988463;
+                        Console.WriteLine($"   ✅ Progress: {progress:P2} | " +
+                                        $"Total: {totalProcessed:N0} | " +
+                                        $"Success: {(double)result.SuccessfulResults / result.TotalInputs:P1}");
+                        
+                        // Checkpoint save every 50K sentences
+                        if (totalProcessed % 50000 == 0)
+                        {
+                            Console.WriteLine($"   💾 Checkpoint save at {totalProcessed:N0} sentences...");
+                            await _tatoebaTrainer!.SaveBrainStateAsync();
+                        }
+                        
+                        batch.Clear();
+                    }
+                }
+                
+                // Process remaining sentences
+                if (batch.Count > 0)
+                {
+                    var result = await _hybridTrainer!.TrainBatchWithSemanticGuidanceAsync(batch.ToArray());
+                    totalProcessed += result.TotalInputs;
+                }
+                
+                Console.WriteLine($"\n📊 Complete Dataset Training Results:");
+                Console.WriteLine($"   • Total sentences processed: {totalProcessed:N0}");
+                Console.WriteLine($"   • Dataset coverage: 100% (complete Tatoeba corpus)");
+                Console.WriteLine($"   • Training represents full English language diversity");
+                
+                // Final save
+                await _tatoebaTrainer!.SaveBrainStateAsync();
+                Console.WriteLine("   ✅ Complete training state saved");
+                
+                Console.WriteLine("\n🎉 COMPLETE DATASET HYBRID TRAINING FINISHED!");
+                Console.WriteLine("    Your system now has exposure to the full Tatoeba corpus!");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Complete dataset training failed: {ex.Message}");
+                throw;
+            }
         }
     }
 }

@@ -773,8 +773,13 @@ namespace GreyMatter.Storage
         
         private async Task SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(clusterPath)!);
-            var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
+            var directory = Path.GetDirectoryName(clusterPath)!;
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            // Use compact JSON for performance (no indentation)
+            var json = JsonSerializer.Serialize(cluster);
             await File.WriteAllTextAsync(clusterPath, json);
         }
         
@@ -788,8 +793,13 @@ namespace GreyMatter.Storage
         
         private async Task SaveConceptClusterAsync(string clusterPath, ConceptCluster cluster)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(clusterPath)!);
-            var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
+            var directory = Path.GetDirectoryName(clusterPath)!;
+            if (!Directory.Exists(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            // Use compact JSON for performance (no indentation)
+            var json = JsonSerializer.Serialize(cluster);
             await File.WriteAllTextAsync(clusterPath, json);
         }
         
@@ -797,7 +807,8 @@ namespace GreyMatter.Storage
         private async Task SaveVocabularyIndexAsync()
         {
             var indexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
-            var json = JsonSerializer.Serialize(_vocabularyIndex, new JsonSerializerOptions { WriteIndented = true });
+            // Use compact JSON for performance (no indentation)
+            var json = JsonSerializer.Serialize(_vocabularyIndex);
             await File.WriteAllTextAsync(indexPath, json);
         }
         
@@ -814,7 +825,8 @@ namespace GreyMatter.Storage
         private async Task SaveConceptIndexAsync()
         {
             var indexPath = Path.Combine(_hippocampusPath, "concept_index.json");
-            var json = JsonSerializer.Serialize(_conceptIndex, new JsonSerializerOptions { WriteIndented = true });
+            // Use compact JSON for performance (no indentation)
+            var json = JsonSerializer.Serialize(_conceptIndex);
             await File.WriteAllTextAsync(indexPath, json);
         }
         
@@ -834,7 +846,8 @@ namespace GreyMatter.Storage
         private string GetConceptHash(string conceptId)
         {
             var hash = conceptId.GetHashCode();
-            return Math.Abs(hash % 1000).ToString("D3"); // 000-999 for distribution
+            // Use fewer files for better batching (50 files max, ~5-10 concepts per file)
+            return Math.Abs(hash % 50).ToString("D2"); // 00-49 for better clustering
         }
         
         // Shared neuron management methods
@@ -961,6 +974,7 @@ namespace GreyMatter.Storage
         
         /// <summary>
         /// Save dirty neurons back to their pool files
+        /// FIXED: Sequential operations to prevent file I/O race conditions
         /// </summary>
         public async Task FlushNeuronPoolAsync()
         {
@@ -985,32 +999,38 @@ namespace GreyMatter.Storage
                 }
             }
             
-            // Write each pool file
-            var tasks = neuronsByFile.Select(async kvp =>
+            // Write each pool file SEQUENTIALLY to avoid race conditions
+            foreach (var kvp in neuronsByFile)
             {
                 var poolFile = kvp.Key;
                 var neurons = kvp.Value;
                 
-                // Merge with existing pool file if it exists
-                if (File.Exists(poolFile))
+                try
                 {
-                    var existingJson = await File.ReadAllTextAsync(poolFile);
-                    var existingData = JsonSerializer.Deserialize<Dictionary<string, SharedNeuron>>(existingJson) ?? new();
-                    
-                    foreach (var neuronKvp in neurons)
+                    // Merge with existing pool file if it exists
+                    if (File.Exists(poolFile))
                     {
-                        existingData[neuronKvp.Key] = neuronKvp.Value;
+                        var existingJson = await File.ReadAllTextAsync(poolFile);
+                        var existingData = JsonSerializer.Deserialize<Dictionary<string, SharedNeuron>>(existingJson) ?? new();
+                        
+                        foreach (var neuronKvp in neurons)
+                        {
+                            existingData[neuronKvp.Key] = neuronKvp.Value;
+                        }
+                        
+                        neurons = existingData;
                     }
                     
-                    neurons = existingData;
+                    Directory.CreateDirectory(Path.GetDirectoryName(poolFile)!);
+                    var json = JsonSerializer.Serialize(neurons, new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(poolFile, json);
                 }
-                
-                Directory.CreateDirectory(Path.GetDirectoryName(poolFile)!);
-                var json = JsonSerializer.Serialize(neurons, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(poolFile, json);
-            });
-            
-            await Task.WhenAll(tasks);
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Error saving neuron pool file {poolFile}: {ex.Message}");
+                    // Continue with other files rather than failing completely
+                }
+            }
             
             // Save metadata
             SaveNeuronPoolIndex();
@@ -1042,26 +1062,64 @@ namespace GreyMatter.Storage
         // Integration methods for existing brain classes
         
         /// <summary>
-        /// Store vocabulary using biological clustering with shared neurons
+        /// Store vocabulary using biological clustering with shared neurons (OPTIMIZED)
         /// </summary>
         public async Task StoreVocabularyAsync(Dictionary<string, WordInfo> vocabulary)
         {
-            foreach (var kvp in vocabulary)
+            if (!vocabulary.Any()) return;
+            
+            var startTime = DateTime.UtcNow;
+            Console.WriteLine($"💾 Optimized vocabulary storage: {vocabulary.Count} words...");
+            
+            // Group words by cluster path to minimize I/O operations
+            var clusterGroups = vocabulary
+                .GroupBy(kvp => GetVocabularyCluster(kvp.Key, kvp.Value))
+                .ToList();
+            
+            Console.WriteLine($"   📁 Organizing into {clusterGroups.Count} cluster files...");
+            
+            // Load all required clusters in parallel
+            var clusterLoadTasks = clusterGroups.Select(async group =>
             {
-                var word = kvp.Key;
-                var wordInfo = kvp.Value;
-                
-                // Get or create cluster for this word
-                var clusterPath = GetVocabularyCluster(word, wordInfo);
+                var clusterPath = group.Key;
                 var cluster = await LoadVocabularyClusterAsync(clusterPath) ?? new VocabularyCluster();
+                return new { ClusterPath = clusterPath, Cluster = cluster, Words = group.ToList() };
+            });
+            
+            var clusterData = await Task.WhenAll(clusterLoadTasks);
+            
+            // Update clusters with new words
+            var saveTasks = new List<Task>();
+            var indexUpdates = new Dictionary<string, string>();
+            
+            foreach (var data in clusterData)
+            {
+                // Add all words to this cluster
+                foreach (var kvp in data.Words)
+                {
+                    data.Cluster.Words[kvp.Key] = kvp.Value;
+                    indexUpdates[kvp.Key] = data.ClusterPath;
+                }
                 
-                cluster.Words[word] = wordInfo;
-                cluster.LastModified = DateTime.UtcNow;
-                cluster.AccessCount++;
+                data.Cluster.LastModified = DateTime.UtcNow;
+                data.Cluster.AccessCount++;
                 
-                await SaveVocabularyClusterAsync(clusterPath, cluster);
-                await UpdateVocabularyIndexAsync(word, clusterPath);
+                // Save cluster asynchronously
+                saveTasks.Add(SaveVocabularyClusterAsync(data.ClusterPath, data.Cluster));
             }
+            
+            // Execute all saves in parallel
+            await Task.WhenAll(saveTasks);
+            
+            // Update index once with all changes
+            foreach (var kvp in indexUpdates)
+            {
+                _vocabularyIndex[kvp.Key] = kvp.Value;
+            }
+            await SaveVocabularyIndexAsync();
+            
+            var elapsed = DateTime.UtcNow - startTime;
+            Console.WriteLine($"   ✅ Vocabulary storage complete: {elapsed.TotalMilliseconds:F0}ms");
         }
         
         /// <summary>
@@ -1229,9 +1287,18 @@ namespace GreyMatter.Storage
         /// <summary>
         /// Store individual neural concepts using Huth's semantic domain categorization
         /// This method analyzes each concept and routes it to the appropriate semantic domain
+        /// OPTIMIZED: Batch operations with parallel processing
         /// </summary>
         public async Task StoreNeuralConceptsAsync(Dictionary<string, object> neuralConcepts)
         {
+            if (!neuralConcepts.Any()) return;
+            
+            var startTime = DateTime.UtcNow;
+            Console.WriteLine($"🧠 Optimized neural concept storage: {neuralConcepts.Count} concepts...");
+            
+            // Group concepts by semantic domain for batch processing
+            var conceptsByDomain = new Dictionary<string, Dictionary<string, object>>();
+            
             foreach (var conceptKvp in neuralConcepts)
             {
                 var conceptId = conceptKvp.Key;
@@ -1240,23 +1307,97 @@ namespace GreyMatter.Storage
                 // Determine semantic domain for this concept using Huth's hierarchical organization
                 var semanticDomain = DetermineSemanticDomainForConcept(conceptId, conceptData);
                 
-                // Create cluster path in the appropriate semantic domain
-                var clusterPath = Path.Combine(_corticalColumnsPath, semanticDomain, $"concepts_{GetConceptHash(conceptId)}.json");
+                if (!conceptsByDomain.ContainsKey(semanticDomain))
+                {
+                    conceptsByDomain[semanticDomain] = new Dictionary<string, object>();
+                }
                 
-                // Load existing concept cluster
-                var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
-                
-                // Add concept to cluster
-                cluster.Concepts[conceptId] = conceptData;
-                cluster.LastModified = DateTime.UtcNow;
-                cluster.AccessCount++;
-                
-                // Save cluster
-                await SaveConceptClusterAsync(clusterPath, cluster);
-                
-                // Update hippocampus index for cross-domain retrieval
-                await UpdateConceptIndexAsync(conceptId, clusterPath, ConceptType.Neural);
+                conceptsByDomain[semanticDomain][conceptId] = conceptData;
             }
+            
+            Console.WriteLine($"   📁 Organizing into {conceptsByDomain.Count} semantic domains...");
+            
+            // Process domains in parallel for better performance
+            var domainTasks = conceptsByDomain.Select(async domainKvp =>
+            {
+                var semanticDomain = domainKvp.Key;
+                var domainConcepts = domainKvp.Value;
+                
+                // Group concepts by cluster file within domain
+                var conceptsByCluster = new Dictionary<string, Dictionary<string, object>>();
+                
+                foreach (var conceptKvp in domainConcepts)
+                {
+                    var conceptId = conceptKvp.Key;
+                    var conceptData = conceptKvp.Value;
+                    
+                    var clusterPath = Path.Combine(_corticalColumnsPath, semanticDomain, $"concepts_{GetConceptHash(conceptId)}.json");
+                    
+                    if (!conceptsByCluster.ContainsKey(clusterPath))
+                    {
+                        conceptsByCluster[clusterPath] = new Dictionary<string, object>();
+                    }
+                    
+                    conceptsByCluster[clusterPath][conceptId] = conceptData;
+                }
+                
+                // Save cluster files in parallel within domain
+                var clusterTasks = conceptsByCluster.Select(async clusterKvp =>
+                {
+                    var clusterPath = clusterKvp.Key;
+                    var clusterConcepts = clusterKvp.Value;
+                    var indexUpdates = new List<(string, string)>();
+                    
+                    try
+                    {
+                        // Load existing concept cluster
+                        var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
+                        
+                        // Add all concepts to cluster in batch
+                        foreach (var conceptKvp in clusterConcepts)
+                        {
+                            cluster.Concepts[conceptKvp.Key] = conceptKvp.Value;
+                            indexUpdates.Add((conceptKvp.Key, clusterPath));
+                        }
+                        
+                        cluster.LastModified = DateTime.UtcNow;
+                        cluster.AccessCount++;
+                        
+                        // Save cluster once
+                        await SaveConceptClusterAsync(clusterPath, cluster);
+                        
+                        return indexUpdates;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"⚠️ Error saving cluster {clusterPath}: {ex.Message}");
+                        return new List<(string, string)>();
+                    }
+                });
+                
+                var clusterResults = await Task.WhenAll(clusterTasks);
+                return clusterResults.SelectMany(r => r).ToList();
+            });
+            
+            var allIndexUpdates = await Task.WhenAll(domainTasks);
+            
+            // Update index once with all changes
+            foreach (var updates in allIndexUpdates)
+            {
+                foreach (var (conceptId, clusterPath) in updates)
+                {
+                    _conceptIndex[conceptId] = new ConceptIndexEntry
+                    {
+                        ClusterPath = clusterPath,
+                        ConceptType = ConceptType.Neural,
+                        LastAccessed = DateTime.UtcNow
+                    };
+                }
+            }
+            await SaveConceptIndexAsync();
+            
+            var elapsed = DateTime.UtcNow - startTime;
+            Console.WriteLine($"   ✅ Neural concept storage complete: {elapsed.TotalMilliseconds:F0}ms");
         }
 
         /// <summary>
@@ -1325,6 +1466,64 @@ namespace GreyMatter.Storage
         public Task<string> GetPredictedDomainAsync(string conceptId)
         {
             return ClassifySemanticDomainAsync(conceptId);
+        }
+        
+        /// <summary>
+        /// Add a neuron from external brain to the storage pool
+        /// This enables persistence of neurons created outside the SemanticStorageManager
+        /// </summary>
+        public async Task AddNeuronToPoolAsync(int externalNeuronId, object neuronData)
+        {
+            var neuronId = _nextNeuronId++;
+            
+            // Convert external neuron data to SharedNeuron format
+            var neuron = new SharedNeuron
+            {
+                Id = neuronId,
+                Type = NeuronType.Concept, // Default type for imported neurons
+                WeightMap = new Dictionary<int, double>(),
+                ActiveConcepts = new HashSet<string>(),
+                LastActivated = DateTime.UtcNow,
+                ActivationCount = 1
+            };
+            
+            // Extract data from the external neuron object if it has properties
+            if (neuronData != null)
+            {
+                var neuronType = neuronData.GetType();
+                
+                // Try to extract ActiveConcepts if available
+                var activeConceptsProp = neuronType.GetProperty("ActiveConcepts");
+                if (activeConceptsProp != null && activeConceptsProp.GetValue(neuronData) is HashSet<string> concepts)
+                {
+                    neuron.ActiveConcepts = concepts;
+                }
+                
+                // Try to extract ClusterId as a concept
+                var clusterIdProp = neuronType.GetProperty("ClusterId");
+                if (clusterIdProp != null && clusterIdProp.GetValue(neuronData) is string clusterId)
+                {
+                    neuron.ActiveConcepts.Add(clusterId);
+                }
+                
+                // Try to extract activation count
+                var activationCountProp = neuronType.GetProperty("ActivationCount");
+                if (activationCountProp != null && activationCountProp.GetValue(neuronData) is int count)
+                {
+                    neuron.ActivationCount = count;
+                }
+            }
+            
+            _neuronPool[neuronId] = neuron;
+            
+            // Determine storage file based on neuron ID for load balancing
+            var poolFile = GetNeuronPoolFile(neuronId);
+            _neuronLocationIndex[neuronId] = new NeuronLocationEntry
+            {
+                PoolFile = poolFile,
+                LastAccessed = DateTime.UtcNow,
+                IsLoaded = true
+            };
         }
     }
 

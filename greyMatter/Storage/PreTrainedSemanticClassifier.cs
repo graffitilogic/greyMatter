@@ -238,17 +238,20 @@ namespace GreyMatter.Storage
                 // Create input tensors with proper dimensions
                 var inputIds = new DenseTensor<long>(new[] { 1, tokens.Length });
                 var attentionMask = new DenseTensor<long>(new[] { 1, tokens.Length });
+                var tokenTypeIds = new DenseTensor<long>(new[] { 1, tokens.Length });
                 
                 for (int i = 0; i < tokens.Length; i++)
                 {
                     inputIds[0, i] = tokens[i];
                     attentionMask[0, i] = 1; // All tokens are attended to
+                    tokenTypeIds[0, i] = 0; // All tokens are sentence A for single sentence
                 }
                 
                 var inputs = new List<NamedOnnxValue>
                 {
                     NamedOnnxValue.CreateFromTensor("input_ids", inputIds),
-                    NamedOnnxValue.CreateFromTensor("attention_mask", attentionMask)
+                    NamedOnnxValue.CreateFromTensor("attention_mask", attentionMask),
+                    NamedOnnxValue.CreateFromTensor("token_type_ids", tokenTypeIds)
                 };
 
                 // Run inference

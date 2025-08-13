@@ -37,6 +37,8 @@ Expected Capabilities:
 Input: "What is the capital of France?"
 Expected Capabilities:
 - Retrieve: "Paris" from learned Wikipedia facts
+
+
 - Confidence: High (multiple source confirmations)
 - Context: Explain France/Paris relationship
 ```

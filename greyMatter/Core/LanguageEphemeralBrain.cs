@@ -385,6 +385,42 @@ namespace greyMatter.Core
         }
 
         /// <summary>
+        /// Export all neurons for persistence to storage manager
+        /// This enables proper neuron transfer to the SemanticStorageManager pool
+        /// </summary>
+        public Dictionary<int, object> ExportNeurons()
+        {
+            var neurons = new Dictionary<int, object>();
+            var neuronId = 0;
+            
+            // Export neurons from all active clusters
+            foreach (var clusterKvp in GetActiveClusters())
+            {
+                var cluster = clusterKvp.Value;
+                
+                foreach (var neuron in cluster.ActiveNeurons)
+                {
+                    var neuronData = new
+                    {
+                        Id = neuronId,
+                        ClusterId = clusterKvp.Key,
+                        Type = "language", // All neurons in LanguageEphemeralBrain are language neurons
+                        Weights = new Dictionary<int, double>(), // Placeholder for neuron weights
+                        ActiveConcepts = new HashSet<string> { clusterKvp.Key },
+                        LastActivated = DateTime.UtcNow,
+                        ActivationCount = 1,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    
+                    neurons[neuronId] = neuronData;
+                    neuronId++;
+                }
+            }
+            
+            return neurons;
+        }
+
+        /// <summary>
         /// Determine the type of concept based on cluster ID and context
         /// </summary>
         private string DetermineConceptType(string clusterId)

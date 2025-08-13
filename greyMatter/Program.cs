@@ -21,6 +21,90 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for Tatoeba hybrid integration (large-scale training)
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid" || args[0] == "--hybrid-tatoeba"))
+            {
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunTatoebaHybridIntegrationAsync();
+                return;
+            }
+
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-full" || args[0] == "--hybrid-full-scale"))
+            {
+                Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
+                Console.WriteLine("║          FULL-SCALE HYBRID TRAINING (OPTIMIZED)               ║");
+                Console.WriteLine("║     Real Tatoeba Data + ONNX Semantic + Biological Neural     ║");
+                Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
+                Console.WriteLine();
+                
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunLargeScaleHybridTrainingAsync();
+                return;
+            }
+            
+            // Check for random sampling hybrid training
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-random" || args[0] == "--hybrid-random"))
+            {
+                Console.WriteLine("🎲 **RANDOM SAMPLING HYBRID TRAINING**");
+                Console.WriteLine("=====================================");
+                Console.WriteLine("Using random sampling from 2M+ Tatoeba sentences");
+                Console.WriteLine();
+                
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunRandomSamplingHybridTrainingAsync();
+                return;
+            }
+
+            // Check for different batch sizes
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-1k" || args[0] == "--hybrid-1k"))
+            {
+                Console.WriteLine("📊 **1K SENTENCE HYBRID TRAINING**");
+                Console.WriteLine("==================================");
+                Console.WriteLine("Processing 1,000 random sentences for quick testing");
+                Console.WriteLine();
+                
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunSizedHybridTrainingAsync(1000);
+                return;
+            }
+
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-10k" || args[0] == "--hybrid-10k"))
+            {
+                Console.WriteLine("📊 **10K SENTENCE HYBRID TRAINING**");
+                Console.WriteLine("===================================");
+                Console.WriteLine("Processing 10,000 random sentences for medium-scale testing");
+                Console.WriteLine();
+                
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunSizedHybridTrainingAsync(10000);
+                return;
+            }
+
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-100k" || args[0] == "--hybrid-100k"))
+            {
+                Console.WriteLine("📊 **100K SENTENCE HYBRID TRAINING**");
+                Console.WriteLine("====================================");
+                Console.WriteLine("Processing 100,000 random sentences for large-scale testing");
+                Console.WriteLine();
+                
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunSizedHybridTrainingAsync(100000);
+                return;
+            }
+
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-complete" || args[0] == "--hybrid-complete"))
+            {
+                Console.WriteLine("🌍 **COMPLETE DATASET HYBRID TRAINING**");
+                Console.WriteLine("=======================================");
+                Console.WriteLine("Processing ALL 2M+ Tatoeba sentences (FULL DATASET)");
+                Console.WriteLine("⚠️  This will take significant time and storage!");
+                Console.WriteLine();
+                
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunCompleteDatasetHybridTrainingAsync();
+                return;
+            }
+            
             // Check for semantic domain test
             if (args.Length > 0 && (args[0] == "--semantic-test" || args[0] == "--test-domains"))
             {
@@ -150,7 +234,16 @@ namespace GreyMatter
             if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h"))
             {
                 CerebroConfiguration.DisplayUsage();
-                Console.WriteLine("\nAdditional options:");
+                Console.WriteLine("\nHybrid Training Options:");
+                Console.WriteLine("  --tatoeba-hybrid             Small-scale hybrid demo (500 sentences, sequential)");
+                Console.WriteLine("  --tatoeba-hybrid-random      Small-scale with random sampling (500 sentences)");
+                Console.WriteLine("  --tatoeba-hybrid-1k          1,000 random sentences for quick testing");
+                Console.WriteLine("  --tatoeba-hybrid-10k         10,000 random sentences for medium testing");
+                Console.WriteLine("  --tatoeba-hybrid-100k        100,000 random sentences for large testing");
+                Console.WriteLine("  --tatoeba-hybrid-full        Optimized large-scale (demo limit: 100K sentences)");
+                Console.WriteLine("  --tatoeba-hybrid-complete    COMPLETE dataset (all 2M+ sentences) - LONG RUNTIME!");
+                Console.WriteLine();
+                Console.WriteLine("Additional Demo Options:");
                 Console.WriteLine("  --simple-demo     Run the original ephemeral brain concept demo");
                 Console.WriteLine("  --original-vision Same as --simple-demo");
                 Console.WriteLine("  --enhanced-demo   Run enhanced demo with Phase 2 features");
@@ -159,6 +252,11 @@ namespace GreyMatter
                 Console.WriteLine("  --phase3-demo     Same as --text-demo");
                 Console.WriteLine("  --comprehensive   Run complete demonstration (all phases)");
                 Console.WriteLine("  --full-demo       Same as --comprehensive");
+                Console.WriteLine();
+                Console.WriteLine("Data Information:");
+                Console.WriteLine("  • Total Tatoeba English sentences: 1,988,463");
+                Console.WriteLine("  • Random sampling gives different training data each run");
+                Console.WriteLine("  • Sequential sampling (default) uses same sentences each run");
                 return;
             }
             
@@ -695,6 +793,21 @@ namespace GreyMatter
             Console.WriteLine("     └─ Duration: 30-60 minutes");
             Console.WriteLine("     └─ Requires: 8GB+ RAM, several hundred MB storage");
             Console.WriteLine("     └─ Result: Production-ready language foundation");
+            Console.WriteLine();
+
+            Console.WriteLine("🧠 HYBRID TRAINING (ONNX + Biological):");
+            Console.WriteLine("  --tatoeba-hybrid  (or --hybrid-tatoeba)");
+            Console.WriteLine("     └─ Real Tatoeba data with semantic-biological integration");
+            Console.WriteLine("     └─ ONNX DistilBERT semantic guidance + emergent neural learning");
+            Console.WriteLine("     └─ Small-scale demonstration (500-1000 sentences)");
+            Console.WriteLine("     └─ Duration: 1-2 minutes");
+            Console.WriteLine();
+            Console.WriteLine("  --tatoeba-hybrid-full  (or --hybrid-full-scale)");
+            Console.WriteLine("     └─ FULL-SCALE hybrid training on complete dataset");
+            Console.WriteLine("     └─ Optimized storage for large-scale operations");
+            Console.WriteLine("     └─ Real semantic embeddings + biological neural networks");
+            Console.WriteLine("     └─ Duration: 20-40 minutes");
+            Console.WriteLine("     └─ Result: Advanced hybrid language model");
             Console.WriteLine();
 
             Console.WriteLine("🎯 CONTROLLED TESTING:");

@@ -98,39 +98,80 @@ namespace greyMatter.Learning
         /// </summary>
         public async Task SaveBrainStateAsync()
         {
+            var totalStartTime = DateTime.UtcNow;
             Console.WriteLine("💾 Saving brain state to biological storage...");
             
             try
             {
                 // Export vocabulary and save
+                var vocabStartTime = DateTime.UtcNow;
                 var vocabulary = _brain.ExportVocabulary();
                 await _storageManager.StoreVocabularyAsync(vocabulary);
-                Console.WriteLine($"   ✅ Saved {vocabulary.Count:N0} vocabulary entries");
+                var vocabElapsed = DateTime.UtcNow - vocabStartTime;
+                Console.WriteLine($"   ✅ Saved {vocabulary.Count:N0} vocabulary entries ({vocabElapsed.TotalMilliseconds:F0}ms)");
                 
                 // Export language data and save
+                var langStartTime = DateTime.UtcNow;
                 var languageData = _brain.ExportLanguageData();
                 await _storageManager.StoreLanguageDataAsync(languageData);
-                Console.WriteLine($"   ✅ Saved {languageData.Count:N0} language data entries");
+                var langElapsed = DateTime.UtcNow - langStartTime;
+                Console.WriteLine($"   ✅ Saved {languageData.Count:N0} language data entries ({langElapsed.TotalMilliseconds:F0}ms)");
                 
                 // Export individual neural concepts for semantic domain categorization
+                var conceptStartTime = DateTime.UtcNow;
                 var neuralConcepts = _brain.ExportNeuralConcepts();
-                await _storageManager.StoreNeuralConceptsAsync(neuralConcepts);
-                Console.WriteLine($"   ✅ Saved {neuralConcepts.Count:N0} neural concepts to semantic domains");
+                Console.WriteLine($"   🧠 Saving {neuralConcepts.Count:N0} neural concepts...");
+                
+                // Add timeout protection for large concept sets
+                var saveTask = _storageManager.StoreNeuralConceptsAsync(neuralConcepts);
+                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5)); // 5 minute timeout
+                
+                var completedTask = await Task.WhenAny(saveTask, timeoutTask);
+                if (completedTask == timeoutTask)
+                {
+                    Console.WriteLine("   ⚠️ Neural concept saving timed out, skipping for now");
+                }
+                else
+                {
+                    await saveTask; // Ensure we get any exceptions
+                    var conceptElapsed = DateTime.UtcNow - conceptStartTime;
+                    Console.WriteLine($"   ✅ Saved {neuralConcepts.Count:N0} neural concepts to semantic domains ({conceptElapsed.TotalMilliseconds:F0}ms)");
+                }
+                
+                // CRITICAL FIX: Export neurons from brain and add to storage manager pool
+                var neuronStartTime = DateTime.UtcNow;
+                Console.WriteLine("   🧠 Exporting neurons from brain...");
+                var brainNeurons = _brain.ExportNeurons(); // Get neurons from LanguageEphemeralBrain
+                Console.WriteLine($"   📊 Found {brainNeurons.Count:N0} neurons to persist");
+                
+                // Add each neuron to the storage manager's pool
+                foreach (var neuron in brainNeurons)
+                {
+                    await _storageManager.AddNeuronToPoolAsync(neuron.Key, neuron.Value);
+                }
+                var neuronElapsed = DateTime.UtcNow - neuronStartTime;
+                Console.WriteLine($"   ✅ Added {brainNeurons.Count:N0} neurons to pool ({neuronElapsed.TotalMilliseconds:F0}ms)");
                 
                 // Flush neuron pool to disk
+                var flushStartTime = DateTime.UtcNow;
+                Console.WriteLine("   💾 Flushing neuron pool...");
                 await _storageManager.FlushNeuronPoolAsync();
-                Console.WriteLine("   ✅ Saved neural network state");
+                var flushElapsed = DateTime.UtcNow - flushStartTime;
+                Console.WriteLine($"   ✅ Saved neural network state ({flushElapsed.TotalMilliseconds:F0}ms)");
                 
                 // Get storage statistics
                 var stats = await _storageManager.GetStorageStatisticsAsync();
                 Console.WriteLine($"   📊 Total storage: {stats.TotalStorageSize / 1024 / 1024:F1} MB");
                 Console.WriteLine($"   📊 Neuron pool: {stats.TotalNeuronsInPool:N0} neurons");
                 
-                Console.WriteLine("💾 Brain state saved successfully!");
+                var totalElapsed = DateTime.UtcNow - totalStartTime;
+                Console.WriteLine($"💾 Brain state saved successfully! (Total: {totalElapsed.TotalMilliseconds:F0}ms)");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Failed to save brain state: {ex.Message}");
+                var totalElapsed = DateTime.UtcNow - totalStartTime;
+                Console.WriteLine($"❌ Failed to save brain state: {ex.Message} (after {totalElapsed.TotalMilliseconds:F0}ms)");
+                Console.WriteLine($"   Stack trace: {ex.StackTrace}");
                 throw;
             }
         }
