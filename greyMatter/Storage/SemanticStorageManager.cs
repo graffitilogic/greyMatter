@@ -1525,6 +1525,59 @@ namespace GreyMatter.Storage
                 IsLoaded = true
             };
         }
+
+        /// <summary>
+        /// Load all neurons from the persistent neuron pool
+        /// This is used when restoring a brain from storage
+        /// </summary>
+        public async Task<Dictionary<int, object>> LoadAllNeuronsAsync()
+        {
+            var loadedNeurons = new Dictionary<int, object>();
+            
+            if (!Directory.Exists(_neuronPoolPath))
+            {
+                return loadedNeurons; // Empty if no pool exists
+            }
+            
+            // Get all neuron pool files
+            var poolFiles = Directory.GetFiles(_neuronPoolPath, "pool_bucket_*.json");
+            
+            foreach (var poolFile in poolFiles)
+            {
+                try
+                {
+                    if (File.Exists(poolFile))
+                    {
+                        var json = await File.ReadAllTextAsync(poolFile);
+                        var neuronsInFile = JsonSerializer.Deserialize<Dictionary<int, SharedNeuron>>(json) 
+                                          ?? new Dictionary<int, SharedNeuron>();
+                        
+                        // Convert SharedNeuron objects to generic objects for brain import
+                        foreach (var kvp in neuronsInFile)
+                        {
+                            var neuron = kvp.Value;
+                            var neuronData = new
+                            {
+                                Id = neuron.Id,
+                                Type = neuron.Type.ToString(),
+                                ActiveConcepts = neuron.ActiveConcepts,
+                                ActivationCount = neuron.ActivationCount,
+                                LastActivated = neuron.LastActivated,
+                                WeightMap = neuron.WeightMap
+                            };
+                            loadedNeurons[kvp.Key] = neuronData;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️  Failed to load neurons from {Path.GetFileName(poolFile)}: {ex.Message}");
+                }
+            }
+            
+            Console.WriteLine($"   🔄 Loaded {loadedNeurons.Count:N0} neurons from pool files");
+            return loadedNeurons;
+        }
     }
 
     /// <summary>

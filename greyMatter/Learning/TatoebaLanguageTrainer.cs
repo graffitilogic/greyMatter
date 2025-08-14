@@ -90,6 +90,19 @@ namespace greyMatter.Learning
                 brain.ImportLanguageData(languageData);
             }
             
+            // CRITICAL FIX: Load neurons from the persistent neuron pool
+            Console.WriteLine("   🔄 Loading neurons from persistent storage...");
+            var neurons = _storageManager.LoadAllNeuronsAsync().Result;
+            if (neurons.Any())
+            {
+                Console.WriteLine($"   🧠 Loading {neurons.Count:N0} neurons from pool...");
+                brain.ImportNeurons(neurons);
+            }
+            else
+            {
+                Console.WriteLine("   ℹ️  No neurons found in storage pool");
+            }
+            
             return brain;
         }
         

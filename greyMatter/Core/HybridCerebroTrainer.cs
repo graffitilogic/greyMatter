@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using GreyMatter.Storage;
+using greyMatter.Core;
 
 namespace GreyMatter.Core
 {
@@ -17,6 +18,7 @@ namespace GreyMatter.Core
         private readonly TrainableSemanticClassifier _trainableClassifier;
         private readonly SemanticStorageManager _storage;
         private readonly Random _random;
+        private readonly LanguageEphemeralBrain? _languageBrain;
 
         // Training configuration
         private readonly double _semanticGuidanceStrength;
@@ -31,6 +33,7 @@ namespace GreyMatter.Core
             PreTrainedSemanticClassifier pretrainedClassifier,
             TrainableSemanticClassifier trainableClassifier,
             SemanticStorageManager storage,
+            LanguageEphemeralBrain? languageBrain = null,
             double semanticGuidanceStrength = 0.7,
             double biologicalVariationRate = 0.3,
             bool enableBidirectionalLearning = true)
@@ -39,6 +42,7 @@ namespace GreyMatter.Core
             _pretrainedClassifier = pretrainedClassifier ?? throw new ArgumentNullException(nameof(pretrainedClassifier));
             _trainableClassifier = trainableClassifier ?? throw new ArgumentNullException(nameof(trainableClassifier));
             _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+            _languageBrain = languageBrain;
             
             _semanticGuidanceStrength = Math.Clamp(semanticGuidanceStrength, 0.0, 1.0);
             _biologicalVariationRate = Math.Clamp(biologicalVariationRate, 0.0, 1.0);
@@ -58,19 +62,25 @@ namespace GreyMatter.Core
 
             try
             {
-                // Phase 1: Semantic Classification
+                // Phase 1: Language Learning (if language brain is available)
+                if (_languageBrain != null)
+                {
+                    _languageBrain.LearnSentence(input);
+                }
+
+                // Phase 2: Semantic Classification
                 var semanticResult = await ClassifySemanticDomainAsync(input);
                 
-                // Phase 2: Semantic-Guided Biological Learning
+                // Phase 3: Semantic-Guided Biological Learning
                 var biologicalResult = await GuidebiologicalLearningAsync(input, semanticResult);
                 
-                // Phase 3: Bidirectional Learning (if enabled)
+                // Phase 4: Bidirectional Learning (if enabled)
                 if (_enableBidirectionalLearning)
                 {
                     await UpdateSemanticClassifierFromBiologicalLearningAsync(input, biologicalResult, semanticResult);
                 }
 
-                // Phase 4: Update statistics and return result
+                // Phase 5: Update statistics and return result
                 var elapsed = DateTime.Now - startTime;
                 Stats.TotalTrainingTime += elapsed;
                 Stats.SuccessfulTrainingCount++;
@@ -118,7 +128,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"🎯 Starting hybrid batch training: {inputList.Count:N0} inputs in {totalBatches} batches");
             }
 
-            foreach (var batch in inputList.Chunk(batchSize))
+            foreach (var batch in System.Linq.Enumerable.Chunk(inputList, batchSize))
             {
                 batchCount++;
                 var batchStart = DateTime.Now;

@@ -264,31 +264,173 @@ namespace greyMatter.Core
                 var dataType = kvp.Key;
                 var data = kvp.Value;
                 
-                // Learn language concepts silently to restore brain state
-                LearnSilently($"language_data_{dataType}");
-                
-                // If this is sentence pattern data, we could reconstruct patterns
-                if (dataType.Contains("sentence_patterns") && data is Dictionary<string, object> patterns)
+                // Restore learning statistics if available
+                if (dataType == "learning_stats" && data is Dictionary<string, object> stats)
                 {
-                    foreach (var pattern in patterns.Keys)
+                    if (stats.ContainsKey("LearnedSentences") && stats["LearnedSentences"] is int sentences)
                     {
-                        LearnSilently($"sentence_pattern_{pattern}");
+                        LearnedSentences = sentences;
+                        Console.WriteLine($"   📊 Restored sentence count: {sentences:N0}");
+                    }
+                    if (stats.ContainsKey("WordAssociations") && stats["WordAssociations"] is Dictionary<string, object> assocData)
+                    {
+                        foreach (var assoc in assocData)
+                        {
+                            if (assoc.Value is List<object> wordList)
+                            {
+                                var words = wordList.Select(w => w.ToString()).Where(w => !string.IsNullOrEmpty(w)).ToHashSet()!;
+                                _wordAssociations[assoc.Key] = words;
+                            }
+                        }
+                        Console.WriteLine($"   🔗 Restored {_wordAssociations.Sum(kvp => kvp.Value.Count):N0} word associations");
                     }
                 }
-                
-                // If this is word association data, restore associations
-                if (dataType.Contains("word_associations") && data is Dictionary<string, object> associations)
+                else
                 {
-                    foreach (var assoc in associations)
+                    // Learn language concepts silently to restore brain state
+                    LearnSilently($"language_data_{dataType}");
+                    
+                    // If this is sentence pattern data, we could reconstruct patterns
+                    if (dataType.Contains("sentence_patterns") && data is Dictionary<string, object> patterns)
                     {
-                        if (assoc.Value is IEnumerable<string> words)
+                        foreach (var pattern in patterns.Keys)
                         {
-                            var wordSet = new HashSet<string>(words);
-                            _wordAssociations[assoc.Key] = wordSet;
+                            LearnSilently($"sentence_pattern_{pattern}");
+                        }
+                    }
+                    
+                    // If this is word association data, restore associations (legacy support)
+                    if (dataType.Contains("word_associations") && data is Dictionary<string, object> associations)
+                    {
+                        foreach (var assoc in associations)
+                        {
+                            if (assoc.Value is IEnumerable<string> words)
+                            {
+                                var wordSet = new HashSet<string>(words);
+                                _wordAssociations[assoc.Key] = wordSet;
+                            }
                         }
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Import neurons from biological storage back into the brain
+        /// This restores the neural network state from persistent storage
+        /// </summary>
+        public void ImportNeurons(Dictionary<int, object> neurons)
+        {
+            foreach (var kvp in neurons)
+            {
+                var neuronId = kvp.Key;
+                var neuronData = kvp.Value;
+                
+                try
+                {
+                    // Extract neuron information using reflection or dynamic access
+                    var neuronType = neuronData.GetType();
+                    
+                    // Get ActiveConcepts if available
+                    var activeConceptsProp = neuronType.GetProperty("ActiveConcepts");
+                    HashSet<string> activeConcepts = new HashSet<string>();
+                    
+                    if (activeConceptsProp != null && activeConceptsProp.GetValue(neuronData) is HashSet<string> concepts)
+                    {
+                        activeConcepts = concepts;
+                    }
+                    
+                    // Get ActivationCount if available
+                    var activationCountProp = neuronType.GetProperty("ActivationCount");
+                    int activationCount = 1;
+                    
+                    if (activationCountProp != null && activationCountProp.GetValue(neuronData) is int count)
+                    {
+                        activationCount = count;
+                    }
+                    
+                    // Restore the neuron's concepts by triggering concept learning
+                    foreach (var concept in activeConcepts)
+                    {
+                        if (!string.IsNullOrEmpty(concept))
+                        {
+                            // Silently restore the concept to rebuild neural structure
+                            LearnSilently(concept);
+                            
+                            // Track restored sentences if this appears to be sentence data
+                            if (concept.StartsWith("sentence_") || concept.Contains("_sent_"))
+                            {
+                                LearnedSentences++;
+                            }
+                        }
+                    }
+                    
+                    // If we can determine word associations from the neuron, restore them
+                    if (activeConcepts.Count >= 2)
+                    {
+                        var conceptList = activeConcepts.ToList();
+                        for (int i = 0; i < conceptList.Count; i++)
+                        {
+                            var concept1 = conceptList[i];
+                            
+                            // Create word associations between concepts if they look like words
+                            if (IsWordConcept(concept1))
+                            {
+                                var word1 = ExtractWordFromConcept(concept1);
+                                if (!_wordAssociations.ContainsKey(word1))
+                                {
+                                    _wordAssociations[word1] = new HashSet<string>();
+                                }
+                                
+                                // Associate with other word concepts in this neuron
+                                for (int j = i + 1; j < conceptList.Count; j++)
+                                {
+                                    var concept2 = conceptList[j];
+                                    if (IsWordConcept(concept2))
+                                    {
+                                        var word2 = ExtractWordFromConcept(concept2);
+                                        _wordAssociations[word1].Add(word2);
+                                        
+                                        if (!_wordAssociations.ContainsKey(word2))
+                                        {
+                                            _wordAssociations[word2] = new HashSet<string>();
+                                        }
+                                        _wordAssociations[word2].Add(word1);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"   ⚠️  Failed to import neuron {neuronId}: {ex.Message}");
+                }
+            }
+            
+            Console.WriteLine($"   🧠 Imported {neurons.Count:N0} neurons into brain structure");
+        }
+
+        /// <summary>
+        /// Check if a concept string represents a word
+        /// </summary>
+        private bool IsWordConcept(string concept)
+        {
+            return concept.StartsWith("word_") || 
+                   concept.StartsWith("vocab_") ||
+                   (!concept.Contains("_") && concept.Length > 1 && concept.Length < 20);
+        }
+
+        /// <summary>
+        /// Extract the actual word from a word concept string
+        /// </summary>
+        private string ExtractWordFromConcept(string concept)
+        {
+            if (concept.StartsWith("word_"))
+                return concept.Substring(5);
+            if (concept.StartsWith("vocab_"))
+                return concept.Substring(6);
+            return concept;
         }
         
         /// <summary>
@@ -322,7 +464,18 @@ namespace greyMatter.Core
         {
             var languageData = new Dictionary<string, object>();
             
-            // Export word associations
+            // Export learning statistics for proper state restoration
+            var learningStats = new Dictionary<string, object>
+            {
+                ["LearnedSentences"] = LearnedSentences,
+                ["WordAssociations"] = _wordAssociations.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value.ToList() as object
+                )
+            };
+            languageData["learning_stats"] = learningStats;
+            
+            // Export word associations (legacy support)
             languageData["word_associations"] = _wordAssociations.ToDictionary(
                 kvp => kvp.Key,
                 kvp => kvp.Value.ToList() as object
