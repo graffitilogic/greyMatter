@@ -108,12 +108,13 @@ namespace GreyMatter
                 Console.WriteLine("   🔄 Will rely on trainable classifier");
             }
 
-            // Initialize hybrid trainer
+            // Initialize hybrid trainer with language brain integration
             _hybridTrainer = new HybridCerebroTrainer(
                 _cerebro,
                 pretrainedClassifier,
                 trainableClassifier,
                 _storage,
+                _tatoebaTrainer.Brain, // Add language brain for vocabulary learning
                 semanticGuidanceStrength: 0.75, // Higher for real data
                 biologicalVariationRate: 0.25,  // Lower for more directed learning
                 enableBidirectionalLearning: true
@@ -611,6 +612,7 @@ namespace GreyMatter
                 _preTrainedClassifier,
                 new TrainableSemanticClassifier(_storageManager),
                 _storageManager,
+                _tatoebaTrainer.Brain, // Add language brain for vocabulary learning
                 semanticGuidanceStrength: 0.75,  // Strong semantic guidance for large datasets
                 biologicalVariationRate: 0.25,
                 enableBidirectionalLearning: true

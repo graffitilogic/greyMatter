@@ -14,6 +14,22 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            // Check for evaluation of training results
+            if (args.Length > 0 && (args[0] == "--evaluate" || args[0] == "--eval-training"))
+            {
+                var evaluator = new TrainingEvaluationTest();
+                await evaluator.RunFullEvaluation();
+                return;
+            }
+            
+            // Check for testing current training results
+            if (args.Length > 0 && (args[0] == "--test-training" || args[0] == "--test-results"))
+            {
+                // await TestTrainingResults.RunTestAsync(); // Temporarily disabled
+                Console.WriteLine("Training results testing temporarily disabled");
+                return;
+            }
+            
             // Check for hybrid training test
             if (args.Length > 0 && (args[0] == "--hybrid-test" || args[0] == "--test-hybrid"))
             {
