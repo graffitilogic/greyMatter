@@ -14,10 +14,12 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
-            // Check for sparse encoding test
+            // Legacy sparse encoding test (use --evaluate instead)
             if (args.Length > 0 && (args[0] == "--test-sparse" || args[0] == "--sparse-encoding"))
             {
-                await SparseEncodingTest.RunSparseEncodingTest();
+                Console.WriteLine("ℹ️  Sparse encoding tests are now integrated into the main evaluation.");
+                Console.WriteLine("    Use --evaluate to test your trained models.");
+                Console.WriteLine("    Use --tatoeba-hybrid-1k to train with sparse encoding.");
                 return;
             }
             
@@ -28,11 +30,11 @@ namespace GreyMatter
                 return;
             }
             
-            // Check for evaluation of training results
+            // Check for unified evaluation of training results
             if (args.Length > 0 && (args[0] == "--evaluate" || args[0] == "--eval-training"))
             {
-                var evaluator = new TrainingEvaluationTest();
-                await evaluator.RunFullEvaluation();
+                var evaluator = new UnifiedTrainingEvaluator();
+                await evaluator.RunUnifiedEvaluation();
                 return;
             }
             
