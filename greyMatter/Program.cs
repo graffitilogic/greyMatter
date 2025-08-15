@@ -37,6 +37,14 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for hybrid optimization test
+            if (args.Length > 0 && (args[0] == "--test-hybrid-optimization" || args[0] == "--verify-optimization"))
+            {
+                // await global::greyMatter.HybridOptimizationTest.RunOptimizationTestAsync();
+                Console.WriteLine("Hybrid optimization test temporarily disabled due to namespace issues");
+                return;
+            }
+            
             // Check for testing current training results
             if (args.Length > 0 && (args[0] == "--test-training" || args[0] == "--test-results"))
             {

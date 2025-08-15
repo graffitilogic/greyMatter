@@ -253,7 +253,10 @@ namespace GreyMatter.Core
             try
             {
                 // 🔧 OPTIMIZATION: Use optimized sentence learning instead of concept-based learning
+                Console.WriteLine($"🔧 DEBUG: Calling LearnSentenceOptimizedAsync for: '{input}'");
                 var optimizedResult = await _cerebro.LearnSentenceOptimizedAsync(input, semanticResult.PrimaryDomain);
+                
+                Console.WriteLine($"🔧 DEBUG: Optimization result - Neurons created: {optimizedResult.NeuronsCreated}, Reused: {optimizedResult.NeuronsReused}, Total: {optimizedResult.TotalNeuronsUsed}");
                 
                 // Extract results from optimized learning
                 conceptsLearned.AddRange(optimizedResult.WordResults.Select(wr => $"{semanticResult.PrimaryDomain}:{wr.Word}"));

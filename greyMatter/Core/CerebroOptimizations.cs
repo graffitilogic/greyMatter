@@ -31,7 +31,7 @@ namespace GreyMatter.Core
             };
 
             var manager = GetOrCreateNeuronManager(result.SemanticDomain);
-            var cluster = await cerebro.FindOrCreateClusterForDomain(result.SemanticDomain);
+            var cluster = await cerebro.FindOrCreateClusterForConcept(result.SemanticDomain);
 
             var totalNeuronsUsed = 0;
             var neuronsCreated = 0;
