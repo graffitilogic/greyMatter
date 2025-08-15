@@ -754,7 +754,7 @@ namespace GreyMatter.Core
 
         // Private helper methods
 
-        private async Task<NeuronCluster> FindOrCreateClusterForConcept(string concept)
+        public async Task<NeuronCluster> FindOrCreateClusterForConcept(string concept)
         {
             // Fast path: cache
             if (_conceptClusterCache.TryGetValue(concept, out var cachedId))

@@ -234,7 +234,7 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
-        /// Guide Cerebro's biological learning using semantic domain information
+        /// Guide Cerebro's biological learning using semantic domain information with optimized neuron reuse
         /// </summary>
         private async Task<BiologicalLearningResult> GuidebiologicalLearningAsync(
             string input, 
@@ -252,38 +252,22 @@ namespace GreyMatter.Core
 
             try
             {
-                // Enhanced concept learning with domain-specific guidance
-                var conceptName = $"{semanticResult.PrimaryDomain}:{GetConceptName(input)}";
+                // 🔧 OPTIMIZATION: Use optimized sentence learning instead of concept-based learning
+                var optimizedResult = await _cerebro.LearnSentenceOptimizedAsync(input, semanticResult.PrimaryDomain);
                 
-                // Use semantic confidence to influence neural allocation
-                var semanticFeatures = CreateSemanticFeatures(input, semanticResult);
-                
-                await _cerebro.LearnConceptAsync(conceptName, semanticFeatures);
-                conceptsLearned.Add(conceptName);
+                // Extract results from optimized learning
+                conceptsLearned.AddRange(optimizedResult.WordResults.Select(wr => $"{semanticResult.PrimaryDomain}:{wr.Word}"));
+                clustersActivated.Add(semanticResult.PrimaryDomain);
 
                 // Map semantic domains to neural clusters (Huth-inspired brain mapping)
                 var targetCluster = MapSemanticDomainToNeuralCluster(semanticResult.PrimaryDomain);
-                if (targetCluster != null)
+                if (targetCluster != null && !clustersActivated.Contains(targetCluster))
                 {
                     clustersActivated.Add(targetCluster);
                 }
 
-                // Learn secondary domains if present with reduced weight
-                foreach (var secondaryDomain in semanticResult.AllDomains.Skip(1).Take(2))
-                {
-                    var secondaryConceptName = $"{secondaryDomain.Key}:{GetConceptName(input)}";
-                    var secondaryFeatures = CreateSemanticFeatures(input, new SemanticClassificationResult
-                    {
-                        PrimaryDomain = secondaryDomain.Key,
-                        Confidence = secondaryDomain.Value,
-                        AllDomains = new Dictionary<string, double> { [secondaryDomain.Key] = secondaryDomain.Value }
-                    });
-                    
-                    await _cerebro.LearnConceptAsync(secondaryConceptName, secondaryFeatures);
-                    conceptsLearned.Add(secondaryConceptName);
-                }
-
-                    var neuralAllocationWeight = _semanticGuidanceStrength * semanticResult.Confidence + 
+                // Calculate neural allocation weight based on optimized learning efficiency
+                var neuralAllocationWeight = _semanticGuidanceStrength * semanticResult.Confidence + 
                                            (1 - _semanticGuidanceStrength) * biologicalVariation;
 
                 return new BiologicalLearningResult
@@ -292,7 +276,16 @@ namespace GreyMatter.Core
                     ConceptsLearned = conceptsLearned,
                     ClustersActivated = clustersActivated,
                     NeuralAllocationWeight = neuralAllocationWeight,
-                    BiologicalVariation = biologicalVariation
+                    BiologicalVariation = biologicalVariation,
+                    // New: Include optimization metrics
+                    OptimizationMetrics = new Dictionary<string, object>
+                    {
+                        ["neurons_used"] = optimizedResult.TotalNeuronsUsed,
+                        ["neurons_created"] = optimizedResult.NeuronsCreated,
+                        ["neurons_reused"] = optimizedResult.NeuronsReused,
+                        ["reuse_efficiency"] = optimizedResult.ReuseEfficiency,
+                        ["words_processed"] = optimizedResult.WordsExtracted
+                    }
                 };
             }
             catch (Exception ex)
@@ -575,6 +568,7 @@ namespace GreyMatter.Core
         public List<string> ClustersActivated { get; set; } = new();
         public double NeuralAllocationWeight { get; set; }
         public double BiologicalVariation { get; set; }
+        public Dictionary<string, object>? OptimizationMetrics { get; set; }
     }
 
     /// <summary>

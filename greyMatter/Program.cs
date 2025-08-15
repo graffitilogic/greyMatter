@@ -22,6 +22,21 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for neuron growth diagnostic
+            if (args.Length > 0 && (args[0] == "--diagnostic" || args[0] == "--analyze-growth"))
+            {
+                var diagnostic = new NeuronGrowthDiagnostic();
+                await diagnostic.RunDiagnostic();
+                return;
+            }
+            
+            // Check for optimized learning test
+            if (args.Length > 0 && (args[0] == "--test-optimized" || args[0] == "--test-efficiency"))
+            {
+                await OptimizedLearningTest.TestOptimizedLearning();
+                return;
+            }
+            
             // Check for testing current training results
             if (args.Length > 0 && (args[0] == "--test-training" || args[0] == "--test-results"))
             {
