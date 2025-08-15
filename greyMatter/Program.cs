@@ -14,6 +14,20 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            // Check for sparse encoding test
+            if (args.Length > 0 && (args[0] == "--test-sparse" || args[0] == "--sparse-encoding"))
+            {
+                await SparseEncodingTest.RunSparseEncodingTest();
+                return;
+            }
+            
+            // Check for pattern analysis
+            if (args.Length > 0 && args[0] == "--analyze-patterns")
+            {
+                await PatternAnalysisTest.RunAsync();
+                return;
+            }
+            
             // Check for evaluation of training results
             if (args.Length > 0 && (args[0] == "--evaluate" || args[0] == "--eval-training"))
             {
@@ -95,6 +109,18 @@ namespace GreyMatter
             }
 
             // Check for different batch sizes
+            if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-debug" || args[0] == "--hybrid-debug"))
+            {
+                Console.WriteLine("🔧 **DEBUG HYBRID TRAINING**");
+                Console.WriteLine("============================");
+                Console.WriteLine("Processing 10 sentences with debug output");
+                Console.WriteLine();
+                
+                var demo = new TatoebaHybridIntegrationDemo();
+                await demo.RunSizedHybridTrainingAsync(10);
+                return;
+            }
+            
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-1k" || args[0] == "--hybrid-1k"))
             {
                 Console.WriteLine("📊 **1K SENTENCE HYBRID TRAINING**");
