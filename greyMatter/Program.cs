@@ -33,7 +33,7 @@ namespace GreyMatter
             // Check for unified evaluation of training results
             if (args.Length > 0 && (args[0] == "--evaluate" || args[0] == "--eval-training"))
             {
-                var evaluator = new UnifiedTrainingEvaluator();
+                var evaluator = new greyMatter.UnifiedTrainingEvaluator();
                 await evaluator.RunUnifiedEvaluation();
                 return;
             }
