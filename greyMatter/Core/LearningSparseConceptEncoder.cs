@@ -4,6 +4,9 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
+using System.IO;
+using GreyMatter.Storage;
+using GreyMatter.Core;
 
 namespace GreyMatter.Core
 {
@@ -18,6 +21,7 @@ namespace GreyMatter.Core
         private readonly Random _random;
         private readonly int _patternSize;
         private readonly double _sparsity;
+        private readonly SemanticStorageManager? _storageManager;
 
         public LearningSparseConceptEncoder(int patternSize = 2048, double sparsity = 0.02)
         {
@@ -27,6 +31,21 @@ namespace GreyMatter.Core
             _random = new Random(42);
             _patternSize = patternSize;
             _sparsity = sparsity;
+            _storageManager = null;
+        }
+
+        public LearningSparseConceptEncoder(SemanticStorageManager storageManager, int patternSize = 2048, double sparsity = 0.02)
+        {
+            _learnedPatterns = new Dictionary<string, LearnedSparsePattern>();
+            _wordRelationships = new Dictionary<string, List<string>>();
+            _semanticConcepts = new Dictionary<string, SemanticConcept>();
+            _random = new Random(42);
+            _patternSize = patternSize;
+            _sparsity = sparsity;
+            _storageManager = storageManager;
+            
+            // Load learned patterns from storage on initialization
+            Task.Run(async () => await LoadLearnedPatternsFromStorageAsync()).Wait();
         }
 
         /// <summary>
@@ -224,7 +243,8 @@ namespace GreyMatter.Core
             var activeBits = (int)(_patternSize * _sparsity);
 
             // Use concept words to seed pattern generation
-            var conceptHash = string.Join(",", concept.Words.OrderBy(w => w));
+            var wordsForHash = concept.Words ?? new List<string>();
+            var conceptHash = string.Join(",", wordsForHash.OrderBy(w => w));
             var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(conceptHash));
 
             // Distribute active bits based on concept hash
@@ -254,7 +274,9 @@ namespace GreyMatter.Core
                 Confidence = 1.0
             };
 
-            foreach (var word in concept.Words)
+            // Store learned pattern for each word in concept
+            var conceptWords = concept.Words ?? new List<string>();
+            foreach (var word in conceptWords)
             {
                 _learnedPatterns[word] = learnedPattern;
             }
@@ -265,6 +287,11 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task<SparsePattern> AdaptPatternToContextAsync(LearnedSparsePattern learnedPattern, string context)
         {
+            if (learnedPattern.BasePattern == null)
+            {
+                return new SparsePattern(Array.Empty<int>(), 1.0);
+            }
+
             if (string.IsNullOrEmpty(context))
             {
                 return new SparsePattern(GetActiveIndices(learnedPattern.BasePattern).ToArray(), 1.0);
@@ -365,22 +392,81 @@ namespace GreyMatter.Core
             new[] { "run", "walk", "eat", "sleep", "play", "work" }.Contains(word);
         private bool IsColorWord(string word) =>
             new[] { "red", "blue", "green", "yellow", "black", "white" }.Contains(word);
+
+        /// <summary>
+        /// Load learned patterns from SemanticStorageManager
+        /// </summary>
+        private async Task LoadLearnedPatternsFromStorageAsync()
+        {
+            if (_storageManager == null) return;
+
+            try
+            {
+                // Load vocabulary using the SemanticStorageManager's public method
+                var vocabulary = await _storageManager.LoadVocabularyAsync();
+                
+                if (vocabulary == null || !vocabulary.Any()) return;
+
+                // Create learned patterns for stored words
+                foreach (var wordEntry in vocabulary.Take(100)) // Limit to 100 for performance
+                {
+                    var pattern = GenerateLearnedPatternForWord(wordEntry.Key);
+                    _learnedPatterns[wordEntry.Key] = pattern;
+                }
+
+                Console.WriteLine($"   ✅ Initialized encoder with {vocabulary.Count} learned word patterns");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"   ⚠️ Failed to load learned patterns from storage: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Generate a learned pattern for a word
+        /// </summary>
+        private LearnedSparsePattern GenerateLearnedPatternForWord(string word)
+        {
+            // Use word to create a deterministic learned pattern
+            var wordHash = word.ToLower();
+            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(wordHash));
+
+            var pattern = new bool[_patternSize];
+            var activeBits = (int)(_patternSize * _sparsity);
+
+            // Distribute active bits based on word hash
+            for (int i = 0; i < activeBits; i++)
+            {
+                var index = BitConverter.ToInt32(hashBytes, (i * 4) % (hashBytes.Length - 3));
+                index = Math.Abs(index) % _patternSize;
+                pattern[index] = true;
+            }
+
+            return new LearnedSparsePattern
+            {
+                ConceptId = $"learned_{word}",
+                BasePattern = pattern,
+                ConceptType = "learned",
+                LearnedFrom = new List<string> { word },
+                Confidence = 1.0
+            };
+        }
     }
 
     public class LearnedSparsePattern
     {
-        public string ConceptId { get; set; }
-        public bool[] BasePattern { get; set; }
-        public string ConceptType { get; set; }
-        public List<string> LearnedFrom { get; set; }
+        public string? ConceptId { get; set; }
+        public bool[]? BasePattern { get; set; }
+        public string? ConceptType { get; set; }
+        public List<string>? LearnedFrom { get; set; }
         public double Confidence { get; set; }
     }
 
     public class SemanticConcept
     {
-        public string Id { get; set; }
-        public List<string> Words { get; set; }
-        public string Type { get; set; }
+        public string? Id { get; set; }
+        public List<string>? Words { get; set; }
+        public string? Type { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsLearned { get; set; }
     }

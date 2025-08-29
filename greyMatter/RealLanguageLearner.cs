@@ -29,7 +29,7 @@ namespace GreyMatter
             _brainPath = brainPath;
             _learnedWordsPath = Path.Combine(brainPath, "learned_words.json");
             _storageManager = new SemanticStorageManager(brainPath);
-            _encoder = new LearningSparseConceptEncoder();
+            _encoder = new LearningSparseConceptEncoder(_storageManager);
             _wordDatabase = new Dictionary<string, TatoebaDataConverter.WordData>();
             _cooccurrenceMatrix = new Dictionary<string, Dictionary<string, int>>();
             _alreadyLearnedWords = new HashSet<string>();

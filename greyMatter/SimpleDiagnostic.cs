@@ -41,7 +41,9 @@ namespace GreyMatter
 
             // 2. Check what the system is actually learning
             Console.WriteLine("\n🧠 **LEARNING CHECK**");
-            var encoder = new LearningSparseConceptEncoder();
+            var brainPath = "/Volumes/jarvis/brainData";
+            var storageManager = new SemanticStorageManager(brainPath);
+            var encoder = new LearningSparseConceptEncoder(storageManager);
 
             var testWords = new[] { "cat", "dog", "the", "and", "is" };
             foreach (var word in testWords)
@@ -66,10 +68,10 @@ namespace GreyMatter
 
             // 3. Check brain data content
             Console.WriteLine("\n💾 **BRAIN DATA ANALYSIS**");
-            var brainPath = "/Volumes/jarvis/brainData/hierarchical/partition_metadata.json";
-            if (File.Exists(brainPath))
+            var brainDataPath = "/Volumes/jarvis/brainData/hierarchical/partition_metadata.json";
+            if (File.Exists(brainDataPath))
             {
-                var content = await File.ReadAllTextAsync(brainPath);
+                var content = await File.ReadAllTextAsync(brainDataPath);
                 var emotionalCount = content.Split(new[] { "emotional_memory" }, StringSplitOptions.None).Length - 1;
                 var languageCount = content.Split(new[] { "language_data" }, StringSplitOptions.None).Length - 1;
 

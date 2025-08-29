@@ -47,8 +47,8 @@ namespace GreyMatter
                 try
                 {
                     // Initialize components
-                    var encoder = new GreyMatter.Core.LearningSparseConceptEncoder();
                     var storage = new GreyMatter.Storage.SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
+                    var encoder = new GreyMatter.Core.LearningSparseConceptEncoder(storage);
 
                     // Create debugger
                     var debugger = new GreyMatter.GreyMatterDebugger(encoder, storage);
