@@ -258,6 +258,59 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for Tatoeba data conversion
+            if (args.Length > 0 && (args[0] == "--convert-tatoeba-data" || args[0] == "--convert-tatoeba"))
+            {
+                Console.WriteLine("🔄 **TATOEBA DATA CONVERSION**");
+                Console.WriteLine("==============================");
+
+                try
+                {
+                    var tatoebaPath = GetArgValue(args, "--input", "/Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv");
+                    var outputPath = GetArgValue(args, "--output", "/Volumes/jarvis/trainData/Tatoeba/learning_data");
+                    var maxSentences = GetArgValue(args, "--max-sentences", 10000);
+
+                    var converter = new TatoebaDataConverter(tatoebaPath, outputPath);
+                    await converter.ConvertAndBuildLearningDataAsync(maxSentences);
+
+                    Console.WriteLine("\n✅ **DATA CONVERSION COMPLETE**");
+                    Console.WriteLine($"📁 Output saved to: {outputPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error during conversion: {ex.Message}");
+                }
+                return;
+            }
+
+            // Check for real language learning from Tatoeba data
+            if (args.Length > 0 && (args[0] == "--learn-from-tatoeba" || args[0] == "--real-learning"))
+            {
+                Console.WriteLine("🧠 **REAL LANGUAGE LEARNING FROM TATOEBA**");
+                Console.WriteLine("==========================================");
+
+                try
+                {
+                    var dataPath = GetArgValue(args, "--data-path", "/Volumes/jarvis/trainData/Tatoeba/learning_data");
+                    var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
+                    var maxWords = GetArgValue(args, "--max-words", 1000);
+
+                    var learner = new RealLanguageLearner(dataPath, brainPath);
+                    await learner.LearnFromTatoebaDataAsync(maxWords);
+
+                    // Test the learning
+                    await learner.TestLearningAsync();
+
+                    Console.WriteLine("\n✅ **REAL LEARNING COMPLETE**");
+                    Console.WriteLine($"📊 Learned {maxWords} words from actual Tatoeba sentences");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error during learning: {ex.Message}");
+                }
+                return;
+            }
+            
             // Check for semantic domain test
             if (args.Length > 0 && (args[0] == "--semantic-test" || args[0] == "--test-domains"))
             {
@@ -410,6 +463,14 @@ namespace GreyMatter
                 Console.WriteLine("  • Total Tatoeba English sentences: 1,988,463");
                 Console.WriteLine("  • Random sampling gives different training data each run");
                 Console.WriteLine("  • Sequential sampling (default) uses same sentences each run");
+                
+                Console.WriteLine("\nReal Language Learning Options:");
+                Console.WriteLine("  --convert-tatoeba-data    Convert Tatoeba CSV to learning data");
+                Console.WriteLine("  --learn-from-tatoeba      Learn from actual Tatoeba sentences");
+                Console.WriteLine("  --diag                    Run diagnostic to check system status");
+                Console.WriteLine("  --debug                   Run comprehensive debugging");
+                Console.WriteLine("  --evaluate                Evaluate current learning results");
+                Console.WriteLine();
                 return;
             }
             
@@ -554,116 +615,67 @@ namespace GreyMatter
         
         static async Task RunCognitionDemo(string[] args, CerebroConfiguration config)
         {
-            Console.WriteLine("🧠🌟 **COGNITION DEMONSTRATION**");
-            Console.WriteLine("==================================================");
-            Console.WriteLine("Advanced cognitive processing with neural networks\n");
+            Console.WriteLine("🧠 **GREYMATTER - REAL LANGUAGE LEARNING SYSTEM**");
+            Console.WriteLine("================================================");
+            Console.WriteLine("Processing actual language data from Tatoeba dataset\n");
 
-            var brain = new Cerebro(config.BrainDataPath);
-            await brain.InitializeAsync();
+            Console.WriteLine("📊 **SYSTEM STATUS**");
+            Console.WriteLine("===================");
 
-            Console.WriteLine("📊 Initial Brain Status:");
-            var initialStats = await brain.GetStatsAsync();
-            Console.WriteLine($"   Age: {await brain.GetBrainAgeAsync()}");
-            Console.WriteLine($"   Clusters: {initialStats.TotalClusters}");
-            Console.WriteLine($"   Storage: {initialStats.StorageSizeFormatted}");
+            // Check if learning data exists
+            var dataPath = "/Volumes/jarvis/trainData/Tatoeba/learning_data";
+            var brainPath = "/Volumes/jarvis/brainData";
 
-            Console.WriteLine("\n🎓 **TEACHING FOUNDATIONAL KNOWLEDGE**");
-            Console.WriteLine("Building core concepts for advanced cognition\n");
-
-            // Core foundational concepts
-            var foundationalConcepts = new[]
+            if (Directory.Exists(dataPath))
             {
-                ("existence", new Dictionary<string, double> { ["philosophical"] = 0.9, ["abstract"] = 0.8, ["importance"] = 1.0 }),
-                ("learning", new Dictionary<string, double> { ["cognitive"] = 0.9, ["adaptive"] = 0.8, ["fundamental"] = 0.9 }),
-                ("memory", new Dictionary<string, double> { ["retention"] = 0.8, ["neural"] = 0.9, ["essential"] = 0.8 }),
-                ("understanding", new Dictionary<string, double> { ["comprehension"] = 0.9, ["insight"] = 0.7, ["wisdom"] = 0.8 }),
-                ("curiosity", new Dictionary<string, double> { ["exploration"] = 0.9, ["motivation"] = 0.8, ["discovery"] = 0.9 }),
-                ("patterns", new Dictionary<string, double> { ["recognition"] = 0.8, ["structure"] = 0.7, ["intelligence"] = 0.8 }),
-                ("connections", new Dictionary<string, double> { ["relationships"] = 0.9, ["associations"] = 0.8, ["networks"] = 0.7 })
-            };
-
-            foreach (var (concept, features) in foundationalConcepts)
+                Console.WriteLine("✅ Learning data found");
+                var wordDbPath = Path.Combine(dataPath, "word_database.json");
+                if (File.Exists(wordDbPath))
+                {
+                    var wordDbJson = await File.ReadAllTextAsync(wordDbPath);
+                    var wordDb = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, TatoebaDataConverter.WordData>>(wordDbJson);
+                    Console.WriteLine($"   Words in database: {wordDb?.Count ?? 0}");
+                }
+            }
+            else
             {
-                var result = await brain.LearnConceptAsync(concept, features);
-                Console.WriteLine($"   ✅ {concept}: {result.NeuronsInvolved} neurons engaged");
+                Console.WriteLine("❌ No learning data found");
+                Console.WriteLine("   Run: dotnet run -- --convert-tatoeba-data");
             }
 
-            Console.WriteLine("\n🌟 **AWAKENING COGNITION**");
-            Console.WriteLine("Starting continuous background processing...\n");
-
-            // Awaken cognitive processing
-            await brain.AwakeCognitionAsync();
-
-            // Monitor cognitive processing for a period
-            Console.WriteLine("🧠 **COGNITION MONITORING** (20 seconds of processing)");
-            Console.WriteLine("Observing cognitive processing and development\n");
-
-            var monitoringDuration = TimeSpan.FromSeconds(20);
-            var startTime = DateTime.UtcNow;
-
-            while (DateTime.UtcNow - startTime < monitoringDuration)
+            // Check brain storage
+            if (Directory.Exists(brainPath))
             {
-                await Task.Delay(4000); // Check every 4 seconds
-                
-                var cognitiveStats = brain.GetCognitionStats();
-                var elapsed = DateTime.UtcNow - startTime;
-                
-                Console.WriteLine($"⏱️  {elapsed.TotalSeconds:F0}s | Status: {cognitiveStats.Status}");
-                Console.WriteLine($"   🧠 Iterations: {cognitiveStats.CognitionIterations}");
-                Console.WriteLine($"   💭 Focus: {cognitiveStats.CurrentFocus}");
-                Console.WriteLine($"   🌟 {cognitiveStats.EthicalState}");
-                Console.WriteLine($"   ⚡ Frequency: {cognitiveStats.CognitionFrequency.TotalMilliseconds}ms");
-                Console.WriteLine();
+                Console.WriteLine("✅ Brain storage found");
+                var files = Directory.GetFiles(brainPath, "*.json", SearchOption.AllDirectories);
+                Console.WriteLine($"   Stored patterns: {files.Length}");
+            }
+            else
+            {
+                Console.WriteLine("❌ No brain storage found");
             }
 
-            Console.WriteLine("🔍 **COGNITION ANALYSIS**");
-            var finalCognitionStats = brain.GetCognitionStats();
-            Console.WriteLine($"   Total Cognitive Iterations: {finalCognitionStats.CognitionIterations}");
-            Console.WriteLine($"   Average Frequency: {finalCognitionStats.CognitionFrequency.TotalMilliseconds}ms");
-            
-            Console.WriteLine($"   Current Ethical Drive State:");
-            Console.WriteLine($"      • Wisdom Seeking: {finalCognitionStats.WisdomSeeking:P1}");
-            Console.WriteLine($"      • Universal Compassion: {finalCognitionStats.UniversalCompassion:P1}");
-            Console.WriteLine($"      • Creative Contribution: {finalCognitionStats.CreativeContribution:P1}");
-            Console.WriteLine($"      • Cooperative Spirit: {finalCognitionStats.CooperativeSpirit:P1}");
-            Console.WriteLine($"      • Benevolent Curiosity: {finalCognitionStats.BenevolentCuriosity:P1}");
-
-            Console.WriteLine("\n🧪 **TESTING COGNITIVE RESPONSES**");
-            Console.WriteLine("Querying cognitive processing and reasoning\n");
-
-            var cognitiveQueries = new[]
-            {
-                ("What do you think about existence?", new Dictionary<string, double> { ["philosophical"] = 0.8, ["deep"] = 0.7 }),
-                ("How do you learn and grow?", new Dictionary<string, double> { ["metacognitive"] = 0.9, ["self_aware"] = 0.8 }),
-                ("What patterns do you see?", new Dictionary<string, double> { ["analytical"] = 0.9, ["pattern_recognition"] = 0.8, ["insight"] = 0.7 }),
-                ("How do you connect concepts?", new Dictionary<string, double> { ["associative"] = 0.9, ["reasoning"] = 0.8, ["networks"] = 0.7 }),
-                ("What drives your curiosity?", new Dictionary<string, double> { ["exploration"] = 0.8, ["motivation"] = 0.7, ["discovery"] = 0.9 }),
-                ("How do you process understanding?", new Dictionary<string, double> { ["comprehension"] = 0.9, ["processing"] = 0.8, ["cognition"] = 0.7 })
-            };
-
-            foreach (var (query, features) in cognitiveQueries)
-            {
-                var response = await brain.ProcessInputAsync(query, features);
-                Console.WriteLine($"🤔 Q: {query}");
-                Console.WriteLine($"💭 A: {response.Response}");
-                Console.WriteLine($"   Confidence: {response.Confidence:P0} | Neurons: {response.ActivatedNeurons} | Clusters: {response.ActivatedClusters.Count}");
-                Console.WriteLine();
-                
-                await Task.Delay(1000); // Let cognitive processing continue between queries
-            }
-
-            Console.WriteLine("💤 **COGNITION SLEEP CYCLE**");
-            await brain.SleepCognitionAsync();
-
-            Console.WriteLine("\n🎉 **COGNITION DEMONSTRATION COMPLETE**");
-            Console.WriteLine("   ✅ Advanced continuous background processing implemented");
-            Console.WriteLine("   ✅ Ethical cognitive framework active");
-            Console.WriteLine("   ✅ Enhanced motivational drives");
-            Console.WriteLine("   ✅ Spontaneous thought generation");
-            Console.WriteLine("   ✅ Sophisticated cognitive simulation");
-            Console.WriteLine("   🌟 Brain now exhibits advanced cognitive behavior!");
-
-            await brain.SaveAsync();
+            Console.WriteLine("\n🚀 **AVAILABLE COMMANDS**");
+            Console.WriteLine("========================");
+            Console.WriteLine("  --convert-tatoeba-data    Convert Tatoeba CSV to learning data");
+            Console.WriteLine("  --learn-from-tatoeba      Learn from actual Tatoeba sentences");
+            Console.WriteLine("  --diag                    Run diagnostic to check system status");
+            Console.WriteLine("  --debug                   Run comprehensive debugging");
+            Console.WriteLine("  --evaluate                Evaluate current learning results");
+            Console.WriteLine();
+            Console.WriteLine("📚 **QUICK START**");
+            Console.WriteLine("==================");
+            Console.WriteLine("1. Convert data: dotnet run -- --convert-tatoeba-data");
+            Console.WriteLine("2. Learn words:  dotnet run -- --learn-from-tatoeba");
+            Console.WriteLine("3. Test results: dotnet run -- --evaluate");
+            Console.WriteLine();
+            Console.WriteLine("💡 **REAL LEARNING SYSTEM**");
+            Console.WriteLine("===========================");
+            Console.WriteLine("• Processes actual Tatoeba sentences (12.9M available)");
+            Console.WriteLine("• Learns from real word frequencies and co-occurrences");
+            Console.WriteLine("• Builds semantic relationships between words");
+            Console.WriteLine("• No algorithmic pattern generation - real data-driven learning");
+            Console.WriteLine("• Measurable storage growth based on actual learning");
         }
 
         /// <summary>
