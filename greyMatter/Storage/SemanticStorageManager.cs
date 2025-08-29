@@ -917,8 +917,25 @@ namespace GreyMatter.Storage
             if (!File.Exists(clusterPath))
                 return null;
 
-            var json = await File.ReadAllTextAsync(clusterPath);
-            return JsonSerializer.Deserialize<VocabularyCluster>(json);
+            try
+            {
+                var json = await File.ReadAllTextAsync(clusterPath);
+                if (string.IsNullOrWhiteSpace(json))
+                    return new VocabularyCluster(); // Return empty cluster for empty files
+                
+                return JsonSerializer.Deserialize<VocabularyCluster>(json);
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Failed to load vocabulary cluster {clusterPath}: {ex.Message}");
+                Console.WriteLine("🔄 Creating new empty cluster");
+                return new VocabularyCluster(); // Return empty cluster on JSON errors
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Unexpected error loading vocabulary cluster {clusterPath}: {ex.Message}");
+                return new VocabularyCluster(); // Return empty cluster on any error
+            }
         }
 
         /// <summary>
@@ -961,8 +978,25 @@ namespace GreyMatter.Storage
             if (!File.Exists(clusterPath))
                 return null;
 
-            var json = await File.ReadAllTextAsync(clusterPath);
-            return JsonSerializer.Deserialize<ConceptCluster>(json);
+            try
+            {
+                var json = await File.ReadAllTextAsync(clusterPath);
+                if (string.IsNullOrWhiteSpace(json))
+                    return new ConceptCluster(); // Return empty cluster for empty files
+                
+                return JsonSerializer.Deserialize<ConceptCluster>(json);
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Failed to load concept cluster {clusterPath}: {ex.Message}");
+                Console.WriteLine("🔄 Creating new empty cluster");
+                return new ConceptCluster(); // Return empty cluster on JSON errors
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Unexpected error loading concept cluster {clusterPath}: {ex.Message}");
+                return new ConceptCluster(); // Return empty cluster on any error
+            }
         }
 
         /// <summary>
