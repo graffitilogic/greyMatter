@@ -63,6 +63,13 @@ namespace GreyMatter
                 return;
             }
 
+            // Check for quick diagnostic
+            if (args.Length > 0 && (args[0] == "--diag" || args[0] == "--quick-diag"))
+            {
+                await GreyMatter.SimpleDiagnostic.RunQuickDiagnosticAsync();
+                return;
+            }
+
             // Check for learning validation
             if (args.Length > 0 && (args[0] == "--validate-learning" || args[0] == "--learning-validation"))
             {
