@@ -470,6 +470,7 @@ namespace GreyMatter
                 Console.WriteLine("  --diag                    Run diagnostic to check system status");
                 Console.WriteLine("  --debug                   Run comprehensive debugging");
                 Console.WriteLine("  --evaluate                Evaluate current learning results");
+                Console.WriteLine("  --benchmark               Run persistence performance benchmarks");
                 Console.WriteLine();
                 return;
             }
@@ -608,7 +609,29 @@ namespace GreyMatter
                 await RunInteractiveMode(config);
                 return;
             }
-            
+
+            // Persistence performance benchmark
+            if (args.Length > 0 && (args[0] == "--benchmark" || args[0] == "--perf-test"))
+            {
+                Console.WriteLine("📊 **PERSISTENCE PERFORMANCE BENCHMARK**");
+                Console.WriteLine("========================================");
+                Console.WriteLine("Measuring persistence operations performance\n");
+
+                try
+                {
+                    var storage = new GreyMatter.Storage.SemanticStorageManager(config.BrainDataPath, config.TrainingDataRoot);
+                    var benchmark = new PersistenceBenchmark(storage);
+
+                    await benchmark.RunComprehensiveBenchmarkAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error running benchmark: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                }
+                return;
+            }
+
             // Enhanced cognitive demo (default)
             await RunCognitionDemo(args, config);
         }
