@@ -37,6 +37,85 @@ namespace GreyMatter
                 await evaluator.RunUnifiedEvaluation();
                 return;
             }
+
+            // Check for comprehensive debugging
+            if (args.Length > 0 && (args[0] == "--debug" || args[0] == "--comprehensive-debug"))
+            {
+                Console.WriteLine("🔍 **COMPREHENSIVE SYSTEM DEBUG**");
+                Console.WriteLine("===============================");
+
+                try
+                {
+                    // Initialize components
+                    var encoder = new GreyMatter.Core.LearningSparseConceptEncoder();
+                    var storage = new GreyMatter.Storage.SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
+
+                    // Create debugger
+                    var debugger = new GreyMatter.GreyMatterDebugger(encoder, storage);
+
+                    // Run comprehensive debug
+                    await debugger.RunComprehensiveDebugAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error running debug: {ex.Message}");
+                }
+                return;
+            }
+
+            // Check for learning validation
+            if (args.Length > 0 && (args[0] == "--validate-learning" || args[0] == "--learning-validation"))
+            {
+                Console.WriteLine("🧪 **LEARNING VALIDATION EVALUATION**");
+                Console.WriteLine("=====================================");
+
+                try
+                {
+                    // Initialize components
+                    var encoder = new GreyMatter.Core.LearningSparseConceptEncoder();
+                    var storage = new GreyMatter.Storage.SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
+
+                    // Create validator
+                    var validator = new GreyMatter.LearningValidationEvaluator(encoder, storage);
+
+                    // Run validation
+                    var result = await validator.ValidateActualLearningAsync();
+
+                    // Display results
+                    Console.WriteLine("\n🎯 **VALIDATION SUMMARY**");
+                    Console.WriteLine($"Real Training Data: {result.HasRealTrainingData}");
+                    Console.WriteLine($"Learned Relationships: {result.HasLearnedRelationships}");
+                    Console.WriteLine($"Prediction Capabilities: {result.CanPredictRelationships}");
+                    Console.WriteLine($"Better Than Baseline: {result.PerformsBetterThanBaseline}");
+                    Console.WriteLine($"Generalization: {result.CanGeneralize}");
+
+                    double overallScore = (result.HasRealTrainingData ? 0.2 : 0) +
+                                         (result.HasLearnedRelationships ? 0.2 : 0) +
+                                         (result.CanPredictRelationships ? 0.2 : 0) +
+                                         (result.PerformsBetterThanBaseline ? 0.2 : 0) +
+                                         (result.CanGeneralize ? 0.2 : 0);
+
+                    Console.WriteLine($"Overall Score: {overallScore:P2}");
+
+                    if (overallScore > 0.7)
+                    {
+                        Console.WriteLine("✅ **EXCELLENT**: System demonstrates real learning capabilities!");
+                    }
+                    else if (overallScore > 0.4)
+                    {
+                        Console.WriteLine("⚠️  **MODERATE**: Some learning detected, but needs improvement");
+                    }
+                    else
+                    {
+                        Console.WriteLine("❌ **POOR**: System shows algorithmic pattern generation, not learning");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error running validation: {ex.Message}");
+                }
+                return;
+            }
             
             // Check for neuron growth diagnostic
             if (args.Length > 0 && (args[0] == "--diagnostic" || args[0] == "--analyze-growth"))
