@@ -619,14 +619,12 @@ namespace GreyMatter
 
                 try
                 {
-                    var storage = new GreyMatter.Storage.SemanticStorageManager(config.BrainDataPath, config.TrainingDataRoot);
-                    var benchmark = new PersistenceBenchmark(storage);
-
-                    await benchmark.RunComprehensiveBenchmarkAsync();
+                    var test = new ConceptStorageTest();
+                    await test.RunPerformanceTest();
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Error running benchmark: {ex.Message}");
+                    Console.WriteLine($"❌ Error running test: {ex.Message}");
                     Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 }
                 return;

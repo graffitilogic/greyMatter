@@ -45,6 +45,7 @@ namespace GreyMatter
 
             // 4. Concept Storage Operations
             results["ConceptStorage_Batch"] = await BenchmarkConceptStorageBatchAsync();
+            results["ConceptStorage_Batch_Optimized"] = await BenchmarkConceptStorageBatchOptimizedAsync();
 
             // 5. File System Operations
             results["FileSystem_ReadWrite"] = await BenchmarkFileSystemOperationsAsync();
@@ -225,7 +226,11 @@ namespace GreyMatter
                 };
             }
 
-            await _storageManager.StoreVocabularyAsync(testWords);
+            // Note: Using individual saves for now - could be optimized with batch method
+            foreach (var (word, wordInfo) in testWords)
+            {
+                await _storageManager.SaveVocabularyWordAsync(word, wordInfo);
+            }
 
             stopwatch.Stop();
 
@@ -300,6 +305,53 @@ namespace GreyMatter
                 DurationMs = stopwatch.ElapsedMilliseconds,
                 ItemCount = 500,
                 DataSize = 500 * 512 // Rough estimate
+            };
+        }
+
+        /// <summary>
+        /// Benchmark optimized batch concept storage
+        /// </summary>
+        private async Task<BenchmarkResult> BenchmarkConceptStorageBatchOptimizedAsync()
+        {
+            Console.WriteLine("🚀 Benchmarking Optimized Batch Concept Storage...");
+
+            var stopwatch = Stopwatch.StartNew();
+
+            // Create test concepts
+            var testConcepts = new Dictionary<string, (object Data, ConceptType Type)>();
+            for (int i = 0; i < 500; i++)
+            {
+                var conceptData = new Dictionary<string, object>
+                {
+                    ["id"] = $"concept_{i}",
+                    ["type"] = "semantic_relation",
+                    ["features"] = new Dictionary<string, double>
+                    {
+                        ["feature1"] = i * 0.1,
+                        ["feature2"] = i * 0.2,
+                        ["feature3"] = i * 0.3
+                    }
+                };
+
+                testConcepts[$"concept_{i}"] = (conceptData, ConceptType.SemanticRelation);
+            }
+
+            // Use the optimized batch method
+            await _storageManager.SaveConceptsBatchAsync(testConcepts);
+
+            stopwatch.Stop();
+
+            return new BenchmarkResult
+            {
+                Operation = "ConceptStorage_Batch_Optimized",
+                DurationMs = stopwatch.ElapsedMilliseconds,
+                ItemCount = testConcepts.Count,
+                DataSize = CalculateConceptDataSize(testConcepts),
+                AdditionalMetrics = new Dictionary<string, object>
+                {
+                    ["ConceptsPerSecond"] = testConcepts.Count / stopwatch.Elapsed.TotalSeconds,
+                    ["OptimizationType"] = "BatchProcessing"
+                }
             };
         }
 
@@ -476,6 +528,12 @@ namespace GreyMatter
         private long CalculateWordInfoSize(Dictionary<string, WordInfo> dict)
         {
             return dict.Count * 1024; // Rough estimate per WordInfo
+        }
+
+        private long CalculateConceptDataSize(Dictionary<string, (object Data, ConceptType Type)> concepts)
+        {
+            // Rough estimate: 1KB per concept
+            return concepts.Count * 1024;
         }
 
         private string FormatBytes(long bytes)

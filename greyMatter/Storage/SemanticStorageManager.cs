@@ -41,6 +41,12 @@ namespace GreyMatter.Storage
         private Dictionary<int, SharedNeuron> _neuronPool;
         private int _nextNeuronId;
         
+        // Batch processing for performance optimization
+        private Dictionary<string, ConceptCluster> _pendingConceptClusters;
+        private Dictionary<string, object> _pendingConcepts;
+        private bool _batchModeEnabled;
+        private int _batchSizeThreshold;
+        
         // Pre-trained semantic classifier for learning-based categorization
         private PreTrainedSemanticClassifier? _preTrainedClassifier;
         private FallbackSemanticClassifier _fallbackClassifier;
@@ -59,6 +65,12 @@ namespace GreyMatter.Storage
             _neuronLocationIndex = new Dictionary<int, NeuronLocationEntry>();
             _clusterAccessTimes = new Dictionary<string, DateTime>();
             _neuronPool = new Dictionary<int, SharedNeuron>();
+            
+            // Initialize batch processing
+            _pendingConceptClusters = new Dictionary<string, ConceptCluster>();
+            _pendingConcepts = new Dictionary<string, object>();
+            _batchModeEnabled = false;
+            _batchSizeThreshold = 50; // Flush after 50 concepts per cluster
             
             // Initialize semantic classifiers
             _fallbackClassifier = new FallbackSemanticClassifier();
@@ -235,6 +247,27 @@ namespace GreyMatter.Storage
         /// <summary>
         /// Save neuron pool metadata
         /// </summary>
+        private async Task SaveNeuronPoolIndexAsync()
+        {
+            var poolData = new Dictionary<string, object>
+            {
+                ["next_neuron_id"] = _nextNeuronId,
+                ["pool_size"] = _neuronPool.Count,
+                ["last_updated"] = DateTime.UtcNow.ToString("O")
+            };
+            
+            var poolIndexPath = Path.Combine(_neuronPoolPath, "pool_index.json");
+            await File.WriteAllTextAsync(poolIndexPath, JsonSerializer.Serialize(poolData, new JsonSerializerOptions { WriteIndented = true }));
+            
+            // Save neuron location index
+            var locationIndexPath = Path.Combine(_hippocampusPath, "neuron_locations.json");
+            var locationData = _neuronLocationIndex.ToDictionary(kvp => kvp.Key.ToString(), kvp => kvp.Value);
+            await File.WriteAllTextAsync(locationIndexPath, JsonSerializer.Serialize(locationData, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        
+        /// <summary>
+        /// Synchronous version of SaveNeuronPoolIndexAsync for use in constructors
+        /// </summary>
         private void SaveNeuronPoolIndex()
         {
             var poolData = new Dictionary<string, object>
@@ -324,433 +357,630 @@ namespace GreyMatter.Storage
             // Update hippocampus concept index
             await UpdateConceptIndexAsync(conceptId, clusterPath, conceptType);
         }
-        
+
         /// <summary>
-        /// Load vocabulary word using hippocampus routing
+        /// Optimized batch concept storage for high-performance scenarios
         /// </summary>
-        public async Task<WordInfo?> LoadVocabularyWordAsync(string word)
+        public async Task SaveConceptsBatchAsync(Dictionary<string, (object Data, ConceptType Type)> concepts)
         {
-            // Check hippocampus index first
-            if (!_vocabularyIndex.ContainsKey(word))
+            // Group concepts by cluster to minimize I/O operations
+            var clusterGroups = new Dictionary<string, List<(string conceptId, object data, ConceptType type)>>();
+
+            foreach (var (conceptId, (data, type)) in concepts)
             {
-                await LoadVocabularyIndexAsync();
-            }
-            
-            if (!_vocabularyIndex.TryGetValue(word, out var clusterPath))
-            {
-                return null; // Word not found
-            }
-            
-            // Load cluster lazily
-            var cluster = await LoadVocabularyClusterAsync(clusterPath);
-            return cluster?.Words.GetValueOrDefault(word);
-        }
-        
-        /// <summary>
-        /// Load multiple vocabulary words efficiently (batch loading)
-        /// </summary>
-        public async Task<Dictionary<string, WordInfo>> LoadVocabularyBatchAsync(IEnumerable<string> words)
-        {
-            var result = new Dictionary<string, WordInfo>();
-            var clusterGroups = new Dictionary<string, List<string>>();
-            
-            // Ensure vocabulary index is loaded
-            if (_vocabularyIndex.Count == 0)
-            {
-                await LoadVocabularyIndexAsync();
-            }
-            
-            // Group words by cluster for batch loading
-            foreach (var word in words)
-            {
-                if (_vocabularyIndex.TryGetValue(word, out var clusterPath))
+                var clusterPath = GetConceptCluster(conceptId, type);
+                if (!clusterGroups.ContainsKey(clusterPath))
                 {
-                    if (!clusterGroups.ContainsKey(clusterPath))
-                    {
-                        clusterGroups[clusterPath] = new List<string>();
-                    }
-                    clusterGroups[clusterPath].Add(word);
+                    clusterGroups[clusterPath] = new List<(string, object, ConceptType)>();
+                }
+                clusterGroups[clusterPath].Add((conceptId, data, type));
+            }
+
+            // Process each cluster group
+            var saveTasks = new List<Task>();
+            foreach (var (clusterPath, conceptList) in clusterGroups)
+            {
+                saveTasks.Add(ProcessConceptClusterBatchAsync(clusterPath, conceptList));
+            }
+
+            await Task.WhenAll(saveTasks);
+
+            // Update concept index in batch
+            await UpdateConceptIndexBatchAsync(concepts);
+        }
+
+        /// <summary>
+        /// Enable batch mode for automatic buffering
+        /// </summary>
+        public void EnableBatchMode(int batchSizeThreshold = 50)
+        {
+            _batchModeEnabled = true;
+            _batchSizeThreshold = batchSizeThreshold;
+            _pendingConceptClusters.Clear();
+            _pendingConcepts.Clear();
+        }
+
+        /// <summary>
+        /// Disable batch mode and flush any pending concepts
+        /// </summary>
+        public async Task DisableBatchModeAsync()
+        {
+            if (_batchModeEnabled)
+            {
+                await FlushPendingConceptsAsync();
+            }
+            _batchModeEnabled = false;
+        }
+
+        /// <summary>
+        /// Optimized SaveConceptAsync with batch buffering
+        /// </summary>
+        public async Task SaveConceptOptimizedAsync(string conceptId, object conceptData, ConceptType conceptType)
+        {
+            if (_batchModeEnabled)
+            {
+                // Buffer concept for batch processing
+                var clusterPath = GetConceptCluster(conceptId, conceptType);
+                
+                if (!_pendingConceptClusters.ContainsKey(clusterPath))
+                {
+                    _pendingConceptClusters[clusterPath] = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
+                }
+
+                _pendingConceptClusters[clusterPath].Concepts[conceptId] = conceptData;
+                _pendingConceptClusters[clusterPath].LastModified = DateTime.UtcNow;
+                _pendingConcepts[conceptId] = (conceptData, conceptType);
+
+                // Flush if batch size threshold reached
+                if (_pendingConcepts.Count >= _batchSizeThreshold)
+                {
+                    await FlushPendingConceptsAsync();
                 }
             }
-            
-            // Load each cluster once and extract requested words
-            foreach (var (clusterPath, wordsInCluster) in clusterGroups)
+            else
             {
-                var cluster = await LoadVocabularyClusterAsync(clusterPath);
-                if (cluster != null)
+                // Fall back to original method
+                await SaveConceptAsync(conceptId, conceptData, conceptType);
+            }
+        }
+
+        /// <summary>
+        /// Process a batch of concepts for a single cluster
+        /// </summary>
+        private async Task ProcessConceptClusterBatchAsync(string clusterPath, List<(string conceptId, object data, ConceptType type)> concepts)
+        {
+            // Load cluster once
+            var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
+
+            // Add all concepts to cluster
+            foreach (var (conceptId, data, _) in concepts)
+            {
+                cluster.Concepts[conceptId] = data;
+            }
+            cluster.LastModified = DateTime.UtcNow;
+
+            // Save cluster once
+            await SaveConceptClusterAsync(clusterPath, cluster);
+        }
+
+        /// <summary>
+        /// Update concept index in batch
+        /// </summary>
+        private async Task UpdateConceptIndexBatchAsync(Dictionary<string, (object Data, ConceptType Type)> concepts)
+        {
+            foreach (var (conceptId, (_, type)) in concepts)
+            {
+                var clusterPath = GetConceptCluster(conceptId, type);
+                _conceptIndex[conceptId] = new ConceptIndexEntry
                 {
-                    foreach (var word in wordsInCluster)
+                    ClusterPath = clusterPath,
+                    ConceptType = type,
+                    LastAccessed = DateTime.UtcNow
+                };
+            }
+
+            // Save index once
+            await SaveConceptIndexAsync();
+        }
+
+        /// <summary>
+        /// Flush all pending concepts to storage
+        /// </summary>
+        private async Task FlushPendingConceptsAsync()
+        {
+            if (_pendingConceptClusters.Count == 0)
+                return;
+
+            // Save all modified clusters
+            var saveTasks = _pendingConceptClusters.Select(kvp => 
+                SaveConceptClusterAsync(kvp.Key, kvp.Value)).ToArray();
+            
+            await Task.WhenAll(saveTasks);
+
+            // Update concept index
+            await UpdateConceptIndexBatchAsync(
+                _pendingConcepts.ToDictionary(
+                    kvp => kvp.Key, 
+                    kvp => ((object Data, ConceptType Type))kvp.Value));
+
+            // Clear buffers
+            _pendingConceptClusters.Clear();
+            _pendingConcepts.Clear();
+        }
+
+        /// <summary>
+        /// Get comprehensive storage statistics
+        /// </summary>
+        public async Task<StorageStatistics> GetStorageStatisticsAsync()
+        {
+            var stats = new StorageStatistics
+            {
+                TotalConcepts = _conceptIndex.Count,
+                TotalVocabularyWords = _vocabularyIndex.Count,
+                TotalNeurons = _neuronPool.Count + _neuronLocationIndex.Count,
+                LoadedNeurons = _neuronPool.Count,
+                StorageSizeBytes = await CalculateStorageSizeAsync(),
+                LastUpdated = DateTime.UtcNow
+            };
+
+            // Count concepts by type
+            stats.ConceptsByType = new Dictionary<ConceptType, int>();
+            foreach (var entry in _conceptIndex.Values)
+            {
+                if (!stats.ConceptsByType.ContainsKey(entry.ConceptType))
+                    stats.ConceptsByType[entry.ConceptType] = 0;
+                stats.ConceptsByType[entry.ConceptType]++;
+            }
+
+            return stats;
+        }
+
+        /// <summary>
+        /// Calculate total storage size
+        /// </summary>
+        private async Task<long> CalculateStorageSizeAsync()
+        {
+            long totalSize = 0;
+
+            // Calculate size of brain data directory
+            if (Directory.Exists(_brainDataPath))
+            {
+                totalSize += await Task.Run(() => GetDirectorySize(_brainDataPath));
+            }
+
+            return totalSize;
+        }
+
+        /// <summary>
+        /// Get directory size recursively
+        /// </summary>
+        private long GetDirectorySize(string path)
+        {
+            long size = 0;
+
+            try
+            {
+                var files = Directory.GetFiles(path, "*", SearchOption.AllDirectories);
+                foreach (var file in files)
+                {
+                    var info = new FileInfo(file);
+                    size += info.Length;
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore errors in size calculation
+            }
+
+            return size;
+        }
+
+        /// <summary>
+        /// Get predicted semantic domain for a word
+        /// </summary>
+        public async Task<string> GetPredictedDomainAsync(string word)
+        {
+            if (_preTrainedClassifier != null)
+            {
+                var domains = await _preTrainedClassifier.ClassifyDomainsAsync(word);
+                return domains.OrderByDescending(d => d.Value).FirstOrDefault().Key ?? "semantic_domains/general_concepts";
+            }
+
+            // Fallback to rule-based classification
+            return _fallbackClassifier.ClassifySemanticDomain(word);
+        }
+
+        /// <summary>
+        /// Check if there's existing brain state
+        /// </summary>
+        public bool HasExistingBrainState()
+        {
+            return Directory.Exists(_brainDataPath) &&
+                   (File.Exists(Path.Combine(_hippocampusPath, "vocabulary_index.json")) ||
+                    File.Exists(Path.Combine(_hippocampusPath, "concept_index.json")));
+        }
+
+        /// <summary>
+        /// Load vocabulary data
+        /// </summary>
+        public async Task<Dictionary<string, WordInfo>> LoadVocabularyAsync()
+        {
+            var vocabulary = new Dictionary<string, WordInfo>();
+
+            if (!Directory.Exists(_corticalColumnsPath))
+                return vocabulary;
+
+            // Load all vocabulary clusters
+            var clusterFiles = Directory.GetFiles(_corticalColumnsPath, "*.json", SearchOption.AllDirectories);
+            foreach (var clusterFile in clusterFiles)
+            {
+                if (clusterFile.Contains("vocabulary") || clusterFile.Contains("freq_"))
+                {
+                    var cluster = await LoadVocabularyClusterAsync(clusterFile);
+                    if (cluster != null)
                     {
-                        if (cluster.Words.TryGetValue(word, out var wordInfo))
+                        foreach (var (word, info) in cluster.Words)
                         {
-                            result[word] = wordInfo;
+                            vocabulary[word] = info;
                         }
                     }
                 }
             }
-            
-            return result;
+
+            return vocabulary;
         }
-        
+
         /// <summary>
-        /// Semantic domain classification for biological clustering
-        /// Uses pre-trained semantic embeddings when available, fallback to rule-based classification
-        /// Based on Huth's semantic brain mapping research with hierarchical organization
+        /// Store vocabulary data
+        /// </summary>
+        public async Task StoreVocabularyAsync(Dictionary<string, WordInfo> vocabulary)
+        {
+            foreach (var (word, info) in vocabulary)
+            {
+                await SaveVocabularyWordAsync(word, info);
+            }
+        }
+
+        /// <summary>
+        /// Load language data
+        /// </summary>
+        public async Task<Dictionary<string, object>> LoadLanguageDataAsync()
+        {
+            var languageData = new Dictionary<string, object>();
+
+            // Load concept clusters that contain language patterns
+            if (!Directory.Exists(_corticalColumnsPath))
+                return languageData;
+
+            var clusterFiles = Directory.GetFiles(_corticalColumnsPath, "*.json", SearchOption.AllDirectories);
+            foreach (var clusterFile in clusterFiles)
+            {
+                var cluster = await LoadConceptClusterAsync(clusterFile);
+                if (cluster != null)
+                {
+                    foreach (var (conceptId, data) in cluster.Concepts)
+                    {
+                        languageData[conceptId] = data;
+                    }
+                }
+            }
+
+            return languageData;
+        }
+
+        /// <summary>
+        /// Store language data
+        /// </summary>
+        public async Task StoreLanguageDataAsync(Dictionary<string, object> languageData)
+        {
+            foreach (var (conceptId, data) in languageData)
+            {
+                await SaveConceptAsync(conceptId, data, ConceptType.SentencePattern);
+            }
+        }
+
+        /// <summary>
+        /// Load all neurons from storage
+        /// </summary>
+        public async Task<Dictionary<int, object>> LoadAllNeuronsAsync()
+        {
+            var allNeurons = new Dictionary<int, object>();
+
+            // Load from neuron pool files
+            if (Directory.Exists(_neuronPoolPath))
+            {
+                var poolFiles = Directory.GetFiles(_neuronPoolPath, "*.json");
+                foreach (var poolFile in poolFiles)
+                {
+                    if (Path.GetFileName(poolFile) != "pool_index.json")
+                    {
+                        var neurons = await LoadNeuronPoolFileAsync(poolFile);
+                        foreach (var neuron in neurons)
+                        {
+                            allNeurons[neuron.Id] = neuron.Data ?? new object();
+                        }
+                    }
+                }
+            }
+
+            return allNeurons;
+        }
+
+        /// <summary>
+        /// Store neural concepts
+        /// </summary>
+        public async Task StoreNeuralConceptsAsync(Dictionary<string, object> concepts)
+        {
+            foreach (var (conceptId, data) in concepts)
+            {
+                await SaveConceptAsync(conceptId, data, ConceptType.Neural);
+            }
+        }
+
+        /// <summary>
+        /// Add neuron to pool
+        /// </summary>
+        public async Task<int> AddNeuronToPoolAsync(int neuronId, object neuronData)
+        {
+            SharedNeuron neuron;
+            
+            // If neuronData is already a SharedNeuron, use it directly
+            if (neuronData is SharedNeuron existingNeuron)
+            {
+                neuron = existingNeuron;
+                neuron.Id = neuronId; // Ensure ID is correct
+            }
+            else
+            {
+                // Create new SharedNeuron from object data
+                neuron = new SharedNeuron
+                {
+                    Id = neuronId,
+                    Data = neuronData,
+                    LastUsed = DateTime.UtcNow
+                };
+            }
+
+            _neuronPool[neuron.Id] = neuron;
+
+            // Update location index
+            _neuronLocationIndex[neuron.Id] = new NeuronLocationEntry
+            {
+                PoolFile = GetNeuronPoolFile(neuron.Id),
+                LastAccessed = DateTime.UtcNow,
+                IsLoaded = true
+            };
+
+            await SaveNeuronPoolIndexAsync();
+            return neuron.Id;
+        }
+
+        /// <summary>
+        /// Flush neuron pool to storage
+        /// </summary>
+        public async Task FlushNeuronPoolAsync()
+        {
+            // Group neurons by pool file
+            var poolGroups = new Dictionary<string, List<SharedNeuron>>();
+            foreach (var neuron in _neuronPool.Values)
+            {
+                var poolFile = GetNeuronPoolFile(neuron.Id);
+                if (!poolGroups.ContainsKey(poolFile))
+                    poolGroups[poolFile] = new List<SharedNeuron>();
+                poolGroups[poolFile].Add(neuron);
+            }
+
+            // Save each pool file
+            foreach (var (poolFile, neurons) in poolGroups)
+            {
+                await SaveNeuronPoolFileAsync(poolFile, neurons);
+            }
+
+            await SaveNeuronPoolIndexAsync();
+        }
+
+        /// <summary>
+        /// Load vocabulary word
+        /// </summary>
+        public async Task<WordInfo?> LoadVocabularyWordAsync(string word)
+        {
+            if (_vocabularyIndex.TryGetValue(word, out var clusterPath))
+            {
+                var cluster = await LoadVocabularyClusterAsync(clusterPath);
+                if (cluster != null && cluster.Words.TryGetValue(word, out var wordInfo))
+                {
+                    return wordInfo;
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Get neuron pool file path for a neuron ID
+        /// </summary>
+        private string GetNeuronPoolFile(int neuronId)
+        {
+            var poolIndex = neuronId / 1000; // 1000 neurons per file
+            return Path.Combine(_neuronPoolPath, $"pool_{poolIndex}.json");
+        }
+
+        /// <summary>
+        /// Load neuron pool file
+        /// </summary>
+        private async Task<List<SharedNeuron>> LoadNeuronPoolFileAsync(string poolFile)
+        {
+            if (!File.Exists(poolFile))
+                return new List<SharedNeuron>();
+
+            var json = await File.ReadAllTextAsync(poolFile);
+            return JsonSerializer.Deserialize<List<SharedNeuron>>(json) ?? new List<SharedNeuron>();
+        }
+
+        /// <summary>
+        /// Save neuron pool file
+        /// </summary>
+        private async Task SaveNeuronPoolFileAsync(string poolFile, List<SharedNeuron> neurons)
+        {
+            var json = JsonSerializer.Serialize(neurons, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(poolFile, json);
+        }
+
+        /// <summary>
+        /// Determine semantic domain for a word
         /// </summary>
         private string DetermineSemanticDomain(string word, WordInfo wordInfo)
         {
-            // Try pre-trained classifier first
+            // Use pre-trained classifier if available
             if (_preTrainedClassifier != null)
             {
                 try
                 {
-                    var domain = _preTrainedClassifier.ClassifySemanticDomain(word);
-                    if (domain != "semantic_domains/general_concepts")
-                    {
-                        return domain.Replace("semantic_domains/", "");
-                    }
+                    var domains = _preTrainedClassifier.ClassifyDomainsAsync(word).Result;
+                    var bestDomain = domains.OrderByDescending(d => d.Value).FirstOrDefault().Key;
+                    if (!string.IsNullOrEmpty(bestDomain))
+                        return bestDomain;
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.WriteLine($"⚠️ Pre-trained classifier error: {ex.Message}");
+                    // Fall back to rule-based
                 }
             }
-            
-            // Fallback to rule-based classification
-            var fallbackDomain = _fallbackClassifier.ClassifySemanticDomain(word);
-            if (fallbackDomain != "semantic_domains/general_concepts")
-            {
-                return fallbackDomain.Replace("semantic_domains/", "");
-            }
-            
-            // Final fallback to original rule-based logic
-            return DetermineSemanticDomainRuleBased(word, wordInfo);
+
+            // Rule-based semantic domain determination
+            return _fallbackClassifier.ClassifySemanticDomain(word);
         }
 
         /// <summary>
-        /// Original rule-based semantic domain classification as fallback
+        /// Determine word type
         /// </summary>
-        private string DetermineSemanticDomainRuleBased(string word, WordInfo wordInfo)
-        {
-            var lowerWord = word.ToLowerInvariant();
-            
-            // === LIVING THINGS DOMAIN ===
-            
-            // Animals - with subcategorization
-            if (IsMammal(lowerWord)) return "semantic_domains/living_things/animals/mammals";
-            if (IsBird(lowerWord)) return "semantic_domains/living_things/animals/birds";
-            if (IsFishOrMarine(lowerWord)) return "semantic_domains/living_things/animals/fish_marine";
-            if (IsInsect(lowerWord)) return "semantic_domains/living_things/animals/insects";
-            
-            // Plants
-            if (IsTree(lowerWord)) return "semantic_domains/living_things/plants/trees";
-            if (IsFlowerOrPlant(lowerWord)) return "semantic_domains/living_things/plants/flowers";
-            
-            // Human-related
-            if (IsBodyPart(lowerWord)) return "semantic_domains/living_things/humans/body_parts";
-            if (IsFamilyRelation(lowerWord)) return "semantic_domains/living_things/humans/family_relations";
-            
-            // === ARTIFACTS & OBJECTS DOMAIN ===
-            
-            // Vehicles - hierarchical
-            if (IsLandVehicle(lowerWord)) return "semantic_domains/artifacts/vehicles/land_vehicles";
-            if (IsWatercraft(lowerWord)) return "semantic_domains/artifacts/vehicles/watercraft";
-            if (IsAircraft(lowerWord)) return "semantic_domains/artifacts/vehicles/aircraft";
-            
-            // Tools and objects
-            if (IsToolOrInstrument(lowerWord)) return "semantic_domains/artifacts/tools_instruments";
-            if (IsBuildingOrStructure(lowerWord)) return "semantic_domains/artifacts/buildings_structures";
-            if (IsClothingOrTextile(lowerWord)) return "semantic_domains/artifacts/clothing_textiles";
-            if (IsFoodOrNutrition(lowerWord)) return "semantic_domains/artifacts/food_nutrition";
-            if (IsTechnologyOrElectronics(lowerWord)) return "semantic_domains/artifacts/technology_electronics";
-            if (IsWeaponOrMilitary(lowerWord)) return "semantic_domains/artifacts/weapons_military";
-            
-            // === NATURAL WORLD DOMAIN ===
-            
-            // Geography
-            if (IsLandform(lowerWord)) return "semantic_domains/natural_world/geography/landforms";
-            if (IsWaterBody(lowerWord)) return "semantic_domains/natural_world/geography/water_bodies";
-            if (IsWeatherOrClimate(lowerWord)) return "semantic_domains/natural_world/weather_climate";
-            if (IsMaterialOrSubstance(lowerWord)) return "semantic_domains/natural_world/materials_substances";
-            if (IsColorOrVisual(lowerWord)) return "semantic_domains/natural_world/colors_visual";
-            
-            // === ABSTRACT DOMAINS ===
-            
-            // Mental/Cognitive
-            if (IsEmotionOrFeeling(lowerWord)) return "semantic_domains/mental_cognitive/emotions_feelings";
-            if (IsThoughtOrIdea(lowerWord)) return "semantic_domains/mental_cognitive/thoughts_ideas";
-            if (IsKnowledgeOrLearning(lowerWord)) return "semantic_domains/mental_cognitive/knowledge_learning";
-            if (IsMemoryOrPerception(lowerWord)) return "semantic_domains/mental_cognitive/memory_perception";
-            
-            // Social/Communication
-            if (IsLanguageOrSpeech(lowerWord)) return "semantic_domains/social_communication/language_speech";
-            if (IsSocialRelation(lowerWord)) return "semantic_domains/social_communication/social_relations";
-            if (IsCulturalPractice(lowerWord)) return "semantic_domains/social_communication/cultural_practices";
-            if (IsPoliticsOrGovernment(lowerWord)) return "semantic_domains/social_communication/politics_government";
-            
-            // Actions/Events
-            if (IsPhysicalMotion(lowerWord)) return "semantic_domains/actions_events/physical_motion";
-            if (IsMentalAction(lowerWord)) return "semantic_domains/actions_events/mental_actions";
-            if (IsSocialInteraction(lowerWord)) return "semantic_domains/actions_events/social_interactions";
-            if (IsWorkOrOccupation(lowerWord)) return "semantic_domains/actions_events/work_occupations";
-            
-            // Properties/Attributes
-            if (IsSpatialRelation(lowerWord)) return "semantic_domains/properties/spatial_relations";
-            if (IsTemporalRelation(lowerWord)) return "semantic_domains/properties/temporal_relations";
-            if (IsQuantityOrMeasurement(lowerWord)) return "semantic_domains/properties/quantity_measurement";
-            if (IsQualityOrEvaluation(lowerWord)) return "semantic_domains/properties/quality_evaluation";
-            
-            // === LANGUAGE STRUCTURE FALLBACK ===
-            
-            // Grammatical categorization based on word type
-            return wordInfo.EstimatedType switch
-            {
-                WordType.Verb => DetermineVerbSubcategory(lowerWord),
-                WordType.Noun => DetermineNounSubcategory(lowerWord), 
-                WordType.Adjective => DetermineAdjectiveSubcategory(lowerWord),
-                _ => "language_structures/grammatical/function_words"
-            };
-        }
-        
         private string DetermineWordType(string word, WordInfo wordInfo)
         {
-            // Analyze grammatical patterns from usage
-            var estimatedType = wordInfo.EstimatedType.ToString().ToLowerInvariant();
-            
-            return estimatedType switch
+            // Use the EstimatedType from WordInfo
+            return wordInfo.EstimatedType switch
             {
-                "verb" => "verbs",
-                "noun" => "nouns", 
-                "adjective" => "adjectives",
-                "adverb" => "adverbs",
-                "preposition" => "prepositions",
-                _ => "mixed" // Unknown or multiple types
+                WordType.Noun => "nouns",
+                WordType.Verb => "verbs",
+                WordType.Adjective => "adjectives",
+                WordType.Adverb => "adverbs",
+                WordType.Preposition => "prepositions",
+                WordType.Article => "articles",
+                WordType.Pronoun => "pronouns",
+                _ => "other"
             };
         }
-        
+
+        /// <summary>
+        /// Get frequency band for storage organization
+        /// </summary>
         private string GetFrequencyBand(int frequency)
         {
-            return frequency switch
-            {
-                >= 1000 => "high",
-                >= 100 => "medium", 
-                >= 10 => "low",
-                _ => "rare"
-            };
+            if (frequency >= 10000) return "very_high";
+            if (frequency >= 1000) return "high";
+            if (frequency >= 100) return "medium";
+            if (frequency >= 10) return "low";
+            return "very_low";
         }
-        
-        private string GetSemanticHash(string concept)
+
+        /// <summary>
+        /// Generate semantic hash for concept clustering
+        /// </summary>
+        private string GetSemanticHash(string conceptId)
         {
-            // Create semantic hash for balanced distribution
-            var hash = concept.GetHashCode();
-            return Math.Abs(hash).ToString("x8");
+            using var sha256 = System.Security.Cryptography.SHA256.Create();
+            var bytes = System.Text.Encoding.UTF8.GetBytes(conceptId);
+            var hash = sha256.ComputeHash(bytes);
+            return BitConverter.ToString(hash).Replace("-", "").ToLower();
         }
-        
+
+        /// <summary>
+        /// Get concept type folder name
+        /// </summary>
         private string GetConceptTypeFolder(ConceptType conceptType)
         {
             return conceptType switch
             {
-                ConceptType.SentencePattern => "language_structures/syntactic/sentence_patterns",
-                ConceptType.WordAssociation => "semantic_domains/social_communication/language_speech/associations", 
-                ConceptType.SemanticRelation => "semantic_domains/properties/semantic_relations",
-                ConceptType.EpisodicMemory => "episodic_memories/personal_experiences",
-                _ => "language_structures/syntactic/general"
+                ConceptType.SentencePattern => "sentence_patterns",
+                ConceptType.WordAssociation => "word_associations",
+                ConceptType.SemanticRelation => "semantic_relations",
+                ConceptType.EpisodicMemory => "episodic_memories",
+                ConceptType.General => "general_concepts",
+                ConceptType.Neural => "neural_concepts",
+                _ => "other"
             };
         }
-        
-        // === LIVING THINGS CLASSIFICATION ===
-        
-        private bool IsMammal(string word) => 
-            new[] { "cat", "dog", "horse", "cow", "sheep", "pig", "elephant", "lion", "tiger", "bear", 
-                   "wolf", "deer", "rabbit", "mouse", "rat", "monkey", "human", "person", "man", "woman", "child" }.Any(word.Contains);
-        
-        private bool IsBird(string word) =>
-            new[] { "bird", "eagle", "hawk", "owl", "robin", "sparrow", "crow", "chicken", "duck", "goose", 
-                   "turkey", "pigeon", "parrot", "penguin", "ostrich", "swan", "flamingo" }.Any(word.Contains);
-        
-        private bool IsFishOrMarine(string word) =>
-            new[] { "fish", "shark", "whale", "dolphin", "salmon", "tuna", "cod", "bass", "trout", 
-                   "octopus", "squid", "crab", "lobster", "shrimp", "jellyfish", "starfish" }.Any(word.Contains);
-        
-        private bool IsInsect(string word) =>
-            new[] { "insect", "bug", "bee", "ant", "fly", "mosquito", "spider", "butterfly", "moth", 
-                   "beetle", "cricket", "grasshopper", "wasp", "termite" }.Any(word.Contains);
-        
-        private bool IsTree(string word) =>
-            new[] { "tree", "oak", "pine", "maple", "birch", "cedar", "willow", "palm", "fir", 
-                   "forest", "woods", "branch", "trunk", "bark", "leaf", "leaves" }.Any(word.Contains);
-        
-        private bool IsFlowerOrPlant(string word) =>
-            new[] { "flower", "plant", "rose", "tulip", "daisy", "sunflower", "lily", "orchid", 
-                   "grass", "bush", "shrub", "vine", "garden", "bloom", "petal" }.Any(word.Contains);
-        
-        private bool IsBodyPart(string word) =>
-            new[] { "head", "face", "eye", "ear", "nose", "mouth", "hand", "arm", "leg", "foot", 
-                   "finger", "toe", "heart", "brain", "lung", "stomach", "back", "chest", "shoulder" }.Any(word.Contains);
-        
-        private bool IsFamilyRelation(string word) =>
-            new[] { "family", "mother", "father", "parent", "child", "son", "daughter", "brother", "sister", 
-                   "grandmother", "grandfather", "aunt", "uncle", "cousin", "spouse", "husband", "wife" }.Any(word.Contains);
-        
-        // === ARTIFACTS & OBJECTS CLASSIFICATION ===
-        
-        private bool IsLandVehicle(string word) =>
-            new[] { "car", "truck", "bus", "motorcycle", "bicycle", "train", "subway", "taxi", 
-                   "van", "suv", "vehicle", "automobile", "scooter", "tractor" }.Any(word.Contains);
-        
-        private bool IsWatercraft(string word) =>
-            new[] { "boat", "ship", "yacht", "canoe", "kayak", "sailboat", "submarine", "ferry", 
-                   "cruise", "vessel", "raft", "barge", "speedboat" }.Any(word.Contains);
-        
-        private bool IsAircraft(string word) =>
-            new[] { "plane", "airplane", "aircraft", "jet", "helicopter", "drone", "glider", 
-                   "balloon", "rocket", "spaceship", "shuttle" }.Any(word.Contains);
-        
-        private bool IsToolOrInstrument(string word) =>
-            new[] { "tool", "hammer", "screwdriver", "wrench", "knife", "scissors", "saw", "drill", 
-                   "instrument", "equipment", "device", "machine", "apparatus" }.Any(word.Contains);
-        
-        private bool IsBuildingOrStructure(string word) =>
-            new[] { "house", "building", "home", "office", "school", "hospital", "church", "store", 
-                   "bridge", "tower", "wall", "roof", "door", "window", "room", "structure" }.Any(word.Contains);
-        
-        private bool IsClothingOrTextile(string word) =>
-            new[] { "clothes", "shirt", "pants", "dress", "shoe", "hat", "coat", "jacket", "sock", 
-                   "fabric", "cotton", "silk", "wool", "leather", "textile" }.Any(word.Contains);
-        
-        private bool IsFoodOrNutrition(string word) =>
-            new[] { "food", "eat", "bread", "meat", "fruit", "vegetable", "milk", "cheese", "egg", 
-                   "rice", "pasta", "soup", "meal", "dinner", "lunch", "breakfast", "nutrition" }.Any(word.Contains);
-        
-        private bool IsTechnologyOrElectronics(string word) =>
-            new[] { "computer", "phone", "internet", "software", "digital", "tech", "electronic", 
-                   "robot", "artificial", "data", "network", "system", "program", "app" }.Any(word.Contains);
-        
-        private bool IsWeaponOrMilitary(string word) =>
-            new[] { "weapon", "gun", "rifle", "sword", "knife", "bomb", "military", "army", "war", 
-                   "soldier", "battle", "fight", "defense", "attack" }.Any(word.Contains);
-        
-        // === NATURAL WORLD CLASSIFICATION ===
-        
-        private bool IsLandform(string word) =>
-            new[] { "mountain", "hill", "valley", "canyon", "cliff", "plain", "desert", "island", 
-                   "peninsula", "plateau", "cave", "rock", "stone", "soil", "earth" }.Any(word.Contains);
-        
-        private bool IsWaterBody(string word) =>
-            new[] { "ocean", "sea", "lake", "river", "stream", "pond", "waterfall", "bay", "gulf", 
-                   "beach", "shore", "coast", "water", "wave", "current" }.Any(word.Contains);
-        
-        private bool IsWeatherOrClimate(string word) =>
-            new[] { "weather", "rain", "snow", "sun", "wind", "storm", "cloud", "hot", "cold", 
-                   "warm", "cool", "climate", "temperature", "season", "winter", "summer" }.Any(word.Contains);
-        
-        private bool IsMaterialOrSubstance(string word) =>
-            new[] { "metal", "wood", "plastic", "glass", "paper", "concrete", "rubber", "oil", 
-                   "gas", "liquid", "solid", "chemical", "substance", "material" }.Any(word.Contains);
-        
-        private bool IsColorOrVisual(string word) =>
-            new[] { "color", "red", "blue", "green", "yellow", "black", "white", "orange", "purple", 
-                   "pink", "brown", "gray", "bright", "dark", "light", "visual", "see", "look" }.Any(word.Contains);
-        
-        // === ABSTRACT DOMAINS CLASSIFICATION ===
-        
-        private bool IsEmotionOrFeeling(string word) =>
-            new[] { "happy", "sad", "angry", "love", "hate", "fear", "joy", "excited", "nervous", 
-                   "calm", "worried", "proud", "ashamed", "emotion", "feeling", "mood" }.Any(word.Contains);
-        
-        private bool IsThoughtOrIdea(string word) =>
-            new[] { "think", "thought", "idea", "concept", "theory", "philosophy", "belief", 
-                   "opinion", "mind", "mental", "cognitive", "reason", "logic" }.Any(word.Contains);
-        
-        private bool IsKnowledgeOrLearning(string word) =>
-            new[] { "know", "learn", "study", "teach", "education", "school", "knowledge", 
-                   "information", "fact", "truth", "science", "research", "discovery" }.Any(word.Contains);
-        
-        private bool IsMemoryOrPerception(string word) =>
-            new[] { "remember", "memory", "forget", "recall", "recognize", "perceive", "sense", 
-                   "aware", "conscious", "attention", "focus", "notice" }.Any(word.Contains);
-        
-        private bool IsLanguageOrSpeech(string word) =>
-            new[] { "language", "speak", "talk", "say", "tell", "word", "sentence", "voice", 
-                   "communication", "conversation", "discuss", "explain", "describe" }.Any(word.Contains);
-        
-        private bool IsSocialRelation(string word) =>
-            new[] { "friend", "social", "relationship", "community", "group", "team", "society", 
-                   "culture", "people", "person", "human", "interaction", "cooperation" }.Any(word.Contains);
-        
-        private bool IsCulturalPractice(string word) =>
-            new[] { "culture", "tradition", "custom", "ritual", "ceremony", "festival", "art", 
-                   "music", "dance", "religion", "spiritual", "cultural", "ethnic" }.Any(word.Contains);
-        
-        private bool IsPoliticsOrGovernment(string word) =>
-            new[] { "government", "politics", "law", "legal", "court", "judge", "police", "vote", 
-                   "election", "democracy", "president", "minister", "political", "policy" }.Any(word.Contains);
-        
-        private bool IsPhysicalMotion(string word) =>
-            new[] { "move", "walk", "run", "jump", "climb", "swim", "fly", "drive", "travel", 
-                   "motion", "speed", "fast", "slow", "direction", "forward", "backward" }.Any(word.Contains);
-        
-        private bool IsMentalAction(string word) =>
-            new[] { "think", "decide", "choose", "plan", "imagine", "dream", "wonder", "consider", 
-                   "analyze", "solve", "create", "invent", "design", "mental", "cognitive" }.Any(word.Contains);
-        
-        private bool IsSocialInteraction(string word) =>
-            new[] { "meet", "greet", "talk", "discuss", "argue", "agree", "help", "cooperate", 
-                   "share", "give", "take", "exchange", "social", "interact" }.Any(word.Contains);
-        
-        private bool IsWorkOrOccupation(string word) =>
-            new[] { "work", "job", "career", "profession", "business", "office", "company", 
-                   "employee", "boss", "manager", "doctor", "teacher", "engineer", "lawyer" }.Any(word.Contains);
-        
-        private bool IsSpatialRelation(string word) =>
-            new[] { "on", "in", "under", "over", "beside", "near", "far", "here", "there", 
-                   "above", "below", "inside", "outside", "left", "right", "front", "back" }.Any(word.Contains);
-        
-        private bool IsTemporalRelation(string word) =>
-            new[] { "when", "then", "now", "before", "after", "during", "while", "time", 
-                   "early", "late", "soon", "yesterday", "today", "tomorrow", "past", "future" }.Any(word.Contains);
-        
-        private bool IsQuantityOrMeasurement(string word) =>
-            new[] { "number", "count", "measure", "size", "big", "small", "many", "few", "all", 
-                   "some", "more", "less", "most", "least", "quantity", "amount" }.Any(word.Contains);
-        
-        private bool IsQualityOrEvaluation(string word) =>
-            new[] { "good", "bad", "better", "best", "worse", "worst", "quality", "excellent", 
-                   "poor", "beautiful", "ugly", "perfect", "terrible", "amazing", "awful" }.Any(word.Contains);
-        
-        // === GRAMMATICAL SUBCATEGORIZATION ===
-        
-        private string DetermineVerbSubcategory(string word)
+
+        /// <summary>
+        /// Load vocabulary cluster
+        /// </summary>
+        private async Task<VocabularyCluster?> LoadVocabularyClusterAsync(string clusterPath)
         {
-            if (IsPhysicalMotion(word)) return "language_structures/grammatical/verbs/action_verbs";
-            if (IsMentalAction(word)) return "language_structures/grammatical/verbs/mental_verbs";
-            if (IsPhysicalMotion(word)) return "language_structures/grammatical/verbs/motion_verbs";
-            return "language_structures/grammatical/verbs/action_verbs";
+            if (!File.Exists(clusterPath))
+                return null;
+
+            var json = await File.ReadAllTextAsync(clusterPath);
+            return JsonSerializer.Deserialize<VocabularyCluster>(json);
         }
-        
-        private string DetermineNounSubcategory(string word)
+
+        /// <summary>
+        /// Save vocabulary cluster
+        /// </summary>
+        private async Task SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
         {
-            // Check if it's a concrete vs abstract noun
-            if (IsMammal(word) || IsBird(word) || IsToolOrInstrument(word) || IsBuildingOrStructure(word))
-                return "language_structures/grammatical/nouns/concrete_nouns";
-            if (IsEmotionOrFeeling(word) || IsThoughtOrIdea(word) || IsKnowledgeOrLearning(word))
-                return "language_structures/grammatical/nouns/abstract_nouns";
-            return "language_structures/grammatical/nouns/concrete_nouns";
+            var directory = Path.GetDirectoryName(clusterPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(clusterPath, json);
         }
-        
-        private string DetermineAdjectiveSubcategory(string word)
-        {
-            if (IsQualityOrEvaluation(word)) return "language_structures/grammatical/adjectives/evaluative";
-            return "language_structures/grammatical/adjectives/descriptive";
-        }
-        
-        // Index management methods
+
+        /// <summary>
+        /// Update vocabulary index
+        /// </summary>
         private async Task UpdateVocabularyIndexAsync(string word, string clusterPath)
         {
             _vocabularyIndex[word] = clusterPath;
             await SaveVocabularyIndexAsync();
         }
-        
+
+        /// <summary>
+        /// Save vocabulary index
+        /// </summary>
+        private async Task SaveVocabularyIndexAsync()
+        {
+            var indexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
+            var json = JsonSerializer.Serialize(_vocabularyIndex, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(indexPath, json);
+        }
+
+        /// <summary>
+        /// Load concept cluster
+        /// </summary>
+        private async Task<ConceptCluster?> LoadConceptClusterAsync(string clusterPath)
+        {
+            if (!File.Exists(clusterPath))
+                return null;
+
+            var json = await File.ReadAllTextAsync(clusterPath);
+            return JsonSerializer.Deserialize<ConceptCluster>(json);
+        }
+
+        /// <summary>
+        /// Save concept cluster
+        /// </summary>
+        private async Task SaveConceptClusterAsync(string clusterPath, ConceptCluster cluster)
+        {
+            var directory = Path.GetDirectoryName(clusterPath);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(clusterPath, json);
+        }
+
+        /// <summary>
+        /// Update concept index
+        /// </summary>
         private async Task UpdateConceptIndexAsync(string conceptId, string clusterPath, ConceptType conceptType)
         {
             _conceptIndex[conceptId] = new ConceptIndexEntry
@@ -761,884 +991,19 @@ namespace GreyMatter.Storage
             };
             await SaveConceptIndexAsync();
         }
-        
-        // Cluster I/O operations
-        private async Task<VocabularyCluster?> LoadVocabularyClusterAsync(string clusterPath)
-        {
-            if (!File.Exists(clusterPath)) return null;
-            
-            var json = await File.ReadAllTextAsync(clusterPath);
-            return JsonSerializer.Deserialize<VocabularyCluster>(json);
-        }
-        
-        private async Task SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
-        {
-            var directory = Path.GetDirectoryName(clusterPath)!;
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            // Use compact JSON for performance (no indentation)
-            var json = JsonSerializer.Serialize(cluster);
-            await File.WriteAllTextAsync(clusterPath, json);
-        }
-        
-        private async Task<ConceptCluster?> LoadConceptClusterAsync(string clusterPath)
-        {
-            if (!File.Exists(clusterPath)) return null;
-            
-            var json = await File.ReadAllTextAsync(clusterPath);
-            return JsonSerializer.Deserialize<ConceptCluster>(json);
-        }
-        
-        private async Task SaveConceptClusterAsync(string clusterPath, ConceptCluster cluster)
-        {
-            var directory = Path.GetDirectoryName(clusterPath)!;
-            if (!Directory.Exists(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-            // Use compact JSON for performance (no indentation)
-            var json = JsonSerializer.Serialize(cluster);
-            await File.WriteAllTextAsync(clusterPath, json);
-        }
-        
-        // Index persistence
-        private async Task SaveVocabularyIndexAsync()
-        {
-            var indexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
-            // Use compact JSON for performance (no indentation)
-            var json = JsonSerializer.Serialize(_vocabularyIndex);
-            await File.WriteAllTextAsync(indexPath, json);
-        }
-        
-        private async Task LoadVocabularyIndexAsync()
-        {
-            var indexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
-            if (File.Exists(indexPath))
-            {
-                var json = await File.ReadAllTextAsync(indexPath);
-                _vocabularyIndex = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
-            }
-        }
-        
+
+        /// <summary>
+        /// Save concept index
+        /// </summary>
         private async Task SaveConceptIndexAsync()
         {
             var indexPath = Path.Combine(_hippocampusPath, "concept_index.json");
-            // Use compact JSON for performance (no indentation)
-            var json = JsonSerializer.Serialize(_conceptIndex);
+            var json = JsonSerializer.Serialize(_conceptIndex, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(indexPath, json);
         }
-        
-        private async Task LoadConceptIndexAsync()
-        {
-            var indexPath = Path.Combine(_hippocampusPath, "concept_index.json");
-            if (File.Exists(indexPath))
-            {
-                var json = await File.ReadAllTextAsync(indexPath);
-                _conceptIndex = JsonSerializer.Deserialize<Dictionary<string, ConceptIndexEntry>>(json) ?? new();
-            }
-        }
-
-        /// <summary>
-        /// Generate a hash for concept clustering to distribute load
-        /// </summary>
-        private string GetConceptHash(string conceptId)
-        {
-            var hash = conceptId.GetHashCode();
-            // Use fewer files for better batching (50 files max, ~5-10 concepts per file)
-            return Math.Abs(hash % 50).ToString("D2"); // 00-49 for better clustering
-        }
-        
-        // Shared neuron management methods
-        
-        /// <summary>
-        /// Create a new shared neuron in the global pool
-        /// </summary>
-        public int CreateSharedNeuron(NeuronType type)
-        {
-            var neuronId = _nextNeuronId++;
-            var neuron = new SharedNeuron
-            {
-                Id = neuronId,
-                Type = type,
-                WeightMap = new Dictionary<int, double>(),
-                ActiveConcepts = new HashSet<string>(),
-                LastActivated = DateTime.UtcNow,
-                ActivationCount = 0
-            };
-            
-            _neuronPool[neuronId] = neuron;
-            
-            // Determine storage file based on neuron ID for load balancing
-            var poolFile = GetNeuronPoolFile(neuronId);
-            _neuronLocationIndex[neuronId] = new NeuronLocationEntry
-            {
-                PoolFile = poolFile,
-                LastAccessed = DateTime.UtcNow,
-                IsLoaded = true
-            };
-            
-            return neuronId;
-        }
-        
-        /// <summary>
-        /// Get or load a shared neuron from the pool
-        /// </summary>
-        public async Task<SharedNeuron?> GetSharedNeuronAsync(int neuronId)
-        {
-            // Check if neuron is already in memory
-            if (_neuronPool.ContainsKey(neuronId))
-            {
-                _neuronPool[neuronId].LastActivated = DateTime.UtcNow;
-                _neuronPool[neuronId].ActivationCount++;
-                return _neuronPool[neuronId];
-            }
-            
-            // Check if we know where to find this neuron
-            if (_neuronLocationIndex.ContainsKey(neuronId))
-            {
-                var location = _neuronLocationIndex[neuronId];
-                var neuron = await LoadNeuronFromPoolFileAsync(neuronId, location.PoolFile);
-                
-                if (neuron != null)
-                {
-                    _neuronPool[neuronId] = neuron;
-                    location.IsLoaded = true;
-                    location.LastAccessed = DateTime.UtcNow;
-                    
-                    neuron.LastActivated = DateTime.UtcNow;
-                    neuron.ActivationCount++;
-                    return neuron;
-                }
-            }
-            
-            return null;
-        }
-        
-        /// <summary>
-        /// Update synaptic weights for a shared neuron
-        /// </summary>
-        public void UpdateNeuronWeights(int neuronId, Dictionary<int, double> weightUpdates)
-        {
-            if (_neuronPool.ContainsKey(neuronId))
-            {
-                var neuron = _neuronPool[neuronId];
-                foreach (var update in weightUpdates)
-                {
-                    neuron.WeightMap[update.Key] = update.Value;
-                }
-                neuron.LastActivated = DateTime.UtcNow;
-                neuron.ActivationCount++;
-            }
-        }
-        
-        /// <summary>
-        /// Associate a neuron with a concept for cross-referencing
-        /// </summary>
-        public void AssociateNeuronWithConcept(int neuronId, string conceptId)
-        {
-            if (_neuronPool.ContainsKey(neuronId))
-            {
-                _neuronPool[neuronId].ActiveConcepts.Add(conceptId);
-            }
-        }
-        
-        /// <summary>
-        /// Get neuron pool file path based on neuron ID for load balancing
-        /// </summary>
-        private string GetNeuronPoolFile(int neuronId)
-        {
-            // Distribute neurons across multiple files for parallel access
-            var bucketId = neuronId % 100; // 100 buckets for load balancing
-            return Path.Combine(_neuronPoolPath, $"pool_bucket_{bucketId:D3}.json");
-        }
-        
-        /// <summary>
-        /// Load a specific neuron from its pool file
-        /// </summary>
-        private async Task<SharedNeuron?> LoadNeuronFromPoolFileAsync(int neuronId, string poolFile)
-        {
-            if (!File.Exists(poolFile)) return null;
-            
-            var json = await File.ReadAllTextAsync(poolFile);
-            var poolData = JsonSerializer.Deserialize<Dictionary<string, SharedNeuron>>(json);
-            
-            if (poolData != null && poolData.ContainsKey(neuronId.ToString()))
-            {
-                return poolData[neuronId.ToString()];
-            }
-            
-            return null;
-        }
-        
-        /// <summary>
-        /// Save dirty neurons back to their pool files
-        /// FIXED: Sequential operations to prevent file I/O race conditions
-        /// </summary>
-        public async Task FlushNeuronPoolAsync()
-        {
-            // Group neurons by their pool file for efficient batch writing
-            var neuronsByFile = new Dictionary<string, Dictionary<string, SharedNeuron>>();
-            
-            foreach (var kvp in _neuronPool)
-            {
-                var neuronId = kvp.Key;
-                var neuron = kvp.Value;
-                
-                if (_neuronLocationIndex.ContainsKey(neuronId))
-                {
-                    var poolFile = _neuronLocationIndex[neuronId].PoolFile;
-                    
-                    if (!neuronsByFile.ContainsKey(poolFile))
-                    {
-                        neuronsByFile[poolFile] = new Dictionary<string, SharedNeuron>();
-                    }
-                    
-                    neuronsByFile[poolFile][neuronId.ToString()] = neuron;
-                }
-            }
-            
-            // Write each pool file SEQUENTIALLY to avoid race conditions
-            foreach (var kvp in neuronsByFile)
-            {
-                var poolFile = kvp.Key;
-                var neurons = kvp.Value;
-                
-                try
-                {
-                    // Merge with existing pool file if it exists
-                    if (File.Exists(poolFile))
-                    {
-                        var existingJson = await File.ReadAllTextAsync(poolFile);
-                        var existingData = JsonSerializer.Deserialize<Dictionary<string, SharedNeuron>>(existingJson) ?? new();
-                        
-                        foreach (var neuronKvp in neurons)
-                        {
-                            existingData[neuronKvp.Key] = neuronKvp.Value;
-                        }
-                        
-                        neurons = existingData;
-                    }
-                    
-                    Directory.CreateDirectory(Path.GetDirectoryName(poolFile)!);
-                    var json = JsonSerializer.Serialize(neurons, new JsonSerializerOptions { WriteIndented = true });
-                    await File.WriteAllTextAsync(poolFile, json);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"⚠️ Error saving neuron pool file {poolFile}: {ex.Message}");
-                    // Continue with other files rather than failing completely
-                }
-            }
-            
-            // Save metadata
-            SaveNeuronPoolIndex();
-        }
-        
-        /// <summary>
-        /// Cleanup memory by unloading least recently used neurons
-        /// </summary>
-        public void CleanupMemory(int maxNeuronsInMemory = 10000)
-        {
-            if (_neuronPool.Count <= maxNeuronsInMemory) return;
-            
-            // Sort neurons by last activation time
-            var sortedNeurons = _neuronPool
-                .OrderBy(kvp => kvp.Value.LastActivated)
-                .Take(_neuronPool.Count - maxNeuronsInMemory / 2)
-                .ToList();
-            
-            foreach (var kvp in sortedNeurons)
-            {
-                _neuronPool.Remove(kvp.Key);
-                if (_neuronLocationIndex.ContainsKey(kvp.Key))
-                {
-                    _neuronLocationIndex[kvp.Key].IsLoaded = false;
-                }
-            }
-        }
-        
-        // Integration methods for existing brain classes
-        
-        /// <summary>
-        /// Store vocabulary using biological clustering with shared neurons (OPTIMIZED)
-        /// </summary>
-        public async Task StoreVocabularyAsync(Dictionary<string, WordInfo> vocabulary)
-        {
-            if (!vocabulary.Any()) return;
-            
-            var startTime = DateTime.UtcNow;
-            Console.WriteLine($"💾 Optimized vocabulary storage: {vocabulary.Count} words...");
-            
-            // Group words by cluster path to minimize I/O operations
-            var clusterGroups = vocabulary
-                .GroupBy(kvp => GetVocabularyCluster(kvp.Key, kvp.Value))
-                .ToList();
-            
-            Console.WriteLine($"   📁 Organizing into {clusterGroups.Count} cluster files...");
-            
-            // Load all required clusters in parallel
-            var clusterLoadTasks = clusterGroups.Select(async group =>
-            {
-                var clusterPath = group.Key;
-                var cluster = await LoadVocabularyClusterAsync(clusterPath) ?? new VocabularyCluster();
-                return new { ClusterPath = clusterPath, Cluster = cluster, Words = group.ToList() };
-            });
-            
-            var clusterData = await Task.WhenAll(clusterLoadTasks);
-            
-            // Update clusters with new words
-            var saveTasks = new List<Task>();
-            var indexUpdates = new Dictionary<string, string>();
-            
-            foreach (var data in clusterData)
-            {
-                // Add all words to this cluster
-                foreach (var kvp in data.Words)
-                {
-                    data.Cluster.Words[kvp.Key] = kvp.Value;
-                    indexUpdates[kvp.Key] = data.ClusterPath;
-                }
-                
-                data.Cluster.LastModified = DateTime.UtcNow;
-                data.Cluster.AccessCount++;
-                
-                // Save cluster asynchronously
-                saveTasks.Add(SaveVocabularyClusterAsync(data.ClusterPath, data.Cluster));
-            }
-            
-            // Execute all saves in parallel
-            await Task.WhenAll(saveTasks);
-            
-            // Update index once with all changes
-            foreach (var kvp in indexUpdates)
-            {
-                _vocabularyIndex[kvp.Key] = kvp.Value;
-            }
-            await SaveVocabularyIndexAsync();
-            
-            var elapsed = DateTime.UtcNow - startTime;
-            Console.WriteLine($"   ✅ Vocabulary storage complete: {elapsed.TotalMilliseconds:F0}ms");
-        }
-        
-        /// <summary>
-        /// Load vocabulary from biological storage
-        /// </summary>
-        public async Task<Dictionary<string, WordInfo>> LoadVocabularyAsync()
-        {
-            var vocabulary = new Dictionary<string, WordInfo>();
-            
-            // Load vocabulary index first
-            await LoadVocabularyIndexAsync();
-            
-            // Load each cluster mentioned in the index
-            var clusterGroups = _vocabularyIndex.Values.Distinct().ToList();
-            
-            var tasks = clusterGroups.Select(async clusterPath =>
-            {
-                var cluster = await LoadVocabularyClusterAsync(clusterPath);
-                return new { ClusterPath = clusterPath, Cluster = cluster };
-            });
-            
-            var results = await Task.WhenAll(tasks);
-            
-            foreach (var result in results.Where(r => r.Cluster != null))
-            {
-                foreach (var kvp in result.Cluster!.Words)
-                {
-                    vocabulary[kvp.Key] = kvp.Value;
-                }
-                
-                // Update access time
-                _clusterAccessTimes[result.ClusterPath] = DateTime.UtcNow;
-            }
-            
-            return vocabulary;
-        }
-        
-        /// <summary>
-        /// Store language-specific data using biological organization
-        /// </summary>
-        public async Task StoreLanguageDataAsync(Dictionary<string, object> languageData)
-        {
-            foreach (var kvp in languageData)
-            {
-                var dataType = kvp.Key;
-                var data = kvp.Value;
-                
-                // Determine semantic domain for language data using Huth's hierarchical organization
-                var domain = dataType switch
-                {
-                    "sentence_patterns" => "language_structures/syntactic/sentence_patterns",
-                    "word_associations" => "semantic_domains/social_communication/language_speech/associations",
-                    "grammar_rules" => "language_structures/syntactic/grammatical_relations",
-                    "phrase_structures" => "language_structures/syntactic/phrase_structures",
-                    "semantic_relations" => "semantic_domains/properties/semantic_relations",
-                    "episodic_memories" => "episodic_memories/personal_experiences",
-                    _ => "language_structures/grammatical/function_words"
-                };
-                
-                var clusterPath = Path.Combine(_corticalColumnsPath, domain, $"{dataType}.json");
-                var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
-                
-                cluster.Concepts[dataType] = data;
-                cluster.LastModified = DateTime.UtcNow;
-                cluster.AccessCount++;
-                
-                await SaveConceptClusterAsync(clusterPath, cluster);
-                await UpdateConceptIndexAsync(dataType, clusterPath, ConceptType.General);
-            }
-        }
-        
-        /// <summary>
-        /// Load language data from biological storage
-        /// </summary>
-        public async Task<Dictionary<string, object>> LoadLanguageDataAsync()
-        {
-            var languageData = new Dictionary<string, object>();
-            
-            // Load from language structure domains following Huth's semantic organization
-            var languageDomains = new[]
-            {
-                "language_structures/syntactic/sentence_patterns",
-                "language_structures/syntactic/phrase_structures", 
-                "language_structures/syntactic/grammatical_relations",
-                "language_structures/grammatical/verbs",
-                "language_structures/grammatical/nouns",
-                "language_structures/grammatical/adjectives",
-                "language_structures/grammatical/function_words",
-                "semantic_domains/social_communication/language_speech/associations",
-                "semantic_domains/properties/semantic_relations",
-                "episodic_memories/personal_experiences"
-            };
-            
-            foreach (var domain in languageDomains)
-            {
-                var domainPath = Path.Combine(_corticalColumnsPath, domain);
-                if (!Directory.Exists(domainPath)) continue;
-                
-                var clusterFiles = Directory.GetFiles(domainPath, "*.json");
-                
-                foreach (var clusterFile in clusterFiles)
-                {
-                    var cluster = await LoadConceptClusterAsync(clusterFile);
-                    if (cluster?.Concepts != null)
-                    {
-                        foreach (var conceptKvp in cluster.Concepts)
-                        {
-                            languageData[conceptKvp.Key] = conceptKvp.Value;
-                        }
-                    }
-                }
-            }
-            
-            return languageData;
-        }
-        
-        /// <summary>
-        /// Check if brain state exists in biological storage
-        /// </summary>
-        public bool HasExistingBrainState()
-        {
-            // Check for hippocampus indices
-            var vocabIndexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
-            var conceptIndexPath = Path.Combine(_hippocampusPath, "concept_index.json");
-            var neuronLocationPath = Path.Combine(_hippocampusPath, "neuron_locations.json");
-            
-            return File.Exists(vocabIndexPath) || File.Exists(conceptIndexPath) || File.Exists(neuronLocationPath);
-        }
-        
-        /// <summary>
-        /// Get storage statistics for analysis
-        /// </summary>
-        public async Task<StorageStatistics> GetStorageStatisticsAsync()
-        {
-            var stats = new StorageStatistics
-            {
-                TotalNeuronsInPool = _neuronPool.Count,
-                NeuronsInMemory = _neuronPool.Count,
-                VocabularyIndexSize = _vocabularyIndex.Count,
-                ConceptIndexSize = _conceptIndex.Count,
-                LastUpdated = DateTime.UtcNow
-            };
-            
-            // Count cortical columns
-            if (Directory.Exists(_corticalColumnsPath))
-            {
-                stats.CorticalColumnCount = Directory.GetDirectories(_corticalColumnsPath, "*", SearchOption.AllDirectories).Length;
-                
-                // Calculate total file sizes
-                var allFiles = Directory.GetFiles(_corticalColumnsPath, "*.json", SearchOption.AllDirectories);
-                stats.TotalStorageSize = allFiles.Sum(f => new FileInfo(f).Length);
-            }
-            
-            // Count neuron pool files
-            if (Directory.Exists(_neuronPoolPath))
-            {
-                var poolFiles = Directory.GetFiles(_neuronPoolPath, "*.json");
-                stats.NeuronPoolFiles = poolFiles.Length;
-                stats.NeuronPoolSize = poolFiles.Sum(f => new FileInfo(f).Length);
-            }
-            
-            return stats;
-        }
-        
-        /// <summary>
-        /// Store individual neural concepts using Huth's semantic domain categorization
-        /// This method analyzes each concept and routes it to the appropriate semantic domain
-        /// OPTIMIZED: Batch operations with parallel processing
-        /// </summary>
-        public async Task StoreNeuralConceptsAsync(Dictionary<string, object> neuralConcepts)
-        {
-            if (!neuralConcepts.Any()) return;
-            
-            var startTime = DateTime.UtcNow;
-            Console.WriteLine($"🧠 Optimized neural concept storage: {neuralConcepts.Count} concepts...");
-            
-            // Group concepts by semantic domain for batch processing
-            var conceptsByDomain = new Dictionary<string, Dictionary<string, object>>();
-            
-            foreach (var conceptKvp in neuralConcepts)
-            {
-                var conceptId = conceptKvp.Key;
-                var conceptData = conceptKvp.Value;
-                
-                // Determine semantic domain for this concept using Huth's hierarchical organization
-                var semanticDomain = DetermineSemanticDomainForConcept(conceptId, conceptData);
-                
-                if (!conceptsByDomain.ContainsKey(semanticDomain))
-                {
-                    conceptsByDomain[semanticDomain] = new Dictionary<string, object>();
-                }
-                
-                conceptsByDomain[semanticDomain][conceptId] = conceptData;
-            }
-            
-            Console.WriteLine($"   📁 Organizing into {conceptsByDomain.Count} semantic domains...");
-            
-            // Process domains in parallel for better performance
-            var domainTasks = conceptsByDomain.Select(async domainKvp =>
-            {
-                var semanticDomain = domainKvp.Key;
-                var domainConcepts = domainKvp.Value;
-                
-                // Group concepts by cluster file within domain
-                var conceptsByCluster = new Dictionary<string, Dictionary<string, object>>();
-                
-                foreach (var conceptKvp in domainConcepts)
-                {
-                    var conceptId = conceptKvp.Key;
-                    var conceptData = conceptKvp.Value;
-                    
-                    var clusterPath = Path.Combine(_corticalColumnsPath, semanticDomain, $"concepts_{GetConceptHash(conceptId)}.json");
-                    
-                    if (!conceptsByCluster.ContainsKey(clusterPath))
-                    {
-                        conceptsByCluster[clusterPath] = new Dictionary<string, object>();
-                    }
-                    
-                    conceptsByCluster[clusterPath][conceptId] = conceptData;
-                }
-                
-                // Save cluster files in parallel within domain
-                var clusterTasks = conceptsByCluster.Select(async clusterKvp =>
-                {
-                    var clusterPath = clusterKvp.Key;
-                    var clusterConcepts = clusterKvp.Value;
-                    var indexUpdates = new List<(string, string)>();
-                    
-                    try
-                    {
-                        // Load existing concept cluster
-                        var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
-                        
-                        // Add all concepts to cluster in batch
-                        foreach (var conceptKvp in clusterConcepts)
-                        {
-                            cluster.Concepts[conceptKvp.Key] = conceptKvp.Value;
-                            indexUpdates.Add((conceptKvp.Key, clusterPath));
-                        }
-                        
-                        cluster.LastModified = DateTime.UtcNow;
-                        cluster.AccessCount++;
-                        
-                        // Save cluster once
-                        await SaveConceptClusterAsync(clusterPath, cluster);
-                        
-                        return indexUpdates;
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"⚠️ Error saving cluster {clusterPath}: {ex.Message}");
-                        return new List<(string, string)>();
-                    }
-                });
-                
-                var clusterResults = await Task.WhenAll(clusterTasks);
-                return clusterResults.SelectMany(r => r).ToList();
-            });
-            
-            var allIndexUpdates = await Task.WhenAll(domainTasks);
-            
-            // Update index once with all changes
-            foreach (var updates in allIndexUpdates)
-            {
-                foreach (var (conceptId, clusterPath) in updates)
-                {
-                    _conceptIndex[conceptId] = new ConceptIndexEntry
-                    {
-                        ClusterPath = clusterPath,
-                        ConceptType = ConceptType.Neural,
-                        LastAccessed = DateTime.UtcNow
-                    };
-                }
-            }
-            await SaveConceptIndexAsync();
-            
-            var elapsed = DateTime.UtcNow - startTime;
-            Console.WriteLine($"   ✅ Neural concept storage complete: {elapsed.TotalMilliseconds:F0}ms");
-        }
-
-        /// <summary>
-        /// Determine the semantic domain for a neural concept using Huth's hierarchical organization
-        /// Analyzes concept content to route to appropriate domain/subdomain
-        /// </summary>
-        private string DetermineSemanticDomainForConcept(string conceptId, object conceptData)
-        {
-            var conceptString = conceptId.ToLower();
-            var dataString = JsonSerializer.Serialize(conceptData).ToLower();
-            var combinedText = $"{conceptString} {dataString}";
-            
-            // Simplified semantic domain categorization
-            // Language and communication concepts
-            if (combinedText.Contains("word") || combinedText.Contains("language") || 
-                combinedText.Contains("speak") || combinedText.Contains("communication"))
-                return "semantic_domains/social_communication/language_speech";
-            
-            // Actions and events
-            if (combinedText.Contains("action") || combinedText.Contains("event") || 
-                combinedText.Contains("activity") || combinedText.Contains("work"))
-                return "semantic_domains/actions_events/general_actions";
-            
-            // Cognitive and mental processes
-            if (combinedText.Contains("think") || combinedText.Contains("memory") || 
-                combinedText.Contains("learn") || combinedText.Contains("knowledge"))
-                return "semantic_domains/mental_cognitive/general_cognitive";
-            
-            // Social interactions
-            if (combinedText.Contains("social") || combinedText.Contains("friend") || 
-                combinedText.Contains("family") || combinedText.Contains("relationship"))
-                return "semantic_domains/social_communication/social_relations";
-            
-            // Default: general concepts
-            return "semantic_domains/general_concepts";
-        }
-        
-        /// <summary>
-        /// Classify semantic domain using pre-trained model
-        /// No training required - uses semantic embeddings for intelligent categorization
-        /// </summary>
-        public async Task<string> ClassifySemanticDomainAsync(string conceptId)
-        {
-            // Try pre-trained classifier first
-            if (_preTrainedClassifier != null)
-            {
-                try
-                {
-                    var domain = _preTrainedClassifier.ClassifySemanticDomain(conceptId);
-                    return await Task.FromResult(domain);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"⚠️ Pre-trained classifier error: {ex.Message}");
-                }
-            }
-            
-            // Fallback to rule-based classification
-            var fallbackDomain = _fallbackClassifier.ClassifySemanticDomain(conceptId);
-            return await Task.FromResult(fallbackDomain);
-        }
-        
-        /// <summary>
-        /// Get the predicted domain for a concept using semantic classification
-        /// </summary>
-        public Task<string> GetPredictedDomainAsync(string conceptId)
-        {
-            return ClassifySemanticDomainAsync(conceptId);
-        }
-        
-        /// <summary>
-        /// Add a neuron from external brain to the storage pool
-        /// This enables persistence of neurons created outside the SemanticStorageManager
-        /// </summary>
-        public async Task AddNeuronToPoolAsync(int externalNeuronId, object neuronData)
-        {
-            var neuronId = _nextNeuronId++;
-            
-            // Convert external neuron data to SharedNeuron format
-            var neuron = new SharedNeuron
-            {
-                Id = neuronId,
-                Type = NeuronType.Concept, // Default type for imported neurons
-                WeightMap = new Dictionary<int, double>(),
-                ActiveConcepts = new HashSet<string>(),
-                LastActivated = DateTime.UtcNow,
-                ActivationCount = 1
-            };
-            
-            // Extract data from the external neuron object if it has properties
-            if (neuronData != null)
-            {
-                var neuronType = neuronData.GetType();
-                
-                // Try to extract ActiveConcepts if available
-                var activeConceptsProp = neuronType.GetProperty("ActiveConcepts");
-                if (activeConceptsProp != null && activeConceptsProp.GetValue(neuronData) is HashSet<string> concepts)
-                {
-                    neuron.ActiveConcepts = concepts;
-                }
-                
-                // Try to extract ClusterId as a concept
-                var clusterIdProp = neuronType.GetProperty("ClusterId");
-                if (clusterIdProp != null && clusterIdProp.GetValue(neuronData) is string clusterId)
-                {
-                    neuron.ActiveConcepts.Add(clusterId);
-                }
-                
-                // Try to extract activation count
-                var activationCountProp = neuronType.GetProperty("ActivationCount");
-                if (activationCountProp != null && activationCountProp.GetValue(neuronData) is int count)
-                {
-                    neuron.ActivationCount = count;
-                }
-            }
-            
-            _neuronPool[neuronId] = neuron;
-            
-            // Determine storage file based on neuron ID for load balancing
-            var poolFile = GetNeuronPoolFile(neuronId);
-            _neuronLocationIndex[neuronId] = new NeuronLocationEntry
-            {
-                PoolFile = poolFile,
-                LastAccessed = DateTime.UtcNow,
-                IsLoaded = true
-            };
-        }
-
-        /// <summary>
-        /// Load all neurons from the persistent neuron pool
-        /// This is used when restoring a brain from storage
-        /// </summary>
-        public async Task<Dictionary<int, object>> LoadAllNeuronsAsync()
-        {
-            var loadedNeurons = new Dictionary<int, object>();
-            
-            if (!Directory.Exists(_neuronPoolPath))
-            {
-                return loadedNeurons; // Empty if no pool exists
-            }
-            
-            // Get all neuron pool files
-            var poolFiles = Directory.GetFiles(_neuronPoolPath, "pool_bucket_*.json");
-            
-            foreach (var poolFile in poolFiles)
-            {
-                try
-                {
-                    if (File.Exists(poolFile))
-                    {
-                        var json = await File.ReadAllTextAsync(poolFile);
-                        var neuronsInFile = JsonSerializer.Deserialize<Dictionary<int, SharedNeuron>>(json) 
-                                          ?? new Dictionary<int, SharedNeuron>();
-                        
-                        // Convert SharedNeuron objects to generic objects for brain import
-                        foreach (var kvp in neuronsInFile)
-                        {
-                            var neuron = kvp.Value;
-                            var neuronData = new
-                            {
-                                Id = neuron.Id,
-                                Type = neuron.Type.ToString(),
-                                ActiveConcepts = neuron.ActiveConcepts,
-                                ActivationCount = neuron.ActivationCount,
-                                LastActivated = neuron.LastActivated,
-                                WeightMap = neuron.WeightMap
-                            };
-                            loadedNeurons[kvp.Key] = neuronData;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"⚠️  Failed to load neurons from {Path.GetFileName(poolFile)}: {ex.Message}");
-                }
-            }
-            
-            Console.WriteLine($"   🔄 Loaded {loadedNeurons.Count:N0} neurons from pool files");
-            return loadedNeurons;
-        }
     }
 
-    /// <summary>
-    /// Shared neuron that can participate in multiple concepts and cortical columns
-    /// Enables biological realism through neural sharing across brain regions
-    /// </summary>
-    public class SharedNeuron
-    {
-        public int Id { get; set; }
-        public NeuronType Type { get; set; }
-        public Dictionary<int, double> WeightMap { get; set; } = new();
-        public HashSet<string> ActiveConcepts { get; set; } = new();
-        public DateTime LastActivated { get; set; }
-        public int ActivationCount { get; set; }
-    }
-    
-    /// <summary>
-    /// Biological concept stored with neural pointers instead of full neuron data
-    /// </summary>
-    public class BiologicalConcept
-    {
-        public string ConceptId { get; set; } = "";
-        public List<int> NeuronIds { get; set; } = new();
-        public string StorageColumn { get; set; } = "";
-        public double ActivationStrength { get; set; }
-        public DateTime LastAccessed { get; set; }
-    }
-    
-    /// <summary>
-    /// Cortical column for semantic clustering and efficient loading
-    /// </summary>
-    public class CorticalColumn
-    {
-        public string Specialization { get; set; } = "";
-        public List<string> ConceptIds { get; set; } = new();
-        public DateTime LastAccessed { get; set; }
-        public Dictionary<string, double> ConceptStrengths { get; set; } = new();
-    }
-
-    // Supporting data structures
-    public class VocabularyCluster
-    {
-        public Dictionary<string, WordInfo> Words { get; set; } = new();
-        public DateTime LastModified { get; set; }
-        public int AccessCount { get; set; }
-    }
-    
-    public class ConceptCluster
-    {
-        public Dictionary<string, object> Concepts { get; set; } = new();
-        public DateTime LastModified { get; set; }
-        public int AccessCount { get; set; }
-    }
-    
-    public class ConceptIndexEntry
-    {
-        public string ClusterPath { get; set; } = "";
-        public ConceptType ConceptType { get; set; }
-        public DateTime LastAccessed { get; set; }
-    }
-    
+    // Missing type definitions
     public enum ConceptType
     {
         SentencePattern,
@@ -1648,34 +1013,53 @@ namespace GreyMatter.Storage
         General,
         Neural
     }
-    
+
+    public class ConceptIndexEntry
+    {
+        public string ClusterPath { get; set; } = "";
+        public ConceptType ConceptType { get; set; }
+        public DateTime LastAccessed { get; set; }
+    }
+
     public class NeuronLocationEntry
     {
         public string PoolFile { get; set; } = "";
         public DateTime LastAccessed { get; set; }
         public bool IsLoaded { get; set; }
     }
-    
-    public enum NeuronType
+
+    public class SharedNeuron
     {
-        Input,
-        Hidden,
-        Output,
-        Memory,
-        Attention,
-        Concept
+        public int Id { get; set; }
+        public object? Data { get; set; }
+        public DateTime LastUsed { get; set; }
     }
-    
+
     public class StorageStatistics
     {
-        public int TotalNeuronsInPool { get; set; }
-        public int NeuronsInMemory { get; set; }
-        public int VocabularyIndexSize { get; set; }
-        public int ConceptIndexSize { get; set; }
-        public int CorticalColumnCount { get; set; }
-        public int NeuronPoolFiles { get; set; }
-        public long TotalStorageSize { get; set; }
-        public long NeuronPoolSize { get; set; }
+        public int TotalConcepts { get; set; }
+        public int TotalVocabularyWords { get; set; }
+        public int TotalNeurons { get; set; }
+        public int LoadedNeurons { get; set; }
+        public long StorageSizeBytes { get; set; }
+        public long TotalStorageSize => StorageSizeBytes; // Alias for backward compatibility
+        public int TotalNeuronsInPool => LoadedNeurons; // Alias for backward compatibility
+        public int ConceptIndexSize => TotalConcepts; // Alias for backward compatibility
+        public int CorticalColumnCount { get; set; } = 0; // Number of cortical columns
+        public int VocabularyIndexSize => TotalVocabularyWords; // Alias for backward compatibility
         public DateTime LastUpdated { get; set; }
+        public Dictionary<ConceptType, int> ConceptsByType { get; set; } = new Dictionary<ConceptType, int>();
+    }
+
+    public class VocabularyCluster
+    {
+        public Dictionary<string, WordInfo> Words { get; set; } = new Dictionary<string, WordInfo>();
+        public DateTime LastModified { get; set; }
+    }
+
+    public class ConceptCluster
+    {
+        public Dictionary<string, object> Concepts { get; set; } = new Dictionary<string, object>();
+        public DateTime LastModified { get; set; }
     }
 }
