@@ -5,7 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using GreyMatter.Storage;
 
-namespace PerformanceValidation
+namespace greyMatter
 {
     public class StoragePerformanceValidator
     {
@@ -14,7 +14,9 @@ namespace PerformanceValidation
 
         public StoragePerformanceValidator()
         {
-            _storageManager = new SemanticStorageManager("/Volumes/jarvis/brainData");
+            var config = new GreyMatter.Core.CerebroConfiguration();
+            config.ValidateAndSetup();
+            _storageManager = new SemanticStorageManager(config.BrainDataPath);
         }
 
         public async Task RunComprehensivePerformanceTest()

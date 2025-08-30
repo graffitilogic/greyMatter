@@ -101,7 +101,7 @@ namespace GreyMatter.Storage
             
             // Cortical columns - semantic clustering based on Huth's semantic brain map
             // Following the ~24 major semantic domains identified in cortical organization research
-            var corticalDomains = new[]
+            var corticalDomains = new
             {
                 // === CONCRETE SEMANTIC DOMAINS ===
                 
@@ -1062,6 +1062,7 @@ namespace GreyMatter.Storage
         public bool IsLoaded { get; set; }
     }
 
+    [Serializable]
     public class SharedNeuron
     {
         public int Id { get; set; }
@@ -1085,15 +1086,40 @@ namespace GreyMatter.Storage
         public Dictionary<ConceptType, int> ConceptsByType { get; set; } = new Dictionary<ConceptType, int>();
     }
 
+    [Serializable]
     public class VocabularyCluster
     {
         public Dictionary<string, WordInfo> Words { get; set; } = new Dictionary<string, WordInfo>();
         public DateTime LastModified { get; set; }
     }
 
+    [Serializable]
     public class ConceptCluster
     {
         public Dictionary<string, object> Concepts { get; set; } = new Dictionary<string, object>();
         public DateTime LastModified { get; set; }
+    }
+
+    [Serializable]
+    public class WordInfo
+    {
+        public string Word { get; set; } = "";
+        public int Frequency { get; set; }
+        public DateTime FirstSeen { get; set; }
+        public WordType EstimatedType { get; set; }
+    }
+
+    public enum WordType
+    {
+        Noun,
+        Verb,
+        Adjective,
+        Adverb,
+        Pronoun,
+        Preposition,
+        Conjunction,
+        Interjection,
+        Article,
+        Unknown
     }
 }

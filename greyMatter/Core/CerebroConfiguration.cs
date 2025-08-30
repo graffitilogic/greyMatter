@@ -126,7 +126,7 @@ namespace GreyMatter.Core
         }
         
         /// <summary>
-        /// Validate and setup paths
+        /// Validate and setup paths with improved data storage handling
         /// </summary>
         public void ValidateAndSetup()
         {
@@ -156,6 +156,21 @@ namespace GreyMatter.Core
             }
             else
             {
+                // CRITICAL: Never store data in project directory
+                // Only use project directory as absolute last resort
+                var projectDir = Directory.GetCurrentDirectory();
+                var isInProjectDir = BrainDataPath.Contains(projectDir) || TrainingDataRoot.Contains(projectDir);
+
+                if (isInProjectDir)
+                {
+                    Console.WriteLine("⚠️  WARNING: Data paths are currently pointing to project directory!");
+                    Console.WriteLine("    This is not recommended for production use.");
+                    Console.WriteLine("    Set BRAIN_DATA_PATH and TRAINING_DATA_ROOT environment variables");
+                    Console.WriteLine("    or use --brain-data and --training-data command line arguments");
+                    Console.WriteLine("    to point to proper NAS/external storage locations.");
+                    Console.WriteLine();
+                }
+
                 // Prefer NAS defaults if user hasn't explicitly set paths
                 bool bdWasDefault = string.Equals(BrainDataPath, "/Volumes/jarvis/brainData", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(BrainDataPath);
                 bool tdWasDefault = string.Equals(TrainingDataRoot, "/tmp/brain_library", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(TrainingDataRoot);
@@ -187,18 +202,18 @@ namespace GreyMatter.Core
                     }
                 }
             }
-            
+
             // Ensure directories exist; if creation fails, fall back to local
-            var actualBrainPath = EnsureDirectoryOrFallback(BrainDataPath, "brainData", "external brain data path");
-            var actualTrainingPath = EnsureDirectoryOrFallback(TrainingDataRoot, Path.Combine(Directory.GetCurrentDirectory(), "learning_datasets"), "external training data path");
-            
+            var actualBrainPath = EnsureDirectoryOrFallback(BrainDataPath, Path.Combine(Path.GetTempPath(), "greyMatter_brainData"), "external brain data path");
+            var actualTrainingPath = EnsureDirectoryOrFallback(TrainingDataRoot, Path.Combine(Path.GetTempPath(), "greyMatter_trainingData"), "external training data path");
+
             // Update paths to reflect what's actually being used
             BrainDataPath = actualBrainPath;
             TrainingDataRoot = actualTrainingPath;
-            
+
             Console.WriteLine($"📁 Brain Data Path: {Path.GetFullPath(BrainDataPath)}");
             Console.WriteLine($"📚 Training Data Root: {Path.GetFullPath(TrainingDataRoot)}");
-            
+
             if (!string.IsNullOrEmpty(WorkingDrivePath))
             {
                 Console.WriteLine($"💾 Working Drive: {WorkingDrivePath}");

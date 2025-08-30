@@ -213,16 +213,15 @@ namespace GreyMatter
             var stopwatch = Stopwatch.StartNew();
 
             // Create test words
-            var testWords = new Dictionary<string, WordInfo>();
+            var testWords = new Dictionary<string, GreyMatter.Storage.WordInfo>();
             for (int i = 0; i < 1000; i++)
             {
-                testWords[$"test_word_{i}"] = new WordInfo
+                testWords[$"test_word_{i}"] = new GreyMatter.Storage.WordInfo
                 {
                     Word = $"test_word_{i}",
                     Frequency = i,
                     FirstSeen = DateTime.Now,
-                    EstimatedType = WordType.Noun,
-                    AssociatedNeuronIds = new List<int> { i, i + 1 }
+                    EstimatedType = GreyMatter.Storage.WordType.Noun
                 };
             }
 
@@ -251,13 +250,12 @@ namespace GreyMatter
 
             for (int i = 0; i < 100; i++)
             {
-                var wordInfo = new WordInfo
+                var wordInfo = new GreyMatter.Storage.WordInfo
                 {
                     Word = $"individual_word_{i}",
                     Frequency = i,
                     FirstSeen = DateTime.Now,
-                    EstimatedType = WordType.Noun,
-                    AssociatedNeuronIds = new List<int> { i }
+                    EstimatedType = GreyMatter.Storage.WordType.Noun
                 };
 
                 await _storageManager.SaveVocabularyWordAsync($"individual_word_{i}", wordInfo);
@@ -525,7 +523,7 @@ namespace GreyMatter
             return dict.Count * 256; // Rough estimate per entry
         }
 
-        private long CalculateWordInfoSize(Dictionary<string, WordInfo> dict)
+        private long CalculateWordInfoSize(Dictionary<string, GreyMatter.Storage.WordInfo> dict)
         {
             return dict.Count * 1024; // Rough estimate per WordInfo
         }
