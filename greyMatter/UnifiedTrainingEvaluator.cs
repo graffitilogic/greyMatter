@@ -13,7 +13,14 @@ namespace greyMatter
 {
     public class UnifiedTrainingEvaluator
     {
-        private readonly string _brainDataPath = "./brain_data";
+        private readonly CerebroConfiguration _config;
+        
+        public UnifiedTrainingEvaluator()
+        {
+            _config = new CerebroConfiguration();
+            _config.ValidateAndSetup();
+        }
+        
         private readonly string _tatoebaDataPath = "/Volumes/jarvis/trainData/tatoeba";
         
         public async Task RunUnifiedEvaluation()
@@ -44,7 +51,7 @@ namespace greyMatter
         {
             Console.WriteLine("🔍 DETECTING TRAINING TYPE");
             
-            var brainDataPath = _brainDataPath;
+            var brainDataPath = _config.BrainDataPath;
             var hierarchicalPath = Path.Combine(brainDataPath, "hierarchical");
             var storageStatsPath = Path.Combine(hierarchicalPath, "storage_stats.json");
             
@@ -293,7 +300,7 @@ namespace greyMatter
             
             try
             {
-                var trainer = new TatoebaLanguageTrainer(_tatoebaDataPath);
+                var trainer = new TatoebaLanguageTrainer(Path.Combine(_config.TrainingDataRoot, "tatoeba"));
                 var brain = trainer.Brain;
                 
                 Console.WriteLine("   ✅ Traditional model loaded successfully");

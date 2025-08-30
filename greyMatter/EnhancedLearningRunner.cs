@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using System.IO;
+using GreyMatter.Core;
 
 namespace GreyMatter
 {
@@ -14,9 +15,12 @@ namespace GreyMatter
             Console.WriteLine("🚀 **ENHANCED LANGUAGE LEARNING RUNNER - PHASE 4**");
             Console.WriteLine("==================================================");
 
-            // Configuration
-            var dataPath = Path.Combine(Directory.GetCurrentDirectory(), "learning_datasets", "learning_data");
-            var brainPath = Path.Combine(Directory.GetCurrentDirectory(), "brain_data");
+            // Use proper NAS configuration
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            
+            var dataPath = Path.Combine(config.TrainingDataRoot, "learning_data");
+            var brainPath = config.BrainDataPath;
 
             // Parse command line arguments
             var targetVocabularySize = 5000; // Default 5,000 words
@@ -61,6 +65,11 @@ namespace GreyMatter
 
             // Initialize enhanced learner
             var learner = new EnhancedLanguageLearner(dataPath, brainPath, maxConcurrency);
+
+            // Initialize Cerebro brain with existing data
+            var cerebro = new GreyMatter.Core.Cerebro(brainPath);
+            await cerebro.InitializeAsync();
+            Console.WriteLine("✅ Cerebro brain initialized with existing data");
 
             try
             {

@@ -79,8 +79,10 @@ namespace GreyMatter
             Console.WriteLine($"   📁 Brain data path: {brainDataPath}");
             Console.WriteLine($"   📁 Training data path: {trainingDataRoot}");
 
-            // Initialize Cerebro with biological configuration
-            _cerebro = new Cerebro();
+            // Initialize Cerebro with proper NAS configuration
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            _cerebro = new Cerebro(config.BrainDataPath);
             Console.WriteLine("   🧠 Cerebro neural network initialized");
 
             // Initialize semantic classifiers

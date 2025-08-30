@@ -7,7 +7,6 @@ using GreyMatter.Core;
 using GreyMatter.Storage;
 using GreyMatter.Learning;
 using greyMatter.Learning;
-using greyMatter.Core;
 
 namespace GreyMatter
 {
@@ -23,7 +22,6 @@ namespace GreyMatter
         private TatoebaLanguageTrainer? _tatoebaTrainer;
         private SemanticStorageManager? _storage;
         private SemanticStorageManager? _storageManager;
-        private PreTrainedSemanticClassifier? _preTrainedClassifier;
 
         public TatoebaHybridIntegrationDemo(string tatoebaDataPath = "/Volumes/jarvis/trainData/tatoeba")
         {
@@ -84,8 +82,10 @@ namespace GreyMatter
             _storage = new SemanticStorageManager(brainDataPath, trainingDataRoot);
             Console.WriteLine($"   📁 Storage initialized: {brainDataPath}");
 
-            // Initialize Cerebro
-            _cerebro = new Cerebro();
+            // Initialize Cerebro with proper NAS configuration
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            _cerebro = new Cerebro(config.BrainDataPath);
             Console.WriteLine("   🧠 Cerebro neural network initialized for real-world training");
 
             // Initialize Tatoeba trainer
@@ -600,16 +600,17 @@ namespace GreyMatter
             
             // Initialize with optimized settings for large-scale processing
             _storageManager = new SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
-            _preTrainedClassifier = new PreTrainedSemanticClassifier(_storageManager);
             _tatoebaTrainer = new TatoebaLanguageTrainer(_tatoebaDataPath);
             
-            // Initialize Cerebro for hybrid training
-            _cerebro = new Cerebro();
+            // Initialize Cerebro for hybrid training with proper NAS configuration
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            _cerebro = new Cerebro(config.BrainDataPath);
             
             // Initialize hybrid trainer with optimized parameters for large datasets
             _hybridTrainer = new HybridCerebroTrainer(
                 _cerebro,
-                _preTrainedClassifier,
+                new PreTrainedSemanticClassifier(_storageManager),
                 new TrainableSemanticClassifier(_storageManager),
                 _storageManager,
                 _tatoebaTrainer.Brain, // Add language brain for vocabulary learning

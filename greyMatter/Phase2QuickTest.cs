@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using GreyMatter.Core;
 using greyMatter.Core;
 
 namespace GreyMatter
@@ -18,8 +19,13 @@ namespace GreyMatter
             {
                 // Configure paths
                 var projectRoot = AppDomain.CurrentDomain.BaseDirectory;
-                var dataPath = "learning_datasets/learning_data";
-                var brainPath = "learning_datasets/brain_data";
+                
+                // Use proper NAS configuration instead of hardcoded local paths
+                var config = new CerebroConfiguration();
+                config.ValidateAndSetup();
+                
+                var dataPath = Path.Combine(config.TrainingDataRoot, "learning_data");
+                var brainPath = config.BrainDataPath;
 
                 Console.WriteLine($"📁 Data Path: {dataPath}");
                 Console.WriteLine($"🧠 Brain Path: {brainPath}");

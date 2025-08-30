@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -40,6 +41,7 @@ namespace GreyMatter.Storage
         // Thread safety for concurrent operations
         private readonly object _vocabularyIndexLock = new object();
         private readonly object _conceptIndexLock = new object();
+        private readonly Dictionary<string, object> _fileLocks = new Dictionary<string, object>();
         
         // Global neuron pool management
         private Dictionary<int, SharedNeuron> _neuronPool;
@@ -91,8 +93,8 @@ namespace GreyMatter.Storage
                 Console.WriteLine("🔄 Using fallback rule-based classifier");
             }
             
-            InitializeStorageStructure();
-            InitializeNeuronPool();
+            // Load existing vocabulary and concept data
+            LoadExistingDataAsync().Wait();
         }
         
         /// <summary>
@@ -328,14 +330,14 @@ namespace GreyMatter.Storage
             var clusterPath = GetVocabularyCluster(word, wordInfo);
             
             // Load existing cluster or create new
-            var cluster = await LoadVocabularyClusterAsync(clusterPath) ?? new VocabularyCluster();
+            var cluster = LoadVocabularyClusterAsync(clusterPath) ?? new VocabularyCluster();
             
             // Add/update word in cluster
             cluster.Words[word] = wordInfo;
             cluster.LastModified = DateTime.UtcNow;
             
             // Save cluster
-            await SaveVocabularyClusterAsync(clusterPath, cluster);
+            SaveVocabularyClusterAsync(clusterPath, cluster);
             
             // Update hippocampus index
             await UpdateVocabularyIndexAsync(word, clusterPath);
@@ -368,14 +370,14 @@ namespace GreyMatter.Storage
         public async Task SaveConceptsBatchAsync(Dictionary<string, (object Data, ConceptType Type)> concepts)
         {
             // Group concepts by cluster to minimize I/O operations
-            var clusterGroups = new Dictionary<string, List<(string conceptId, object data, ConceptType type)>>();
+            var clusterGroups = new Dictionary<string, List< (string conceptId, object data, ConceptType type)>>();
 
             foreach (var (conceptId, (data, type)) in concepts)
             {
                 var clusterPath = GetConceptCluster(conceptId, type);
                 if (!clusterGroups.ContainsKey(clusterPath))
                 {
-                    clusterGroups[clusterPath] = new List<(string, object, ConceptType)>();
+                    clusterGroups[clusterPath] = new List< (string, object, ConceptType)>();
                 }
                 clusterGroups[clusterPath].Add((conceptId, data, type));
             }
@@ -451,7 +453,7 @@ namespace GreyMatter.Storage
         /// <summary>
         /// Process a batch of concepts for a single cluster
         /// </summary>
-        private async Task ProcessConceptClusterBatchAsync(string clusterPath, List<(string conceptId, object data, ConceptType type)> concepts)
+        private async Task ProcessConceptClusterBatchAsync(string clusterPath, List< (string conceptId, object data, ConceptType type)> concepts)
         {
             // Load cluster once
             var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
@@ -637,11 +639,13 @@ namespace GreyMatter.Storage
             {
                 if (clusterFile.Contains("vocabulary") || clusterFile.Contains("freq_"))
                 {
-                    var cluster = await LoadVocabularyClusterAsync(clusterFile);
+                    var cluster = LoadVocabularyClusterAsync(clusterFile);
                     if (cluster != null)
                     {
-                        foreach (var (word, info) in cluster.Words)
+                        foreach (var kvp in cluster.Words)
                         {
+                            var word = kvp.Key;
+                            var info = kvp.Value;
                             vocabulary[word] = info;
                         }
                     }
@@ -813,7 +817,7 @@ namespace GreyMatter.Storage
             
             if (clusterPath != null)
             {
-                var cluster = await LoadVocabularyClusterAsync(clusterPath);
+                var cluster = LoadVocabularyClusterAsync(clusterPath);
                 if (cluster != null && cluster.Words.TryGetValue(word, out var wordInfo))
                 {
                     return wordInfo;
@@ -937,45 +941,55 @@ namespace GreyMatter.Storage
         }
 
         /// <summary>
-        /// Load vocabulary cluster
+        /// Load vocabulary cluster from file
         /// </summary>
-        private async Task<VocabularyCluster?> LoadVocabularyClusterAsync(string clusterPath)
+        private VocabularyCluster? LoadVocabularyClusterAsync(string clusterPath)
         {
-            if (!File.Exists(clusterPath))
-                return null;
+            var fileLock = GetFileLock(clusterPath);
+            
+            lock (fileLock)
+            {
+                if (!File.Exists(clusterPath))
+                    return null;
 
-            try
-            {
-                var json = await File.ReadAllTextAsync(clusterPath);
-                if (string.IsNullOrWhiteSpace(json))
-                    return new VocabularyCluster(); // Return empty cluster for empty files
-                
-                return JsonSerializer.Deserialize<VocabularyCluster>(json);
-            }
-            catch (JsonException ex)
-            {
-                Console.WriteLine($"⚠️ Warning: Failed to load vocabulary cluster {clusterPath}: {ex.Message}");
-                Console.WriteLine("🔄 Creating new empty cluster");
-                return new VocabularyCluster(); // Return empty cluster on JSON errors
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ Warning: Unexpected error loading vocabulary cluster {clusterPath}: {ex.Message}");
-                return new VocabularyCluster(); // Return empty cluster on any error
+                try
+                {
+                    var json = File.ReadAllText(clusterPath); // Use sync read under lock
+                    if (string.IsNullOrWhiteSpace(json))
+                        return new VocabularyCluster(); // Return empty cluster for empty files
+                    
+                    return JsonSerializer.Deserialize<VocabularyCluster>(json);
+                }
+                catch (JsonException ex)
+                {
+                    Console.WriteLine($"⚠️ Warning: Failed to load vocabulary cluster {clusterPath}: {ex.Message}");
+                    Console.WriteLine("🔄 Creating new empty cluster");
+                    return new VocabularyCluster(); // Return empty cluster on JSON errors
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Warning: Unexpected error loading vocabulary cluster {clusterPath}: {ex.Message}");
+                    return new VocabularyCluster(); // Return empty cluster on any error
+                }
             }
         }
 
         /// <summary>
         /// Save vocabulary cluster
         /// </summary>
-        private async Task SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
+        private void SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
         {
-            var directory = Path.GetDirectoryName(clusterPath);
-            if (!string.IsNullOrEmpty(directory))
-                Directory.CreateDirectory(directory);
+            var fileLock = GetFileLock(clusterPath);
+            
+            lock (fileLock)
+            {
+                var directory = Path.GetDirectoryName(clusterPath);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
 
-            var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(clusterPath, json);
+                var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(clusterPath, json); // Use sync write under lock
+            }
         }
 
         /// <summary>
@@ -1080,6 +1094,86 @@ namespace GreyMatter.Storage
             
             var json = JsonSerializer.Serialize(conceptIndexCopy, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(indexPath, json);
+        }
+
+        /// <summary>
+        /// Get or create a file lock for the specified path
+        /// </summary>
+        private object GetFileLock(string filePath)
+        {
+            lock (_fileLocks)
+            {
+                if (!_fileLocks.TryGetValue(filePath, out var fileLock))
+                {
+                    fileLock = new object();
+                    _fileLocks[filePath] = fileLock;
+                }
+                return fileLock;
+            }
+        }
+
+        /// <summary>
+        /// Load existing vocabulary and concept data from storage
+        /// </summary>
+        private async Task LoadExistingDataAsync()
+        {
+            try
+            {
+                Console.WriteLine("📚 Loading existing vocabulary data...");
+                
+                // Load vocabulary index
+                await LoadVocabularyIndexAsync();
+                
+                // Load concept index  
+                await LoadConceptIndexAsync();
+                
+                Console.WriteLine($"✅ Loaded {_vocabularyIndex.Count} vocabulary entries and {_conceptIndex.Count} concepts");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to load existing data: {ex.Message}");
+                // Continue with empty indices - this is not a fatal error
+            }
+        }
+
+        /// <summary>
+        /// Load vocabulary index from disk
+        /// </summary>
+        private async Task LoadVocabularyIndexAsync()
+        {
+            var vocabIndexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
+            if (File.Exists(vocabIndexPath))
+            {
+                var json = await File.ReadAllTextAsync(vocabIndexPath);
+                var loadedIndex = JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                if (loadedIndex != null)
+                {
+                    lock (_vocabularyIndexLock)
+                    {
+                        _vocabularyIndex = loadedIndex;
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Load concept index from disk
+        /// </summary>
+        private async Task LoadConceptIndexAsync()
+        {
+            var conceptIndexPath = Path.Combine(_hippocampusPath, "concept_index.json");
+            if (File.Exists(conceptIndexPath))
+            {
+                var json = await File.ReadAllTextAsync(conceptIndexPath);
+                var loadedIndex = JsonSerializer.Deserialize<Dictionary<string, ConceptIndexEntry>>(json);
+                if (loadedIndex != null)
+                {
+                    lock (_conceptIndexLock)
+                    {
+                        _conceptIndex = loadedIndex;
+                    }
+                }
+            }
         }
     }
 

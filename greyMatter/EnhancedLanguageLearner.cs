@@ -99,7 +99,43 @@ namespace GreyMatter
                 ?? new Dictionary<string, Dictionary<string, int>>();
             Console.WriteLine($" {_cooccurrenceMatrix.Count:N0} entries loaded");
 
+            // Load existing vocabulary from storage manager
+            await LoadExistingVocabularyAsync();
+
             await LoadLearnedWordsAsync();
+        }
+
+        private async Task LoadExistingVocabularyAsync()
+        {
+            try
+            {
+                Console.Write("Loading existing vocabulary from storage...");
+                var existingVocabulary = await _storageManager.LoadVocabularyAsync();
+                
+                // Merge with word database, preferring existing data
+                foreach (var kvp in existingVocabulary)
+                {
+                    if (!_wordDatabase.ContainsKey(kvp.Key))
+                    {
+                        // Convert WordInfo back to WordData format
+                        var wordData = new TatoebaDataConverter.WordData
+                        {
+                            Word = kvp.Key,
+                            Frequency = kvp.Value.Frequency,
+                            SentenceContexts = new List<string>(),
+                            CooccurringWords = new Dictionary<string, int>()
+                        };
+                        _wordDatabase[kvp.Key] = wordData;
+                    }
+                }
+                
+                Console.WriteLine($" {existingVocabulary.Count:N0} existing words loaded");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to load existing vocabulary: {ex.Message}");
+                // Continue without existing vocabulary - not a fatal error
+            }
         }
 
         private LearningPlan CalculateLearningPlan(int targetVocabularySize, int batchSize)
@@ -281,8 +317,47 @@ namespace GreyMatter
 
         private async Task SaveLearnedKnowledgeAsync()
         {
-            // This would integrate with the existing storage system
-            await Task.CompletedTask;
+            Console.WriteLine("💾 Saving learned knowledge to persistent storage...");
+            
+            try
+            {
+                // Save vocabulary data through storage manager
+                foreach (var word in _alreadyLearnedWords)
+                {
+                    if (_wordDatabase.TryGetValue(word, out var wordData))
+                    {
+                        var wordInfo = new GreyMatter.Storage.WordInfo
+                        {
+                            Word = word,
+                            Frequency = wordData.Frequency,
+                            FirstSeen = DateTime.UtcNow,
+                            EstimatedType = GreyMatter.Storage.WordType.Unknown
+                        };
+                        
+                        await _storageManager.SaveVocabularyWordAsync(word, wordInfo);
+                    }
+                }
+                
+                // Save co-occurrence relationships as concepts
+                if (_cooccurrenceMatrix.Any())
+                {
+                    var conceptsToSave = new Dictionary<string, (object Data, GreyMatter.Storage.ConceptType Type)>();
+                    
+                    foreach (var kvp in _cooccurrenceMatrix)
+                    {
+                        conceptsToSave[$"cooccurrences_{kvp.Key}"] = (kvp.Value, GreyMatter.Storage.ConceptType.SemanticRelation);
+                    }
+                    
+                    await _storageManager.SaveConceptsBatchAsync(conceptsToSave);
+                }
+                
+                Console.WriteLine($"✅ Saved {_alreadyLearnedWords.Count} learned words and their relationships");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed to save learned knowledge: {ex.Message}");
+                // Don't throw - saving failure shouldn't stop the learning process
+            }
         }
 
         private async Task SaveLearnedWordsAsync()

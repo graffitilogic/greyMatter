@@ -13,8 +13,10 @@ namespace GreyMatter
             Console.WriteLine("Simulating child-like progression from guided to autonomous learning");
             Console.WriteLine("with a 37TB digital library for exploration\n");
 
-            // Initialize the brain with developmental learning
-            var libraryPath = args.Length > 0 ? args[0] : "/tmp/brain_library";
+            // Initialize the brain with developmental learning using proper NAS configuration
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            var libraryPath = args.Length > 0 ? args[0] : config.BrainDataPath;
             var brain = new Cerebro(libraryPath);
             
             Console.WriteLine($"🧠 Initializing Brain with library at: {libraryPath}");

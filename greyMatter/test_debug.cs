@@ -14,8 +14,10 @@ namespace GreyMatter
         {
             Console.WriteLine("🔍 Running debug test...");
             
-            // Simple test to debug one input
-            var brain = new Cerebro();
+            // Initialize with proper NAS configuration
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            var brain = new Cerebro(config.BrainDataPath);
             await brain.InitializeAsync();
 
             // Test with red features - should match what was learned

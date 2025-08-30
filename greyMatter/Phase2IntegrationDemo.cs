@@ -314,10 +314,12 @@ namespace GreyMatter
         {
             Console.WriteLine("🚀 Starting Phase 2 Integration Demo...");
 
-            // Configure paths
-            var projectRoot = Path.GetDirectoryName(typeof(Phase2IntegrationDemo).Assembly.Location) ?? Directory.GetCurrentDirectory();
-            var dataPath = Path.Combine(projectRoot, "learning_datasets");
-            var brainPath = Path.Combine(projectRoot, "brain_data");
+            // Use proper NAS configuration instead of hardcoded local paths
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            
+            var dataPath = Path.Combine(config.TrainingDataRoot, "learning_data");
+            var brainPath = config.BrainDataPath;
 
             // Ensure directories exist
             Directory.CreateDirectory(dataPath);
@@ -329,7 +331,7 @@ namespace GreyMatter
 
             Console.WriteLine("\n🎉 Phase 2 Integration Demo Complete!");
             Console.WriteLine("Press any key to exit...");
-            Console.ReadKey();
+            //stop prompting for keypresses-> Console.ReadKey();
         }
     }
 }

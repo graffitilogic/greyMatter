@@ -147,72 +147,72 @@ namespace BinarySerializationDemo
 
     class Program
     {
-        static async Task Main(string[] args)
-        {
-            Console.WriteLine("🚀 **BINARY SERIALIZATION PERFORMANCE DEMO**");
-            Console.WriteLine("==========================================");
+        // static async Task Main(string[] args)
+        // {
+        //     Console.WriteLine("🚀 **BINARY SERIALIZATION PERFORMANCE DEMO**");
+        //     Console.WriteLine("==========================================");
 
-            try
-            {
-                var testDir = Path.Combine(Path.GetTempPath(), "BinarySerializationTest");
-                var manager = new BinaryStorageManager(testDir);
+        //     try
+        //     {
+        //         var testDir = Path.Combine(Path.GetTempPath(), "BinarySerializationTest");
+        //         var manager = new BinaryStorageManager(testDir);
 
-                // Create test data
-                var testNeurons = CreateTestNeurons(1000);
-                Console.WriteLine($"📊 Created {testNeurons.Count} test neurons");
+        //         // Create test data
+        //         var testNeurons = CreateTestNeurons(1000);
+        //         Console.WriteLine($"📊 Created {testNeurons.Count} test neurons");
 
-                // Test performance
-                Console.WriteLine("\n⚡ **PERFORMANCE TEST**");
-                var perfResult = await manager.TestSerializationPerformanceAsync(testNeurons, 5);
-                Console.WriteLine($"   {perfResult}");
+        //         // Test performance
+        //         Console.WriteLine("\n⚡ **PERFORMANCE TEST**");
+        //         var perfResult = await manager.TestSerializationPerformanceAsync(testNeurons, 5);
+        //         Console.WriteLine($"   {perfResult}");
 
-                // Test storage efficiency
-                Console.WriteLine("\n💾 **STORAGE EFFICIENCY TEST**");
-                var sizeComparison = await manager.CompareStorageSizesAsync(testNeurons, "efficiency_test");
-                Console.WriteLine($"   JSON Size: {sizeComparison.JsonSize:N0} bytes");
-                Console.WriteLine($"   Binary Size: {sizeComparison.BinarySize:N0} bytes");
-                Console.WriteLine($"   Compression Ratio: {sizeComparison.CompressionRatio:F2}x smaller");
+        //         // Test storage efficiency
+        //         Console.WriteLine("\n💾 **STORAGE EFFICIENCY TEST**");
+        //         var sizeComparison = await manager.CompareStorageSizesAsync(testNeurons, "efficiency_test");
+        //         Console.WriteLine($"   JSON Size: {sizeComparison.JsonSize:N0} bytes");
+        //         Console.WriteLine($"   Binary Size: {sizeComparison.BinarySize:N0} bytes");
+        //         Console.WriteLine($"   Compression Ratio: {sizeComparison.CompressionRatio:F2}x smaller");
 
-                // Calculate system-wide projections
-                Console.WriteLine("\n🔮 **SYSTEM PROJECTIONS**");
-                var totalNeurons = 28572; // From diagnostic
-                var estimatedJsonSize = totalNeurons * 1000L; // Rough estimate per neuron
-                var estimatedBinarySize = (long)(estimatedJsonSize / sizeComparison.CompressionRatio);
-                var spaceSaved = estimatedJsonSize - estimatedBinarySize;
+        //         // Calculate system-wide projections
+        //         Console.WriteLine("\n🔮 **SYSTEM PROJECTIONS**");
+        //         var totalNeurons = 28572; // From diagnostic
+        //         var estimatedJsonSize = totalNeurons * 1000L; // Rough estimate per neuron
+        //         var estimatedBinarySize = (long)(estimatedJsonSize / sizeComparison.CompressionRatio);
+        //         var spaceSaved = estimatedJsonSize - estimatedBinarySize;
 
-                Console.WriteLine($"   Current JSON storage: ~{estimatedJsonSize / 1024.0 / 1024.0:F1} MB");
-                Console.WriteLine($"   Binary storage: ~{estimatedBinarySize / 1024.0 / 1024.0:F1} MB");
-                Console.WriteLine($"   Space savings: ~{spaceSaved / 1024.0 / 1024.0:F1} MB ({spaceSaved * 100.0 / estimatedJsonSize:F1}%)");
+        //         Console.WriteLine($"   Current JSON storage: ~{estimatedJsonSize / 1024.0 / 1024.0:F1} MB");
+        //         Console.WriteLine($"   Binary storage: ~{estimatedBinarySize / 1024.0 / 1024.0:F1} MB");
+        //         Console.WriteLine($"   Space savings: ~{spaceSaved / 1024.0 / 1024.0:F1} MB ({spaceSaved * 100.0 / estimatedJsonSize:F1}%)");
 
-                // Test vocabulary serialization
-                Console.WriteLine("\n📚 **VOCABULARY SERIALIZATION TEST**");
-                var vocab = CreateTestVocabulary();
-                var vocabJson = JsonSerializer.Serialize(vocab);
-                var vocabBytes = System.Text.Encoding.UTF8.GetBytes(vocabJson);
-                var vocabFilePath = Path.Combine(testDir, "test_vocab.bin");
-                await File.WriteAllBytesAsync(vocabFilePath, vocabBytes);
+        //         // Test vocabulary serialization
+        //         Console.WriteLine("\n📚 **VOCABULARY SERIALIZATION TEST**");
+        //         var vocab = CreateTestVocabulary();
+        //         var vocabJson = JsonSerializer.Serialize(vocab);
+        //         var vocabBytes = System.Text.Encoding.UTF8.GetBytes(vocabJson);
+        //         var vocabFilePath = Path.Combine(testDir, "test_vocab.bin");
+        //         await File.WriteAllBytesAsync(vocabFilePath, vocabBytes);
 
-                var loadStart = Stopwatch.StartNew();
-                var loadedBytes = await File.ReadAllBytesAsync(vocabFilePath);
-                var loadedJson = System.Text.Encoding.UTF8.GetString(loadedBytes);
-                var loadedVocab = JsonSerializer.Deserialize<VocabularyCluster>(loadedJson);
-                loadStart.Stop();
+        //         var loadStart = Stopwatch.StartNew();
+        //         var loadedBytes = await File.ReadAllBytesAsync(vocabFilePath);
+        //         var loadedJson = System.Text.Encoding.UTF8.GetString(loadedBytes);
+        //         var loadedVocab = JsonSerializer.Deserialize<VocabularyCluster>(loadedJson);
+        //         loadStart.Stop();
 
-                Console.WriteLine($"   Saved and loaded {loadedVocab?.Words.Count ?? 0} words in {loadStart.Elapsed.TotalMilliseconds:F2}ms");
+        //         Console.WriteLine($"   Saved and loaded {loadedVocab?.Words.Count ?? 0} words in {loadStart.Elapsed.TotalMilliseconds:F2}ms");
 
-                // Cleanup
-                manager.CleanupTestFiles();
-                Console.WriteLine("\n✅ Test completed successfully!");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Error: {ex.Message}");
-                Console.WriteLine(ex.StackTrace);
-            }
+        //         // Cleanup
+        //         manager.CleanupTestFiles();
+        //         Console.WriteLine("\n✅ Test completed successfully!");
+        //     }
+        //     catch (Exception ex)
+        //     {
+        //         Console.WriteLine($"❌ Error: {ex.Message}");
+        //         Console.WriteLine(ex.StackTrace);
+        //     }
 
-            Console.WriteLine("\nPress any key to exit...");
-            Console.ReadKey();
-        }
+        //     Console.WriteLine("\nPress any key to exit...");
+        //     Console.ReadKey();
+        // }
 
         static List<SharedNeuron> CreateTestNeurons(int count)
         {
