@@ -6,6 +6,7 @@ using System.IO;
 using greyMatter.Core;
 using greyMatter.Learning;
 using GreyMatter.Storage;
+using GreyMatter.Core;
 
 namespace greyMatter
 {
@@ -20,10 +21,14 @@ namespace greyMatter
 
         public NeuronGrowthDiagnostic()
         {
-            var tatoebaDataPath = "/Volumes/jarvis/trainData/tatoeba";
+            // Use centralized configuration with fallbacks
+            var config = new CerebroConfiguration();
+            config.ValidateAndSetup();
+            
+            var tatoebaDataPath = Path.Combine(config.TrainingDataRoot, "tatoeba");
             _trainer = new TatoebaLanguageTrainer(tatoebaDataPath);
             _brain = _trainer.Brain;
-            _storageManager = new SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
+            _storageManager = new SemanticStorageManager(config.BrainDataPath, config.TrainingDataRoot);
         }
 
         /// <summary>
@@ -90,9 +95,14 @@ namespace greyMatter
         /// </summary>
         private async Task AnalyzeStorageFiles()
         {
+            await Task.Delay(1); // Make async
+            
             try
             {
-                var brainDataPath = "/Volumes/jarvis/brainData";
+                var config = new CerebroConfiguration();
+                config.ValidateAndSetup();
+                var brainDataPath = config.BrainDataPath;
+                
                 if (!Directory.Exists(brainDataPath))
                 {
                     Console.WriteLine("   ⚠️  Brain data directory not found");
@@ -204,7 +214,9 @@ namespace greyMatter
             try
             {
                 // Analyze cluster file distribution
-                var clusterPath = "/Volumes/jarvis/brainData/clusters";
+                var config = new CerebroConfiguration();
+                config.ValidateAndSetup();
+                var clusterPath = Path.Combine(config.BrainDataPath, "clusters");
                 if (Directory.Exists(clusterPath))
                 {
                     var clusterFiles = Directory.GetFiles(clusterPath, "cluster_*.json");
@@ -318,7 +330,9 @@ namespace greyMatter
                 var storageStats = await _storageManager.GetStorageStatisticsAsync();
                 
                 // Analyze neuron pool files
-                var brainDataPath = "/Volumes/jarvis/brainData";
+                var config = new CerebroConfiguration();
+                config.ValidateAndSetup();
+                var brainDataPath = config.BrainDataPath;
                 var poolFiles = Directory.GetFiles(brainDataPath, "neuron_pool_*.json");
                 
                 Console.WriteLine($"   Neuron pool files: {poolFiles.Length:N0}");
