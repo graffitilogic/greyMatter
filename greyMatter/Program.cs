@@ -13,7 +13,8 @@ namespace GreyMatter
 {
     class Program
     {
-        static async Task Main(string[] args)
+        // static async Task Main(string[] args)
+        static async Task RunProgram(string[] args)
         {
             // Legacy sparse encoding test (use --evaluate instead)
             if (args.Length > 0 && (args[0] == "--test-sparse" || args[0] == "--sparse-encoding"))
