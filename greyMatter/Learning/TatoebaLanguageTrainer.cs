@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using greyMatter.Core;
 using GreyMatter.Learning;
 using GreyMatter.Storage;
+using CoreWordInfo = greyMatter.Core.WordInfo;
+using StorageWordInfo = GreyMatter.Storage.WordInfo;
 
 namespace greyMatter.Learning
 {
@@ -79,7 +81,8 @@ namespace greyMatter.Learning
             if (vocabulary.Any())
             {
                 Console.WriteLine($"   📚 Loading {vocabulary.Count:N0} vocabulary entries...");
-                brain.ImportVocabulary(vocabulary);
+                var coreVocabulary = ConvertToCoreVocabulary(vocabulary);
+                brain.ImportVocabulary(coreVocabulary);
             }
             
             // Load language data (concepts, patterns, etc.)
@@ -118,10 +121,11 @@ namespace greyMatter.Learning
             {
                 // Export vocabulary and save
                 var vocabStartTime = DateTime.UtcNow;
-                var vocabulary = _brain.ExportVocabulary();
-                await _storageManager.StoreVocabularyAsync(vocabulary);
+                var coreVocabulary = _brain.ExportVocabulary();
+                var storageVocabulary = ConvertToStorageVocabulary(coreVocabulary);
+                await _storageManager.StoreVocabularyAsync(storageVocabulary);
                 var vocabElapsed = DateTime.UtcNow - vocabStartTime;
-                Console.WriteLine($"   ✅ Saved {vocabulary.Count:N0} vocabulary entries ({vocabElapsed.TotalMilliseconds:F0}ms)");
+                Console.WriteLine($"   ✅ Saved {storageVocabulary.Count:N0} vocabulary entries ({vocabElapsed.TotalMilliseconds:F0}ms)");
                 
                 // Export language data and save
                 var langStartTime = DateTime.UtcNow;
@@ -567,7 +571,7 @@ namespace greyMatter.Learning
                 // Storage monitoring after each block
                 if (blockNumber % 5 == 0) // Every 5 blocks
                 {
-                    await MonitorStorageGrowth(blockNumber, finalStats);
+                    MonitorStorageGrowth(blockNumber, finalStats);
                 }
             }
 
@@ -647,7 +651,7 @@ namespace greyMatter.Learning
         /// <summary>
         /// Monitor storage growth patterns during training
         /// </summary>
-        private async Task MonitorStorageGrowth(int blockNumber, LanguageLearningStats stats)
+        private void MonitorStorageGrowth(int blockNumber, LanguageLearningStats stats)
         {
             Console.WriteLine($"\n💾 Storage Monitoring (Block {blockNumber}):");
             
@@ -689,6 +693,32 @@ namespace greyMatter.Learning
                 size /= 1024;
             }
             return $"{size:0.##} {sizes[order]}";
+        }
+
+        private Dictionary<string, CoreWordInfo> ConvertToCoreVocabulary(Dictionary<string, StorageWordInfo> storageVocab)
+        {
+            return storageVocab.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new CoreWordInfo
+                {
+                    Word = kvp.Value.Word,
+                    Frequency = kvp.Value.Frequency,
+                    FirstSeen = kvp.Value.FirstSeen,
+                    EstimatedType = (greyMatter.Core.WordType)(int)kvp.Value.EstimatedType
+                });
+        }
+
+        private Dictionary<string, StorageWordInfo> ConvertToStorageVocabulary(Dictionary<string, CoreWordInfo> coreVocab)
+        {
+            return coreVocab.ToDictionary(
+                kvp => kvp.Key,
+                kvp => new StorageWordInfo
+                {
+                    Word = kvp.Value.Word,
+                    Frequency = kvp.Value.Frequency,
+                    FirstSeen = kvp.Value.FirstSeen,
+                    EstimatedType = (GreyMatter.Storage.WordType)(int)kvp.Value.EstimatedType
+                });
         }
     }
 }

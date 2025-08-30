@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using GreyMatter.Storage;
 using greyMatter.Core;
+using CoreWordInfo = greyMatter.Core.WordInfo;
+using StorageWordInfo = GreyMatter.Storage.WordInfo;
 
 namespace greyMatter
 {
@@ -77,16 +79,16 @@ namespace greyMatter
             Console.WriteLine();
             
             // Test vocabulary categorization with word examples
-            var testVocabulary = new Dictionary<string, WordInfo>
+            var testVocabulary = new Dictionary<string, StorageWordInfo>
             {
-                ["cat"] = new WordInfo { Word = "cat", Frequency = 150, FirstSeen = DateTime.UtcNow },
-                ["dog"] = new WordInfo { Word = "dog", Frequency = 200, FirstSeen = DateTime.UtcNow },
-                ["car"] = new WordInfo { Word = "car", Frequency = 180, FirstSeen = DateTime.UtcNow },
-                ["mountain"] = new WordInfo { Word = "mountain", Frequency = 95, FirstSeen = DateTime.UtcNow },
-                ["think"] = new WordInfo { Word = "think", Frequency = 300, FirstSeen = DateTime.UtcNow },
-                ["speak"] = new WordInfo { Word = "speak", Frequency = 220, FirstSeen = DateTime.UtcNow },
-                ["run"] = new WordInfo { Word = "run", Frequency = 170, FirstSeen = DateTime.UtcNow },
-                ["computer"] = new WordInfo { Word = "computer", Frequency = 130, FirstSeen = DateTime.UtcNow }
+                ["cat"] = new StorageWordInfo { Word = "cat", Frequency = 150, FirstSeen = DateTime.UtcNow },
+                ["dog"] = new StorageWordInfo { Word = "dog", Frequency = 200, FirstSeen = DateTime.UtcNow },
+                ["car"] = new StorageWordInfo { Word = "car", Frequency = 180, FirstSeen = DateTime.UtcNow },
+                ["mountain"] = new StorageWordInfo { Word = "mountain", Frequency = 95, FirstSeen = DateTime.UtcNow },
+                ["think"] = new StorageWordInfo { Word = "think", Frequency = 300, FirstSeen = DateTime.UtcNow },
+                ["speak"] = new StorageWordInfo { Word = "speak", Frequency = 220, FirstSeen = DateTime.UtcNow },
+                ["run"] = new StorageWordInfo { Word = "run", Frequency = 170, FirstSeen = DateTime.UtcNow },
+                ["computer"] = new StorageWordInfo { Word = "computer", Frequency = 130, FirstSeen = DateTime.UtcNow }
             };
             
             Console.WriteLine("📝 Testing Vocabulary Semantic Clustering:");

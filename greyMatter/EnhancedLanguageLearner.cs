@@ -1,0 +1,341 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using System.IO;
+using System.Diagnostics;
+using GreyMatter.Core;
+using GreyMatter.Storage;
+using System.Threading;
+
+namespace GreyMatter
+{
+    /// <summary>
+    /// Enhanced language learning system for scaling to 5,000+ words with parallel processing
+    /// </summary>
+    public class EnhancedLanguageLearner
+    {
+        private readonly string _dataPath;
+        private readonly string _brainPath;
+        private readonly string _learnedWordsPath;
+        private readonly SemanticStorageManager _storageManager;
+        private readonly LearningSparseConceptEncoder _encoder;
+        private Dictionary<string, TatoebaDataConverter.WordData> _wordDatabase;
+        private Dictionary<string, Dictionary<string, int>> _cooccurrenceMatrix;
+        private HashSet<string> _alreadyLearnedWords;
+        private readonly int _maxConcurrency;
+
+        public EnhancedLanguageLearner(string dataPath, string brainPath, int maxConcurrency = 4)
+        {
+            _dataPath = dataPath;
+            _brainPath = brainPath;
+            _learnedWordsPath = Path.Combine(brainPath, "learned_words.json");
+            _storageManager = new SemanticStorageManager(brainPath);
+            _encoder = new LearningSparseConceptEncoder(_storageManager);
+            _wordDatabase = new Dictionary<string, TatoebaDataConverter.WordData>();
+            _cooccurrenceMatrix = new Dictionary<string, Dictionary<string, int>>();
+            _alreadyLearnedWords = new HashSet<string>();
+            _maxConcurrency = maxConcurrency;
+        }
+
+        public async Task LearnVocabularyAtScaleAsync(int targetVocabularySize = 5000, int batchSize = 500)
+        {
+            Console.WriteLine("🚀 **ENHANCED LANGUAGE LEARNING SYSTEM - PHASE 4**");
+            Console.WriteLine("=================================================");
+            Console.WriteLine($"Target: {targetVocabularySize:N0} words | Batch Size: {batchSize} | Max Concurrency: {_maxConcurrency}");
+
+            var stopwatch = Stopwatch.StartNew();
+
+            // Step 1: Load learning data
+            await LoadLearningDataAsync();
+
+            // Step 2: Load previously learned words
+            await LoadLearnedWordsAsync();
+
+            // Step 3: Calculate learning plan
+            var learningPlan = CalculateLearningPlan(targetVocabularySize, batchSize);
+            Console.WriteLine($"\n📊 **LEARNING PLAN**");
+            Console.WriteLine($"Current vocabulary: {_alreadyLearnedWords.Count:N0} words");
+            Console.WriteLine($"New words to learn: {learningPlan.NewWordsToLearn:N0}");
+            Console.WriteLine($"Reinforcement words: {learningPlan.ReinforcementWords:N0}");
+            Console.WriteLine($"Total batches: {learningPlan.TotalBatches}");
+            Console.WriteLine($"Estimated time: {learningPlan.EstimatedTimeMinutes} minutes");
+
+            // Step 4: Execute learning in batches
+            await ExecuteBatchLearningAsync(learningPlan, batchSize);
+
+            // Step 5: Final validation and reporting
+            await PerformFinalValidationAsync();
+
+            stopwatch.Stop();
+            Console.WriteLine($"\n⏱️ **LEARNING COMPLETE** - Total time: {stopwatch.Elapsed.TotalMinutes:F1} minutes");
+            Console.WriteLine($"Final vocabulary size: {_alreadyLearnedWords.Count:N0} words");
+            Console.WriteLine($"Learning rate: {(double)_alreadyLearnedWords.Count / stopwatch.Elapsed.TotalMinutes:F0} words/minute");
+        }
+
+        private async Task LoadLearningDataAsync()
+        {
+            Console.WriteLine("\n📚 **LOADING LEARNING DATA**");
+
+            var wordDbPath = Path.Combine(_dataPath, "word_database.json");
+            var cooccurrencePath = Path.Combine(_dataPath, "cooccurrence_matrix.json");
+
+            if (!File.Exists(wordDbPath) || !File.Exists(cooccurrencePath))
+            {
+                throw new FileNotFoundException("Learning data not found. Run --convert-tatoeba-data first.");
+            }
+
+            // Load word database with progress reporting
+            Console.Write("Loading word database...");
+            var wordDbJson = await File.ReadAllTextAsync(wordDbPath);
+            _wordDatabase = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, TatoebaDataConverter.WordData>>(wordDbJson)
+                ?? new Dictionary<string, TatoebaDataConverter.WordData>();
+            Console.WriteLine($" {_wordDatabase.Count:N0} words loaded");
+
+            // Load co-occurrence matrix
+            Console.Write("Loading co-occurrence matrix...");
+            var cooccurrenceJson = await File.ReadAllTextAsync(cooccurrencePath);
+            _cooccurrenceMatrix = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(cooccurrenceJson)
+                ?? new Dictionary<string, Dictionary<string, int>>();
+            Console.WriteLine($" {_cooccurrenceMatrix.Count:N0} entries loaded");
+
+            await LoadLearnedWordsAsync();
+        }
+
+        private LearningPlan CalculateLearningPlan(int targetVocabularySize, int batchSize)
+        {
+            var stopWords = new HashSet<string> {
+                "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
+                "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does",
+                "did", "will", "would", "could", "should", "may", "might", "must", "can", "shall"
+            };
+
+            var allWords = _wordDatabase
+                .Where(w => !stopWords.Contains(w.Key))
+                .ToList();
+
+            var newWords = allWords.Where(w => !_alreadyLearnedWords.Contains(w.Key)).ToList();
+            var learnedWords = allWords.Where(w => _alreadyLearnedWords.Contains(w.Key)).ToList();
+
+            var newWordsToLearn = Math.Min(newWords.Count, targetVocabularySize - _alreadyLearnedWords.Count);
+            var reinforcementWords = Math.Min(learnedWords.Count, (int)(newWordsToLearn * 0.2)); // 20% reinforcement
+
+            var totalWordsToProcess = newWordsToLearn + reinforcementWords;
+            var totalBatches = (int)Math.Ceiling((double)totalWordsToProcess / batchSize);
+
+            // Estimate time: ~2 seconds per word for processing
+            var estimatedTimeMinutes = (totalWordsToProcess * 2.0) / 60.0;
+
+            return new LearningPlan
+            {
+                NewWordsToLearn = newWordsToLearn,
+                ReinforcementWords = reinforcementWords,
+                TotalBatches = totalBatches,
+                EstimatedTimeMinutes = estimatedTimeMinutes,
+                NewWords = newWords,
+                LearnedWords = learnedWords
+            };
+        }
+
+        private async Task ExecuteBatchLearningAsync(LearningPlan plan, int batchSize)
+        {
+            Console.WriteLine("\n🔄 **EXECUTING BATCH LEARNING**");
+
+            var semaphore = new SemaphoreSlim(_maxConcurrency);
+            var tasks = new List<Task>();
+
+            // Prepare word batches
+            var allWordsToLearn = new List<string>();
+
+            // Add new words
+            var newWordsSample = SelectWeightedRandomWords(plan.NewWords, plan.NewWordsToLearn, new Random(42));
+            allWordsToLearn.AddRange(newWordsSample);
+
+            // Add reinforcement words
+            if (plan.ReinforcementWords > 0)
+            {
+                var reinforcementSample = SelectWeightedRandomWords(plan.LearnedWords, plan.ReinforcementWords, new Random(123));
+                allWordsToLearn.AddRange(reinforcementSample);
+            }
+
+            // Process in batches
+            for (int batchIndex = 0; batchIndex < plan.TotalBatches; batchIndex++)
+            {
+                var batchWords = allWordsToLearn
+                    .Skip(batchIndex * batchSize)
+                    .Take(batchSize)
+                    .ToList();
+
+                if (!batchWords.Any()) break;
+
+                var batchTask = ProcessBatchAsync(batchWords, batchIndex + 1, plan.TotalBatches, semaphore);
+                tasks.Add(batchTask);
+            }
+
+            // Wait for all batches to complete
+            await Task.WhenAll(tasks);
+
+            Console.WriteLine($"\n✅ **BATCH LEARNING COMPLETE**");
+            Console.WriteLine($"Processed {allWordsToLearn.Count:N0} words in {plan.TotalBatches} batches");
+        }
+
+        private async Task ProcessBatchAsync(List<string> words, int batchNumber, int totalBatches, SemaphoreSlim semaphore)
+        {
+            await semaphore.WaitAsync();
+
+            try
+            {
+                Console.WriteLine($"📦 Processing batch {batchNumber}/{totalBatches} ({words.Count} words)...");
+
+                // Learn word patterns for this batch
+                await LearnWordPatternsBatchAsync(words);
+
+                // Learn semantic relationships for this batch
+                await LearnSemanticRelationshipsBatchAsync(words);
+
+                Console.WriteLine($"✅ Batch {batchNumber}/{totalBatches} completed");
+            }
+            finally
+            {
+                semaphore.Release();
+            }
+        }
+
+        private async Task LearnWordPatternsBatchAsync(List<string> words)
+        {
+            foreach (var word in words)
+            {
+                if (_wordDatabase.TryGetValue(word, out var wordData))
+                {
+                    // Convert WordData to WordInfo (Storage namespace)
+                    var wordInfo = new GreyMatter.Storage.WordInfo
+                    {
+                        Word = word,
+                        Frequency = wordData.Frequency,
+                        FirstSeen = DateTime.UtcNow,
+                        EstimatedType = GreyMatter.Storage.WordType.Unknown // Could be enhanced with POS tagging
+                    };
+
+                    // Store word in semantic storage
+                    await _storageManager.SaveVocabularyWordAsync(word, wordInfo);
+
+                    // Mark as learned
+                    _alreadyLearnedWords.Add(word);
+                }
+            }
+        }
+
+        private async Task LearnSemanticRelationshipsBatchAsync(List<string> words)
+        {
+            var conceptsToStore = new Dictionary<string, object>();
+
+            foreach (var word in words)
+            {
+                if (_cooccurrenceMatrix.TryGetValue(word, out var cooccurrences))
+                {
+                    // Store co-occurrence relationships as neural concepts
+                    conceptsToStore[$"cooccurrences_{word}"] = cooccurrences;
+                }
+            }
+
+            if (conceptsToStore.Any())
+            {
+                await _storageManager.StoreNeuralConceptsAsync(conceptsToStore);
+            }
+        }
+
+        private async Task PerformFinalValidationAsync()
+        {
+            Console.WriteLine("\n🔍 **FINAL VALIDATION**");
+
+            // Save all learned knowledge
+            await SaveLearnedKnowledgeAsync();
+            await SaveLearnedWordsAsync();
+
+            // Generate learning report
+            Console.WriteLine("\n📊 **LEARNING REPORT**");
+            Console.WriteLine($"Total words in database: {_wordDatabase.Count:N0}");
+            Console.WriteLine($"Words learned: {_alreadyLearnedWords.Count:N0}");
+            Console.WriteLine($"Learning coverage: {(double)_alreadyLearnedWords.Count / _wordDatabase.Count * 100:F1}%");
+
+            // Test a few learned words
+            var testWords = _alreadyLearnedWords.Take(5).ToList();
+            Console.WriteLine("\n🧪 **SAMPLE LEARNED WORDS**");
+            foreach (var word in testWords)
+            {
+                if (_wordDatabase.TryGetValue(word, out var data))
+                {
+                    Console.WriteLine($"- {word}: {data.SentenceContexts.Count} contexts, {data.CooccurringWords.Count} relationships");
+                }
+            }
+        }
+
+        private async Task LoadLearnedWordsAsync()
+        {
+            if (File.Exists(_learnedWordsPath))
+            {
+                var json = await File.ReadAllTextAsync(_learnedWordsPath);
+                _alreadyLearnedWords = System.Text.Json.JsonSerializer.Deserialize<HashSet<string>>(json) ?? new HashSet<string>();
+            }
+        }
+
+        private async Task SaveLearnedKnowledgeAsync()
+        {
+            // This would integrate with the existing storage system
+            await Task.CompletedTask;
+        }
+
+        private async Task SaveLearnedWordsAsync()
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(_alreadyLearnedWords, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(_learnedWordsPath, json);
+        }
+
+        private List<string> SelectWeightedRandomWords(
+            List<KeyValuePair<string, TatoebaDataConverter.WordData>> words,
+            int count,
+            Random random)
+        {
+            if (words.Count <= count)
+                return words.Select(w => w.Key).ToList();
+
+            // Weight by frequency for more important words
+            var weightedWords = words
+                .Select(w => new { Word = w.Key, Weight = Math.Max(1, w.Value.Frequency) })
+                .ToList();
+
+            var selected = new List<string>();
+            var totalWeight = weightedWords.Sum(w => w.Weight);
+
+            for (int i = 0; i < count && weightedWords.Any(); i++)
+            {
+                var randomWeight = random.NextDouble() * totalWeight;
+                var cumulativeWeight = 0.0;
+
+                for (int j = 0; j < weightedWords.Count; j++)
+                {
+                    cumulativeWeight += weightedWords[j].Weight;
+                    if (randomWeight <= cumulativeWeight)
+                    {
+                        selected.Add(weightedWords[j].Word);
+                        totalWeight -= weightedWords[j].Weight;
+                        weightedWords.RemoveAt(j);
+                        break;
+                    }
+                }
+            }
+
+            return selected;
+        }
+
+        private class LearningPlan
+        {
+            public int NewWordsToLearn { get; set; }
+            public int ReinforcementWords { get; set; }
+            public int TotalBatches { get; set; }
+            public double EstimatedTimeMinutes { get; set; }
+            public List<KeyValuePair<string, TatoebaDataConverter.WordData>> NewWords { get; set; } = new();
+            public List<KeyValuePair<string, TatoebaDataConverter.WordData>> LearnedWords { get; set; } = new();
+        }
+    }
+}

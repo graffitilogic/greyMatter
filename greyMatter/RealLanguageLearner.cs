@@ -6,6 +6,10 @@ using System.IO;
 using GreyMatter.Core;
 using greyMatter.Core;
 using GreyMatter.Storage;
+using CoreWordInfo = greyMatter.Core.WordInfo;
+using StorageWordInfo = GreyMatter.Storage.WordInfo;
+using CoreWordType = greyMatter.Core.WordType;
+using StorageWordType = GreyMatter.Storage.WordType;
 
 namespace GreyMatter
 {
@@ -205,13 +209,12 @@ namespace GreyMatter
                 var wordData = _wordDatabase[word];
 
                 // Store word using the correct method
-                var wordInfo = new WordInfo
+                var wordInfo = new StorageWordInfo
                 {
                     Word = word,
                     Frequency = wordData.Frequency,
                     FirstSeen = DateTime.Now,
-                    EstimatedType = WordType.Unknown,
-                    AssociatedNeuronIds = new List<int>()
+                    EstimatedType = StorageWordType.Unknown
                 };
 
                 await _storageManager.SaveVocabularyWordAsync(word, wordInfo);
@@ -333,7 +336,7 @@ namespace GreyMatter
                     Console.WriteLine($"📝 {word}:");
                     Console.WriteLine($"   Frequency: {wordInfo.Frequency}");
                     Console.WriteLine($"   Type: {wordInfo.EstimatedType}");
-                    Console.WriteLine($"   Associated neurons: {wordInfo.AssociatedNeuronIds.Count}");
+                    Console.WriteLine($"   First seen: {wordInfo.FirstSeen}");
                 }
                 else
                 {

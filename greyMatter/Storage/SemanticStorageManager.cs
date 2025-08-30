@@ -37,6 +37,10 @@ namespace GreyMatter.Storage
         private Dictionary<int, NeuronLocationEntry> _neuronLocationIndex;
         private Dictionary<string, DateTime> _clusterAccessTimes;
         
+        // Thread safety for concurrent operations
+        private readonly object _vocabularyIndexLock = new object();
+        private readonly object _conceptIndexLock = new object();
+        
         // Global neuron pool management
         private Dictionary<int, SharedNeuron> _neuronPool;
         private int _nextNeuronId;
@@ -101,7 +105,7 @@ namespace GreyMatter.Storage
             
             // Cortical columns - semantic clustering based on Huth's semantic brain map
             // Following the ~24 major semantic domains identified in cortical organization research
-            var corticalDomains = new
+            var corticalDomains = new[]
             {
                 // === CONCRETE SEMANTIC DOMAINS ===
                 
@@ -471,12 +475,15 @@ namespace GreyMatter.Storage
             foreach (var (conceptId, (_, type)) in concepts)
             {
                 var clusterPath = GetConceptCluster(conceptId, type);
-                _conceptIndex[conceptId] = new ConceptIndexEntry
+                lock (_conceptIndexLock)
                 {
-                    ClusterPath = clusterPath,
-                    ConceptType = type,
-                    LastAccessed = DateTime.UtcNow
-                };
+                    _conceptIndex[conceptId] = new ConceptIndexEntry
+                    {
+                        ClusterPath = clusterPath,
+                        ConceptType = type,
+                        LastAccessed = DateTime.UtcNow
+                    };
+                }
             }
 
             // Save index once
@@ -513,10 +520,24 @@ namespace GreyMatter.Storage
         /// </summary>
         public async Task<StorageStatistics> GetStorageStatisticsAsync()
         {
+            int vocabularyCount;
+            lock (_vocabularyIndexLock)
+            {
+                vocabularyCount = _vocabularyIndex.Count;
+            }
+            
+            int conceptCount;
+            Dictionary<string, ConceptIndexEntry> conceptIndexCopy;
+            lock (_conceptIndexLock)
+            {
+                conceptCount = _conceptIndex.Count;
+                conceptIndexCopy = new Dictionary<string, ConceptIndexEntry>(_conceptIndex);
+            }
+            
             var stats = new StorageStatistics
             {
-                TotalConcepts = _conceptIndex.Count,
-                TotalVocabularyWords = _vocabularyIndex.Count,
+                TotalConcepts = conceptCount,
+                TotalVocabularyWords = vocabularyCount,
                 TotalNeurons = _neuronPool.Count + _neuronLocationIndex.Count,
                 LoadedNeurons = _neuronPool.Count,
                 StorageSizeBytes = await CalculateStorageSizeAsync(),
@@ -525,7 +546,7 @@ namespace GreyMatter.Storage
 
             // Count concepts by type
             stats.ConceptsByType = new Dictionary<ConceptType, int>();
-            foreach (var entry in _conceptIndex.Values)
+            foreach (var entry in conceptIndexCopy.Values)
             {
                 if (!stats.ConceptsByType.ContainsKey(entry.ConceptType))
                     stats.ConceptsByType[entry.ConceptType] = 0;
@@ -784,7 +805,13 @@ namespace GreyMatter.Storage
         /// </summary>
         public async Task<WordInfo?> LoadVocabularyWordAsync(string word)
         {
-            if (_vocabularyIndex.TryGetValue(word, out var clusterPath))
+            string? clusterPath;
+            lock (_vocabularyIndexLock)
+            {
+                _vocabularyIndex.TryGetValue(word, out clusterPath);
+            }
+            
+            if (clusterPath != null)
             {
                 var cluster = await LoadVocabularyClusterAsync(clusterPath);
                 if (cluster != null && cluster.Words.TryGetValue(word, out var wordInfo))
@@ -956,7 +983,10 @@ namespace GreyMatter.Storage
         /// </summary>
         private async Task UpdateVocabularyIndexAsync(string word, string clusterPath)
         {
-            _vocabularyIndex[word] = clusterPath;
+            lock (_vocabularyIndexLock)
+            {
+                _vocabularyIndex[word] = clusterPath;
+            }
             await SaveVocabularyIndexAsync();
         }
 
@@ -965,8 +995,13 @@ namespace GreyMatter.Storage
         /// </summary>
         private async Task SaveVocabularyIndexAsync()
         {
+            Dictionary<string, string> indexCopy;
+            lock (_vocabularyIndexLock)
+            {
+                indexCopy = new Dictionary<string, string>(_vocabularyIndex);
+            }
             var indexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
-            var json = JsonSerializer.Serialize(_vocabularyIndex, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(indexCopy, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(indexPath, json);
         }
 
@@ -1017,12 +1052,15 @@ namespace GreyMatter.Storage
         /// </summary>
         private async Task UpdateConceptIndexAsync(string conceptId, string clusterPath, ConceptType conceptType)
         {
-            _conceptIndex[conceptId] = new ConceptIndexEntry
+            lock (_conceptIndexLock)
             {
-                ClusterPath = clusterPath,
-                ConceptType = conceptType,
-                LastAccessed = DateTime.UtcNow
-            };
+                _conceptIndex[conceptId] = new ConceptIndexEntry
+                {
+                    ClusterPath = clusterPath,
+                    ConceptType = conceptType,
+                    LastAccessed = DateTime.UtcNow
+                };
+            }
             await SaveConceptIndexAsync();
         }
 
@@ -1032,7 +1070,15 @@ namespace GreyMatter.Storage
         private async Task SaveConceptIndexAsync()
         {
             var indexPath = Path.Combine(_hippocampusPath, "concept_index.json");
-            var json = JsonSerializer.Serialize(_conceptIndex, new JsonSerializerOptions { WriteIndented = true });
+            
+            // Create a thread-safe copy of the concept index
+            Dictionary<string, ConceptIndexEntry> conceptIndexCopy;
+            lock (_conceptIndexLock)
+            {
+                conceptIndexCopy = new Dictionary<string, ConceptIndexEntry>(_conceptIndex);
+            }
+            
+            var json = JsonSerializer.Serialize(conceptIndexCopy, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(indexPath, json);
         }
     }
