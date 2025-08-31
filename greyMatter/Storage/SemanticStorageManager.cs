@@ -1175,6 +1175,61 @@ namespace GreyMatter.Storage
                 }
             }
         }
+
+        /// <summary>
+        /// Save episodic event to storage
+        /// </summary>
+        public async Task SaveEpisodicEventAsync(string eventId, Dictionary<string, object> eventData)
+        {
+            var clusterPath = GetConceptCluster(eventId, ConceptType.EpisodicMemory);
+
+            // Load existing episodic cluster or create new
+            var cluster = await LoadConceptClusterAsync(clusterPath) ?? new ConceptCluster();
+
+            // Add/update event in cluster
+            cluster.Concepts[eventId] = eventData;
+            cluster.LastModified = DateTime.UtcNow;
+
+            // Save cluster
+            await SaveConceptClusterAsync(clusterPath, cluster);
+
+            // Update hippocampus concept index
+            await UpdateConceptIndexAsync(eventId, clusterPath, ConceptType.EpisodicMemory);
+        }
+
+        /// <summary>
+        /// Load episodic events from storage
+        /// </summary>
+        public async Task<Dictionary<string, Dictionary<string, object>>> LoadEpisodicEventsAsync()
+        {
+            var episodicEvents = new Dictionary<string, Dictionary<string, object>>();
+
+            if (!Directory.Exists(_corticalColumnsPath))
+                return episodicEvents;
+
+            // Load episodic memory clusters
+            var episodicPath = Path.Combine(_corticalColumnsPath, "episodic_memories");
+            if (Directory.Exists(episodicPath))
+            {
+                var clusterFiles = Directory.GetFiles(episodicPath, "*.json", SearchOption.AllDirectories);
+                foreach (var clusterFile in clusterFiles)
+                {
+                    var cluster = await LoadConceptClusterAsync(clusterFile);
+                    if (cluster != null)
+                    {
+                        foreach (var (eventId, eventData) in cluster.Concepts)
+                        {
+                            if (eventData is Dictionary<string, object> eventDict)
+                            {
+                                episodicEvents[eventId] = eventDict;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return episodicEvents;
+        }
     }
 
     // Missing type definitions
