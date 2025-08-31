@@ -4,7 +4,7 @@
 
 ---
 
-## 🎯 Current Status: **RECOVERY COMPLETE**
+## 🎯 Current Status: **PRODUCTION READY WITH READING COMPREHENSION**
 
 We successfully returned to the original biological vision:
 - ✅ **Ephemeral clusters** with shared neurons working
@@ -12,6 +12,8 @@ We successfully returned to the original biological vision:
 - ✅ **Memory efficiency**: O(active_concepts) scaling
 - ✅ **Real-time visualization** of brain activity
 - ✅ **Progressive training** from words to stories
+- ✅ **Reading Comprehension** with episodic memory and question answering
+- ✅ **Interactive Learning** with real-time question answering
 
 **Performance vs Complex System**: 5-10x faster, immediate feedback, 70% less code
 
@@ -43,6 +45,8 @@ red (83 neurons) + fruit (57 neurons) = apple (86 neurons, 17+13 shared)
 - ✅ **Biological Behaviors**: `dotnet run -- --enhanced-demo`  
 - ✅ **Text Learning**: `dotnet run -- --text-demo`
 - ✅ **Complete System**: `dotnet run -- --comprehensive`
+- ✅ **Reading Comprehension**: `dotnet run --project greyMatter.csproj ReadingComprehensionRunner.cs`
+- ✅ **Enhanced Learning**: `dotnet run --project greyMatter.csproj -p:StartupObject=GreyMatter.EnhancedLearningRunner 5000 500 4`
 
 ### Scaling Requirements (Next Steps)
 1. **📊 Exhibit at Scale**: Handle 100K+ concepts with performance metrics
@@ -102,6 +106,8 @@ dotnet run -- --simple-demo      # Original vision proof
 dotnet run -- --enhanced-demo    # Biological behaviors  
 dotnet run -- --text-demo        # Real text learning
 dotnet run -- --comprehensive    # Complete demonstration
+dotnet run --project greyMatter.csproj ReadingComprehensionRunner.cs    # Reading comprehension demo
+dotnet run --project greyMatter.csproj -p:StartupObject=GreyMatter.EnhancedLearningRunner 5000 500 4    # Enhanced learning demo
 
 # Coming soon
 dotnet run -- --scale-demo       # 100K+ concepts
