@@ -90,6 +90,26 @@ dotnet run --project greyMatter.csproj -p:StartupObject=GreyMatter.EnhancedLearn
 - Fast validation of core functionality
 - Basic performance metrics
 
+### 7. Reading Comprehension Demo 📖
+**Command:** `dotnet run --project greyMatter.csproj ReadingComprehensionRunner.cs`
+
+**Purpose:** Demonstrates advanced reading comprehension with episodic memory for narrative understanding and question answering.
+
+**Expected Outcomes:**
+- Initializes episodic memory system for temporal event storage
+- Processes sample documents with entity extraction and topic analysis
+- Demonstrates question answering with confidence scoring
+- Shows interactive memory exploration capabilities
+- Provides narrative chain building and context tracking
+- Outputs comprehension metrics and answer accuracy statistics
+
+**Features:**
+- Episodic memory for storing and retrieving narrative events
+- Text processing pipeline with semantic analysis
+- Confidence-based question answering (up to 1.00 confidence)
+- Interactive exploration of learned knowledge
+- Persistent storage of comprehension data
+
 ## Data Storage and Persistence
 
 ### NAS Configuration
@@ -113,6 +133,7 @@ All training options use NAS storage for data persistence:
 
 ### Expected Accumulation
 When running the same training option multiple times:
+- **Reading Comprehension:** Episodic memory and narrative understanding accumulate
 - **Enhanced Learning Runner:** Vocabulary grows incrementally
 - **Hybrid Training Demo:** Neural connections strengthen
 - **Phase 2 Integration:** Language patterns accumulate
@@ -130,7 +151,8 @@ When running the same training option multiple times:
 1. **Ensure NAS Storage:** Verify `/Volumes/jarvis/` is mounted
 2. **Check Data:** Confirm training data exists in `/Volumes/jarvis/trainData/learning_data/`
 3. **Run Initial Training:** Start with Phase 2 Quick Test for validation
-4. **Scale Up:** Use Enhanced Learning Runner for large-scale training
+4. **Try Reading Comprehension:** Run the Reading Comprehension Demo to see advanced narrative understanding
+5. **Scale Up:** Use Enhanced Learning Runner for large-scale training
 
 ## Troubleshooting
 
@@ -155,6 +177,7 @@ dotnet build greyMatter.csproj
 ## Expected Performance
 
 - **Phase 2 Quick Test:** < 30 seconds
+- **Reading Comprehension Demo:** 1-2 minutes
 - **Enhanced Learning (5K vocab):** 2-5 minutes
 - **Hybrid Training Demo:** 1-3 minutes
 - **Developmental Learning:** 5-10 minutes
