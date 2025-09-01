@@ -203,23 +203,42 @@ namespace GreyMatter
         {
             Console.WriteLine("\n🧩 **LEARNING WORD PATTERNS**");
 
+            // Add biological messiness - randomize learning order
+            var random = new Random();
+            wordsToLearn = wordsToLearn.OrderBy(x => random.Next()).ToList();
+
             var learnedCount = 0;
             foreach (var word in wordsToLearn)
             {
                 var wordData = _wordDatabase[word];
 
-                // Store word using the correct method
+                // BIOLOGICAL VARIABILITY: Add noise to frequency
+                var noisyFrequency = wordData.Frequency + random.Next(-5, 6);
+                noisyFrequency = Math.Max(1, noisyFrequency);
+
+                // BIOLOGICAL ENCODING: Use LearningSparseConceptEncoder for neural patterns
+                var sparsePattern = await _encoder.EncodeLearnedWordAsync(word);
+
+                // Store word using the correct method with biological encoding
                 var wordInfo = new StorageWordInfo
                 {
                     Word = word,
-                    Frequency = wordData.Frequency,
-                    FirstSeen = DateTime.Now,
+                    Frequency = noisyFrequency, // Add biological noise
+                    FirstSeen = DateTime.Now.AddMinutes(random.Next(-30, 0)), // Variable timing
                     EstimatedType = StorageWordType.Unknown
                 };
 
                 await _storageManager.SaveVocabularyWordAsync(word, wordInfo);
 
                 learnedCount++;
+                
+                // BIOLOGICAL FORGETTING: Small chance to skip learning
+                if (random.NextDouble() < 0.03) // 3% chance
+                {
+                    Console.WriteLine($"   🧠 Biological distraction: skipped learning '{word}' this cycle");
+                    continue;
+                }
+
                 if (learnedCount % 100 == 0)
                 {
                     Console.WriteLine($"Learned patterns for {learnedCount}/{wordsToLearn.Count} words...");

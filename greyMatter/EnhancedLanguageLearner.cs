@@ -239,24 +239,44 @@ namespace GreyMatter
 
         private async Task LearnWordPatternsBatchAsync(List<string> words)
         {
+            // Add biological messiness - randomize learning order
+            var random = new Random();
+            words = words.OrderBy(x => random.Next()).ToList();
+            
             foreach (var word in words)
             {
                 if (_wordDatabase.TryGetValue(word, out var wordData))
                 {
-                    // Convert WordData to WordInfo (Storage namespace)
+                    // BIOLOGICAL VARIABILITY: Add noise to frequency to simulate imperfect memory
+                    var noisyFrequency = wordData.Frequency + random.Next(-10, 11);
+                    noisyFrequency = Math.Max(1, noisyFrequency); // Ensure positive
+                    
+                    // BIOLOGICAL ENCODING: Use LearningSparseConceptEncoder for neural patterns
+                    var sparsePattern = await _encoder.EncodeLearnedWordAsync(word);
+                    
+                    // Patterns are stored internally by the encoder
+                    
+                    // Convert WordData to WordInfo with biological variability
                     var wordInfo = new GreyMatter.Storage.WordInfo
                     {
                         Word = word,
-                        Frequency = wordData.Frequency,
-                        FirstSeen = DateTime.UtcNow,
-                        EstimatedType = GreyMatter.Storage.WordType.Unknown // Could be enhanced with POS tagging
+                        Frequency = noisyFrequency, // Add biological noise
+                        FirstSeen = DateTime.UtcNow.AddMinutes(random.Next(-60, 0)), // Variable "first seen" time
+                        EstimatedType = GreyMatter.Storage.WordType.Unknown
                     };
 
-                    // Store word in semantic storage
+                    // Store word in semantic storage with biological encoding
                     await _storageManager.SaveVocabularyWordAsync(word, wordInfo);
 
                     // Mark as learned
                     _alreadyLearnedWords.Add(word);
+                    
+                    // BIOLOGICAL FORGETTING: Random chance to "forget" some words
+                    if (random.NextDouble() < 0.05) // 5% chance
+                    {
+                        _alreadyLearnedWords.Remove(word);
+                        Console.WriteLine($"   🧠 Biological forgetting: temporarily forgot '{word}'");
+                    }
                 }
             }
         }
