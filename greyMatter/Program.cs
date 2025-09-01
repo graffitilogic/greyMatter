@@ -13,7 +13,12 @@ namespace GreyMatter
 {
     class Program
     {
-        // static async Task Main(string[] args)
+        static async Task Main(string[] args)
+        {
+            await RunProgram(args);
+        }
+
+        // static async Task RunProgram(string[] args)
         static async Task RunProgram(string[] args)
         {
             // Legacy sparse encoding test (use --evaluate instead)
@@ -281,6 +286,31 @@ namespace GreyMatter
                 catch (Exception ex)
                 {
                     Console.WriteLine($"❌ Error during conversion: {ex.Message}");
+                }
+                return;
+            }
+
+            // Check for enhanced data conversion (multiple sources)
+            if (args.Length > 0 && (args[0] == "--convert-enhanced-data" || args[0] == "--enhanced-data-converter"))
+            {
+                Console.WriteLine("🚀 **ENHANCED DATA CONVERSION**");
+                Console.WriteLine("==============================");
+
+                try
+                {
+                    var dataRoot = GetArgValue(args, "--data-root", "/Volumes/jarvis/trainData");
+                    var outputPath = GetArgValue(args, "--output", "/Volumes/jarvis/trainData/enhanced_learning_data");
+                    var maxSentences = GetArgValue(args, "--max-sentences", 50000);
+
+                    var converter = new EnhancedDataConverter(dataRoot, outputPath);
+                    await converter.ConvertAllSourcesAsync(maxSentences);
+
+                    Console.WriteLine("\n✅ **ENHANCED DATA CONVERSION COMPLETE**");
+                    Console.WriteLine($"📁 Output saved to: {outputPath}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error during enhanced conversion: {ex.Message}");
                 }
                 return;
             }
