@@ -345,6 +345,35 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for enhanced learning from multi-source data
+            if (args.Length > 0 && (args[0] == "--learn-from-enhanced-data" || args[0] == "--enhanced-learning"))
+            {
+                Console.WriteLine("🚀 **ENHANCED MULTI-SOURCE LEARNING**");
+                Console.WriteLine("====================================");
+                Console.WriteLine("Learning from diverse data sources (OpenSubtitles, News, Science, etc.)");
+                Console.WriteLine();
+
+                try
+                {
+                    var dataPath = GetArgValue(args, "--data-path", "/Volumes/jarvis/trainData/enhanced_learning_data");
+                    var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
+                    var maxWords = GetArgValue(args, "--max-words", 5000);
+
+                    // Use EnhancedLanguageLearner with enhanced data path
+                    var learner = new EnhancedLanguageLearner(dataPath, brainPath, maxConcurrency: 4);
+                    await learner.LearnVocabularyAtScaleAsync(maxWords, batchSize: 500);
+
+                    Console.WriteLine("\n✅ **ENHANCED LEARNING COMPLETE**");
+                    Console.WriteLine($"📊 Learned from multi-source data: {maxWords} words");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error during enhanced learning: {ex.Message}");
+                    Console.WriteLine("💡 Make sure to run --convert-enhanced-data first");
+                }
+                return;
+            }
+            
             // Check for semantic domain test
             if (args.Length > 0 && (args[0] == "--semantic-test" || args[0] == "--test-domains"))
             {

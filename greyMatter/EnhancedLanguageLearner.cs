@@ -77,12 +77,25 @@ namespace GreyMatter
         {
             Console.WriteLine("\n📚 **LOADING LEARNING DATA**");
 
-            var wordDbPath = Path.Combine(_dataPath, "word_database.json");
-            var cooccurrencePath = Path.Combine(_dataPath, "cooccurrence_matrix.json");
+            // Try enhanced data files first, then fall back to standard Tatoeba files
+            var wordDbPath = Path.Combine(_dataPath, "enhanced_word_database.json");
+            var cooccurrencePath = Path.Combine(_dataPath, "enhanced_cooccurrence_matrix.json");
+
+            // If enhanced files don't exist, try standard Tatoeba files
+            if (!File.Exists(wordDbPath))
+            {
+                wordDbPath = Path.Combine(_dataPath, "word_database.json");
+                cooccurrencePath = Path.Combine(_dataPath, "cooccurrence_matrix.json");
+                Console.WriteLine("Using standard Tatoeba learning data");
+            }
+            else
+            {
+                Console.WriteLine("Using enhanced multi-source learning data");
+            }
 
             if (!File.Exists(wordDbPath) || !File.Exists(cooccurrencePath))
             {
-                throw new FileNotFoundException("Learning data not found. Run --convert-tatoeba-data first.");
+                throw new FileNotFoundException($"Learning data not found. Run --convert-enhanced-data or --convert-tatoeba-data first. Looking for: {wordDbPath}");
             }
 
             // Load word database with progress reporting

@@ -399,6 +399,9 @@ namespace GreyMatter
         {
             Console.WriteLine("🎯 Generating integrated learning patterns...");
 
+            // Ensure output directory exists
+            Directory.CreateDirectory(_outputPath);
+
             var patterns = new List<LearningPattern>();
 
             // Generate patterns from co-occurrence data
@@ -429,6 +432,9 @@ namespace GreyMatter
         private async Task SaveEnhancedLearningDataAsync()
         {
             Console.WriteLine("💾 Saving enhanced learning data...");
+
+            // Ensure output directory exists
+            Directory.CreateDirectory(_outputPath);
 
             // Save word database
             var wordDbPath = Path.Combine(_outputPath, "enhanced_word_database.json");
