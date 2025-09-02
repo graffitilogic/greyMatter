@@ -374,6 +374,26 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for procedural generation demo (Phase 2)
+            if (args.Length > 0 && (args[0] == "--procedural-demo" || args[0] == "--phase2-demo"))
+            {
+                Console.WriteLine("🚀 **PHASE 2: PROCEDURAL GENERATION DEMO**");
+                Console.WriteLine("========================================");
+                Console.WriteLine("No Man's Sky-inspired cortical column generation");
+                Console.WriteLine();
+
+                try
+                {
+                    await ProceduralGenerationDemo.RunAsync();
+                    Console.WriteLine("\n✅ **PROCEDURAL GENERATION DEMO COMPLETE**");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error during procedural demo: {ex.Message}");
+                }
+                return;
+            }
+            
             // Check for semantic domain test
             if (args.Length > 0 && (args[0] == "--semantic-test" || args[0] == "--test-domains"))
             {
