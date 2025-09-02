@@ -33,90 +33,100 @@ red (83 neurons) + fruit (57 neurons) = apple (86 neurons, 17+13 shared)
 
 ### Key Breakthrough: Shared Neuron Magic
 - **Learning**: When you learn "apple" after "red" and "fruit", it automatically shares neurons
-- **Recall**: Thinking "red" activates "apple" through those 17 shared neurons  
+- **Recall**: Thinking "red" activates "apple" through those 17 shared neurons
 - **Efficiency**: Memory scales with active concepts, not total concepts
 - **Biological**: Matches how brain regions overlap for related concepts
 
 ---
 
-## 🚀 Next Phase: Production Scale
+## 🚀 Quick Start Commands
 
-### Current Capabilities (Working Demos)
-- ✅ **Hybrid Training Demo**: `dotnet run --project greyMatter.csproj HybridTrainingDemo.cs`
-- ✅ **Performance Validation**: `dotnet run --project greyMatter.csproj -- --performance-validation`
-- ✅ **Performance Benchmarks**: `dotnet run PerformanceBenchmarkRunner.cs`
-- ✅ **Simple Performance Benchmark**: `dotnet run --project greyMatter.csproj SimpleBenchmarkRunner.cs`
-- ✅ **Enhanced Language Learning (Phase 4)**: `dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4`
-
-### Scaling Requirements (Next Steps)
-1. **📊 Exhibit at Scale**: Handle 100K+ concepts with performance metrics
-2. **💾 Persistent Storage**: Efficient disk persistence without losing ephemeral benefits
-3. **📚 External Training**: Ingest real datasets (Wikipedia, books, papers)
-4. **🧪 Comprehension Tests**: Automated evaluation and progress tracking
-
----
-
-## 🏗️ Scaling Implementation Plan
-
-### Phase 5: Production Scale (4-6 weeks)
-
-#### 5.1 Scale Demonstration 
-**Goal**: Prove the concept works at real-world scale
-
-**Actions**:
-- [ ] Load 100K+ concepts efficiently  
-- [ ] Benchmark memory usage vs traditional neural networks
-- [ ] Performance monitoring dashboard
-- [ ] Scale-appropriate visualization (cluster overview, not individual neurons)
-
-#### 5.2 Efficient Persistence
-**Goal**: Save/load brain state without losing ephemeral benefits
-
-**Actions**:
-- [ ] `EphemeralBrainStorage.cs` - lightweight persistence for clusters + neurons
-- [ ] Incremental saves (only changed clusters)
-- [ ] Background persistence (non-blocking)
-- [ ] Fast startup with lazy loading
-
-#### 5.3 Real Dataset Ingestion  
-**Goal**: Learn from actual training materials
-
-**Actions**:
-- [ ] Wikipedia stream reader (articles → concepts)
-- [ ] Book text parser (chapters → progressive concepts)
-- [ ] Academic paper processor (abstracts → domain knowledge)
-- [ ] Curriculum builder (difficulty-graded content)
-
-#### 5.4 Automated Evaluation
-**Goal**: Measure learning quality and comprehension
-
-**Actions**:
-- [ ] Comprehension test generator (from training materials)
-- [ ] Association strength measurements
-- [ ] Knowledge graph completeness scoring
-- [ ] Progress tracking and learning curves
-
----
-
-## 🎪 Available Demos
-
+### Basic Demos
 ```bash
-# Current working demos
-dotnet run --project greyMatter.csproj HybridTrainingDemo.cs                    # Hybrid training demonstration
-dotnet run --project greyMatter.csproj -- --performance-validation              # Performance validation tests
-dotnet run PerformanceBenchmarkRunner.cs                                        # Performance benchmarks
-dotnet run --project greyMatter.csproj SimpleBenchmarkRunner.cs                 # Simple performance benchmark
-dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4     # Enhanced language learning (Phase 4)
+# Original vision demo - ephemeral brain with shared neurons
+dotnet run --project greyMatter.csproj -- --simple-demo
 
-# Legacy demos (may need updates)
-dotnet run -- --simple-demo      # Original vision proof
-dotnet run -- --enhanced-demo    # Biological behaviors  
-dotnet run -- --text-demo        # Real text learning
-dotnet run -- --comprehensive    # Complete demonstration
+# Enhanced demo with biological behaviors and sequences
+dotnet run --project greyMatter.csproj -- --enhanced-demo
 
-# Coming soon
-dotnet run -- --scale-demo       # 100K+ concepts
+# Text learning demo (real text parsing)
+dotnet run --project greyMatter.csproj -- --text-demo
+
+# Complete demonstration (all phases)
+dotnet run --project greyMatter.csproj -- --comprehensive
 ```
+
+### Performance & Validation
+```bash
+# Run comprehensive storage performance tests
+dotnet run --project greyMatter.csproj -- --performance-validation
+
+# Run comprehensive system debugging
+dotnet run --project greyMatter.csproj -- --debug
+
+# Quick diagnostic tests
+dotnet run --project greyMatter.csproj -- --diag
+```
+
+### Real Data Learning
+```bash
+# Learn from 1,000 Tatoeba sentences (quick test)
+dotnet run --project greyMatter.csproj -- --tatoeba-hybrid-1k
+
+# Learn from 10,000 Tatoeba sentences (medium scale)
+dotnet run --project greyMatter.csproj -- --tatoeba-hybrid-10k
+
+# Learn from 100,000 Tatoeba sentences (large scale)
+dotnet run --project greyMatter.csproj -- --tatoeba-hybrid-100k
+
+# Full dataset training (2M+ sentences - takes time!)
+dotnet run --project greyMatter.csproj -- --tatoeba-hybrid-complete
+```
+
+### Enhanced Language Learning (Programmatic)
+```csharp
+// Use EnhancedLanguageLearner for scalable vocabulary learning
+var learner = new EnhancedLanguageLearner(
+    dataPath: "/Volumes/jarvis/trainData/Tatoeba/learning_data",
+    brainPath: "/Volumes/jarvis/brainData",
+    maxConcurrency: 4
+);
+
+// Learn 5,000 words with batch processing
+await learner.LearnVocabularyAtScaleAsync(
+    targetVocabularySize: 5000,
+    batchSize: 500
+);
+```
+
+---
+
+## 🎪 Available Commands
+
+### Core Learning Demos
+- `--simple-demo` - Original ephemeral brain concept demo
+- `--enhanced-demo` - Enhanced demo with Phase 2 biological behaviors
+- `--text-demo` - Text learning demo (Phase 3)
+- `--comprehensive` - Complete demonstration (all phases)
+
+### Performance & Testing
+- `--performance-validation` - Comprehensive storage performance tests
+- `--debug` - Comprehensive system debugging
+- `--diag` - Quick diagnostic tests
+- `--validate-learning` - Learning validation evaluation
+- `--evaluate` - Unified training evaluation
+
+### Real Data Training
+- `--tatoeba-hybrid-1k` - 1,000 sentence training
+- `--tatoeba-hybrid-10k` - 10,000 sentence training
+- `--tatoeba-hybrid-100k` - 100,000 sentence training
+- `--tatoeba-hybrid-complete` - Full 2M+ sentence dataset
+- `--learn-from-tatoeba` - Real language learning from Tatoeba data
+
+### Data Processing
+- `--convert-tatoeba-data` - Convert Tatoeba CSV to learning format
+- `--convert-enhanced-data` - Convert multiple data sources
+- `--analyze-patterns` - Pattern analysis tests
 
 ---
 
@@ -157,7 +167,7 @@ dotnet run -- --scale-demo       # 100K+ concepts
 - [ ] **Linear memory scaling** with active concepts
 - [ ] **Static brain scan visualization** at scale
 
-### Learning Quality  
+### Learning Quality
 - [ ] **Progressive comprehension** from simple to complex
 - [ ] **Cross-domain transfer** (concepts learned in one domain help another)
 - [ ] **Natural associations** matching human semantic networks
@@ -171,32 +181,32 @@ dotnet run -- --scale-demo       # 100K+ concepts
 ```bash
 git clone <repo>
 cd greyMatter
-dotnet run --project greyMatter.csproj HybridTrainingDemo.cs
+dotnet run -- --simple-demo
 ```
 
 ### Performance Testing
 ```bash
 # Run performance validation
-dotnet run --project greyMatter.csproj -- --performance-validation
+dotnet run -- --performance-validation
 
-# Run benchmarks
-dotnet run PerformanceBenchmarkRunner.cs
+# Run comprehensive debugging
+dotnet run -- --debug
+```
 
-# Run simple benchmark
-dotnet run --project greyMatter.csproj SimpleBenchmarkRunner.cs
+### Real Data Learning
+```bash
+# Quick test with 1,000 sentences
+dotnet run -- --tatoeba-hybrid-1k
+
+# Medium scale with 10,000 sentences
+dotnet run -- --tatoeba-hybrid-10k
 ```
 
 ### Enhanced Learning
-```bash
-# Run enhanced language learning with parameters
-dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4
-```
-
-### Scale Testing (Coming Soon)
-```bash
-dotnet run -- --scale-demo --concepts 100000
-dotnet run -- --wikipedia --articles 1000  
-dotnet run -- --evaluation --test-suite comprehensive
+```csharp
+// Programmatic learning with EnhancedLanguageLearner
+var learner = new EnhancedLanguageLearner(dataPath, brainPath, maxConcurrency);
+await learner.LearnVocabularyAtScaleAsync(targetVocabularySize, batchSize);
 ```
 
 ---
@@ -311,11 +321,6 @@ Category: Evaluation
 - [ ] Per-concept mastery tracking
 - [ ] Benchmark suite + regression thresholds
 
-Category: Integrity & Monitoring
-- [ ] Deep integrity scan (membership ↔ neuron bank)
-- [ ] Drift report: capacities vs actual vs utilization
-- [ ] Alert on abnormal growth patterns
-
 Category: Developer Ergonomics
 - [ ] Central config file for thresholds & rates
 - [ ] Verbosity tiers doc; add --perf flag
@@ -349,13 +354,13 @@ Category: Future Expansion
 ## 8. Getting Started (Quick)
 1. Setup datasets/resources if needed.
 2. Run a quick demo:
-   - `dotnet run --project greyMatter.csproj HybridTrainingDemo.cs`
+   - `dotnet run --project greyMatter.csproj -- --simple-demo`
 3. Test performance:
    - `dotnet run --project greyMatter.csproj -- --performance-validation`
 4. Run enhanced learning:
-   - `dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4`
+   - Use `EnhancedLanguageLearner` class programmatically
 5. Validate persistence stability (no learning):
-   - `dotnet run -- --save-only` (if available)
+   - `dotnet run --project greyMatter.csproj -- --save-only` (if available)
 
 ---
 ## 9. Next Session Plan
@@ -372,4 +377,4 @@ Persistence layer is optimized (batching, caching, diffs, normalized IDs). Prima
 
 ---
 
-(README updated with current metrics, recent fixes, and codebase cleanup.)
+(README updated to reflect actual working commands and system capabilities.)

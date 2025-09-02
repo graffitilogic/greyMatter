@@ -254,8 +254,12 @@ namespace GreyMatter.Core
             catch (Exception ex)
             {
                 Console.WriteLine($"⚠️  Could not create fallback directory '{fallbackRelative}' - {ex.Message}");
-                // Last resort: current directory
-                return Directory.GetCurrentDirectory();
+                // CRITICAL: Never fall back to project directory for data storage
+                // This prevents accidental storage of large brain data in the project folder
+                throw new InvalidOperationException(
+                    $"Cannot create brain data directory at '{desiredPath}' or fallback '{fallbackRelative}'. " +
+                    $"Please ensure NAS/external storage is available and properly configured. " +
+                    $"Set BRAIN_DATA_PATH environment variable or use --brain-data command line argument.");
             }
         }
         

@@ -178,7 +178,7 @@ namespace GreyMatter.Core
             // Else: keep capacity unchanged to avoid churn when on target
         }
 
-        public Cerebro(string storagePath = "brain_data")
+        public Cerebro(string storagePath)
         {
             _storage = new EnhancedBrainStorage(storagePath);
             _continuousProcessor = new ContinuousProcessor(this); // Initialize consciousness

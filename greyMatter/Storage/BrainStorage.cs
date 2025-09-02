@@ -16,7 +16,7 @@ namespace GreyMatter.Storage
         private readonly string _basePath;
         private readonly JsonSerializerOptions _jsonOptions;
         
-        public BrainStorage(string basePath = "brain_data")
+        public BrainStorage(string basePath)
         {
             _basePath = basePath;
             _jsonOptions = new JsonSerializerOptions

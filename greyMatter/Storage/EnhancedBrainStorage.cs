@@ -125,7 +125,7 @@ namespace GreyMatter.Storage
             }
         }
 
-        public EnhancedBrainStorage(string basePath = "brain_data") : base(basePath)
+        public EnhancedBrainStorage(string basePath) : base(basePath)
         {
             _partitioner = new NeuroPartitioner();
             _hierarchicalBasePath = Path.Combine(basePath, "hierarchical");
