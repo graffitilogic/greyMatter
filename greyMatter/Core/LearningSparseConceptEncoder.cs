@@ -394,27 +394,84 @@ namespace GreyMatter.Core
             new[] { "red", "blue", "green", "yellow", "black", "white" }.Contains(word);
 
         /// <summary>
-        /// Load learned patterns from SemanticStorageManager
+        /// Load learned patterns from storage
         /// </summary>
-        private async Task LoadLearnedPatternsFromStorageAsync()
+        public async Task LoadLearnedPatternsFromStorageAsync()
         {
             if (_storageManager == null) return;
 
             try
             {
-                // Load vocabulary using the SemanticStorageManager's public method
-                var vocabulary = await _storageManager.LoadVocabularyAsync();
-                
-                if (vocabulary == null || !vocabulary.Any()) return;
+                // Load learned patterns from storage
+                var loadedPatterns = await _storageManager.RetrieveNeuralConceptsAsync();
 
-                // Create learned patterns for stored words
-                foreach (var wordEntry in vocabulary.Take(100)) // Limit to 100 for performance
+                if (loadedPatterns != null)
                 {
-                    var pattern = GenerateLearnedPatternForWord(wordEntry.Key);
-                    _learnedPatterns[wordEntry.Key] = pattern;
-                }
+                    int loadedCount = 0;
+                    foreach (var kvp in loadedPatterns)
+                    {
+                        if (kvp.Key.StartsWith("learned_pattern_"))
+                        {
+                            var word = kvp.Key.Replace("learned_pattern_", "");
+                            var patternData = kvp.Value;
 
-                Console.WriteLine($"   ✅ Initialized encoder with {vocabulary.Count} learned word patterns");
+                            if (patternData != null)
+                            {
+                                try
+                                {
+                                    // Handle JsonElement properly
+                                    if (patternData is System.Text.Json.JsonElement jsonElement)
+                                    {
+                                        if (jsonElement.ValueKind == System.Text.Json.JsonValueKind.Object)
+                                        {
+                                            var learnedPattern = new LearnedSparsePattern
+                                            {
+                                                ConceptId = jsonElement.TryGetProperty("Word", out var wordProp) ? wordProp.GetString() : word,
+                                                BasePattern = jsonElement.TryGetProperty("Pattern", out var patternProp) ? 
+                                                    patternProp.EnumerateArray().Select(x => x.GetBoolean()).ToArray() : null,
+                                                LearnedFrom = jsonElement.TryGetProperty("LearnedFrom", out var learnedFromProp) ? 
+                                                    learnedFromProp.EnumerateArray().Select(x => x.GetString()).Where(s => s != null).ToList()! : new List<string>(),
+                                                ConceptType = jsonElement.TryGetProperty("ConceptType", out var typeProp) ? typeProp.GetString() : "Word",
+                                                Confidence = 1.0
+                                            };
+
+                                            _learnedPatterns[word] = learnedPattern;
+                                            loadedCount++;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        // Handle as dynamic object
+                                        var dynamicData = patternData as dynamic;
+                                        if (dynamicData != null)
+                                        {
+                                            var learnedPattern = new LearnedSparsePattern
+                                            {
+                                                ConceptId = dynamicData.Word?.ToString(),
+                                                BasePattern = dynamicData.Pattern,
+                                                LearnedFrom = dynamicData.LearnedFrom,
+                                                ConceptType = dynamicData.ConceptType?.ToString(),
+                                                Confidence = 1.0
+                                            };
+
+                                            _learnedPatterns[word] = learnedPattern;
+                                            loadedCount++;
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine($"   ⚠️ Failed to parse pattern for word '{word}': {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+
+                    if (loadedCount > 0)
+                    {
+                        Console.WriteLine($"   ✅ Loaded {loadedCount} learned patterns from storage");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -450,6 +507,42 @@ namespace GreyMatter.Core
                 LearnedFrom = new List<string> { word },
                 Confidence = 1.0
             };
+        }
+
+        /// <summary>
+        /// Save learned patterns to storage
+        /// </summary>
+        public async Task SaveLearnedPatternsToStorageAsync()
+        {
+            if (_storageManager == null) return;
+
+            try
+            {
+                // Save learned patterns to storage
+                var patternsToSave = new Dictionary<string, object>();
+                
+                foreach (var kvp in _learnedPatterns)
+                {
+                    patternsToSave[$"learned_pattern_{kvp.Key}"] = new
+                    {
+                        Word = kvp.Key,
+                        Pattern = kvp.Value.BasePattern,
+                        Sparsity = _sparsity,
+                        LearnedFrom = kvp.Value.LearnedFrom,
+                        ConceptType = kvp.Value.ConceptType
+                    };
+                }
+
+                if (patternsToSave.Any())
+                {
+                    await _storageManager.StoreNeuralConceptsAsync(patternsToSave);
+                    Console.WriteLine($"   ✅ Saved {_learnedPatterns.Count} learned patterns to storage");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"   ⚠️ Failed to save learned patterns to storage: {ex.Message}");
+            }
         }
     }
 

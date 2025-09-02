@@ -99,6 +99,9 @@ namespace GreyMatter
                 ?? new Dictionary<string, Dictionary<string, int>>();
             Console.WriteLine($" {_cooccurrenceMatrix.Count:N0} entries loaded");
 
+            // CRITICAL FIX: Learn from actual sentence data before processing words
+            await LearnFromSentenceDataAsync();
+
             // Load existing vocabulary from storage manager
             await LoadExistingVocabularyAsync();
 
@@ -321,7 +324,9 @@ namespace GreyMatter
             {
                 if (_wordDatabase.TryGetValue(word, out var data))
                 {
-                    Console.WriteLine($"- {word}: {data.SentenceContexts.Count} contexts, {data.CooccurringWords.Count} relationships");
+                    var contextCount = data.SentenceContexts?.Count ?? 0;
+                    var relationshipCount = data.CooccurringWords?.Count ?? 0;
+                    Console.WriteLine($"- {word}: {contextCount} contexts, {relationshipCount} relationships");
                 }
             }
         }
@@ -421,6 +426,35 @@ namespace GreyMatter
             }
 
             return selected;
+        }
+
+        private async Task LearnFromSentenceDataAsync()
+        {
+            Console.Write("Learning patterns from sentence data...");
+
+            // Collect all sentence contexts from word database
+            var allSentences = new List<string>();
+            foreach (var wordData in _wordDatabase.Values)
+            {
+                if (wordData.SentenceContexts != null)
+                {
+                    allSentences.AddRange(wordData.SentenceContexts);
+                }
+            }
+
+            // Remove duplicates and limit for performance
+            allSentences = allSentences.Distinct().Take(5000).ToList();
+
+            if (allSentences.Any())
+            {
+                // Learn from actual sentence data
+                await _encoder.LearnFromDataAsync(allSentences);
+                Console.WriteLine($" Learned from {allSentences.Count} sentences");
+            }
+            else
+            {
+                Console.WriteLine(" No sentence data available for learning");
+            }
         }
 
         private class LearningPlan

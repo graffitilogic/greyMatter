@@ -313,7 +313,7 @@ namespace GreyMatter
             return new SparsePattern(combinedBits.ToArray(), 0.02);
         }
 
-        private async Task SaveLearnedKnowledgeAsync()
+        public async Task SaveLearnedKnowledgeAsync()
         {
             Console.WriteLine("\n💾 **SAVING LEARNED KNOWLEDGE**");
 
@@ -326,7 +326,7 @@ namespace GreyMatter
                 TotalWordsLearned = _wordDatabase.Count,
                 PatternsStored = stats.VocabularyIndexSize,
                 LearningTimestamp = DateTime.Now,
-                DataSource = "Tatoeba Dataset"
+                DataSource = "Enhanced Data Sources"
             };
 
             var reportPath = Path.Combine(_brainPath, "learning_report.json");
@@ -409,6 +409,82 @@ namespace GreyMatter
             public int PatternsStored { get; set; }
             public DateTime LearningTimestamp { get; set; }
             public string? DataSource { get; set; }
+        }
+
+        public async Task LearnFromTextAsync(string text, string contextType = "general")
+        {
+            Console.WriteLine($"📖 Learning from text ({contextType} context)...");
+
+            // Split text into words and filter
+            var words = text.Split(new[] { ' ', '\n', '\r', '\t', '.', ',', '!', '?', ';', ':', '-', '(', ')', '[', ']', '"', '\'' },
+                                  StringSplitOptions.RemoveEmptyEntries)
+                           .Select(w => w.ToLower().Trim())
+                           .Where(w => w.Length > 1 && w.Length < 20) // Filter reasonable word lengths
+                           .Distinct()
+                           .ToList();
+
+            if (!words.Any())
+            {
+                Console.WriteLine("⚠️ No valid words found in text");
+                return;
+            }
+
+            // Add words to our database if they don't exist
+            foreach (var word in words)
+            {
+                if (!_wordDatabase.ContainsKey(word))
+                {
+                    _wordDatabase[word] = new TatoebaDataConverter.WordData
+                    {
+                        Word = word,
+                        Frequency = 1,
+                        SentenceContexts = new List<string> { text },
+                        CooccurringWords = new Dictionary<string, int>(),
+                        LearnedPattern = new SparsePattern(new int[0], 0.02) // Empty pattern initially
+                    };
+                }
+                else
+                {
+                    // Update frequency and contexts
+                    _wordDatabase[word].Frequency++;
+                    if (!_wordDatabase[word].SentenceContexts.Contains(text))
+                    {
+                        _wordDatabase[word].SentenceContexts.Add(text);
+                    }
+                }
+            }
+
+            // Update co-occurrence matrix
+            for (int i = 0; i < words.Count; i++)
+            {
+                for (int j = i + 1; j < Math.Min(i + 5, words.Count); j++) // Look at nearby words
+                {
+                    var word1 = words[i];
+                    var word2 = words[j];
+
+                    if (!_wordDatabase[word1].CooccurringWords.ContainsKey(word2))
+                    {
+                        _wordDatabase[word1].CooccurringWords[word2] = 0;
+                    }
+                    _wordDatabase[word1].CooccurringWords[word2]++;
+
+                    if (!_wordDatabase[word2].CooccurringWords.ContainsKey(word1))
+                    {
+                        _wordDatabase[word2].CooccurringWords[word1] = 0;
+                    }
+                    _wordDatabase[word2].CooccurringWords[word1]++;
+                }
+            }
+
+            // Learn patterns for new words
+            var newWords = words.Where(w => !_alreadyLearnedWords.Contains(w)).ToList();
+            if (newWords.Any())
+            {
+                await LearnWordPatternsAsync(newWords);
+                await LearnSemanticRelationshipsAsync(newWords);
+            }
+
+            Console.WriteLine($"✅ Learned from text: {words.Count} words processed, {newWords.Count} new words");
         }
     }
 }

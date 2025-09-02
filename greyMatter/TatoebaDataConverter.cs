@@ -18,13 +18,15 @@ namespace GreyMatter
         private readonly string _outputPath;
         private readonly Dictionary<string, WordData> _wordDatabase;
         private readonly Dictionary<string, Dictionary<string, int>> _wordCooccurrences;
+        private readonly SemanticStorageManager? _storageManager;
 
-        public TatoebaDataConverter(string tatoebaPath, string outputPath)
+        public TatoebaDataConverter(string tatoebaPath, string outputPath, SemanticStorageManager? storageManager = null)
         {
             _tatoebaPath = tatoebaPath;
             _outputPath = outputPath;
             _wordDatabase = new Dictionary<string, WordData>();
             _wordCooccurrences = new Dictionary<string, Dictionary<string, int>>();
+            _storageManager = storageManager;
         }
 
         public async Task ConvertAndBuildLearningDataAsync(int maxSentences = 10000)
@@ -105,7 +107,7 @@ namespace GreyMatter
                 }
 
                 _wordDatabase[word].Frequency++;
-                _wordDatabase[word].SentenceContexts.Add(sentence);
+                _wordDatabase[word].SentenceContexts?.Add(sentence);
             }
 
             // Build co-occurrence matrix for words in same sentence
@@ -139,26 +141,37 @@ namespace GreyMatter
                     _wordCooccurrences[word2][word1]++;
 
                     // Update word data
-                    if (!_wordDatabase[word1].CooccurringWords.ContainsKey(word2))
+                    _wordDatabase[word1].CooccurringWords ??= new Dictionary<string, int>();
+                    if (!_wordDatabase[word1].CooccurringWords!.ContainsKey(word2))
                     {
-                        _wordDatabase[word1].CooccurringWords[word2] = 0;
+                        _wordDatabase[word1].CooccurringWords![word2] = 0;
                     }
-                    _wordDatabase[word1].CooccurringWords[word2]++;
+                    _wordDatabase[word1].CooccurringWords![word2]++;
 
-                    if (!_wordDatabase[word2].CooccurringWords.ContainsKey(word1))
+                    _wordDatabase[word2].CooccurringWords ??= new Dictionary<string, int>();
+                    if (!_wordDatabase[word2].CooccurringWords!.ContainsKey(word1))
                     {
-                        _wordDatabase[word2].CooccurringWords[word1] = 0;
+                        _wordDatabase[word2].CooccurringWords![word1] = 0;
                     }
-                    _wordDatabase[word2].CooccurringWords[word1]++;
+                    _wordDatabase[word2].CooccurringWords![word1]++;
                 }
             }
         }
 
         private string[] TokenizeSentence(string sentence)
         {
-            // Simple tokenization - remove punctuation and split on whitespace
+            // Enhanced tokenization - remove punctuation, filter out numbers and short words
             var cleaned = System.Text.RegularExpressions.Regex.Replace(sentence.ToLower(), @"[^\w\s]", "");
-            return cleaned.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var words = cleaned.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+
+            // Filter out numbers, very short words, and meaningless tokens
+            return words.Where(word =>
+                word.Length >= 3 && // At least 3 characters
+                !int.TryParse(word, out _) && // Not a number
+                !long.TryParse(word, out _) && // Not a large number
+                !word.All(char.IsDigit) && // Not all digits
+                word.Any(char.IsLetter) // Must contain at least one letter
+            ).ToArray();
         }
 
         private void BuildCooccurrenceMatrix()
@@ -191,31 +204,81 @@ namespace GreyMatter
         {
             Console.WriteLine("\n🎭 **GENERATING LEARNING PATTERNS**");
 
-            var learningEncoder = new LearningSparseConceptEncoder();
-
+            // Collect all sentences for learning
+            var allSentences = new List<string>();
             foreach (var wordData in _wordDatabase.Values)
             {
-                // Generate pattern based on actual word data
-                var pattern = await GenerateLearnedPatternAsync(wordData, learningEncoder);
-                wordData.LearnedPattern = pattern;
-
-                if (_wordDatabase.Count % 100 == 0)
+                if (wordData.SentenceContexts != null)
                 {
-                    Console.WriteLine($"Generated patterns for {_wordDatabase.Count} words...");
+                    allSentences.AddRange(wordData.SentenceContexts);
                 }
             }
 
-            Console.WriteLine($"Generated learning patterns for {_wordDatabase.Count} words");
+            // Remove duplicates and limit for performance
+            allSentences = allSentences.Distinct().Take(5000).ToList();
+
+            if (allSentences.Any())
+            {
+                Console.WriteLine($"Learning from {allSentences.Count} unique sentences...");
+
+                var learningEncoder = _storageManager != null 
+                    ? new LearningSparseConceptEncoder(_storageManager)
+                    : new LearningSparseConceptEncoder();
+
+                // CRITICAL FIX: Actually learn from real sentence data
+                await learningEncoder.LearnFromDataAsync(allSentences);
+
+                // Now generate patterns using the learned encoder
+                foreach (var wordData in _wordDatabase.Values)
+                {
+                    // Use the learned encoder to generate patterns from real data
+                    var pattern = await learningEncoder.EncodeLearnedWordAsync(wordData.Word ?? "");
+                    wordData.LearnedPattern = pattern;
+
+                    if (_wordDatabase.Count % 100 == 0)
+                    {
+                        Console.WriteLine($"Generated learned patterns for {_wordDatabase.Count} words...");
+                    }
+                }
+
+                Console.WriteLine($"Generated learning patterns for {_wordDatabase.Count} words using real sentence data");
+
+                // Save the learned patterns to storage
+                await learningEncoder.SaveLearnedPatternsToStorageAsync();
+            }
+            else
+            {
+                Console.WriteLine("⚠️ No sentence contexts found, falling back to algorithmic patterns");
+
+                var learningEncoder = new LearningSparseConceptEncoder();
+
+                foreach (var wordData in _wordDatabase.Values)
+                {
+                    // Fallback to algorithmic generation
+                    var pattern = GenerateLearnedPattern(wordData, learningEncoder);
+                    wordData.LearnedPattern = pattern;
+
+                    if (_wordDatabase.Count % 100 == 0)
+                    {
+                        Console.WriteLine($"Generated algorithmic patterns for {_wordDatabase.Count} words...");
+                    }
+                }
+
+                Console.WriteLine($"Generated algorithmic learning patterns for {_wordDatabase.Count} words");
+
+                // Save the learned patterns to storage even for algorithmic fallback
+                await learningEncoder.SaveLearnedPatternsToStorageAsync();
+            }
         }
 
-        private async Task<SparsePattern> GenerateLearnedPatternAsync(WordData wordData, LearningSparseConceptEncoder encoder)
+        private SparsePattern GenerateLearnedPattern(WordData wordData, LearningSparseConceptEncoder encoder)
         {
             // Create pattern based on word frequency and co-occurrences
             var patternSize = 2048; // SDR size
             var activeBits = new List<int>();
 
             // Base pattern from word hash
-            var baseHash = wordData.Word.GetHashCode();
+            var baseHash = wordData.Word?.GetHashCode() ?? 0;
             var random = new Random(baseHash);
 
             // Add bits based on frequency (more frequent words have more stable patterns)
@@ -228,15 +291,18 @@ namespace GreyMatter
             }
 
             // Add bits based on co-occurring words
-            foreach (var cooccurrence in wordData.CooccurringWords.OrderByDescending(x => x.Value).Take(5))
+            if (wordData.CooccurringWords != null)
             {
-                var coHash = cooccurrence.Key.GetHashCode();
-                var coRandom = new Random(coHash);
-                var coBits = Math.Min(cooccurrence.Value / 2, 5); // Up to 5 bits per co-occurring word
-
-                for (int i = 0; i < coBits; i++)
+                foreach (var cooccurrence in wordData.CooccurringWords.OrderByDescending(x => x.Value).Take(5))
                 {
-                    activeBits.Add(coRandom.Next(patternSize));
+                    var coHash = cooccurrence.Key.GetHashCode();
+                    var coRandom = new Random(coHash);
+                    var coBits = Math.Min(cooccurrence.Value / 2, 5); // Up to 5 bits per co-occurring word
+
+                    for (int i = 0; i < coBits; i++)
+                    {
+                        activeBits.Add(coRandom.Next(patternSize));
+                    }
                 }
             }
 
@@ -277,11 +343,11 @@ namespace GreyMatter
 
         public class WordData
         {
-            public string Word { get; set; }
+            public string? Word { get; set; }
             public int Frequency { get; set; }
-            public List<string> SentenceContexts { get; set; }
-            public Dictionary<string, int> CooccurringWords { get; set; }
-            public SparsePattern LearnedPattern { get; set; }
+            public List<string>? SentenceContexts { get; set; }
+            public Dictionary<string, int>? CooccurringWords { get; set; }
+            public SparsePattern? LearnedPattern { get; set; }
         }
     }
 }

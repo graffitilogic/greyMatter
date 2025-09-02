@@ -1230,6 +1230,36 @@ namespace GreyMatter.Storage
 
             return episodicEvents;
         }
+
+        /// <summary>
+        /// Retrieve neural concepts
+        /// </summary>
+        public async Task<Dictionary<string, object>> RetrieveNeuralConceptsAsync()
+        {
+            var neuralConcepts = new Dictionary<string, object>();
+
+            // Get all neural concepts from the concept index
+            Dictionary<string, ConceptIndexEntry> conceptIndexCopy;
+            lock (_conceptIndexLock)
+            {
+                conceptIndexCopy = new Dictionary<string, ConceptIndexEntry>(_conceptIndex);
+            }
+
+            // Load concepts that are of type Neural
+            foreach (var kvp in conceptIndexCopy)
+            {
+                if (kvp.Value.ConceptType == ConceptType.Neural)
+                {
+                    var cluster = await LoadConceptClusterAsync(kvp.Value.ClusterPath);
+                    if (cluster != null && cluster.Concepts.TryGetValue(kvp.Key, out var conceptData))
+                    {
+                        neuralConcepts[kvp.Key] = conceptData;
+                    }
+                }
+            }
+
+            return neuralConcepts;
+        }
     }
 
     // Missing type definitions

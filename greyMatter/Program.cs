@@ -7,6 +7,7 @@ using GreyMatter.Core;
 using GreyMatter.Storage;
 using GreyMatter.Learning;
 using GreyMatter.Evaluations;
+using GreyMatter.DataIntegration;
 using greyMatter;
 
 namespace GreyMatter
@@ -277,7 +278,8 @@ namespace GreyMatter
                     var outputPath = GetArgValue(args, "--output", "/Volumes/jarvis/trainData/Tatoeba/learning_data");
                     var maxSentences = GetArgValue(args, "--max-sentences", 10000);
 
-                    var converter = new TatoebaDataConverter(tatoebaPath, outputPath);
+                    var storage = new GreyMatter.Storage.SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
+                    var converter = new TatoebaDataConverter(tatoebaPath, outputPath, storage);
                     await converter.ConvertAndBuildLearningDataAsync(maxSentences);
 
                     Console.WriteLine("\n✅ **DATA CONVERSION COMPLETE**");
@@ -666,6 +668,50 @@ namespace GreyMatter
             if (args.Length > 0 && args[0] == "--performance-validation")
             {
                 await RunPerformanceValidation();
+                return;
+            }
+
+            // Enhanced data integration
+            if (args.Length > 0 && args[0] == "--enhanced-integration")
+            {
+                Console.WriteLine("🧠 GreyMatter Enhanced Data Integration Runner");
+                Console.WriteLine("==============================================");
+
+                try
+                {
+                    // Initialize paths
+                    string dataPath = "/Volumes/jarvis/trainData";
+                    string brainPath = "/Volumes/jarvis/brainData";
+
+                    // Initialize the Real Language Learner
+                    var learner = new RealLanguageLearner(dataPath, brainPath);
+
+                    // Create the data integrator
+                    var integrator = new EnhancedDataIntegrator(learner);
+
+                    // Run the integration
+                    await integrator.IntegrateAllSourcesAsync();
+
+                    // Save the enhanced knowledge
+                    await learner.SaveLearnedKnowledgeAsync();
+
+                    Console.WriteLine("\n🎉 Enhanced Data Integration Complete!");
+                    Console.WriteLine("📊 The system now has access to diverse learning sources:");
+                    Console.WriteLine("   • SimpleWiki articles (encyclopedic knowledge)");
+                    Console.WriteLine("   • News headlines (current events)");
+                    Console.WriteLine("   • Scientific abstracts (technical knowledge)");
+                    Console.WriteLine("   • Children's literature (narrative patterns)");
+                    Console.WriteLine("   • Idioms and expressions (colloquial language)");
+                    Console.WriteLine("   • Technical documentation (formal writing)");
+                    Console.WriteLine("   • Social media posts (conversational language)");
+                    Console.WriteLine("   • Open subtitles (spoken dialogue)");
+
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error during integration: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                }
                 return;
             }
 
