@@ -4,16 +4,17 @@
 
 ---
 
-## 🎯 Current Status: **PRODUCTION READY WITH READING COMPREHENSION**
+## 🎯 Current Status: **PRODUCTION READY WITH READING COMPREHENSION - CODEBASE CLEANED**
 
 We successfully returned to the original biological vision:
 - ✅ **Ephemeral clusters** with shared neurons working
-- ✅ **FMRI-like activation** spreading through connections  
+- ✅ **FMRI-like activation patterns** (visualized in static brain scans)
 - ✅ **Memory efficiency**: O(active_concepts) scaling
-- ✅ **Real-time visualization** of brain activity
+- ✅ **Static brain scan visualization** of brain activity (FMRI-like display)
 - ✅ **Progressive training** from words to stories
 - ✅ **Reading Comprehension** with episodic memory and question answering
 - ✅ **Interactive Learning** with real-time question answering
+- ✅ **Codebase Cleanup**: Removed 32 unused files (demos, runners, backups) for better maintainability
 
 **Performance vs Complex System**: 5-10x faster, immediate feedback, 70% less code
 
@@ -41,12 +42,11 @@ red (83 neurons) + fruit (57 neurons) = apple (86 neurons, 17+13 shared)
 ## 🚀 Next Phase: Production Scale
 
 ### Current Capabilities (Working Demos)
-- ✅ **Proof of Concept**: `dotnet run -- --simple-demo`
-- ✅ **Biological Behaviors**: `dotnet run -- --enhanced-demo`  
-- ✅ **Text Learning**: `dotnet run -- --text-demo`
-- ✅ **Complete System**: `dotnet run -- --comprehensive`
-- ✅ **Reading Comprehension**: `dotnet run --project greyMatter.csproj ReadingComprehensionRunner.cs`
-- ✅ **Enhanced Learning**: `dotnet run --project greyMatter.csproj -p:StartupObject=GreyMatter.EnhancedLearningRunner 5000 500 4`
+- ✅ **Hybrid Training Demo**: `dotnet run --project greyMatter.csproj HybridTrainingDemo.cs`
+- ✅ **Performance Validation**: `dotnet run --project greyMatter.csproj -- --performance-validation`
+- ✅ **Performance Benchmarks**: `dotnet run PerformanceBenchmarkRunner.cs`
+- ✅ **Simple Performance Benchmark**: `dotnet run --project greyMatter.csproj SimpleBenchmarkRunner.cs`
+- ✅ **Enhanced Language Learning (Phase 4)**: `dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4`
 
 ### Scaling Requirements (Next Steps)
 1. **📊 Exhibit at Scale**: Handle 100K+ concepts with performance metrics
@@ -102,17 +102,20 @@ red (83 neurons) + fruit (57 neurons) = apple (86 neurons, 17+13 shared)
 
 ```bash
 # Current working demos
+dotnet run --project greyMatter.csproj HybridTrainingDemo.cs                    # Hybrid training demonstration
+dotnet run --project greyMatter.csproj -- --performance-validation              # Performance validation tests
+dotnet run PerformanceBenchmarkRunner.cs                                        # Performance benchmarks
+dotnet run --project greyMatter.csproj SimpleBenchmarkRunner.cs                 # Simple performance benchmark
+dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4     # Enhanced language learning (Phase 4)
+
+# Legacy demos (may need updates)
 dotnet run -- --simple-demo      # Original vision proof
 dotnet run -- --enhanced-demo    # Biological behaviors  
 dotnet run -- --text-demo        # Real text learning
 dotnet run -- --comprehensive    # Complete demonstration
-dotnet run --project greyMatter.csproj ReadingComprehensionRunner.cs    # Reading comprehension demo
-dotnet run --project greyMatter.csproj -p:StartupObject=GreyMatter.EnhancedLearningRunner 5000 500 4    # Enhanced learning demo
 
 # Coming soon
 dotnet run -- --scale-demo       # 100K+ concepts
-dotnet run -- --wikipedia        # Wikipedia learning
-dotnet run -- --evaluation       # Comprehension testing
 ```
 
 ---
@@ -123,9 +126,10 @@ dotnet run -- --evaluation       # Comprehension testing
 |--------|----------------|-----------------|-------------|
 | Learning Speed | 1.3-1.7 lps | Immediate | 5-10x faster |
 | Save Time | 40 seconds | < 1 second | 40x faster |
-| Code Complexity | 1000s lines | ~300 lines | 70% reduction |
+| Code Complexity | 1000s lines | ~300 lines + cleanup | 75%+ reduction |
 | Memory Pattern | O(total) | O(active) | Scalable |
 | Neuron Sharing | None | Venn diagram | Biological |
+| Visualization | None | Static brain scans | FMRI-like display |
 
 ---
 
@@ -133,13 +137,13 @@ dotnet run -- --evaluation       # Comprehension testing
 
 ### Core Components
 - **`Core/SimpleEphemeralBrain.cs`**: Main brain implementation
-- **`Visualization/BrainScanVisualizer.cs`**: FMRI-like monitoring
+- **`Visualization/BrainScanVisualizer.cs`**: Static brain scan visualization (FMRI-like display)
 - **`Learning/SimpleTextParser.cs`**: Text → concept extraction
 - **`RealisticTrainingRegimen.cs`**: Progressive learning system
 
 ### Biological Behaviors
 - **Shared Neurons**: Related concepts automatically share neurons
-- **FMRI Activation**: Recall spreads through shared connections
+- **FMRI-like Display**: Static brain scan visualization showing activation patterns
 - **Memory Efficiency**: Only active clusters consume memory
 - **Fatigue & Decay**: Neurons tire and connections fade naturally
 
@@ -151,7 +155,7 @@ dotnet run -- --evaluation       # Comprehension testing
 - [ ] **100K+ concepts** learned and retained
 - [ ] **Sub-second response** for any query
 - [ ] **Linear memory scaling** with active concepts
-- [ ] **Real-time visualization** at scale
+- [ ] **Static brain scan visualization** at scale
 
 ### Learning Quality  
 - [ ] **Progressive comprehension** from simple to complex
@@ -167,7 +171,25 @@ dotnet run -- --evaluation       # Comprehension testing
 ```bash
 git clone <repo>
 cd greyMatter
-dotnet run -- --comprehensive
+dotnet run --project greyMatter.csproj HybridTrainingDemo.cs
+```
+
+### Performance Testing
+```bash
+# Run performance validation
+dotnet run --project greyMatter.csproj -- --performance-validation
+
+# Run benchmarks
+dotnet run PerformanceBenchmarkRunner.cs
+
+# Run simple benchmark
+dotnet run --project greyMatter.csproj SimpleBenchmarkRunner.cs
+```
+
+### Enhanced Learning
+```bash
+# Run enhanced language learning with parameters
+dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4
 ```
 
 ### Scale Testing (Coming Soon)
@@ -326,23 +348,28 @@ Category: Future Expansion
 ---
 ## 8. Getting Started (Quick)
 1. Setup datasets/resources if needed.
-2. Typical preschool pipeline (macOS + tuned saves):
-   - `dotnet run -- --preschool-train -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData -log 1 -mps 2 -cc true`
-3. Validate persistence stability (no learning):
-   - `dotnet run -- --save-only -bd /Volumes/jarvis/brainData -td /Volumes/jarvis/trainData -log 2`
+2. Run a quick demo:
+   - `dotnet run --project greyMatter.csproj HybridTrainingDemo.cs`
+3. Test performance:
+   - `dotnet run --project greyMatter.csproj -- --performance-validation`
+4. Run enhanced learning:
+   - `dotnet run --project greyMatter.csproj EnhancedLearningRunner.cs 5000 500 4`
+5. Validate persistence stability (no learning):
+   - `dotnet run -- --save-only` (if available)
 
 ---
 ## 9. Next Session Plan
-1. Add detailed timing instrumentation (no functional changes).
-2. Observe a full run; capture histogram of neuron additions per concept.
-3. Prototype staged capacity growth flag and re-run.
-4. Add optional growth-freeze switch for churn validation.
-5. Prune metadata + refine dirty flag semantics.
+1. ✅ **Codebase Cleanup**: Removed 32 unused files (demos, runners, backups) - COMPLETED
+2. Add detailed timing instrumentation (no functional changes).
+3. Observe a full run; capture histogram of neuron additions per concept.
+4. Prototype staged capacity growth flag and re-run.
+5. Add optional growth-freeze switch for churn validation.
+6. Prune metadata + refine dirty flag semantics.
 
 ---
 ## 10. Status Summary
-Persistence layer is optimized (batching, caching, diffs, normalized IDs). Primary bottleneck is front-side training driven by aggressive neuron growth & capacity targets. Next work focuses on measurement, staged allocation, and data hygiene before adding new cognitive features.
+Persistence layer is optimized (batching, caching, diffs, normalized IDs). Primary bottleneck is front-side training driven by aggressive neuron growth & capacity targets. Next work focuses on measurement, staged allocation, and data hygiene before adding new cognitive features. Recent codebase cleanup removed 32 unused files for improved maintainability.
 
 ---
 
-(README updated with current metrics and recent fixes.)
+(README updated with current metrics, recent fixes, and codebase cleanup.)

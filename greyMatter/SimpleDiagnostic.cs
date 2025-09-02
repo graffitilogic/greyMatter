@@ -75,20 +75,34 @@ namespace GreyMatter
                 var emotionalCount = content.Split(new[] { "emotional_memory" }, StringSplitOptions.None).Length - 1;
                 var languageCount = content.Split(new[] { "language_data" }, StringSplitOptions.None).Length - 1;
 
-                Console.WriteLine($"Emotional memory patterns: {emotionalCount}");
-                Console.WriteLine($"Language learning patterns: {languageCount}");
+                // Also check for actual learned patterns and vocabulary
+                var learnedPatternCount = content.Split(new[] { "learned_" }, StringSplitOptions.None).Length - 1;
+                var vocabularyCount = content.Split(new[] { "vocabulary" }, StringSplitOptions.None).Length - 1;
 
-                if (emotionalCount > languageCount)
+                Console.WriteLine($"Emotional memory patterns: {emotionalCount}");
+                Console.WriteLine($"Language data patterns: {languageCount}");
+                Console.WriteLine($"Learned word patterns: {learnedPatternCount}");
+                Console.WriteLine($"Vocabulary entries: {vocabularyCount}");
+
+                if (learnedPatternCount > 0 || vocabularyCount > 10)
+                {
+                    Console.WriteLine("✅ **LANGUAGE LEARNING DETECTED** - Found learned patterns and vocabulary");
+                }
+                else if (emotionalCount > languageCount)
                 {
                     Console.WriteLine("⚠️  SYSTEM IS PRIMARILY DOING EMOTIONAL PROCESSING, NOT LANGUAGE LEARNING!");
+                }
+                else
+                {
+                    Console.WriteLine("🤔 **UNCLEAR LEARNING STATE** - Limited language learning activity detected");
                 }
             }
 
             Console.WriteLine("\n🎯 **DIAGNOSIS**");
             Console.WriteLine("1. Tatoeba data is in CSV format, not JSON");
-            Console.WriteLine("2. System is generating emotional patterns, not learning language");
-            Console.WriteLine("3. Learning encoder is falling back to algorithmic patterns");
-            Console.WriteLine("4. No actual language learning is occurring");
+            Console.WriteLine("2. System should now learn from actual sentence data instead of algorithmic fallbacks");
+            Console.WriteLine("3. Check for learned patterns and vocabulary in brain data");
+            Console.WriteLine("4. If algorithmic fallback still occurs, the learning pipeline may need regeneration");
         }
     }
 }
