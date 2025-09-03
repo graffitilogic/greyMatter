@@ -173,104 +173,147 @@ namespace GreyMatter
             // Check for Tatoeba hybrid integration (large-scale training)
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid" || args[0] == "--hybrid-tatoeba"))
             {
+                var totalTimer = Stopwatch.StartNew();
+                Console.WriteLine("⏱️  Starting Tatoeba Hybrid Integration...");
+                
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunTatoebaHybridIntegrationAsync();
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  Tatoeba Hybrid Integration completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
 
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-full" || args[0] == "--hybrid-full-scale"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("╔════════════════════════════════════════════════════════════════╗");
                 Console.WriteLine("║          FULL-SCALE HYBRID TRAINING (OPTIMIZED)               ║");
                 Console.WriteLine("║     Real Tatoeba Data + ONNX Semantic + Biological Neural     ║");
                 Console.WriteLine("╚════════════════════════════════════════════════════════════════╝");
                 Console.WriteLine();
+                Console.WriteLine("⏱️  Starting Full-Scale Hybrid Training...");
                 
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunLargeScaleHybridTrainingAsync();
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  Full-Scale Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
             
             // Check for random sampling hybrid training
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-random" || args[0] == "--hybrid-random"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🎲 **RANDOM SAMPLING HYBRID TRAINING**");
                 Console.WriteLine("=====================================");
                 Console.WriteLine("Using random sampling from 2M+ Tatoeba sentences");
+                Console.WriteLine("⏱️  Starting Random Sampling Hybrid Training...");
                 Console.WriteLine();
                 
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunRandomSamplingHybridTrainingAsync();
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  Random Sampling Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
 
             // Check for different batch sizes
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-debug" || args[0] == "--hybrid-debug"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🔧 **DEBUG HYBRID TRAINING**");
                 Console.WriteLine("============================");
                 Console.WriteLine("Processing 10 sentences with debug output");
+                Console.WriteLine("⏱️  Starting Debug Hybrid Training...");
                 Console.WriteLine();
                 
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunSizedHybridTrainingAsync(10);
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  Debug Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
             
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-1k" || args[0] == "--hybrid-1k"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("📊 **1K SENTENCE HYBRID TRAINING**");
                 Console.WriteLine("==================================");
                 Console.WriteLine("Processing 1,000 random sentences for quick testing");
+                Console.WriteLine("⏱️  Starting 1K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunSizedHybridTrainingAsync(1000);
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  1K Sentence Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
 
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-10k" || args[0] == "--hybrid-10k"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("📊 **10K SENTENCE HYBRID TRAINING**");
                 Console.WriteLine("===================================");
                 Console.WriteLine("Processing 10,000 random sentences for medium-scale testing");
+                Console.WriteLine("⏱️  Starting 10K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunSizedHybridTrainingAsync(10000);
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  10K Sentence Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
 
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-100k" || args[0] == "--hybrid-100k"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("📊 **100K SENTENCE HYBRID TRAINING**");
                 Console.WriteLine("====================================");
                 Console.WriteLine("Processing 100,000 random sentences for large-scale testing");
+                Console.WriteLine("⏱️  Starting 100K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunSizedHybridTrainingAsync(100000);
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  100K Sentence Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
 
             if (args.Length > 0 && (args[0] == "--tatoeba-hybrid-complete" || args[0] == "--hybrid-complete"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🌍 **COMPLETE DATASET HYBRID TRAINING**");
                 Console.WriteLine("=======================================");
                 Console.WriteLine("Processing ALL 2M+ Tatoeba sentences (FULL DATASET)");
                 Console.WriteLine("⚠️  This will take significant time and storage!");
+                Console.WriteLine("⏱️  Starting Complete Dataset Hybrid Training...");
                 Console.WriteLine();
                 
                 var demo = new TatoebaHybridIntegrationDemo();
                 await demo.RunCompleteDatasetHybridTrainingAsync();
+                
+                totalTimer.Stop();
+                Console.WriteLine($"⏱️  Complete Dataset Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 return;
             }
             
             // Check for Tatoeba data conversion
             if (args.Length > 0 && (args[0] == "--convert-tatoeba-data" || args[0] == "--convert-tatoeba"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🔄 **TATOEBA DATA CONVERSION**");
                 Console.WriteLine("==============================");
+                Console.WriteLine("⏱️  Starting Tatoeba Data Conversion...");
 
                 try
                 {
@@ -284,10 +327,15 @@ namespace GreyMatter
 
                     Console.WriteLine("\n✅ **DATA CONVERSION COMPLETE**");
                     Console.WriteLine($"📁 Output saved to: {outputPath}");
+                    
+                    totalTimer.Stop();
+                    Console.WriteLine($"⏱️  Tatoeba Data Conversion completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 catch (Exception ex)
                 {
+                    totalTimer.Stop();
                     Console.WriteLine($"❌ Error during conversion: {ex.Message}");
+                    Console.WriteLine($"⏱️  Tatoeba Data Conversion failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 return;
             }
@@ -295,8 +343,10 @@ namespace GreyMatter
             // Check for enhanced data conversion (multiple sources)
             if (args.Length > 0 && (args[0] == "--convert-enhanced-data" || args[0] == "--enhanced-data-converter"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🚀 **ENHANCED DATA CONVERSION**");
                 Console.WriteLine("==============================");
+                Console.WriteLine("⏱️  Starting Enhanced Data Conversion...");
 
                 try
                 {
@@ -309,10 +359,15 @@ namespace GreyMatter
 
                     Console.WriteLine("\n✅ **ENHANCED DATA CONVERSION COMPLETE**");
                     Console.WriteLine($"📁 Output saved to: {outputPath}");
+                    
+                    totalTimer.Stop();
+                    Console.WriteLine($"⏱️  Enhanced Data Conversion completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 catch (Exception ex)
                 {
+                    totalTimer.Stop();
                     Console.WriteLine($"❌ Error during enhanced conversion: {ex.Message}");
+                    Console.WriteLine($"⏱️  Enhanced Data Conversion failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 return;
             }
@@ -320,8 +375,10 @@ namespace GreyMatter
             // Check for real language learning from Tatoeba data
             if (args.Length > 0 && (args[0] == "--learn-from-tatoeba" || args[0] == "--real-learning"))
             {
+                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🧠 **REAL LANGUAGE LEARNING FROM TATOEBA**");
                 Console.WriteLine("==========================================");
+                Console.WriteLine("⏱️  Starting Real Language Learning...");
 
                 try
                 {
@@ -337,10 +394,15 @@ namespace GreyMatter
 
                     Console.WriteLine("\n✅ **REAL LEARNING COMPLETE**");
                     Console.WriteLine($"📊 Learned {maxWords} words from actual Tatoeba sentences");
+                    
+                    totalTimer.Stop();
+                    Console.WriteLine($"⏱️  Real Language Learning completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 catch (Exception ex)
                 {
+                    totalTimer.Stop();
                     Console.WriteLine($"❌ Error during learning: {ex.Message}");
+                    Console.WriteLine($"⏱️  Real Language Learning failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 return;
             }
@@ -353,22 +415,64 @@ namespace GreyMatter
                 Console.WriteLine("Learning from diverse data sources (OpenSubtitles, News, Science, etc.)");
                 Console.WriteLine();
 
+                var totalTimer = Stopwatch.StartNew();
+                var phaseTimer = new Stopwatch();
+
                 try
                 {
                     var dataPath = GetArgValue(args, "--data-path", "/Volumes/jarvis/trainData/enhanced_learning_data");
                     var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
                     var maxWords = GetArgValue(args, "--max-words", 5000);
 
-                    // Use EnhancedLanguageLearner with enhanced data path
+                    Console.WriteLine($"⏱️  **TIMING ANALYSIS STARTED**");
+                    Console.WriteLine($"📁 Data Path: {dataPath}");
+                    Console.WriteLine($"🧠 Brain Path: {brainPath}");
+                    Console.WriteLine($"📊 Target Words: {maxWords}");
+                    Console.WriteLine();
+
+                    // Phase 1: Initialization
+                    phaseTimer.Restart();
+                    Console.WriteLine("📋 **PHASE 1: INITIALIZATION**");
                     var learner = new EnhancedLanguageLearner(dataPath, brainPath, maxConcurrency: 4);
+                    phaseTimer.Stop();
+                    Console.WriteLine($"✅ Initialization completed in {phaseTimer.Elapsed.TotalSeconds:F2} seconds");
+                    Console.WriteLine();
+
+                    // Phase 2: Learning Execution
+                    phaseTimer.Restart();
+                    Console.WriteLine("🧠 **PHASE 2: VOCABULARY LEARNING**");
+                    Console.WriteLine("Starting batch learning process...");
                     await learner.LearnVocabularyAtScaleAsync(maxWords, batchSize: 500);
+                    phaseTimer.Stop();
+                    Console.WriteLine($"✅ Learning completed in {phaseTimer.Elapsed.TotalSeconds:F2} seconds");
+                    Console.WriteLine();
+
+                    // Phase 3: Finalization
+                    phaseTimer.Restart();
+                    Console.WriteLine("💾 **PHASE 3: FINALIZATION**");
+                    // Force garbage collection and cleanup
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    phaseTimer.Stop();
+                    Console.WriteLine($"✅ Finalization completed in {phaseTimer.Elapsed.TotalSeconds:F2} seconds");
+                    Console.WriteLine();
+
+                    // Total timing summary
+                    totalTimer.Stop();
+                    Console.WriteLine("📊 **TIMING SUMMARY**");
+                    Console.WriteLine("===================");
+                    Console.WriteLine($"⏱️  Total execution time: {totalTimer.Elapsed.TotalMinutes:F2} minutes ({totalTimer.Elapsed.TotalSeconds:F2} seconds)");
+                    Console.WriteLine($"📈 Learning rate: {maxWords / totalTimer.Elapsed.TotalSeconds:F1} words/second");
+                    Console.WriteLine($"💾 Memory usage: {GC.GetTotalMemory(false) / 1024 / 1024:F1} MB");
 
                     Console.WriteLine("\n✅ **ENHANCED LEARNING COMPLETE**");
                     Console.WriteLine($"📊 Learned from multi-source data: {maxWords} words");
                 }
                 catch (Exception ex)
                 {
+                    totalTimer.Stop();
                     Console.WriteLine($"❌ Error during enhanced learning: {ex.Message}");
+                    Console.WriteLine($"⏱️  Failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                     Console.WriteLine("💡 Make sure to run --convert-enhanced-data first");
                 }
                 return;

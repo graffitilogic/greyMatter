@@ -20,7 +20,7 @@ namespace GreyMatter
         public ProceduralGenerationDemo()
         {
             _generator = new ProceduralCorticalColumnGenerator();
-            _persistenceManager = new HybridPersistenceManager("./brain_data", _generator);
+            _persistenceManager = new HybridPersistenceManager("/Volumes/jarvis/brainData", _generator);
         }
 
         public async Task RunDemoAsync()

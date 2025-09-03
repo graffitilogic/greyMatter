@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using greyMatter.Core;
 
@@ -337,7 +338,7 @@ namespace GreyMatter.Storage
             cluster.LastModified = DateTime.UtcNow;
             
             // Save cluster
-            SaveVocabularyClusterAsync(clusterPath, cluster);
+            await SaveVocabularyClusterAsync(clusterPath, cluster);
             
             // Update hippocampus index
             await UpdateVocabularyIndexAsync(word, clusterPath);
@@ -941,54 +942,94 @@ namespace GreyMatter.Storage
         }
 
         /// <summary>
-        /// Load vocabulary cluster from file
+        /// Load vocabulary cluster from file with proper timeout handling
         /// </summary>
         private VocabularyCluster? LoadVocabularyClusterAsync(string clusterPath)
         {
             var fileLock = GetFileLock(clusterPath);
-            
-            lock (fileLock)
+            var lockAcquired = false;
+            try
             {
+                // Try to acquire lock with timeout
+                lockAcquired = Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30));
+                if (!lockAcquired)
+                {
+                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}");
+                    return new VocabularyCluster(); // Return empty cluster on timeout
+                }
+
                 if (!File.Exists(clusterPath))
                     return null;
 
-                try
+                var json = File.ReadAllText(clusterPath); // Use sync read under lock
+                if (string.IsNullOrWhiteSpace(json))
+                    return new VocabularyCluster(); // Return empty cluster for empty files
+
+                return JsonSerializer.Deserialize<VocabularyCluster>(json);
+            }
+            catch (JsonException ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Failed to load vocabulary cluster {clusterPath}: {ex.Message}");
+                Console.WriteLine("🔄 Creating new empty cluster");
+                return new VocabularyCluster(); // Return empty cluster on JSON errors
+            }
+            catch (IOException ex) when (ex.Message.Contains("being used by another process"))
+            {
+                Console.WriteLine($"⚠️ Warning: File {clusterPath} is locked by another process, skipping");
+                return new VocabularyCluster(); // Return empty cluster on file lock
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Unexpected error loading vocabulary cluster {clusterPath}: {ex.Message}");
+                return new VocabularyCluster(); // Return empty cluster on any error
+            }
+            finally
+            {
+                if (lockAcquired)
                 {
-                    var json = File.ReadAllText(clusterPath); // Use sync read under lock
-                    if (string.IsNullOrWhiteSpace(json))
-                        return new VocabularyCluster(); // Return empty cluster for empty files
-                    
-                    return JsonSerializer.Deserialize<VocabularyCluster>(json);
-                }
-                catch (JsonException ex)
-                {
-                    Console.WriteLine($"⚠️ Warning: Failed to load vocabulary cluster {clusterPath}: {ex.Message}");
-                    Console.WriteLine("🔄 Creating new empty cluster");
-                    return new VocabularyCluster(); // Return empty cluster on JSON errors
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"⚠️ Warning: Unexpected error loading vocabulary cluster {clusterPath}: {ex.Message}");
-                    return new VocabularyCluster(); // Return empty cluster on any error
+                    Monitor.Exit(fileLock);
                 }
             }
         }
 
         /// <summary>
-        /// Save vocabulary cluster
+        /// Save vocabulary cluster with proper timeout handling
         /// </summary>
-        private void SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
+        private async Task SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
         {
             var fileLock = GetFileLock(clusterPath);
-            
-            lock (fileLock)
+            var lockAcquired = false;
+            try
             {
+                // Try to acquire lock with timeout
+                lockAcquired = await Task.Run(() => Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30)));
+                if (!lockAcquired)
+                {
+                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, skipping save");
+                    return;
+                }
+
                 var directory = Path.GetDirectoryName(clusterPath);
                 if (!string.IsNullOrEmpty(directory))
                     Directory.CreateDirectory(directory);
 
                 var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(clusterPath, json); // Use sync write under lock
+                await File.WriteAllTextAsync(clusterPath, json);
+            }
+            catch (IOException ex) when (ex.Message.Contains("being used by another process"))
+            {
+                Console.WriteLine($"⚠️ Warning: Cannot save {clusterPath}, file is locked by another process");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Failed to save vocabulary cluster {clusterPath}: {ex.Message}");
+            }
+            finally
+            {
+                if (lockAcquired)
+                {
+                    Monitor.Exit(fileLock);
+                }
             }
         }
 
@@ -1027,12 +1068,22 @@ namespace GreyMatter.Storage
             if (!File.Exists(clusterPath))
                 return null;
 
+            var fileLock = GetFileLock(clusterPath);
+            var lockAcquired = false;
             try
             {
+                // Try to acquire lock with timeout
+                lockAcquired = await Task.Run(() => Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30)));
+                if (!lockAcquired)
+                {
+                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}");
+                    return new ConceptCluster(); // Return empty cluster on timeout
+                }
+
                 var json = await File.ReadAllTextAsync(clusterPath);
                 if (string.IsNullOrWhiteSpace(json))
                     return new ConceptCluster(); // Return empty cluster for empty files
-                
+
                 return JsonSerializer.Deserialize<ConceptCluster>(json);
             }
             catch (JsonException ex)
@@ -1041,10 +1092,22 @@ namespace GreyMatter.Storage
                 Console.WriteLine("🔄 Creating new empty cluster");
                 return new ConceptCluster(); // Return empty cluster on JSON errors
             }
+            catch (IOException ex) when (ex.Message.Contains("being used by another process"))
+            {
+                Console.WriteLine($"⚠️ Warning: File {clusterPath} is locked by another process, skipping");
+                return new ConceptCluster(); // Return empty cluster on file lock
+            }
             catch (Exception ex)
             {
                 Console.WriteLine($"⚠️ Warning: Unexpected error loading concept cluster {clusterPath}: {ex.Message}");
                 return new ConceptCluster(); // Return empty cluster on any error
+            }
+            finally
+            {
+                if (lockAcquired)
+                {
+                    Monitor.Exit(fileLock);
+                }
             }
         }
 
@@ -1053,12 +1116,40 @@ namespace GreyMatter.Storage
         /// </summary>
         private async Task SaveConceptClusterAsync(string clusterPath, ConceptCluster cluster)
         {
-            var directory = Path.GetDirectoryName(clusterPath);
-            if (!string.IsNullOrEmpty(directory))
-                Directory.CreateDirectory(directory);
+            var fileLock = GetFileLock(clusterPath);
+            var lockAcquired = false;
+            try
+            {
+                // Try to acquire lock with timeout
+                lockAcquired = await Task.Run(() => Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30)));
+                if (!lockAcquired)
+                {
+                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, skipping save");
+                    return;
+                }
 
-            var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(clusterPath, json);
+                var directory = Path.GetDirectoryName(clusterPath);
+                if (!string.IsNullOrEmpty(directory))
+                    Directory.CreateDirectory(directory);
+
+                var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(clusterPath, json);
+            }
+            catch (IOException ex) when (ex.Message.Contains("being used by another process"))
+            {
+                Console.WriteLine($"⚠️ Warning: Cannot save {clusterPath}, file is locked by another process");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Warning: Failed to save concept cluster {clusterPath}: {ex.Message}");
+            }
+            finally
+            {
+                if (lockAcquired)
+                {
+                    Monitor.Exit(fileLock);
+                }
+            }
         }
 
         /// <summary>
