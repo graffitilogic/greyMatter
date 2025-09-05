@@ -35,21 +35,21 @@ namespace greyMatter.Learning
             _storageManager = new SemanticStorageManager(brainDataPath, trainingDataRoot);
             
             // Try to load existing brain state, create new if none exists
-            _brain = LoadOrCreateBrain();
+            _brain = LoadOrCreateBrainAsync().GetAwaiter().GetResult();
         }
 
         /// <summary>
         /// Load existing brain state or create a new one
         /// This ensures training sessions are cumulative rather than starting fresh
         /// </summary>
-        private LanguageEphemeralBrain LoadOrCreateBrain()
+        private async Task<LanguageEphemeralBrain> LoadOrCreateBrainAsync()
         {
             if (_storageManager.HasExistingBrainState())
             {
                 try
                 {
                     Console.WriteLine("📂 Loading existing brain state using biological storage...");
-                    var brain = LoadExistingBrain();
+                    var brain = await LoadExistingBrainAsync();
                     var stats = brain.GetLearningStats();
                     Console.WriteLine($"   ✅ Loaded brain with {stats.VocabularySize:N0} words, {stats.TotalConcepts:N0} concepts");
                     Console.WriteLine($"   📊 Training sessions: {stats.TrainingSessions}");
@@ -72,12 +72,12 @@ namespace greyMatter.Learning
         /// <summary>
         /// Load existing brain state from biological storage
         /// </summary>
-        private LanguageEphemeralBrain LoadExistingBrain()
+        private async Task<LanguageEphemeralBrain> LoadExistingBrainAsync()
         {
             var brain = new LanguageEphemeralBrain();
             
             // Load vocabulary from biological storage
-            var vocabulary = _storageManager.LoadVocabularyAsync().Result;
+            var vocabulary = await _storageManager.LoadVocabularyAsync();
             if (vocabulary.Any())
             {
                 Console.WriteLine($"   📚 Loading {vocabulary.Count:N0} vocabulary entries...");
@@ -86,7 +86,7 @@ namespace greyMatter.Learning
             }
             
             // Load language data (concepts, patterns, etc.)
-            var languageData = _storageManager.LoadLanguageDataAsync().Result;
+            var languageData = await _storageManager.LoadLanguageDataAsync();
             if (languageData.Any())
             {
                 Console.WriteLine($"   🧠 Loading {languageData.Count:N0} language concepts...");
@@ -95,7 +95,7 @@ namespace greyMatter.Learning
             
             // CRITICAL FIX: Load neurons from the persistent neuron pool
             Console.WriteLine("   🔄 Loading neurons from persistent storage...");
-            var neurons = _storageManager.LoadAllNeuronsAsync().Result;
+            var neurons = await _storageManager.LoadAllNeuronsAsync();
             if (neurons.Any())
             {
                 Console.WriteLine($"   🧠 Loading {neurons.Count:N0} neurons from pool...");
@@ -141,7 +141,7 @@ namespace greyMatter.Learning
                 
                 // Add timeout protection for large concept sets
                 var saveTask = _storageManager.StoreNeuralConceptsAsync(neuralConcepts);
-                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(5)); // 5 minute timeout
+                var timeoutTask = Task.Delay(TimeSpan.FromMinutes(15)); // 15 minute timeout
                 
                 var completedTask = await Task.WhenAny(saveTask, timeoutTask);
                 if (completedTask == timeoutTask)

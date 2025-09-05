@@ -6,6 +6,8 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using MessagePack;
+using MessagePack.Resolvers;
 using greyMatter.Core;
 
 
@@ -43,6 +45,7 @@ namespace GreyMatter.Storage
         private readonly object _vocabularyIndexLock = new object();
         private readonly object _conceptIndexLock = new object();
         private readonly Dictionary<string, object> _fileLocks = new Dictionary<string, object>();
+        private readonly Dictionary<string, SemaphoreSlim> _fileSemaphores = new Dictionary<string, SemaphoreSlim>();
         
         // Global neuron pool management
         private Dictionary<int, SharedNeuron> _neuronPool;
@@ -58,6 +61,9 @@ namespace GreyMatter.Storage
         private PreTrainedSemanticClassifier? _preTrainedClassifier;
         private FallbackSemanticClassifier _fallbackClassifier;
         
+        // MessagePack serialization options for high-performance binary serialization
+        private readonly MessagePackSerializerOptions _messagePackOptions;
+        
         public SemanticStorageManager(string brainDataPath, string trainingDataRoot = "/Volumes/jarvis/trainData")
         {
             _brainDataPath = brainDataPath;
@@ -72,6 +78,13 @@ namespace GreyMatter.Storage
             _neuronLocationIndex = new Dictionary<int, NeuronLocationEntry>();
             _clusterAccessTimes = new Dictionary<string, DateTime>();
             _neuronPool = new Dictionary<int, SharedNeuron>();
+            
+            // Initialize MessagePack for high-performance serialization
+            var resolver = CompositeResolver.Create(
+                StandardResolver.Instance,
+                ContractlessStandardResolver.Instance
+            );
+            _messagePackOptions = MessagePackSerializerOptions.Standard.WithResolver(resolver);
             
             // Initialize batch processing
             _pendingConceptClusters = new Dictionary<string, ConceptCluster>();
@@ -96,6 +109,9 @@ namespace GreyMatter.Storage
             
             // Load existing vocabulary and concept data
             LoadExistingDataAsync().Wait();
+            
+            // Create storage directory structure
+            InitializeStorageStructure();
         }
         
         /// <summary>
@@ -214,7 +230,7 @@ namespace GreyMatter.Storage
                 var poolData = File.ReadAllText(poolIndexPath);
                 var poolIndex = JsonSerializer.Deserialize<Dictionary<string, object>>(poolData);
                 
-                if (poolIndex.ContainsKey("next_neuron_id"))
+                if (poolIndex != null && poolIndex.ContainsKey("next_neuron_id"))
                 {
                     _nextNeuronId = ((JsonElement)poolIndex["next_neuron_id"]).GetInt32();
                 }
@@ -241,11 +257,14 @@ namespace GreyMatter.Storage
                 var locations = JsonSerializer.Deserialize<Dictionary<string, NeuronLocationEntry>>(indexData);
                 
                 _neuronLocationIndex.Clear();
-                foreach (var kvp in locations)
+                if (locations != null)
                 {
-                    if (int.TryParse(kvp.Key, out int neuronId))
+                    foreach (var kvp in locations)
                     {
-                        _neuronLocationIndex[neuronId] = kvp.Value;
+                        if (int.TryParse(kvp.Key, out int neuronId))
+                        {
+                            _neuronLocationIndex[neuronId] = kvp.Value;
+                        }
                     }
                 }
             }
@@ -264,10 +283,12 @@ namespace GreyMatter.Storage
             };
             
             var poolIndexPath = Path.Combine(_neuronPoolPath, "pool_index.json");
+            Directory.CreateDirectory(_neuronPoolPath);
             await File.WriteAllTextAsync(poolIndexPath, JsonSerializer.Serialize(poolData, new JsonSerializerOptions { WriteIndented = true }));
             
             // Save neuron location index
             var locationIndexPath = Path.Combine(_hippocampusPath, "neuron_locations.json");
+            Directory.CreateDirectory(_hippocampusPath);
             var locationData = _neuronLocationIndex.ToDictionary(kvp => kvp.Key.ToString(), kvp => kvp.Value);
             await File.WriteAllTextAsync(locationIndexPath, JsonSerializer.Serialize(locationData, new JsonSerializerOptions { WriteIndented = true }));
         }
@@ -285,10 +306,12 @@ namespace GreyMatter.Storage
             };
             
             var poolIndexPath = Path.Combine(_neuronPoolPath, "pool_index.json");
+            Directory.CreateDirectory(_neuronPoolPath);
             File.WriteAllText(poolIndexPath, JsonSerializer.Serialize(poolData, new JsonSerializerOptions { WriteIndented = true }));
             
             // Save neuron location index
             var locationIndexPath = Path.Combine(_hippocampusPath, "neuron_locations.json");
+            Directory.CreateDirectory(_hippocampusPath);
             var locationData = _neuronLocationIndex.ToDictionary(kvp => kvp.Key.ToString(), kvp => kvp.Value);
             File.WriteAllText(locationIndexPath, JsonSerializer.Serialize(locationData, new JsonSerializerOptions { WriteIndented = true }));
         }
@@ -331,7 +354,7 @@ namespace GreyMatter.Storage
             var clusterPath = GetVocabularyCluster(word, wordInfo);
             
             // Load existing cluster or create new
-            var cluster = LoadVocabularyClusterAsync(clusterPath) ?? new VocabularyCluster();
+            var cluster = await LoadVocabularyClusterAsync(clusterPath) ?? new VocabularyCluster();
             
             // Add/update word in cluster
             cluster.Words[word] = wordInfo;
@@ -634,21 +657,33 @@ namespace GreyMatter.Storage
             if (!Directory.Exists(_corticalColumnsPath))
                 return vocabulary;
 
-            // Load all vocabulary clusters
-            var clusterFiles = Directory.GetFiles(_corticalColumnsPath, "*.json", SearchOption.AllDirectories);
-            foreach (var clusterFile in clusterFiles)
+            // Get unique file paths from vocabulary index instead of scanning all files
+            HashSet<string> vocabularyFiles;
+            lock (_vocabularyIndexLock)
             {
-                if (clusterFile.Contains("vocabulary") || clusterFile.Contains("freq_"))
+                vocabularyFiles = new HashSet<string>(_vocabularyIndex.Values);
+            }
+
+            // Load vocabulary clusters in parallel for better performance
+            var loadTasks = vocabularyFiles
+                .Where(file => File.Exists(file))
+                .Select(async file =>
                 {
-                    var cluster = LoadVocabularyClusterAsync(clusterFile);
-                    if (cluster != null)
+                    var cluster = await LoadVocabularyClusterAsync(file);
+                    return cluster;
+                })
+                .ToList();
+
+            var clusters = await Task.WhenAll(loadTasks);
+
+            // Extract vocabulary from loaded clusters
+            foreach (var cluster in clusters)
+            {
+                if (cluster != null && cluster.Words != null)
+                {
+                    foreach (var kvp in cluster.Words)
                     {
-                        foreach (var kvp in cluster.Words)
-                        {
-                            var word = kvp.Key;
-                            var info = kvp.Value;
-                            vocabulary[word] = info;
-                        }
+                        vocabulary[kvp.Key] = kvp.Value;
                     }
                 }
             }
@@ -661,12 +696,52 @@ namespace GreyMatter.Storage
         /// </summary>
         public async Task StoreVocabularyAsync(Dictionary<string, WordInfo> vocabulary)
         {
+            // Group words by cluster to minimize file I/O
+            var clusterGroups = new Dictionary<string, Dictionary<string, WordInfo>>();
+            
             foreach (var (word, info) in vocabulary)
             {
-                await SaveVocabularyWordAsync(word, info);
+                var clusterPath = GetVocabularyCluster(word, info);
+                if (!clusterGroups.ContainsKey(clusterPath))
+                {
+                    clusterGroups[clusterPath] = new Dictionary<string, WordInfo>();
+                }
+                clusterGroups[clusterPath][word] = info;
             }
+            
+            // Process each cluster
+            var saveTasks = new List<Task>();
+            foreach (var (clusterPath, words) in clusterGroups)
+            {
+                saveTasks.Add(SaveVocabularyClusterBatchAsync(clusterPath, words));
+            }
+            
+            await Task.WhenAll(saveTasks);
         }
-
+        
+        /// <summary>
+        /// Save a batch of vocabulary words to a single cluster
+        /// </summary>
+        private async Task SaveVocabularyClusterBatchAsync(string clusterPath, Dictionary<string, WordInfo> words)
+        {
+            // Load existing cluster or create new
+            var cluster = await LoadVocabularyClusterAsync(clusterPath) ?? new VocabularyCluster();
+            
+            // Add all words to cluster
+            foreach (var (word, info) in words)
+            {
+                cluster.Words[word] = info;
+            }
+            cluster.LastModified = DateTime.UtcNow;
+            
+            // Save cluster once
+            await SaveVocabularyClusterAsync(clusterPath, cluster);
+            
+            // Update hippocampus index for all words in this cluster
+            var indexTasks = words.Keys.Select(word => UpdateVocabularyIndexAsync(word, clusterPath)).ToList();
+            await Task.WhenAll(indexTasks);
+        }
+        
         /// <summary>
         /// Load language data
         /// </summary>
@@ -678,11 +753,29 @@ namespace GreyMatter.Storage
             if (!Directory.Exists(_corticalColumnsPath))
                 return languageData;
 
-            var clusterFiles = Directory.GetFiles(_corticalColumnsPath, "*.json", SearchOption.AllDirectories);
-            foreach (var clusterFile in clusterFiles)
+            // Get unique file paths from concept index instead of scanning all files
+            HashSet<string> conceptFiles;
+            lock (_conceptIndexLock)
             {
-                var cluster = await LoadConceptClusterAsync(clusterFile);
-                if (cluster != null)
+                conceptFiles = new HashSet<string>(_conceptIndex.Values.Select(entry => entry.ClusterPath));
+            }
+
+            // Load concept clusters in parallel for better performance
+            var loadTasks = conceptFiles
+                .Where(file => File.Exists(file))
+                .Select(async file =>
+                {
+                    var cluster = await LoadConceptClusterAsync(file);
+                    return cluster;
+                })
+                .ToList();
+
+            var clusters = await Task.WhenAll(loadTasks);
+
+            // Extract language data from loaded clusters
+            foreach (var cluster in clusters)
+            {
+                if (cluster != null && cluster.Concepts != null)
                 {
                     foreach (var (conceptId, data) in cluster.Concepts)
                     {
@@ -699,10 +792,13 @@ namespace GreyMatter.Storage
         /// </summary>
         public async Task StoreLanguageDataAsync(Dictionary<string, object> languageData)
         {
-            foreach (var (conceptId, data) in languageData)
-            {
-                await SaveConceptAsync(conceptId, data, ConceptType.SentencePattern);
-            }
+            // Convert to batch format and use optimized batch storage
+            var concepts = languageData.ToDictionary(
+                kvp => kvp.Key,
+                kvp => (kvp.Value, ConceptType.SentencePattern)
+            );
+            
+            await SaveConceptsBatchAsync(concepts);
         }
 
         /// <summary>
@@ -715,7 +811,7 @@ namespace GreyMatter.Storage
             // Load from neuron pool files
             if (Directory.Exists(_neuronPoolPath))
             {
-                var poolFiles = Directory.GetFiles(_neuronPoolPath, "*.json");
+                var poolFiles = Directory.GetFiles(_neuronPoolPath, "*.msgpack");
                 foreach (var poolFile in poolFiles)
                 {
                     if (Path.GetFileName(poolFile) != "pool_index.json")
@@ -818,7 +914,7 @@ namespace GreyMatter.Storage
             
             if (clusterPath != null)
             {
-                var cluster = LoadVocabularyClusterAsync(clusterPath);
+                var cluster = await LoadVocabularyClusterAsync(clusterPath);
                 if (cluster != null && cluster.Words.TryGetValue(word, out var wordInfo))
                 {
                     return wordInfo;
@@ -833,7 +929,7 @@ namespace GreyMatter.Storage
         private string GetNeuronPoolFile(int neuronId)
         {
             var poolIndex = neuronId / 1000; // 1000 neurons per file
-            return Path.Combine(_neuronPoolPath, $"pool_{poolIndex}.json");
+            return Path.Combine(_neuronPoolPath, $"pool_{poolIndex}.msgpack");
         }
 
         /// <summary>
@@ -844,8 +940,9 @@ namespace GreyMatter.Storage
             if (!File.Exists(poolFile))
                 return new List<SharedNeuron>();
 
-            var json = await File.ReadAllTextAsync(poolFile);
-            return JsonSerializer.Deserialize<List<SharedNeuron>>(json) ?? new List<SharedNeuron>();
+            // Use MessagePack for high-performance binary deserialization
+            var bytes = await File.ReadAllBytesAsync(poolFile);
+            return MessagePackSerializer.Deserialize<List<SharedNeuron>>(bytes, _messagePackOptions) ?? new List<SharedNeuron>();
         }
 
         /// <summary>
@@ -853,8 +950,13 @@ namespace GreyMatter.Storage
         /// </summary>
         private async Task SaveNeuronPoolFileAsync(string poolFile, List<SharedNeuron> neurons)
         {
-            var json = JsonSerializer.Serialize(neurons, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(poolFile, json);
+            var directory = Path.GetDirectoryName(poolFile);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+            
+            // Use MessagePack for high-performance binary serialization
+            var bytes = MessagePackSerializer.Serialize(neurons, _messagePackOptions);
+            await File.WriteAllBytesAsync(poolFile, bytes);
         }
 
         /// <summary>
@@ -944,28 +1046,25 @@ namespace GreyMatter.Storage
         /// <summary>
         /// Load vocabulary cluster from file with proper timeout handling
         /// </summary>
-        private VocabularyCluster? LoadVocabularyClusterAsync(string clusterPath)
+        private async Task<VocabularyCluster?> LoadVocabularyClusterAsync(string clusterPath)
         {
-            var fileLock = GetFileLock(clusterPath);
-            var lockAcquired = false;
+            var semaphore = GetFileSemaphore(clusterPath);
+            if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(30)))
+            {
+                Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, skipping");
+                return new VocabularyCluster(); // Return empty cluster on timeout
+            }
             try
             {
-                // Try to acquire lock with timeout
-                lockAcquired = Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30));
-                if (!lockAcquired)
-                {
-                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}");
-                    return new VocabularyCluster(); // Return empty cluster on timeout
-                }
-
                 if (!File.Exists(clusterPath))
                     return null;
 
-                var json = File.ReadAllText(clusterPath); // Use sync read under lock
-                if (string.IsNullOrWhiteSpace(json))
+                // Use MessagePack for high-performance binary deserialization
+                var bytes = await File.ReadAllBytesAsync(clusterPath);
+                if (bytes.Length == 0)
                     return new VocabularyCluster(); // Return empty cluster for empty files
 
-                return JsonSerializer.Deserialize<VocabularyCluster>(json);
+                return MessagePackSerializer.Deserialize<VocabularyCluster>(bytes, _messagePackOptions);
             }
             catch (JsonException ex)
             {
@@ -985,10 +1084,7 @@ namespace GreyMatter.Storage
             }
             finally
             {
-                if (lockAcquired)
-                {
-                    Monitor.Exit(fileLock);
-                }
+                semaphore.Release();
             }
         }
 
@@ -997,24 +1093,21 @@ namespace GreyMatter.Storage
         /// </summary>
         private async Task SaveVocabularyClusterAsync(string clusterPath, VocabularyCluster cluster)
         {
-            var fileLock = GetFileLock(clusterPath);
-            var lockAcquired = false;
+            var semaphore = GetFileSemaphore(clusterPath);
+            if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(30)))
+            {
+                Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, cannot save");
+                return;
+            }
             try
             {
-                // Try to acquire lock with timeout
-                lockAcquired = await Task.Run(() => Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30)));
-                if (!lockAcquired)
-                {
-                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, skipping save");
-                    return;
-                }
-
                 var directory = Path.GetDirectoryName(clusterPath);
                 if (!string.IsNullOrEmpty(directory))
                     Directory.CreateDirectory(directory);
 
-                var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(clusterPath, json);
+                // Use MessagePack for high-performance binary serialization
+                var bytes = MessagePackSerializer.Serialize(cluster, _messagePackOptions);
+                await File.WriteAllBytesAsync(clusterPath, bytes);
             }
             catch (IOException ex) when (ex.Message.Contains("being used by another process"))
             {
@@ -1026,10 +1119,7 @@ namespace GreyMatter.Storage
             }
             finally
             {
-                if (lockAcquired)
-                {
-                    Monitor.Exit(fileLock);
-                }
+                semaphore.Release();
             }
         }
 
@@ -1056,6 +1146,7 @@ namespace GreyMatter.Storage
                 indexCopy = new Dictionary<string, string>(_vocabularyIndex);
             }
             var indexPath = Path.Combine(_hippocampusPath, "vocabulary_index.json");
+            Directory.CreateDirectory(_hippocampusPath);
             var json = JsonSerializer.Serialize(indexCopy, new JsonSerializerOptions { WriteIndented = true });
             await File.WriteAllTextAsync(indexPath, json);
         }
@@ -1068,23 +1159,20 @@ namespace GreyMatter.Storage
             if (!File.Exists(clusterPath))
                 return null;
 
-            var fileLock = GetFileLock(clusterPath);
-            var lockAcquired = false;
+            var semaphore = GetFileSemaphore(clusterPath);
+            if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(30)))
+            {
+                Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, skipping");
+                return new ConceptCluster(); // Return empty cluster on timeout
+            }
             try
             {
-                // Try to acquire lock with timeout
-                lockAcquired = await Task.Run(() => Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30)));
-                if (!lockAcquired)
-                {
-                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}");
-                    return new ConceptCluster(); // Return empty cluster on timeout
-                }
-
-                var json = await File.ReadAllTextAsync(clusterPath);
-                if (string.IsNullOrWhiteSpace(json))
+                // Use MessagePack for high-performance binary deserialization
+                var bytes = await File.ReadAllBytesAsync(clusterPath);
+                if (bytes.Length == 0)
                     return new ConceptCluster(); // Return empty cluster for empty files
 
-                return JsonSerializer.Deserialize<ConceptCluster>(json);
+                return MessagePackSerializer.Deserialize<ConceptCluster>(bytes, _messagePackOptions);
             }
             catch (JsonException ex)
             {
@@ -1104,10 +1192,7 @@ namespace GreyMatter.Storage
             }
             finally
             {
-                if (lockAcquired)
-                {
-                    Monitor.Exit(fileLock);
-                }
+                semaphore.Release();
             }
         }
 
@@ -1116,24 +1201,21 @@ namespace GreyMatter.Storage
         /// </summary>
         private async Task SaveConceptClusterAsync(string clusterPath, ConceptCluster cluster)
         {
-            var fileLock = GetFileLock(clusterPath);
-            var lockAcquired = false;
+            var semaphore = GetFileSemaphore(clusterPath);
+            if (!await semaphore.WaitAsync(TimeSpan.FromSeconds(30)))
+            {
+                Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, cannot save");
+                return;
+            }
             try
             {
-                // Try to acquire lock with timeout
-                lockAcquired = await Task.Run(() => Monitor.TryEnter(fileLock, TimeSpan.FromSeconds(30)));
-                if (!lockAcquired)
-                {
-                    Console.WriteLine($"⚠️ Warning: Timeout waiting for file lock on {clusterPath}, skipping save");
-                    return;
-                }
-
                 var directory = Path.GetDirectoryName(clusterPath);
                 if (!string.IsNullOrEmpty(directory))
                     Directory.CreateDirectory(directory);
 
-                var json = JsonSerializer.Serialize(cluster, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(clusterPath, json);
+                // Use MessagePack for high-performance binary serialization
+                var bytes = MessagePackSerializer.Serialize(cluster, _messagePackOptions);
+                await File.WriteAllBytesAsync(clusterPath, bytes);
             }
             catch (IOException ex) when (ex.Message.Contains("being used by another process"))
             {
@@ -1145,10 +1227,7 @@ namespace GreyMatter.Storage
             }
             finally
             {
-                if (lockAcquired)
-                {
-                    Monitor.Exit(fileLock);
-                }
+                semaphore.Release();
             }
         }
 
@@ -1175,6 +1254,7 @@ namespace GreyMatter.Storage
         private async Task SaveConceptIndexAsync()
         {
             var indexPath = Path.Combine(_hippocampusPath, "concept_index.json");
+            Directory.CreateDirectory(_hippocampusPath);
             
             // Create a thread-safe copy of the concept index
             Dictionary<string, ConceptIndexEntry> conceptIndexCopy;
@@ -1200,6 +1280,22 @@ namespace GreyMatter.Storage
                     _fileLocks[filePath] = fileLock;
                 }
                 return fileLock;
+            }
+        }
+
+        /// <summary>
+        /// Get or create a file semaphore for the specified path
+        /// </summary>
+        private SemaphoreSlim GetFileSemaphore(string filePath)
+        {
+            lock (_fileLocks)
+            {
+                if (!_fileSemaphores.TryGetValue(filePath, out var semaphore))
+                {
+                    semaphore = new SemaphoreSlim(1, 1);
+                    _fileSemaphores[filePath] = semaphore;
+                }
+                return semaphore;
             }
         }
 
