@@ -40,14 +40,14 @@ namespace greyMatter
                 Console.WriteLine("Phase 1a: Building Vocabulary Foundation");
                 Console.WriteLine(new string('─', 60));
                 
-                trainer.TrainVocabularyFoundation(targetVocabulary);
+                await trainer.TrainVocabularyFoundationAsync(targetVocabulary);
 
                 // Phase 1b: Sentence Structure Learning  
                 Console.WriteLine("\n" + new string('─', 60));
                 Console.WriteLine("Phase 1b: Learning Sentence Patterns");
                 Console.WriteLine(new string('─', 60));
                 
-                trainer.TrainOnEnglishSentences(maxSentences, batchSize: 50);
+                await trainer.TrainOnEnglishSentencesAsync(maxSentences, batchSize: 50);
 
                 // Phase 1c: Capability Testing
                 Console.WriteLine("\n" + new string('─', 60));
@@ -273,11 +273,11 @@ namespace greyMatter
 
                 // Quick vocabulary building
                 Console.WriteLine("Phase 1a: Quick Vocabulary Building");
-                trainer.TrainVocabularyFoundation(targetVocabulary);
+                await trainer.TrainVocabularyFoundationAsync(targetVocabulary);
 
                 // Quick sentence learning  
                 Console.WriteLine("\nPhase 1b: Quick Sentence Learning");
-                trainer.TrainOnEnglishSentences(maxSentences, batchSize: 25);
+                await trainer.TrainOnEnglishSentencesAsync(maxSentences, batchSize: 25);
 
                 // Quick results
                 var stats = trainer.Brain.GetLearningStats();
@@ -332,14 +332,14 @@ namespace greyMatter
                 Console.WriteLine("Phase 1: Building Comprehensive Vocabulary Foundation");
                 Console.WriteLine(new string('═', 70));
                 
-                trainer.TrainVocabularyFoundation(targetVocabulary);
+                await trainer.TrainVocabularyFoundationAsync(targetVocabulary);
 
                 // Phase 2: Full sentence structure learning
                 Console.WriteLine("\n" + new string('═', 70));
                 Console.WriteLine("Phase 2: Learning from ALL English Sentences");
                 Console.WriteLine(new string('═', 70));
                 
-                trainer.TrainOnEnglishSentences(maxSentences, batchSize: 1000); // Larger batches for efficiency
+                await trainer.TrainOnEnglishSentencesAsync(maxSentences, batchSize: 1000); // Larger batches for efficiency
 
                 // Phase 3: Comprehensive testing
                 Console.WriteLine("\n" + new string('═', 70));

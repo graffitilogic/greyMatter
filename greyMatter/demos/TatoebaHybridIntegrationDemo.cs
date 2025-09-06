@@ -352,9 +352,9 @@ namespace GreyMatter
                 await _hybridTrainer!.SaveHybridTrainingStateAsync();
                 Console.WriteLine("   ✅ Hybrid training state saved");
 
-                // Save Tatoeba trainer brain state
-                await _tatoebaTrainer!.SaveBrainStateAsync();
-                Console.WriteLine("   ✅ Tatoeba language brain state saved");
+                // Save Tatoeba trainer brain state (using background save to avoid blocking)
+                await _tatoebaTrainer!.SaveBrainStateBackgroundAsync();
+                Console.WriteLine("   ✅ Tatoeba language brain state saved (background)");
 
                 // Save integration metadata
                 var integrationMetadata = new
@@ -662,7 +662,7 @@ namespace GreyMatter
                     if (totalProcessed % 25000 == 0)
                     {
                         Console.WriteLine($"   💾 Checkpoint save at {totalProcessed:N0} sentences...");
-                        await _tatoebaTrainer!.SaveBrainStateAsync();
+                        await _tatoebaTrainer!.SaveBrainStateBackgroundAsync();
                     }
                     
                     batch.Clear();
@@ -725,7 +725,7 @@ namespace GreyMatter
             
             // Save final state
             Console.WriteLine("\n💾 Saving optimized brain state...");
-            await _tatoebaTrainer.SaveBrainStateAsync();
+            await _tatoebaTrainer.SaveBrainStateBackgroundAsync();
             
             Console.WriteLine("✅ Comprehensive evaluation completed");
         }
@@ -769,7 +769,7 @@ namespace GreyMatter
                 Console.WriteLine($"   • Average confidence: {result.AverageSemanticConfidence:F3}");
                 
                 // Save results
-                await _tatoebaTrainer!.SaveBrainStateAsync();
+                await _tatoebaTrainer!.SaveBrainStateBackgroundAsync();
                 Console.WriteLine("   ✅ Random sampling training state saved");
                 
                 Console.WriteLine("\n✅ Random sampling hybrid training completed!");
@@ -824,7 +824,7 @@ namespace GreyMatter
                 Console.WriteLine($"   • Dataset coverage: {(double)sentenceCount / 1988463:P2}");
                 
                 // Save results
-                await _tatoebaTrainer!.SaveBrainStateAsync();
+                await _tatoebaTrainer!.SaveBrainStateBackgroundAsync();
                 Console.WriteLine("   ✅ Training state saved");
                 
                 Console.WriteLine($"\n✅ {sentenceCount:N0} sentence hybrid training completed!");
@@ -887,7 +887,7 @@ namespace GreyMatter
                         if (totalProcessed % 50000 == 0)
                         {
                             Console.WriteLine($"   💾 Checkpoint save at {totalProcessed:N0} sentences...");
-                            await _tatoebaTrainer!.SaveBrainStateAsync();
+                            await _tatoebaTrainer!.SaveBrainStateBackgroundAsync();
                         }
                         
                         batch.Clear();
@@ -907,7 +907,7 @@ namespace GreyMatter
                 Console.WriteLine($"   • Training represents full English language diversity");
                 
                 // Final save
-                await _tatoebaTrainer!.SaveBrainStateAsync();
+                await _tatoebaTrainer!.SaveBrainStateBackgroundAsync();
                 Console.WriteLine("   ✅ Complete training state saved");
                 
                 Console.WriteLine("\n🎉 COMPLETE DATASET HYBRID TRAINING FINISHED!");

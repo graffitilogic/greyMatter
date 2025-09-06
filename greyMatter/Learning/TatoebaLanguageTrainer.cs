@@ -22,6 +22,10 @@ namespace greyMatter.Learning
         private readonly SemanticStorageManager _storageManager;
         private readonly string _dataPath;
 
+        private Task? _backgroundSaveTask;
+        private bool _isBackgroundSaveRunning;
+        private readonly object _backgroundSaveLock = new object();
+
         public LanguageEphemeralBrain Brain => _brain;
 
         public TatoebaLanguageTrainer(string tatoebaDataPath)
@@ -197,7 +201,7 @@ namespace greyMatter.Learning
         /// Train on English sentences from Tatoeba dataset
         /// Implements Phase 1: Sentence Pattern Learning
         /// </summary>
-        public void TrainOnEnglishSentences(int maxSentences = 10000, int batchSize = 100)
+        public async Task TrainOnEnglishSentencesAsync(int maxSentences = 10000, int batchSize = 100)
         {
             Console.WriteLine("=== Tatoeba Language Training (Phase 1) ===");
             Console.WriteLine("Learning sentence patterns from real English sentences\n");
@@ -237,8 +241,8 @@ namespace greyMatter.Learning
             // Display learning results
             DisplayLearningResults(elapsed);
             
-            // Save brain state to biological storage
-            SaveBrainStateAsync().Wait();
+            // Save brain state to biological storage (background, non-blocking)
+            await SaveBrainStateBackgroundAsync();
             
             // Test the learned capabilities
             TestLearnedCapabilities();
@@ -247,7 +251,7 @@ namespace greyMatter.Learning
         /// <summary>
         /// Train with focused vocabulary building (first 5000 most common words)
         /// </summary>
-        public void TrainVocabularyFoundation(int targetVocabularySize = 5000)
+        public async Task TrainVocabularyFoundationAsync(int targetVocabularySize = 5000)
         {
             Console.WriteLine($"=== Building Vocabulary Foundation (Target: {targetVocabularySize:N0} words) ===\n");
 
@@ -299,7 +303,7 @@ namespace greyMatter.Learning
             Console.WriteLine($"📊 Processed {processedSentences:N0} sentences in {finalElapsed:mm\\:ss}");
             
             // Save brain state to biological storage
-            SaveBrainStateAsync().Wait();
+            await SaveBrainStateBackgroundAsync();
             
             DisplayTopWords();
         }
@@ -719,6 +723,42 @@ namespace greyMatter.Learning
                     FirstSeen = kvp.Value.FirstSeen,
                     EstimatedType = (GreyMatter.Storage.WordType)(int)kvp.Value.EstimatedType
                 });
+        }
+
+        /// <summary>
+        /// Save brain state in the background (non-blocking)
+        /// This allows training to continue while saving happens asynchronously
+        /// </summary>
+        public async Task SaveBrainStateBackgroundAsync()
+        {
+            // Use the existing background save infrastructure
+            lock (_backgroundSaveLock)
+            {
+                if (_isBackgroundSaveRunning)
+                {
+                    Console.WriteLine("   ⏳ Background save already in progress, skipping...");
+                    return;
+                }
+                _isBackgroundSaveRunning = true;
+            }
+
+            // Start background save task
+            _backgroundSaveTask = Task.Run(async () =>
+            {
+                try
+                {
+                    await SaveBrainStateAsync();
+                }
+                finally
+                {
+                    lock (_backgroundSaveLock)
+                    {
+                        _isBackgroundSaveRunning = false;
+                    }
+                }
+            });
+
+            Console.WriteLine("   🚀 Background save initiated (non-blocking)");
         }
     }
 }
