@@ -360,7 +360,11 @@ namespace GreyMatter.Core
             return sentence.ToLower()
                           .Split(new[] { ' ', '.', ',', '!', '?', ';', ':', '-', '(', ')' },
                                 StringSplitOptions.RemoveEmptyEntries)
-                          .Where(word => word.Length > 2)
+                          .Where(word => word.Length >= 3 && // At least 3 characters
+                                        !int.TryParse(word, out _) && // Not a number
+                                        !long.TryParse(word, out _) && // Not a large number
+                                        !word.All(char.IsDigit) && // Not all digits
+                                        word.Any(char.IsLetter)) // Must contain at least one letter
                           .Select(word => word.Trim())
                           .ToList();
         }

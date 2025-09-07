@@ -415,11 +415,15 @@ namespace GreyMatter
         {
             Console.WriteLine($"📖 Learning from text ({contextType} context)...");
 
-            // Split text into words and filter
+            // Split text into words and filter - same logic as TatoebaDataConverter
             var words = text.Split(new[] { ' ', '\n', '\r', '\t', '.', ',', '!', '?', ';', ':', '-', '(', ')', '[', ']', '"', '\'' },
                                   StringSplitOptions.RemoveEmptyEntries)
                            .Select(w => w.ToLower().Trim())
-                           .Where(w => w.Length > 1 && w.Length < 20) // Filter reasonable word lengths
+                           .Where(w => w.Length >= 3 && // At least 3 characters
+                                      !int.TryParse(w, out _) && // Not a number
+                                      !long.TryParse(w, out _) && // Not a large number
+                                      !w.All(char.IsDigit) && // Not all digits
+                                      w.Any(char.IsLetter)) // Must contain at least one letter
                            .Distinct()
                            .ToList();
 

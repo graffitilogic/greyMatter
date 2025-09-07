@@ -354,10 +354,15 @@ namespace GreyMatter
 
         private List<string> TokenizeSentence(string sentence)
         {
-            // Simple tokenization - split on whitespace and remove punctuation
+            // Enhanced tokenization - filter out numbers and meaningless tokens
             var words = sentence.Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(w => w.Trim(new[] { '.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']', '{', '}' }))
-                .Where(w => !string.IsNullOrWhiteSpace(w) && w.Length > 1)
+                .Where(w => !string.IsNullOrWhiteSpace(w) && 
+                           w.Length >= 3 && // At least 3 characters
+                           !int.TryParse(w, out _) && // Not a number
+                           !long.TryParse(w, out _) && // Not a large number
+                           !w.All(char.IsDigit) && // Not all digits
+                           w.Any(char.IsLetter)) // Must contain at least one letter
                 .Select(w => w.ToLower())
                 .ToList();
 
