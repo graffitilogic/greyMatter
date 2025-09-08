@@ -256,6 +256,34 @@ namespace GreyMatter.Storage
             await ConsolidateToNASAsync();
             _writeSemaphore?.Dispose();
         }
+
+        /// <summary>
+        /// Batch write multiple items efficiently
+        /// </summary>
+        public async Task WriteBatchAsync(Dictionary<string, object> items)
+        {
+            var tasks = new List<Task>();
+            foreach (var (key, data) in items)
+            {
+                tasks.Add(WriteAsync(key, data));
+            }
+            await Task.WhenAll(tasks);
+        }
+
+        /// <summary>
+        /// Get storage performance statistics
+        /// </summary>
+        public async Task<HybridStorageStats> GetStatsAsync()
+        {
+            return await Task.FromResult(new HybridStorageStats
+            {
+                HotStorageSizeMB = GetDirectorySizeMB(_workingSetPath),
+                ColdStorageSizeMB = GetDirectorySizeMB(_coldStoragePath),
+                PendingWrites = _pendingWrites.Count,
+                CachedItems = _writeCache.Count,
+                LastConsolidation = DateTime.UtcNow
+            });
+        }
     }
     
     /// <summary>
