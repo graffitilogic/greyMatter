@@ -30,7 +30,7 @@ namespace GreyMatter
             _dataPath = dataPath;
             _brainPath = brainPath;
             _learnedWordsPath = Path.Combine(brainPath, "learned_words.json");
-            _storageManager = new SemanticStorageManager(brainPath);
+            _storageManager = new SemanticStorageManager(brainPath, dataPath);
             _encoder = new LearningSparseConceptEncoder(_storageManager);
             _wordDatabase = new Dictionary<string, TatoebaDataConverter.WordData>();
             _cooccurrenceMatrix = new Dictionary<string, Dictionary<string, int>>();
@@ -359,7 +359,8 @@ namespace GreyMatter
             
             try
             {
-                // Save vocabulary data through storage manager
+                // Collect vocabulary data for batch saving
+                var vocabularyToSave = new Dictionary<string, GreyMatter.Storage.WordInfo>();
                 foreach (var word in _alreadyLearnedWords)
                 {
                     if (_wordDatabase.TryGetValue(word, out var wordData))
@@ -372,8 +373,14 @@ namespace GreyMatter
                             EstimatedType = GreyMatter.Storage.WordType.Unknown
                         };
                         
-                        await _storageManager.SaveVocabularyWordAsync(word, wordInfo);
+                        vocabularyToSave[word] = wordInfo;
                     }
+                }
+                
+                // Save vocabulary data in batch
+                if (vocabularyToSave.Any())
+                {
+                    await _storageManager.StoreVocabularyAsync(vocabularyToSave);
                 }
                 
                 // Save co-occurrence relationships as concepts

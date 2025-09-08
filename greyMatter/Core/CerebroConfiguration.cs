@@ -207,6 +207,17 @@ namespace GreyMatter.Core
             var actualBrainPath = EnsureDirectoryOrFallback(BrainDataPath, Path.Combine(Path.GetTempPath(), "greyMatter_brainData"), "external brain data path");
             var actualTrainingPath = EnsureDirectoryOrFallback(TrainingDataRoot, Path.Combine(Path.GetTempPath(), "greyMatter_trainingData"), "external training data path");
 
+            // CRITICAL: Never allow paths to resolve to project directory
+            var currentProjectDir = Directory.GetCurrentDirectory();
+            if (actualBrainPath.Contains(currentProjectDir) || actualTrainingPath.Contains(currentProjectDir))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot use project directory for brain data storage. " +
+                    $"Brain path '{actualBrainPath}' or training path '{actualTrainingPath}' resolves to project directory '{currentProjectDir}'. " +
+                    $"Please specify external storage paths using --brain-data and --training-data arguments, " +
+                    $"or set BRAIN_DATA_PATH and TRAINING_DATA_ROOT environment variables.");
+            }
+
             // Update paths to reflect what's actually being used
             BrainDataPath = actualBrainPath;
             TrainingDataRoot = actualTrainingPath;
