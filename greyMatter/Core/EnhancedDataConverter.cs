@@ -309,16 +309,18 @@ namespace GreyMatter
                     {
                         Word = word,
                         Frequency = 1,
-                        Contexts = new List<string> { context },
+                        SentenceContexts = new List<string> { sentence }, // Store actual sentence
                         CooccurringWords = new Dictionary<string, int>()
                     };
                 }
                 else
                 {
                     _wordDatabase[word].Frequency++;
-                    if (!_wordDatabase[word].Contexts.Contains(context))
+                    // Add sentence context if not already present (avoid duplicates)
+                    var wordData = _wordDatabase[word];
+                    if (wordData.SentenceContexts != null && !wordData.SentenceContexts.Contains(sentence))
                     {
-                        _wordDatabase[word].Contexts.Add(context);
+                        wordData.SentenceContexts.Add(sentence);
                     }
                 }
             }
@@ -421,7 +423,7 @@ namespace GreyMatter
                     RelatedWords = cooccurrences.Select(x => x.Key).ToList(),
                     PatternType = "cooccurrence",
                     Confidence = cooccurrences.Average(x => x.Value) / 10.0,
-                    Contexts = _wordDatabase.ContainsKey(word) ? _wordDatabase[word].Contexts : new List<string>()
+                    Contexts = _wordDatabase.ContainsKey(word) ? _wordDatabase[word].SentenceContexts : new List<string>()
                 };
 
                 patterns.Add(pattern);
@@ -457,7 +459,7 @@ namespace GreyMatter
                 TotalWords = _wordDatabase.Count,
                 TotalCooccurrencePairs = _wordCooccurrences.Sum(x => x.Value.Count),
                 AverageFrequency = _wordDatabase.Values.Average(x => x.Frequency),
-                ContextTypes = _wordDatabase.Values.SelectMany(x => x.Contexts).Distinct().ToList(),
+                ContextTypes = _wordDatabase.Values.SelectMany(x => x.SentenceContexts ?? new List<string>()).Distinct().ToList(),
                 Timestamp = DateTime.UtcNow
             };
 
@@ -471,19 +473,19 @@ namespace GreyMatter
         // Data structures
         public class WordData
         {
-            public string Word { get; set; }
+            public string? Word { get; set; }
             public int Frequency { get; set; }
-            public List<string> Contexts { get; set; } = new();
-            public Dictionary<string, int> CooccurringWords { get; set; } = new();
+            public List<string>? SentenceContexts { get; set; } = new();
+            public Dictionary<string, int>? CooccurringWords { get; set; } = new();
         }
 
         public class LearningPattern
         {
-            public string Word { get; set; }
-            public List<string> RelatedWords { get; set; } = new();
-            public string PatternType { get; set; }
+            public string? Word { get; set; }
+            public List<string>? RelatedWords { get; set; } = new();
+            public string? PatternType { get; set; }
             public double Confidence { get; set; }
-            public List<string> Contexts { get; set; } = new();
+            public List<string>? Contexts { get; set; } = new();
         }
     }
 }

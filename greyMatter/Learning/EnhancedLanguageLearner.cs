@@ -389,6 +389,9 @@ namespace GreyMatter
                     await _storageManager.SaveConceptsBatchAsync(conceptsToSave);
                 }
                 
+                // CRITICAL FIX: Save learned sparse patterns from the encoder
+                await _encoder.SaveLearnedPatternsToStorageAsync();
+                
                 Console.WriteLine($"✅ Saved {_alreadyLearnedWords.Count} learned words and their relationships");
             }
             catch (Exception ex)
