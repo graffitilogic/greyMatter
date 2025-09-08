@@ -420,8 +420,12 @@ namespace GreyMatter
 
                 try
                 {
-                    var dataPath = GetArgValue(args, "--data-path", "/Volumes/jarvis/trainData/enhanced_learning_data");
-                    var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
+                    // Use CerebroConfiguration for consistent path handling
+                    var enhancedConfig = CerebroConfiguration.FromCommandLine(args);
+                    enhancedConfig.ValidateAndSetup();
+
+                    var dataPath = enhancedConfig.TrainingDataRoot;
+                    var brainPath = enhancedConfig.BrainDataPath;
                     var maxWords = GetArgValue(args, "--max-words", 5000);
 
                     Console.WriteLine($"⏱️  **TIMING ANALYSIS STARTED**");
@@ -462,7 +466,7 @@ namespace GreyMatter
                     Console.WriteLine("📊 **TIMING SUMMARY**");
                     Console.WriteLine("===================");
                     Console.WriteLine($"⏱️  Total execution time: {totalTimer.Elapsed.TotalMinutes:F2} minutes ({totalTimer.Elapsed.TotalSeconds:F2} seconds)");
-                    Console.WriteLine($"📈 Learning rate: {maxWords / totalTimer.Elapsed.TotalSeconds:F1} words/second");
+                    Console.WriteLine($"📈 Learning rate: {maxWords / totalTimer.Elapsed.TotalSeconds:F0} words/second");
                     Console.WriteLine($"💾 Memory usage: {GC.GetTotalMemory(false) / 1024 / 1024:F1} MB");
 
                     Console.WriteLine("\n✅ **ENHANCED LEARNING COMPLETE**");
