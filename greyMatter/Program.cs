@@ -382,8 +382,12 @@ namespace GreyMatter
 
                 try
                 {
-                    var dataPath = GetArgValue(args, "--data-path", "/Volumes/jarvis/trainData/Tatoeba/learning_data");
-                    var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
+                    // Use CerebroConfiguration for consistent path handling
+                    var realLangConfig = CerebroConfiguration.FromCommandLine(args);
+                    realLangConfig.ValidateAndSetup();
+
+                    var dataPath = realLangConfig.TrainingDataRoot;
+                    var brainPath = realLangConfig.BrainDataPath;
                     var maxWords = GetArgValue(args, "--max-words", 1000);
 
                     var learner = new RealLanguageLearner(dataPath, brainPath);
@@ -407,77 +411,64 @@ namespace GreyMatter
                 return;
             }
             
-            // Check for enhanced learning from multi-source data
-            if (args.Length > 0 && (args[0] == "--learn-from-enhanced-data" || args[0] == "--enhanced-learning"))
+            // Check for continuous learning mode (unified pipeline)
+            if (args.Length > 0 && (args[0] == "--continuous-learning" || args[0] == "--continuous"))
             {
-                Console.WriteLine("🚀 **ENHANCED MULTI-SOURCE LEARNING**");
-                Console.WriteLine("====================================");
-                Console.WriteLine("Learning from diverse data sources (OpenSubtitles, News, Science, etc.)");
-                Console.WriteLine();
+                Console.WriteLine("🧠 **CONTINUOUS LEARNING MODE**");
+                Console.WriteLine("==============================");
+                Console.WriteLine("Unified data preparation and learning pipeline");
+                Console.WriteLine("Can run indefinitely with interruptible learning\n");
 
                 var totalTimer = Stopwatch.StartNew();
-                var phaseTimer = new Stopwatch();
+                var sessionTimer = new Stopwatch();
 
                 try
                 {
                     // Use CerebroConfiguration for consistent path handling
-                    var enhancedConfig = CerebroConfiguration.FromCommandLine(args);
-                    enhancedConfig.ValidateAndSetup();
+                    var continuousConfig = CerebroConfiguration.FromCommandLine(args);
+                    continuousConfig.ValidateAndSetup();
 
-                    var dataPath = enhancedConfig.TrainingDataRoot;
-                    var brainPath = enhancedConfig.BrainDataPath;
-                    var maxWords = GetArgValue(args, "--max-words", 5000);
+                    var dataPath = continuousConfig.TrainingDataRoot;
+                    var brainPath = continuousConfig.BrainDataPath;
+                    var maxWords = GetArgValue(args, "--max-words", 10000);
+                    var batchSize = GetArgValue(args, "--batch-size", 1000);
+                    var autoSaveInterval = GetArgValue(args, "--auto-save", 300); // 5 minutes default
 
-                    Console.WriteLine($"⏱️  **TIMING ANALYSIS STARTED**");
                     Console.WriteLine($"📁 Data Path: {dataPath}");
                     Console.WriteLine($"🧠 Brain Path: {brainPath}");
                     Console.WriteLine($"📊 Target Words: {maxWords}");
+                    Console.WriteLine($"🔄 Batch Size: {batchSize}");
+                    Console.WriteLine($"💾 Auto-save: {autoSaveInterval}s intervals");
                     Console.WriteLine();
 
-                    // Phase 1: Initialization
-                    phaseTimer.Restart();
-                    Console.WriteLine("📋 **PHASE 1: INITIALIZATION**");
-                    var learner = new EnhancedLanguageLearner(dataPath, brainPath, maxConcurrency: 4);
-                    phaseTimer.Stop();
-                    Console.WriteLine($"✅ Initialization completed in {phaseTimer.Elapsed.TotalSeconds:F2} seconds");
-                    Console.WriteLine();
+                    // Initialize continuous learner
+                    var continuousLearner = new ContinuousLearner(dataPath, brainPath, batchSize, autoSaveInterval);
+                    await continuousLearner.InitializeAsync();
 
-                    // Phase 2: Learning Execution
-                    phaseTimer.Restart();
-                    Console.WriteLine("🧠 **PHASE 2: VOCABULARY LEARNING**");
-                    Console.WriteLine("Starting batch learning process...");
-                    await learner.LearnVocabularyAtScaleAsync(maxWords, batchSize: 500);
-                    phaseTimer.Stop();
-                    Console.WriteLine($"✅ Learning completed in {phaseTimer.Elapsed.TotalSeconds:F2} seconds");
-                    Console.WriteLine();
+                    // Start continuous learning loop
+                    Console.WriteLine("🚀 **STARTING CONTINUOUS LEARNING LOOP**");
+                    Console.WriteLine("=======================================");
+                    Console.WriteLine("Press Ctrl+C to interrupt and save progress");
+                    Console.WriteLine("Learning will continue until target reached or interrupted\n");
 
-                    // Phase 3: Finalization
-                    phaseTimer.Restart();
-                    Console.WriteLine("💾 **PHASE 3: FINALIZATION**");
-                    // Force garbage collection and cleanup
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                    phaseTimer.Stop();
-                    Console.WriteLine($"✅ Finalization completed in {phaseTimer.Elapsed.TotalSeconds:F2} seconds");
-                    Console.WriteLine();
+                    sessionTimer.Start();
+                    var learnedWords = await continuousLearner.RunContinuousLearningAsync(maxWords);
 
-                    // Total timing summary
+                    sessionTimer.Stop();
                     totalTimer.Stop();
-                    Console.WriteLine("📊 **TIMING SUMMARY**");
-                    Console.WriteLine("===================");
-                    Console.WriteLine($"⏱️  Total execution time: {totalTimer.Elapsed.TotalMinutes:F2} minutes ({totalTimer.Elapsed.TotalSeconds:F2} seconds)");
-                    Console.WriteLine($"📈 Learning rate: {maxWords / totalTimer.Elapsed.TotalSeconds:F0} words/second");
-                    Console.WriteLine($"💾 Memory usage: {GC.GetTotalMemory(false) / 1024 / 1024:F1} MB");
 
-                    Console.WriteLine("\n✅ **ENHANCED LEARNING COMPLETE**");
-                    Console.WriteLine($"📊 Learned from multi-source data: {maxWords} words");
+                    Console.WriteLine("\n📊 **CONTINUOUS LEARNING COMPLETE**");
+                    Console.WriteLine("==================================");
+                    Console.WriteLine($"📚 Words Learned: {learnedWords}");
+                    Console.WriteLine($"⏱️  Session Time: {sessionTimer.Elapsed.TotalMinutes:F1} minutes");
+                    Console.WriteLine($"⏱️  Total Time: {totalTimer.Elapsed.TotalMinutes:F1} minutes");
+                    Console.WriteLine($"⚡ Learning Rate: {learnedWords / sessionTimer.Elapsed.TotalSeconds:F1} words/second");
                 }
                 catch (Exception ex)
                 {
                     totalTimer.Stop();
-                    Console.WriteLine($"❌ Error during enhanced learning: {ex.Message}");
+                    Console.WriteLine($"❌ Error during continuous learning: {ex.Message}");
                     Console.WriteLine($"⏱️  Failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
-                    Console.WriteLine("💡 Make sure to run --convert-enhanced-data first");
                 }
                 return;
             }
@@ -655,13 +646,22 @@ namespace GreyMatter
                 Console.WriteLine("  • Random sampling gives different training data each run");
                 Console.WriteLine("  • Sequential sampling (default) uses same sentences each run");
                 
-                Console.WriteLine("\nReal Language Learning Options:");
-                Console.WriteLine("  --convert-tatoeba-data    Convert Tatoeba CSV to learning data");
-                Console.WriteLine("  --learn-from-tatoeba      Learn from actual Tatoeba sentences");
-                Console.WriteLine("  --diag                    Run diagnostic to check system status");
-                Console.WriteLine("  --debug                   Run comprehensive debugging");
-                Console.WriteLine("  --evaluate                Evaluate current learning results");
-                Console.WriteLine("  --benchmark               Run persistence performance benchmarks");
+                Console.WriteLine("\nContinuous Learning Options:");
+                Console.WriteLine("  --continuous-learning    Unified data prep + learning pipeline");
+                Console.WriteLine("  --continuous            Same as --continuous-learning");
+                Console.WriteLine("    └─ Runs indefinitely with interruptible learning");
+                Console.WriteLine("    └─ Auto-saves progress every 5 minutes");
+                Console.WriteLine("    └─ Handles priority tasks (user interactions)");
+                Console.WriteLine("    └─ Example: --continuous-learning --max-words 50000");
+                Console.WriteLine();
+                Console.WriteLine("Legacy Options:");
+                Console.WriteLine("  --convert-tatoeba-data  Convert Tatoeba CSV to learning data");
+                Console.WriteLine("  --enhanced-learning     Learn from pre-converted data");
+                Console.WriteLine("  --learn-from-tatoeba    Learn from actual Tatoeba sentences");
+                Console.WriteLine("  --diag                  Run diagnostic to check system status");
+                Console.WriteLine("  --debug                 Run comprehensive debugging");
+                Console.WriteLine("  --evaluate              Evaluate current learning results");
+                Console.WriteLine("  --benchmark             Run persistence performance benchmarks");
                 Console.WriteLine();
                 return;
             }

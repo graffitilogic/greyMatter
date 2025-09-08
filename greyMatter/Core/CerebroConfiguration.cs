@@ -66,12 +66,14 @@ namespace GreyMatter.Core
                 switch (args[i].ToLower())
                 {
                     case "--brain-data":
+                    case "--brain-path":  // Alias for backward compatibility
                     case "-bd":
                         if (i + 1 < args.Length)
                             config.BrainDataPath = args[++i];
                         break;
                         
                     case "--training-data":
+                    case "--data-path":   // Alias for backward compatibility
                     case "-td":
                         if (i + 1 < args.Length)
                             config.TrainingDataRoot = args[++i];
@@ -333,11 +335,11 @@ namespace GreyMatter.Core
             Console.WriteLine("  --save-only                  Initialize and immediately save brain state (no learning)");
             Console.WriteLine();
             Console.WriteLine("Storage Configuration:");
-            Console.WriteLine("  --brain-data, -bd <path>     Brain data storage location");
-            Console.WriteLine("  --training-data, -td <path>  Training data root directory");
-            Console.WriteLine("  --working-drive, -wd <path>  Working drive for large-scale storage");
-            Console.WriteLine("  env BRAIN_DATA_PATH          Override brain data path");
-            Console.WriteLine("  env TRAINING_DATA_ROOT       Override training data path");
+            Console.WriteLine("  --brain-data, --brain-path, -bd <path>     Brain data storage location");
+            Console.WriteLine("  --training-data, --data-path, -td <path>   Training data root directory");
+            Console.WriteLine("  --working-drive, -wd <path>                Working drive for large-scale storage");
+            Console.WriteLine("  env BRAIN_DATA_PATH                        Override brain data path");
+            Console.WriteLine("  env TRAINING_DATA_ROOT                     Override training data path");
             Console.WriteLine("  Defaults attempt NAS: \\doddnas\\jarvis\\brainData and \\doddnas\\jarvis\\trainData (or /Volumes/jarvis on macOS)");
             Console.WriteLine();
             Console.WriteLine("Performance & Logging:");
