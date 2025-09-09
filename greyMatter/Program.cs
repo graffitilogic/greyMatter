@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using GreyMatter.Core;
-using GreyMatter.demos;
 using GreyMatter.Storage;
 using GreyMatter.Learning;
 using GreyMatter.Evaluations;
@@ -15,6 +14,16 @@ namespace GreyMatter
 {
     class Program
     {
+        private static TrainingService CreateTrainingService()
+        {
+            var config = new TrainingConfiguration
+            {
+                BrainDataPath = "/Volumes/jarvis/brainData",
+                TrainingDataRoot = "/Volumes/jarvis/trainData"
+            };
+            return new TrainingService(config);
+        }
+
         static async Task Main(string[] args)
         {
             await RunProgram(args);
@@ -177,11 +186,19 @@ namespace GreyMatter
                 var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("⏱️  Starting Tatoeba Hybrid Integration...");
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunTatoebaHybridIntegrationAsync();
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = 500,
+                    SamplingMode = SamplingMode.Sequential,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  Tatoeba Hybrid Integration completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
 
@@ -195,11 +212,19 @@ namespace GreyMatter
                 Console.WriteLine();
                 Console.WriteLine("⏱️  Starting Full-Scale Hybrid Training...");
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunLargeScaleHybridTrainingAsync();
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = 100000, // Large scale
+                    SamplingMode = SamplingMode.Random,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  Full-Scale Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
             
@@ -213,11 +238,19 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting Random Sampling Hybrid Training...");
                 Console.WriteLine();
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunRandomSamplingHybridTrainingAsync();
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = 500,
+                    SamplingMode = SamplingMode.Random,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  Random Sampling Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
 
@@ -231,11 +264,19 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting Debug Hybrid Training...");
                 Console.WriteLine();
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunSizedHybridTrainingAsync(10);
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = 10,
+                    SamplingMode = SamplingMode.Random,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  Debug Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
             
@@ -248,11 +289,19 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting 1K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunSizedHybridTrainingAsync(1000);
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = 1000,
+                    SamplingMode = SamplingMode.Random,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  1K Sentence Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
 
@@ -265,11 +314,19 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting 10K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunSizedHybridTrainingAsync(10000);
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = 10000,
+                    SamplingMode = SamplingMode.Random,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  10K Sentence Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
 
@@ -282,11 +339,19 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting 100K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunSizedHybridTrainingAsync(100000);
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = 100000,
+                    SamplingMode = SamplingMode.Random,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  100K Sentence Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
 
@@ -300,11 +365,19 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting Complete Dataset Hybrid Training...");
                 Console.WriteLine();
                 
-                var demo = new TatoebaHybridIntegrationDemo();
-                await demo.RunCompleteDatasetHybridTrainingAsync();
+                var trainingService = CreateTrainingService();
+                var parameters = new TatoebaTrainingParameters
+                {
+                    SentenceCount = int.MaxValue, // Complete dataset
+                    SamplingMode = SamplingMode.Complete,
+                    ResetBrain = false
+                };
+                
+                var result = await trainingService.RunTatoebaTrainingAsync(parameters);
                 
                 totalTimer.Stop();
                 Console.WriteLine($"⏱️  Complete Dataset Hybrid Training completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                Console.WriteLine($"   Success: {result.Success}, Processed: {result.ProcessedSentences} sentences");
                 return;
             }
             
@@ -477,15 +550,17 @@ namespace GreyMatter
             // Check for procedural generation demo (Phase 2)
             if (args.Length > 0 && (args[0] == "--procedural-demo" || args[0] == "--phase2-demo"))
             {
-                Console.WriteLine("🚀 **PHASE 2: PROCEDURAL GENERATION DEMO**");
-                Console.WriteLine("========================================");
+                Console.WriteLine("🚀 **PHASE 2: PROCEDURAL GENERATION**");
+                Console.WriteLine("====================================");
                 Console.WriteLine("No Man's Sky-inspired cortical column generation");
                 Console.WriteLine();
 
                 try
                 {
-                    await ProceduralGenerationDemo.RunAsync();
-                    Console.WriteLine("\n✅ **PROCEDURAL GENERATION DEMO COMPLETE**");
+                    // TODO: Convert ProceduralGenerationDemo to parameterized function
+                    // await ProceduralGenerationDemo.RunAsync();
+                    Console.WriteLine("⚠️  Procedural generation demo temporarily disabled during demo-to-service conversion");
+                    Console.WriteLine("   This functionality will be moved to TrainingService.RunProceduralGenerationAsync()");
                 }
                 catch (Exception ex)
                 {
@@ -497,19 +572,27 @@ namespace GreyMatter
             // Check for LLM teacher demo
             if (args.Length > 0 && (args[0] == "--llm-teacher" || args[0] == "--teacher-demo"))
             {
-                Console.WriteLine("🧠 **LLM TEACHER INTEGRATION DEMO**");
-                Console.WriteLine("=====================================");
+                Console.WriteLine("🧠 **LLM TEACHER INTEGRATION**");
+                Console.WriteLine("=================================");
                 Console.WriteLine("Dynamic learning with Ollama API teacher guidance");
                 Console.WriteLine();
 
                 try
                 {
-                    await LLMTeacherDemo.Main(args);
-                    Console.WriteLine("\n✅ **LLM TEACHER DEMO COMPLETE**");
+                    var trainingService = CreateTrainingService();
+                    var parameters = new LLMTeacherParameters
+                    {
+                        ApiEndpoint = "http://192.168.69.138:11434/api/chat",
+                        Model = "deepseek-r1:1.5b",
+                        Interactive = true
+                    };
+                    
+                    var result = await trainingService.RunLLMTeacherSessionAsync(parameters);
+                    Console.WriteLine($"\n✅ **LLM TEACHER SESSION COMPLETE** - Success: {result.Success}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Error during LLM teacher demo: {ex.Message}");
+                    Console.WriteLine($"❌ Error during LLM teacher session: {ex.Message}");
                     Console.WriteLine("⚠️  Make sure Ollama is running at http://192.168.69.138:11434");
                 }
                 return;
@@ -539,7 +622,9 @@ namespace GreyMatter
             // Check for simple demo first
             if (args.Length > 0 && (args[0] == "--simple-demo" || args[0] == "--original-vision"))
             {
-                SimpleEphemeralDemo.RunDemo();
+                var trainingService = CreateTrainingService();
+                var result = trainingService.RunSimpleEphemeralDemo();
+                Console.WriteLine($"✅ Simple ephemeral demo completed - Success: {result.Success}, Concepts: {result.ConceptsLearned}");
                 return;
             }
             
