@@ -445,16 +445,15 @@ namespace GreyMatter.Core
                                     }
                                     else
                                     {
-                                        // Handle as dynamic object
-                                        var dynamicData = patternData as dynamic;
-                                        if (dynamicData != null)
+                                        // Handle as Dictionary<string, object> or other data structures
+                                        if (patternData is Dictionary<string, object> dictData)
                                         {
                                             var learnedPattern = new LearnedSparsePattern
                                             {
-                                                ConceptId = dynamicData.Word?.ToString(),
-                                                BasePattern = dynamicData.Pattern,
-                                                LearnedFrom = dynamicData.LearnedFrom,
-                                                ConceptType = dynamicData.ConceptType?.ToString(),
+                                                ConceptId = dictData.ContainsKey("Word") ? dictData["Word"]?.ToString() : word,
+                                                BasePattern = dictData.ContainsKey("Pattern") ? dictData["Pattern"] as bool[] : null,
+                                                LearnedFrom = dictData.ContainsKey("LearnedFrom") ? dictData["LearnedFrom"] as List<string> ?? new List<string>() : new List<string>(),
+                                                ConceptType = dictData.ContainsKey("ConceptType") ? dictData["ConceptType"]?.ToString() : "Word",
                                                 Confidence = 1.0
                                             };
 

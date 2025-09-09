@@ -108,7 +108,40 @@ namespace GreyMatter
 
             if (!File.Exists(wordDbPath) || !File.Exists(cooccurrencePath))
             {
-                throw new FileNotFoundException($"Learning data not found. Run --convert-enhanced-data or --convert-tatoeba-data first. Looking for: {wordDbPath}");
+                Console.WriteLine($"⚠️ Learning data not found at: {wordDbPath}");
+                Console.WriteLine("🔄 Auto-converting Tatoeba data for continuous learning...");
+                
+                try
+                {
+                    // Auto-convert Tatoeba data if it doesn't exist
+                    var tatoebaPath = Path.Combine(_dataPath, "Tatoeba", "sentences_eng_small.csv");
+                    if (!File.Exists(tatoebaPath))
+                    {
+                        // Try alternative common paths
+                        tatoebaPath = "/Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv";
+                        if (!File.Exists(tatoebaPath))
+                        {
+                            throw new FileNotFoundException($"Tatoeba source data not found. Expected at: {tatoebaPath}");
+                        }
+                    }
+                    
+                    var outputPath = Path.Combine(_dataPath, "Tatoeba", "learning_data");
+                    Directory.CreateDirectory(outputPath);
+                    
+                    var storage = new GreyMatter.Storage.SemanticStorageManager(_brainPath, _dataPath);
+                    var converter = new TatoebaDataConverter(tatoebaPath, outputPath, storage);
+                    await converter.ConvertAndBuildLearningDataAsync(10000); // Reasonable default
+                    
+                    Console.WriteLine("✅ Data conversion completed automatically");
+                    
+                    // Update paths to converted data
+                    wordDbPath = Path.Combine(outputPath, "word_database.json");
+                    cooccurrencePath = Path.Combine(outputPath, "cooccurrence_matrix.json");
+                }
+                catch (Exception ex)
+                {
+                    throw new FileNotFoundException($"Failed to auto-convert learning data: {ex.Message}. You may need to run --convert-tatoeba-data manually.");
+                }
             }
 
             // Load word database with progress reporting

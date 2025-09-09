@@ -4,9 +4,9 @@
 
 ## 🎯 What is greyMatter?
 
-greyMatter is an experimental neural learning system inspired by biological brain architecture. Instead of traditional static neural networks, it creates **ephemeral neural clusters** that are procedurally generated on-demand, much like how No Man's Sky renders infinite worlds within the player's "render distance."
+greyMatter is an experimental neural learning system inspired by biological brain architecture. Instead of traditional static neural networks, it creates **ephemeral neural clusters** that are procedurally generated on-demand. The central much like how No Man's Sky renders infinite worlds within the player's "render distance."
 
-**Core Philosophy**: True cognition emerges through complex interactions between specialized, short-lived neural structures - not through massive parameter counts or computational brute force.
+**Core Philosophy / Question**: Can higher level cognition emerge through complex interactions between specialized, short-lived neural structures rather than through massive parameter counts or computational brute force.
 
 ## 🚀 Quick Start
 
@@ -24,10 +24,10 @@ dotnet build
 # Quick demo (1k sentences)
 dotnet run -- --tatoeba-hybrid-1k
 
-# LLM-Guided Continuous Learning (NEW!)
+# LLM-Guided Learning (auto-converts data if needed)
 dotnet run -- --llm-teacher
 
-# Enhanced learning with TrainingService
+# Enhanced learning with TrainingService (requires data prep)
 dotnet run -- --enhanced-learning --brain-path ~/brainData --max-words 5000
 
 # Performance validation
@@ -38,8 +38,12 @@ dotnet run -- --performance-validation
 ```bash
 # Learning & Training (TrainingService-based)
 dotnet run -- --enhanced-learning --brain-path ~/brainData --max-words 5000
-dotnet run -- --llm-teacher                    # LLM-guided continuous learning
-dotnet run -- --performance-validation         # System performance tests
+dotnet run -- --llm-teacher                   # LLM-guided learning (auto-converts data)
+dotnet run -- --performance-validation        # System performance tests
+
+# Manual Data Preparation (optional - auto-done if needed)
+dotnet run -- --convert-tatoeba-data          # Prepare Tatoeba dataset
+dotnet run -- --convert-enhanced-data         # Prepare enhanced training data
 
 # Legacy Learning Commands  
 dotnet run -- --tatoeba-hybrid-1k
@@ -62,11 +66,14 @@ Centralized service that replaced 80+ scattered demo classes:
 - **Result Tracking**: Standardized training results and metrics
 
 ### LLM-Guided Continuous Learning System
-**Revolutionary approach**: LLM analyzes learning state and guides continuous data processing:
+**True continuous learning**: LLM provides learning guidance with automatic data preparation:
+- **Auto-Data Conversion**: Automatically converts Tatoeba data if not already prepared
 - **Interactive Mode**: Real-time LLM guidance with background learning
-- **Automated Mode**: LLM develops learning strategy and executes autonomously  
-- **Multi-Source Integration**: Scientific abstracts, social media, technical docs, subtitles
-- **Status Commands**: `status`, `focus <topic>`, live progress analysis
+- **Guided Training**: LLM develops learning strategy and executes with available datasets
+- **Multi-Source Potential**: Framework exists for scientific abstracts, social media, technical docs
+- **Status Commands**: `status`, `focus <topic>` commands for live interaction
+
+**✅ Now Truly Continuous**: No separate data prep step required - handles conversion automatically
 
 **LLM Teacher Configuration:**
 ```bash
@@ -92,17 +99,18 @@ http://192.168.69.138:11434/api/chat
 
 ### ✅ Working Components
 - **TrainingService**: Unified training interface replacing 80+ demo classes
-- **LLM-Guided Learning**: Intelligent continuous learning with external LLM teacher
-- **Data Processing**: Multi-source integration (TatoebaDataConverter, EnhancedDataIntegrator)
+- **True Continuous Learning**: LLM-guided learning with automatic data conversion
+- **Data Processing**: Multi-source conversion (TatoebaDataConverter, EnhancedDataIntegrator)
 - **Simple Brain**: SimpleEphemeralBrain with shared neurons
 - **Storage System**: SemanticStorageManager with Huth-inspired semantic domains
 - **Performance Optimization**: FastStorageAdapter (1,350x speedup demonstrated)
-- **Continuous Learning**: ContinuousLearner with background processing
+- **Background Processing**: ContinuousLearner with integrated data preparation
 - **Visualization**: Brain scan visualization tools
 
 ### 🚀 Recent Major Updates
 - **Architecture Refactor**: 84+ demo classes → TrainingService with parameterized methods
-- **LLM Teacher Revolution**: Simple prompts → Intelligent continuous learning system
+- **True Continuous Learning**: Integrated data prep into learning pipeline (no separate step)
+- **LLM Teacher Integration**: Learning guidance system with external LLM
 - **Documentation Consolidation**: 42 scattered .md files → 3 organized documents
 - **Zero Compilation Errors**: Production-ready build status achieved
 
@@ -124,9 +132,9 @@ http://192.168.69.138:11434/api/chat
 - **`Cerebro`**: Central learning orchestrator
 - **`SimpleEphemeralBrain`**: Core ephemeral neural cluster implementation
 - **`SemanticStorageManager`**: Biologically-inspired storage with semantic domains
-- **`ContinuousLearner`**: Background continuous learning with auto-save
-- **`EnhancedDataIntegrator`**: Multi-source data processing pipeline
-- **`LLMTeacher`**: Intelligent continuous learning guidance system
+- **`ContinuousLearner`**: Background continuous learning with integrated data preparation
+- **`EnhancedDataIntegrator`**: Multi-source data processing and conversion pipeline
+- **`LLMTeacher`**: Intelligent continuous learning guidance system (auto-converts data)
 - **`ProceduralCorticalColumnGenerator`**: On-demand neural structure creation
 
 ### Storage Architecture
