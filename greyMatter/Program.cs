@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using GreyMatter.Core;
+using GreyMatter.demos;
 using GreyMatter.Storage;
 using GreyMatter.Learning;
 using GreyMatter.Evaluations;
@@ -489,6 +490,27 @@ namespace GreyMatter
                 catch (Exception ex)
                 {
                     Console.WriteLine($"❌ Error during procedural demo: {ex.Message}");
+                }
+                return;
+            }
+            
+            // Check for LLM teacher demo
+            if (args.Length > 0 && (args[0] == "--llm-teacher" || args[0] == "--teacher-demo"))
+            {
+                Console.WriteLine("🧠 **LLM TEACHER INTEGRATION DEMO**");
+                Console.WriteLine("=====================================");
+                Console.WriteLine("Dynamic learning with Ollama API teacher guidance");
+                Console.WriteLine();
+
+                try
+                {
+                    await LLMTeacherDemo.Main(args);
+                    Console.WriteLine("\n✅ **LLM TEACHER DEMO COMPLETE**");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error during LLM teacher demo: {ex.Message}");
+                    Console.WriteLine("⚠️  Make sure Ollama is running at http://192.168.69.138:11434");
                 }
                 return;
             }
