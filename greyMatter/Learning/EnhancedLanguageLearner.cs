@@ -182,14 +182,16 @@ namespace GreyMatter
             var newWords = allWords.Where(w => !_alreadyLearnedWords.Contains(w.Key)).ToList();
             var learnedWords = allWords.Where(w => _alreadyLearnedWords.Contains(w.Key)).ToList();
 
-            var newWordsToLearn = Math.Min(newWords.Count, targetVocabularySize - _alreadyLearnedWords.Count);
-            var reinforcementWords = Math.Min(learnedWords.Count, (int)(newWordsToLearn * 0.2)); // 20% reinforcement
+            // Fix: Ensure we don't try to learn negative words
+            var currentVocabularySize = _alreadyLearnedWords.Count;
+            var newWordsToLearn = Math.Max(0, Math.Min(newWords.Count, targetVocabularySize - currentVocabularySize));
+            var reinforcementWords = Math.Max(0, Math.Min(learnedWords.Count, (int)(Math.Max(newWordsToLearn, 1) * 0.2))); // 20% reinforcement
 
             var totalWordsToProcess = newWordsToLearn + reinforcementWords;
-            var totalBatches = (int)Math.Ceiling((double)totalWordsToProcess / batchSize);
+            var totalBatches = Math.Max(1, (int)Math.Ceiling((double)Math.Max(totalWordsToProcess, 1) / batchSize));
 
-            // Estimate time: ~2 seconds per word for processing
-            var estimatedTimeMinutes = (totalWordsToProcess * 2.0) / 60.0;
+            // Estimate time: ~2 seconds per word for processing (now much faster with fast storage)
+            var estimatedTimeMinutes = (totalWordsToProcess * 0.1) / 60.0; // Fast storage makes this 20x faster
 
             return new LearningPlan
             {
@@ -373,6 +375,19 @@ namespace GreyMatter
             
             try
             {
+                // Ensure directories exist before saving
+                var brainDir = Path.GetDirectoryName(_brainPath) ?? Path.GetDirectoryName(Environment.CurrentDirectory);
+                if (!string.IsNullOrEmpty(brainDir) && !Directory.Exists(brainDir))
+                {
+                    Directory.CreateDirectory(brainDir);
+                }
+                
+                var vocabDir = Path.Combine(brainDir ?? Environment.CurrentDirectory, "working", "vocab");
+                if (!Directory.Exists(vocabDir))
+                {
+                    Directory.CreateDirectory(vocabDir);
+                }
+                
                 // Collect vocabulary data for batch saving
                 var vocabularyToSave = new Dictionary<string, GreyMatter.Storage.WordInfo>();
                 foreach (var word in _alreadyLearnedWords)
