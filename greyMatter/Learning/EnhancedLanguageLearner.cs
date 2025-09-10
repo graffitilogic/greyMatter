@@ -236,7 +236,10 @@ namespace GreyMatter
                 learnedWords = allWords.Where(w => _alreadyLearnedWords.Contains(w.Key)).ToList();
                 currentVocabularySize = _alreadyLearnedWords.Count;
             }
-            var newWordsToLearn = Math.Max(0, Math.Min(newWords.Count, targetVocabularySize - currentVocabularySize));
+            
+            // FIXED: Respect the targetVocabularySize limit - don't process more words than requested
+            var wordsStillNeeded = Math.Max(0, targetVocabularySize - currentVocabularySize);
+            var newWordsToLearn = Math.Min(wordsStillNeeded, newWords.Count);
             var reinforcementWords = Math.Max(0, Math.Min(learnedWords.Count, (int)(Math.Max(newWordsToLearn, 1) * 0.2))); // 20% reinforcement
 
             var totalWordsToProcess = newWordsToLearn + reinforcementWords;
@@ -677,6 +680,141 @@ namespace GreyMatter
         /// <summary>
         /// Properly shutdown the enhanced learner - consolidate all fast storage to NAS
         /// </summary>
+        /// <summary>
+        /// Continuous vocabulary learning with proper max-words limit and clean exit
+        /// </summary>
+        public async Task<int> LearnVocabularyContinuouslyAsync(int maxWords = 5000, int batchSize = 500, CancellationToken cancellationToken = default)
+        {
+            Console.WriteLine("� **CONTINUOUS VOCABULARY LEARNING**");
+            Console.WriteLine("===================================");
+            Console.WriteLine($"Target: {maxWords:N0} words | Batch Size: {batchSize} | Max Concurrency: {_maxConcurrency}");
+
+            var stopwatch = Stopwatch.StartNew();
+            var totalWordsLearned = 0;
+            var batchCount = 0;
+
+            try
+            {
+                // Step 1: Load learning data
+                await LoadLearningDataAsync();
+                await LoadLearnedWordsAsync();
+
+                int currentVocabCount;
+                lock (_learnedWordsLock)
+                {
+                    currentVocabCount = _alreadyLearnedWords.Count;
+                }
+
+                Console.WriteLine($"📊 Starting vocabulary: {currentVocabCount:N0} words");
+                Console.WriteLine($"🎯 Target vocabulary: {maxWords:N0} words");
+                Console.WriteLine($"📈 Words to learn: {Math.Max(0, maxWords - currentVocabCount):N0}");
+                Console.WriteLine();
+
+                // Continuous learning loop
+                while (currentVocabCount < maxWords && !cancellationToken.IsCancellationRequested)
+                {
+                    batchCount++;
+                    var batchStartTime = DateTime.Now;
+                    
+                    Console.WriteLine($"🔄 **BATCH {batchCount}** - {batchStartTime:HH:mm:ss}");
+                    
+                    // Calculate this batch's target (don't exceed maxWords)
+                    var batchTarget = Math.Min(currentVocabCount + batchSize, maxWords);
+                    var wordsNeededThisBatch = batchTarget - currentVocabCount;
+                    
+                    if (wordsNeededThisBatch <= 0)
+                    {
+                        Console.WriteLine("✅ Target vocabulary size reached!");
+                        break;
+                    }
+                    
+                    Console.WriteLine($"   Learning {wordsNeededThisBatch} words (current: {currentVocabCount} → target: {batchTarget})");
+
+                    // Learn this batch
+                    var batchPlan = CalculateLearningPlan(batchTarget, wordsNeededThisBatch);
+                    await ExecuteBatchLearningAsync(batchPlan, wordsNeededThisBatch);
+
+                    // Update current vocab count
+                    lock (_learnedWordsLock)
+                    {
+                        var newVocabCount = _alreadyLearnedWords.Count;
+                        var wordsLearnedThisBatch = newVocabCount - currentVocabCount;
+                        totalWordsLearned += wordsLearnedThisBatch;
+                        currentVocabCount = newVocabCount;
+                    }
+
+                    var batchDuration = DateTime.Now - batchStartTime;
+                    var batchWordsLearned = Math.Max(0, currentVocabCount - (batchTarget - wordsNeededThisBatch));
+                    
+                    Console.WriteLine($"   ✅ Batch complete: +{batchWordsLearned} words in {batchDuration.TotalSeconds:F1}s");
+                    Console.WriteLine($"   📊 Progress: {currentVocabCount}/{maxWords} ({(currentVocabCount * 100.0 / maxWords):F1}%)");
+                    Console.WriteLine();
+
+                    // Check for cancellation periodically
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        Console.WriteLine("🛑 Cancellation requested - stopping learning");
+                        break;
+                    }
+
+                    // Small delay to prevent system overload
+                    await Task.Delay(100, cancellationToken);
+                }
+
+                stopwatch.Stop();
+
+                // Final save and validation
+                await SaveLearnedWordsAsync();
+                await PerformFinalValidationAsync();
+
+                Console.WriteLine("\n🎉 **CONTINUOUS LEARNING COMPLETE**");
+                Console.WriteLine("==================================");
+                Console.WriteLine($"📚 Total words learned this session: {totalWordsLearned}");
+                Console.WriteLine($"📊 Final vocabulary size: {currentVocabCount:N0} words");
+                Console.WriteLine($"🔄 Batches processed: {batchCount}");
+                Console.WriteLine($"⏱️  Learning duration: {stopwatch.Elapsed.TotalMinutes:F1} minutes");
+                
+                if (stopwatch.Elapsed.TotalMinutes > 0)
+                {
+                    Console.WriteLine($"⚡ Learning rate: {totalWordsLearned / stopwatch.Elapsed.TotalMinutes:F0} words/minute");
+                }
+
+                return currentVocabCount;
+            }
+            catch (OperationCanceledException)
+            {
+                Console.WriteLine("\n🛑 **LEARNING INTERRUPTED**");
+                Console.WriteLine("Saving progress and shutting down gracefully...");
+                
+                await SaveLearnedWordsAsync();
+                
+                lock (_learnedWordsLock)
+                {
+                    Console.WriteLine($"📊 Progress saved: {_alreadyLearnedWords.Count:N0} words learned");
+                }
+                
+                return _alreadyLearnedWords.Count;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("\n❌ **ERROR DURING CONTINUOUS LEARNING**");
+                Console.WriteLine($"Error: {ex.Message}");
+                
+                // Try to save progress even on error
+                try
+                {
+                    await SaveLearnedWordsAsync();
+                    Console.WriteLine("✅ Progress saved despite error");
+                }
+                catch
+                {
+                    Console.WriteLine("❌ Failed to save progress");
+                }
+                
+                throw;
+            }
+        }
+
         public async Task ShutdownAsync()
         {
             Console.WriteLine("\n🛑 **ENHANCED LEARNER SHUTDOWN**");
@@ -684,15 +822,15 @@ namespace GreyMatter
             
             try
             {
-                // Force consolidation of all fast storage to NAS
-                await _fastStorage.ConsolidateToNASAsync();
+                // Force final save
+                await SaveLearnedWordsAsync();
                 
-                // Clean shutdown of fast storage
-                await _fastStorage.ShutdownAsync();
-                
-                // Get final storage statistics
-                var stats = await _fastStorage.GetStorageStatsAsync();
-                Console.WriteLine(stats);
+                // Shutdown storage systems
+                if (_fastStorage != null)
+                {
+                    Console.WriteLine("📡 Forcing consolidation to NAS storage...");
+                    await _fastStorage.ShutdownAsync();
+                }
                 
                 Console.WriteLine("✅ Enhanced Learner shutdown complete");
                 Console.WriteLine("📡 All data consolidated to permanent NAS storage");

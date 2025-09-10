@@ -764,6 +764,12 @@ namespace GreyMatter
                 Console.WriteLine("Legacy Options:");
                 Console.WriteLine("  --convert-tatoeba-data  Convert Tatoeba CSV to learning data");
                 Console.WriteLine("  --enhanced-learning     Learn from pre-converted data");
+                Console.WriteLine("    Options:");
+                Console.WriteLine("      --max-words N       Maximum words to learn (default: 5000)");
+                Console.WriteLine("      --batch-size N      Batch size for learning (default: 500)");
+                Console.WriteLine("      --continuous        Use continuous learning mode");
+                Console.WriteLine("      --brain-path PATH   Path to brain data storage");
+                Console.WriteLine("      --data-path PATH    Path to training data");
                 Console.WriteLine("  --learn-from-tatoeba    Learn from actual Tatoeba sentences");
                 Console.WriteLine("  --diag                  Run diagnostic to check system status");
                 Console.WriteLine("  --debug                 Run comprehensive debugging");
@@ -957,17 +963,42 @@ namespace GreyMatter
                     var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
                     var maxWords = int.Parse(GetArgValue(args, "--max-words", "5000"));
                     var batchSize = int.Parse(GetArgValue(args, "--batch-size", "500"));
+                    var useContinuous = HasFlag(args, "--continuous");
                     
                     Console.WriteLine($"📂 Data Path: {dataPath}");
                     Console.WriteLine($"🧠 Brain Path: {brainPath}");
                     Console.WriteLine($"📊 Max Words: {maxWords:N0}");
                     Console.WriteLine($"📦 Batch Size: {batchSize:N0}");
+                    Console.WriteLine($"🔄 Mode: {(useContinuous ? "Continuous" : "Batch")}");
                     
                     // Initialize Enhanced Language Learner with FAST storage
                     var learner = new EnhancedLanguageLearner(dataPath, brainPath, maxConcurrency: 8);
                     
-                    // Run the enhanced learning at scale
-                    await learner.LearnVocabularyAtScaleAsync(maxWords, batchSize);
+                    // Handle Ctrl+C gracefully for continuous learning
+                    var cancellationTokenSource = new CancellationTokenSource();
+                    Console.CancelKeyPress += (sender, e) =>
+                    {
+                        e.Cancel = true;
+                        Console.WriteLine("\n🛑 **INTERRUPTION DETECTED**");
+                        Console.WriteLine("Gracefully shutting down learning...");
+                        cancellationTokenSource.Cancel();
+                    };
+                    
+                    // Run learning based on mode
+                    if (useContinuous)
+                    {
+                        Console.WriteLine("\n🔄 **STARTING CONTINUOUS LEARNING**");
+                        var finalVocabSize = await learner.LearnVocabularyContinuouslyAsync(
+                            maxWords: maxWords, 
+                            batchSize: batchSize, 
+                            cancellationToken: cancellationTokenSource.Token);
+                        Console.WriteLine($"📊 Final vocabulary size: {finalVocabSize:N0} words");
+                    }
+                    else
+                    {
+                        Console.WriteLine("\n📦 **STARTING BATCH LEARNING**");
+                        await learner.LearnVocabularyAtScaleAsync(maxWords, batchSize);
+                    }
                     
                     // CRITICAL: Proper shutdown to consolidate to NAS
                     await learner.ShutdownAsync();
@@ -1349,6 +1380,11 @@ namespace GreyMatter
             if (index >= 0 && index + 1 < args.Length)
                 return args[index + 1];
             return defaultValue;
+        }
+
+        private static bool HasFlag(string[] args, string flagName)
+        {
+            return Array.IndexOf(args, flagName) >= 0;
         }
 
         static void DisplayLanguageHelp()

@@ -92,7 +92,6 @@ namespace GreyMatter.Learning
             _lastSaveTimer.Restart();
 
             var learningTimer = Stopwatch.StartNew();
-            var batchCount = 0;
 
             Console.WriteLine($"🎯 **LEARNING TARGET: {targetWords} words**");
             Console.WriteLine($"🔄 **BATCH SIZE: {_batchSize} words**");
@@ -101,92 +100,34 @@ namespace GreyMatter.Learning
 
             try
             {
-                while (_wordsLearned < targetWords && !_cancellationTokenSource.Token.IsCancellationRequested)
+                if (_learner == null)
                 {
-                    batchCount++;
-                    var batchStartTime = DateTime.Now;
-
-                    Console.WriteLine($"🔄 **BATCH {batchCount}** (Words learned: {_wordsLearned}/{targetWords})");
-                    Console.WriteLine($"   Started: {batchStartTime:HH:mm:ss}");
-
-                    // Learn this batch using the enhanced learner
-                    int batchWordsLearned = 0;
-                    if (_learner != null)
-                    {
-                        // Use the enhanced learner's main learning method with incremental target
-                        var currentTarget = Math.Min(_wordsLearned + _batchSize, targetWords);
-                        await _learner.LearnVocabularyAtScaleAsync(currentTarget, _batchSize);
-                        
-                        // Update learned words count by checking the learned words file
-                        var learnedWordsPath = Path.Combine(_brainPath, "learned_words.json");
-                        if (File.Exists(learnedWordsPath))
-                        {
-                            var json = await File.ReadAllTextAsync(learnedWordsPath);
-                            var currentLearnedWords = JsonSerializer.Deserialize<HashSet<string>>(json);
-                            if (currentLearnedWords != null)
-                            {
-                                _learnedWords = currentLearnedWords;
-                                var newWordsLearned = currentLearnedWords.Count - _wordsLearned;
-                                _wordsLearned = currentLearnedWords.Count;
-                                batchWordsLearned = newWordsLearned;
-                            }
-                            else
-                            {
-                                batchWordsLearned = 0;
-                            }
-                        }
-                        else
-                        {
-                            batchWordsLearned = 0;
-                        }
-                    }
-                    else
-                    {
-                        batchWordsLearned = 0;
-                    }
-
-                    var batchEndTime = DateTime.Now;
-                    var batchDuration = batchEndTime - batchStartTime;
-
-                    Console.WriteLine($"   ✅ Learned {batchWordsLearned} words in {batchDuration.TotalSeconds:F1}s");
-                    Console.WriteLine($"   📊 Progress: {_wordsLearned}/{targetWords} ({(_wordsLearned * 100.0 / targetWords):F1}%)");
-                    Console.WriteLine($"   ⚡ Rate: {batchWordsLearned / batchDuration.TotalSeconds:F1} words/second");
-                    Console.WriteLine();
-
-                    // Auto-save progress
-                    if (_lastSaveTimer.Elapsed.TotalSeconds >= _autoSaveIntervalSeconds)
-                    {
-                        await SaveProgressAsync();
-                        _lastSaveTimer.Restart();
-                        Console.WriteLine($"💾 Auto-saved progress at {DateTime.Now:HH:mm:ss}");
-                        Console.WriteLine();
-                    }
-
-                    // Check for priority interruptions (placeholder for future user interaction)
-                    if (await CheckForPriorityTasksAsync())
-                    {
-                        Console.WriteLine("🎯 **PRIORITY TASK DETECTED**");
-                        Console.WriteLine("Pausing learning to handle priority task...");
-                        await HandlePriorityTaskAsync();
-                        Console.WriteLine("✅ Priority task completed, resuming learning");
-                        Console.WriteLine();
-                    }
-
-                    // Small delay to prevent overwhelming the system
-                    await Task.Delay(100, _cancellationTokenSource.Token);
+                    throw new InvalidOperationException("Learner not initialized. Call InitializeAsync() first.");
                 }
+
+                // Use the enhanced continuous learning method with proper cancellation
+                var finalVocabSize = await _learner.LearnVocabularyContinuouslyAsync(
+                    maxWords: targetWords, 
+                    batchSize: _batchSize, 
+                    cancellationToken: _cancellationTokenSource.Token);
 
                 learningTimer.Stop();
 
-                // Final save
-                await SaveProgressAsync();
+                // Update final stats
+                _wordsLearned = finalVocabSize;
 
                 Console.WriteLine("🎉 **CONTINUOUS LEARNING SESSION COMPLETE**");
                 Console.WriteLine("==========================================");
-                Console.WriteLine($"📚 Total words learned: {_wordsLearned}");
-                Console.WriteLine($"🔄 Batches processed: {batchCount}");
+                Console.WriteLine($"📚 Final vocabulary size: {finalVocabSize}");
                 Console.WriteLine($"⏱️  Learning duration: {learningTimer.Elapsed.TotalMinutes:F1} minutes");
-                Console.WriteLine($"⚡ Average rate: {_wordsLearned / learningTimer.Elapsed.TotalSeconds:F1} words/second");
+                
+                if (learningTimer.Elapsed.TotalSeconds > 0)
+                {
+                    Console.WriteLine($"⚡ Average rate: {finalVocabSize / learningTimer.Elapsed.TotalSeconds:F1} words/second");
+                }
+
+                // Final shutdown
+                await _learner.ShutdownAsync();
 
                 return _wordsLearned;
             }
