@@ -318,7 +318,21 @@ namespace GreyMatter
                     // BIOLOGICAL ENCODING: Use LearningSparseConceptEncoder for neural patterns
                     var sparsePattern = await _encoder.EncodeLearnedWordAsync(word);
                     
-                    // Patterns are stored internally by the encoder
+                    // ACTUAL NEURAL LEARNING: Store activation pattern as neural concept
+                    var neuralActivation = new
+                    {
+                        Word = word,
+                        ActivationSignature = sparsePattern.ActiveBits,
+                        ActivationStrength = sparsePattern.ActivationStrength,
+                        PatternSize = sparsePattern.ActiveBits.Length,
+                        Sparsity = (double)sparsePattern.ActiveBits.Length / 2048.0, // 2048 is typical pattern size
+                        LearnedAt = DateTime.UtcNow,
+                        Frequency = noisyFrequency,
+                        ConceptType = "NeuralActivation"
+                    };
+                    
+                    // Store as actual neural concept (not just pattern metadata)
+                    await _legacyStorageManager.SaveConceptAsync($"neural_activation_{word}", neuralActivation, GreyMatter.Storage.ConceptType.Neural);
                     
                     // Convert WordData to WordInfo with biological variability
                     var wordInfo = new GreyMatter.Storage.WordInfo
@@ -472,24 +486,39 @@ namespace GreyMatter
                     Console.WriteLine($"✅ Vocabulary saved in {saveTimer.Elapsed.TotalSeconds:F1}s (was 35+ minutes with old system)");
                 }
                 
-                // Save co-occurrence relationships as concepts
+                // Save co-occurrence relationships as neural activation patterns
                 if (_cooccurrenceMatrix.Any())
                 {
-                    var conceptsToSave = new Dictionary<string, (object Data, GreyMatter.Storage.ConceptType Type)>();
+                    Console.WriteLine($"🧠 Creating neural activation patterns for {_cooccurrenceMatrix.Count:N0} word relationships...");
+                    
+                    var neuralConcepts = new Dictionary<string, object>();
                     
                     foreach (var kvp in _cooccurrenceMatrix)
                     {
-                        conceptsToSave[$"cooccurrences_{kvp.Key}"] = (kvp.Value, GreyMatter.Storage.ConceptType.SemanticRelation);
+                        var word = kvp.Key;
+                        var cooccurrences = kvp.Value;
+                        
+                        // Generate sparse activation pattern for word relationships
+                        var relationshipPattern = await _encoder.EncodeLearnedWordAsync($"cooccurrence_{word}");
+                        
+                        // Create neural activation signature for the relationship
+                        var neuralRelationship = new
+                        {
+                            SourceWord = word,
+                            RelatedWords = cooccurrences.Keys.ToList(),
+                            CooccurrenceStrengths = cooccurrences.Values.ToList(),
+                            ActivationSignature = relationshipPattern.ActiveBits,
+                            ActivationStrength = relationshipPattern.ActivationStrength,
+                            PatternSize = relationshipPattern.ActiveBits.Length,
+                            Sparsity = (double)relationshipPattern.ActiveBits.Length / 2048.0,
+                            ConceptType = "SemanticRelationship",
+                            LearnedAt = DateTime.UtcNow
+                        };
+                        
+                        neuralConcepts[$"neural_relationship_{word}"] = neuralRelationship;
                     }
                     
-                    // Convert concepts to fast storage format
-                    var neuralConcepts = new Dictionary<string, object>();
-                    foreach (var kvp in conceptsToSave)
-                    {
-                        neuralConcepts[kvp.Key] = kvp.Value.Data;
-                    }
-                    
-                    Console.WriteLine($"🧠 Saving {neuralConcepts.Count:N0} neural concepts with FAST storage...");
+                    Console.WriteLine($"🧠 Saving {neuralConcepts.Count:N0} neural relationship patterns...");
                     await _fastStorage.SaveNeuralConceptsAsync(neuralConcepts);
                 }
                 

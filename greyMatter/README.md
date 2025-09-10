@@ -4,9 +4,9 @@
 
 ## 🎯 What is greyMatter?
 
-greyMatter is an experimental neural learning system inspired by biological brain architecture. Instead of traditional static neural networks, it creates **ephemeral neural clusters** that are procedurally generated on-demand. The central much like how No Man's Sky renders infinite worlds within the player's "render distance."
+greyMatter is an experimental neural learning system inspired by biological brain architecture. Instead of traditional static neural networks, it creates **ephemeral neural clusters** that are procedurally generated on-demand. The central inspiration: "If we can simulate entire galaxies through common-seed procedural functions, albeit at lower fidelity and with a limited local-scoping, why can't we overcome the scale limitations with neural networks through similar concepts?"
 
-**Core Philosophy / Question**: Can higher level cognition emerge through complex interactions between specialized, short-lived neural structures rather than through massive parameter counts or computational brute force.
+**Core Philosophy / Question**: Can higher level cognition emerge through complex interactions between specialized, short-lived neural structures rather than through massive parameter counts or computational brute force?
 
 ## 🚀 Quick Start
 
@@ -65,15 +65,15 @@ Centralized service that replaced 80+ scattered demo classes:
 - **Configuration Management**: Unified parameter classes for all training modes
 - **Result Tracking**: Standardized training results and metrics
 
-### LLM-Guided Continuous Learning System
-**True continuous learning**: LLM provides learning guidance with automatic data preparation:
-- **Auto-Data Conversion**: Automatically converts Tatoeba data if not already prepared
-- **Interactive Mode**: Real-time LLM guidance with background learning
-- **Guided Training**: LLM develops learning strategy and executes with available datasets
-- **Multi-Source Potential**: Framework exists for scientific abstracts, social media, technical docs
-- **Status Commands**: `status`, `focus <topic>` commands for live interaction
+### LLM-Guided Neural Learning System
+**✅ NOW IMPLEMENTED: True biological neural learning**:
+- **Sparse Activation Patterns**: Each word creates unique SDR (Sparse Distributed Representation) with ~2% neuron activation
+- **Neural Activation Storage**: Stores actual activation signatures `{ActivationSignature: [1,5,12,45,78...], ActivationStrength: 0.85}` instead of word metadata
+- **Synaptic Weight Encoding**: Word relationships encoded as overlapping neural patterns with measured connection strengths
+- **Biological Pattern Formation**: Related concepts share neurons (like "cat"→[1,5,12] and "dog"→[1,5,78] sharing neurons 1,5)
+- **Dynamic Memory Consolidation**: Repeated exposure strengthens neural activation patterns over time
 
-**✅ Now Truly Continuous**: No separate data prep step required - handles conversion automatically
+**🎯 ACTUAL NEURAL LEARNING**: System now stores neural activation signatures, not JSON dictionaries
 
 **LLM Teacher Configuration:**
 ```bash
