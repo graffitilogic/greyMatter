@@ -59,6 +59,14 @@ namespace GreyMatter.Storage
                 
                 // Write to fast storage immediately
                 var filePath = Path.Combine(_workingSetPath, $"{key}.json");
+                
+                // Ensure directory exists
+                var directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                
                 var jsonData = JsonSerializer.Serialize(data);
                 await File.WriteAllTextAsync(filePath, jsonData);
                 
@@ -170,6 +178,14 @@ namespace GreyMatter.Storage
             try
             {
                 var filePath = Path.Combine(_coldStoragePath, $"{key}.json");
+                
+                // Ensure directory exists
+                var directory = Path.GetDirectoryName(filePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+                
                 var jsonData = JsonSerializer.Serialize(data);
                 await File.WriteAllTextAsync(filePath, jsonData);
             }

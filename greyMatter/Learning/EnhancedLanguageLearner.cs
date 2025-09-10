@@ -24,6 +24,7 @@ namespace GreyMatter
         private Dictionary<string, TatoebaDataConverter.WordData> _wordDatabase;
         private Dictionary<string, Dictionary<string, int>> _cooccurrenceMatrix;
         private HashSet<string> _alreadyLearnedWords;
+        private readonly object _learnedWordsLock = new object();
         private readonly int _maxConcurrency;
 
         public EnhancedLanguageLearner(string dataPath, string brainPath, int maxConcurrency = 4)
@@ -68,7 +69,13 @@ namespace GreyMatter
             // Step 3: Calculate learning plan
             var learningPlan = CalculateLearningPlan(targetVocabularySize, batchSize);
             Console.WriteLine($"\n📊 **LEARNING PLAN**");
-            Console.WriteLine($"Current vocabulary: {_alreadyLearnedWords.Count:N0} words");
+            
+            int currentVocabCount;
+            lock (_learnedWordsLock)
+            {
+                currentVocabCount = _alreadyLearnedWords.Count;
+            }
+            Console.WriteLine($"Current vocabulary: {currentVocabCount:N0} words");
             Console.WriteLine($"New words to learn: {learningPlan.NewWordsToLearn:N0}");
             Console.WriteLine($"Reinforcement words: {learningPlan.ReinforcementWords:N0}");
             Console.WriteLine($"Total batches: {learningPlan.TotalBatches}");
@@ -82,8 +89,14 @@ namespace GreyMatter
 
             stopwatch.Stop();
             Console.WriteLine($"\n⏱️ **LEARNING COMPLETE** - Total time: {stopwatch.Elapsed.TotalMinutes:F1} minutes");
-            Console.WriteLine($"Final vocabulary size: {_alreadyLearnedWords.Count:N0} words");
-            Console.WriteLine($"Learning rate: {(double)_alreadyLearnedWords.Count / stopwatch.Elapsed.TotalMinutes:F0} words/minute");
+            
+            int finalVocabSize;
+            lock (_learnedWordsLock)
+            {
+                finalVocabSize = _alreadyLearnedWords.Count;
+            }
+            Console.WriteLine($"Final vocabulary size: {finalVocabSize:N0} words");
+            Console.WriteLine($"Learning rate: {(double)finalVocabSize / stopwatch.Elapsed.TotalMinutes:F0} words/minute");
         }
 
         private async Task LoadLearningDataAsync()
@@ -209,14 +222,20 @@ namespace GreyMatter
             };
 
             var allWords = _wordDatabase
-                .Where(w => !stopWords.Contains(w.Key))
+                .Where(w => !string.IsNullOrWhiteSpace(w.Key) && !stopWords.Contains(w.Key))
                 .ToList();
 
-            var newWords = allWords.Where(w => !_alreadyLearnedWords.Contains(w.Key)).ToList();
-            var learnedWords = allWords.Where(w => _alreadyLearnedWords.Contains(w.Key)).ToList();
-
-            // Fix: Ensure we don't try to learn negative words
-            var currentVocabularySize = _alreadyLearnedWords.Count;
+            List<KeyValuePair<string, TatoebaDataConverter.WordData>> newWords;
+            List<KeyValuePair<string, TatoebaDataConverter.WordData>> learnedWords;
+            int currentVocabularySize;
+            
+            // Thread-safe access to learned words set
+            lock (_learnedWordsLock)
+            {
+                newWords = allWords.Where(w => !_alreadyLearnedWords.Contains(w.Key)).ToList();
+                learnedWords = allWords.Where(w => _alreadyLearnedWords.Contains(w.Key)).ToList();
+                currentVocabularySize = _alreadyLearnedWords.Count;
+            }
             var newWordsToLearn = Math.Max(0, Math.Min(newWords.Count, targetVocabularySize - currentVocabularySize));
             var reinforcementWords = Math.Max(0, Math.Min(learnedWords.Count, (int)(Math.Max(newWordsToLearn, 1) * 0.2))); // 20% reinforcement
 
@@ -309,6 +328,10 @@ namespace GreyMatter
             
             foreach (var word in words)
             {
+                // Skip null or empty words
+                if (string.IsNullOrWhiteSpace(word))
+                    continue;
+                    
                 if (_wordDatabase.TryGetValue(word, out var wordData))
                 {
                     // BIOLOGICAL VARIABILITY: Add noise to frequency to simulate imperfect memory
@@ -347,13 +370,19 @@ namespace GreyMatter
                     // Store word in semantic storage with biological encoding
                     await _legacyStorageManager.SaveVocabularyWordAsync(word, wordInfo);
 
-                    // Mark as learned
-                    _alreadyLearnedWords.Add(word);
+                    // Mark as learned - Thread-safe operation
+                    lock (_learnedWordsLock)
+                    {
+                        _alreadyLearnedWords.Add(word);
+                    }
                     
                     // BIOLOGICAL FORGETTING: Random chance to "forget" some words
                     if (random.NextDouble() < 0.05) // 5% chance
                     {
-                        _alreadyLearnedWords.Remove(word);
+                        lock (_learnedWordsLock)
+                        {
+                            _alreadyLearnedWords.Remove(word);
+                        }
                         Console.WriteLine($"   🧠 Biological forgetting: temporarily forgot '{word}'");
                     }
                 }
@@ -390,14 +419,30 @@ namespace GreyMatter
             // Generate learning report
             Console.WriteLine("\n📊 **LEARNING REPORT**");
             Console.WriteLine($"Total words in database: {_wordDatabase.Count:N0}");
-            Console.WriteLine($"Words learned: {_alreadyLearnedWords.Count:N0}");
-            Console.WriteLine($"Learning coverage: {(double)_alreadyLearnedWords.Count / _wordDatabase.Count * 100:F1}%");
+            
+            int learnedWordsCount;
+            List<string> testWords;
+            lock (_learnedWordsLock)
+            {
+                learnedWordsCount = _alreadyLearnedWords.Count;
+                // Filter out any null or empty words before taking samples
+                testWords = _alreadyLearnedWords
+                    .Where(w => !string.IsNullOrWhiteSpace(w))
+                    .Take(5)
+                    .ToList();
+            }
+            
+            Console.WriteLine($"Words learned: {learnedWordsCount:N0}");
+            Console.WriteLine($"Learning coverage: {(double)learnedWordsCount / _wordDatabase.Count * 100:F1}%");
 
             // Test a few learned words
-            var testWords = _alreadyLearnedWords.Take(5).ToList();
             Console.WriteLine("\n🧪 **SAMPLE LEARNED WORDS**");
             foreach (var word in testWords)
             {
+                // Additional safety checks
+                if (string.IsNullOrWhiteSpace(word))
+                    continue;
+                    
                 if (_wordDatabase.TryGetValue(word, out var data))
                 {
                     var contextCount = data.SentenceContexts?.Count ?? 0;
@@ -437,7 +482,17 @@ namespace GreyMatter
                 
                 // Collect vocabulary data for batch saving
                 var vocabularyToSave = new Dictionary<string, GreyMatter.Storage.WordInfo>();
-                foreach (var word in _alreadyLearnedWords)
+                
+                List<string> wordsToSave;
+                lock (_learnedWordsLock)
+                {
+                    // Filter out any null or empty words before processing
+                    wordsToSave = _alreadyLearnedWords
+                        .Where(w => !string.IsNullOrWhiteSpace(w))
+                        .ToList();
+                }
+                
+                foreach (var word in wordsToSave)
                 {
                     if (_wordDatabase.TryGetValue(word, out var wordData))
                     {
@@ -545,11 +600,14 @@ namespace GreyMatter
             int count,
             Random random)
         {
-            if (words.Count <= count)
-                return words.Select(w => w.Key).ToList();
+            // Filter out any null or empty words first
+            var validWords = words.Where(w => !string.IsNullOrWhiteSpace(w.Key)).ToList();
+            
+            if (validWords.Count <= count)
+                return validWords.Select(w => w.Key).ToList();
 
             // Weight by frequency for more important words
-            var weightedWords = words
+            var weightedWords = validWords
                 .Select(w => new { Word = w.Key, Weight = Math.Max(1, w.Value.Frequency) })
                 .ToList();
 
