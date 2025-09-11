@@ -314,6 +314,7 @@ namespace GreyMatter.Core
 
             result.Success = true;
             result.NeuronsInvolved = conceptNeurons.Count;
+            result.NeuronsCreated = grew;  // Track how many neurons were actually created this session
 
             // Update instrumentation aggregates
             tAll.Stop();

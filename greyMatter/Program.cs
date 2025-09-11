@@ -41,6 +41,13 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for neuron creation analysis
+            if (args.Length > 0 && (args[0] == "--neuron-analysis" || args[0] == "--analyze-neurons"))
+            {
+                await NeuronCreationAnalysisTest.RunAnalysisAsync();
+                return;
+            }
+            
             // Check for auto-save test
             if (args.Length > 0 && (args[0] == "--auto-save-test" || args[0] == "--test-auto-save"))
             {
