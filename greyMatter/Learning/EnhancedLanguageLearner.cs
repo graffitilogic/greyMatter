@@ -242,6 +242,12 @@ namespace GreyMatter
             var newWordsToLearn = Math.Min(wordsStillNeeded, newWords.Count);
             var reinforcementWords = Math.Max(0, Math.Min(learnedWords.Count, (int)(Math.Max(newWordsToLearn, 1) * 0.2))); // 20% reinforcement
 
+            // Debug logging for continuous learning issues
+            if (newWordsToLearn == 0 && wordsStillNeeded > 0)
+            {
+                Console.WriteLine($"🔍 DEBUG: No new words available - target: {targetVocabularySize}, current: {currentVocabularySize}, available new words: {newWords.Count}");
+            }
+
             var totalWordsToProcess = newWordsToLearn + reinforcementWords;
             var totalBatches = Math.Max(1, (int)Math.Ceiling((double)Math.Max(totalWordsToProcess, 1) / batchSize));
 
@@ -731,8 +737,17 @@ namespace GreyMatter
                     Console.WriteLine($"   Learning {wordsNeededThisBatch} words (current: {currentVocabCount} → target: {batchTarget})");
 
                     // Learn this batch
-                    var batchPlan = CalculateLearningPlan(batchTarget, wordsNeededThisBatch);
-                    await ExecuteBatchLearningAsync(batchPlan, wordsNeededThisBatch);
+                    var batchPlan = CalculateLearningPlan(batchTarget, batchSize);
+                    
+                    // Check if there are actually new words available to learn
+                    if (batchPlan.NewWordsToLearn == 0)
+                    {
+                        Console.WriteLine("⚠️  No new words available in database - learning complete!");
+                        Console.WriteLine($"📊 Final vocabulary: {currentVocabCount} words learned from available data");
+                        break;
+                    }
+                    
+                    await ExecuteBatchLearningAsync(batchPlan, batchSize);
 
                     // Update current vocab count
                     lock (_learnedWordsLock)
@@ -741,6 +756,13 @@ namespace GreyMatter
                         var wordsLearnedThisBatch = newVocabCount - currentVocabCount;
                         totalWordsLearned += wordsLearnedThisBatch;
                         currentVocabCount = newVocabCount;
+                        
+                        // Safety check: if no progress was made, break to avoid infinite loop
+                        if (wordsLearnedThisBatch == 0)
+                        {
+                            Console.WriteLine("⚠️  No progress made in this batch - stopping to prevent infinite loop");
+                            break;
+                        }
                     }
 
                     var batchDuration = DateTime.Now - batchStartTime;

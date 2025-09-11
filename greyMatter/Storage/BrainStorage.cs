@@ -29,6 +29,14 @@ namespace GreyMatter.Storage
         }
 
         /// <summary>
+        /// Get the base storage path for this brain instance
+        /// </summary>
+        public string GetBasePath()
+        {
+            return _basePath;
+        }
+
+        /// <summary>
         /// Save neuron cluster to disk
         /// </summary>
         public async Task SaveClusterAsync(string clusterPath, List<NeuronSnapshot> neurons)

@@ -120,9 +120,9 @@ namespace GreyMatter.demos
                 Console.WriteLine($"   Phase details:");
                 foreach (var phase in learningPlan.TeacherGuidance.phases)
                 {
-                    Console.WriteLine($"     - {phase.name}: {phase.description}");
-                    Console.WriteLine($"       Data sources: {string.Join(", ", phase.data_sources)}");
-                    Console.WriteLine($"       Target words: {phase.target_words}");
+                    Console.WriteLine($"     - {phase.Name}: {phase.Description}");
+                    Console.WriteLine($"       Data sources: {string.Join(", ", phase.DataSources)}");
+                    Console.WriteLine($"       Target words: {string.Join(", ", phase.TargetWords)}");
                 }
             }
             Console.WriteLine();

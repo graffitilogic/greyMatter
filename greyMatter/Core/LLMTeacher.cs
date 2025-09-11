@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace GreyMatter.Core
@@ -20,9 +22,175 @@ namespace GreyMatter.Core
         
         public LLMTeacher(string apiUrl = "http://192.168.69.138:11434/api/chat", string model = "deepseek-r1:1.5b")
         {
-            _httpClient = new HttpClient();
+            _httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(10) // 10 second timeout for all requests
+            };
             _apiUrl = apiUrl;
             _model = model;
+        }
+
+        /// <summary>
+        /// Generate educational content on a specific topic as training data
+        /// </summary>
+        public async Task<EducationalContentResponse> GenerateEducationalContentAsync(ContentRequest request)
+        {
+            var prompt = $@"Generate educational content on the topic: {request.Topic}
+
+Target audience: {request.TargetAudience}
+Difficulty level: {request.DifficultyLevel}
+Learning objectives: {string.Join(", ", request.LearningObjectives)}
+Target content length: {request.ContentLength} words
+
+Create comprehensive educational material that includes:
+1. Key vocabulary words relevant to the topic
+2. Core concepts that should be understood
+3. Well-structured content explaining the topic
+4. Clear learning objectives
+5. Estimated time to complete
+
+Provide response in JSON format with exact structure.";
+
+            var response = await QueryLLM(prompt, new
+            {
+                type = "object",
+                properties = new
+                {
+                    content = new { type = "string" },
+                    key_vocabulary = new { type = "array", items = new { type = "string" } },
+                    concepts = new { type = "array", items = new { type = "string" } },
+                    difficulty_level = new { type = "string" },
+                    word_count = new { type = "number" },
+                    topic_category = new { type = "string" }
+                },
+                required = new[] { "content", "key_vocabulary", "concepts", "difficulty_level" }
+            });
+
+            if (response != null)
+            {
+                var contentResponse = JsonSerializer.Deserialize<EducationalContentResponse>(response);
+                return contentResponse ?? new EducationalContentResponse
+                {
+                    Topic = request.Topic,
+                    DifficultyLevel = request.DifficultyLevel,
+                    Content = "Educational content could not be generated at this time.",
+                    KeyVocabulary = new List<string>(),
+                    CoreConcepts = new List<string>(),
+                    LearningObjectives = request.LearningObjectives,
+                    EstimatedDuration = "Unknown"
+                };
+            }
+
+            return new EducationalContentResponse { 
+                Topic = request.Topic, 
+                Content = "Educational content generation temporarily unavailable.", 
+                DifficultyLevel = request.DifficultyLevel,
+                KeyVocabulary = new List<string>(),
+                CoreConcepts = new List<string>(),
+                LearningObjectives = request.LearningObjectives,
+                EstimatedDuration = "Unknown"
+            };
+        }
+
+        /// <summary>
+        /// Generate a curriculum of topics based on current learning state
+        /// </summary>
+        public async Task<List<string>> GenerateLearningCurriculumAsync(LearningContext context, int topicCount = 10)
+        {
+            var prompt = $@"You are a curriculum designer. Based on the student's current learning state, generate {topicCount} educational topics they should learn next.
+
+Current State:
+- Vocabulary size: {context.VocabularySize}
+- Recent words: {string.Join(", ", context.RecentWords.Take(10))}
+- Performance: {context.PerformanceMetrics}
+
+Generate a progressive curriculum of topics that build on current knowledge while introducing new concepts.
+Topics should be specific enough to generate focused educational content.
+
+Examples of good topics:
+- 'The water cycle and precipitation'
+- 'Basic principles of democracy'
+- 'How photosynthesis works in plants'
+- 'Introduction to the solar system'
+- 'Economic concepts: supply and demand'";
+
+            var response = await QueryLLM(prompt, new
+            {
+                type = "object",
+                properties = new
+                {
+                    topics = new { type = "array", items = new { type = "string" } },
+                    learning_sequence = new { type = "array", items = new { type = "string" } },
+                    rationale = new { type = "string" }
+                },
+                required = new[] { "topics", "learning_sequence" }
+            });
+
+            if (!string.IsNullOrEmpty(response))
+            {
+                var curriculumResponse = JsonSerializer.Deserialize<CurriculumResponse>(response);
+                return curriculumResponse?.Phases?.Select(p => p.Name).ToList() ?? new List<string>();
+            }
+
+            return new List<string>();
+        }
+
+        /// <summary>
+        /// Answer specific questions and provide learning content
+        /// </summary>
+        public async Task<AnswerResponse> AnswerQuestionAsync(string question, BrainState brainState)
+        {
+            var prompt = $@"You are an educational teacher. A student has asked: '{question}'
+
+Provide a comprehensive, educational answer that includes:
+- Clear explanation of the concept
+- Key vocabulary and terms
+- Related concepts they should understand
+- Examples where appropriate
+
+Student's current level: {brainState.ActiveVocabulary} words learned
+Recent focus: {brainState.RecentFocus}
+
+Question: {question}
+
+Provide an educational response:";
+
+            var response = await QueryLLM(prompt, new
+            {
+                type = "object",
+                properties = new
+                {
+                    answer = new { type = "string" },
+                    key_vocabulary = new { type = "array", items = new { type = "string" } },
+                    related_concepts = new { type = "array", items = new { type = "string" } },
+                    follow_up_topics = new { type = "array", items = new { type = "string" } },
+                    difficulty_level = new { type = "string" }
+                },
+                required = new[] { "answer", "key_vocabulary", "related_concepts" }
+            });
+
+            if (response != null)
+            {
+                var answerResponse = JsonSerializer.Deserialize<AnswerResponse>(response);
+                return answerResponse ?? new AnswerResponse
+                {
+                    Answer = "I'm unable to provide an answer at this time.",
+                    KeyConcepts = new List<string>(),
+                    RelatedTopics = new List<string>(),
+                    Vocabulary = new List<string>(),
+                    ConfidenceLevel = "low",
+                    FollowUpQuestions = new List<string>()
+                };
+            }
+
+            return new AnswerResponse { 
+                Answer = "I'm unable to provide an answer at this time.", 
+                KeyConcepts = new List<string>(),
+                RelatedTopics = new List<string>(),
+                Vocabulary = new List<string>(),
+                ConfidenceLevel = "low",
+                FollowUpQuestions = new List<string>()
+            };
         }
 
         public async Task<TeacherResponse> AnalyzeLearningState(LearningContext context)
@@ -210,16 +378,6 @@ Also suggest how this interaction could guide future learning priorities.";
         public List<string> success_metrics { get; set; } = new();
     }
 
-    public class CurriculumPhase
-    {
-        public string name { get; set; } = "";
-        public string description { get; set; } = "";
-        public List<string> data_sources { get; set; } = new();
-        public int target_words { get; set; }
-        public string duration_estimate { get; set; } = "";
-        public List<string> prerequisites { get; set; } = new();
-    }
-
     public class InteractionResponse
     {
         public string response_text { get; set; } = "";
@@ -237,6 +395,24 @@ Also suggest how this interaction could guide future learning priorities.";
         public string PerformanceMetrics { get; set; } = "";
     }
 
+    public class ContentRequest
+    {
+        public string Topic { get; set; } = "";
+        public string TargetAudience { get; set; } = "";
+        public string DifficultyLevel { get; set; } = "";
+        public List<string> LearningObjectives { get; set; } = new();
+        public int ContentLength { get; set; } = 200;
+    }
+
+    public class CurriculumGoals
+    {
+        public string Topic { get; set; } = "";
+        public int TargetChunks { get; set; }
+        public string CurrentLevel { get; set; } = "";
+        public List<string> FocusAreas { get; set; } = new();
+        public List<string> AvailableDataSources { get; set; } = new();
+    }
+
     public class LearningGoals
     {
         public int TargetVocabularySize { get; set; }
@@ -250,6 +426,65 @@ Also suggest how this interaction could guide future learning priorities.";
         public int ActiveVocabulary { get; set; }
         public string RecentFocus { get; set; } = "";
         public List<string> KnowledgeDomains { get; set; } = new();
+    }
+
+    // Educational Content Response Classes
+    public class EducationalContentResponse
+    {
+        public string Topic { get; set; } = "";
+        public string DifficultyLevel { get; set; } = "";
+        public List<string> KeyVocabulary { get; set; } = new();
+        public List<string> CoreConcepts { get; set; } = new();
+        public string Content { get; set; } = "";
+        public List<string> LearningObjectives { get; set; } = new();
+        public string EstimatedDuration { get; set; } = "";
+    }
+
+    public class CurriculumResponse
+    {
+        public List<CurriculumPhase> Phases { get; set; } = new();
+        public string TotalEstimatedTime { get; set; } = "";
+        public List<string> Prerequisites { get; set; } = new();
+    }
+
+    public class CurriculumPhase
+    {
+        [JsonPropertyName("name")]
+        public string Name { get; set; } = "";
+        
+        [JsonPropertyName("description")]
+        public string Description { get; set; } = "";
+        
+        [JsonPropertyName("topics")]
+        public List<string> Topics { get; set; } = new();
+        
+        [JsonPropertyName("data_sources")]
+        public List<string> DataSources { get; set; } = new();
+        
+        [JsonPropertyName("target_words")]
+        public List<string> TargetWords { get; set; } = new();
+        
+        [JsonPropertyName("milestones")]
+        public List<string> Milestones { get; set; } = new();
+        
+        [JsonPropertyName("duration_estimate")]
+        public string Duration { get; set; } = "";
+        
+        [JsonPropertyName("prerequisites")]
+        public List<string> Prerequisites { get; set; } = new();
+        
+        [JsonPropertyName("difficulty_level")]
+        public string DifficultyLevel { get; set; } = "";
+    }
+
+    public class AnswerResponse
+    {
+        public string Answer { get; set; } = "";
+        public List<string> KeyConcepts { get; set; } = new();
+        public List<string> RelatedTopics { get; set; } = new();
+        public List<string> Vocabulary { get; set; } = new();
+        public string ConfidenceLevel { get; set; } = "";
+        public List<string> FollowUpQuestions { get; set; } = new();
     }
 
     // Ollama API Response

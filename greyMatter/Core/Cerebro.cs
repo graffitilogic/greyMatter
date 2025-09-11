@@ -185,6 +185,14 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// Get the storage path for this brain instance
+        /// </summary>
+        public string GetStoragePath()
+        {
+            return _storage.GetBasePath();
+        }
+
+        /// <summary>
         /// Initialize the brain - load existing clusters and synapses
         /// </summary>
         public async Task InitializeAsync()

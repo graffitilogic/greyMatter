@@ -164,12 +164,12 @@ namespace GreyMatter.Learning
             {
                 var learningPhase = new LearningPhase
                 {
-                    Name = phase.name,
-                    Description = phase.description,
-                    DataSources = phase.data_sources.Where(ds => _availableDataSources.ContainsKey(ds)).ToList(),
-                    TargetWords = phase.target_words,
-                    EstimatedDuration = phase.duration_estimate,
-                    Prerequisites = phase.prerequisites
+                    Name = phase.Name,
+                    Description = phase.Description,
+                    DataSources = phase.DataSources.Where(ds => _availableDataSources.ContainsKey(ds)).ToList(),
+                    TargetWords = phase.TargetWords.Count,
+                    EstimatedDuration = phase.Duration,
+                    Prerequisites = phase.Prerequisites
                 };
 
                 phases.Add(learningPhase);

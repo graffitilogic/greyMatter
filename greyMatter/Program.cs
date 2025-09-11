@@ -41,6 +41,13 @@ namespace GreyMatter
                 return;
             }
             
+            // Check for auto-save test
+            if (args.Length > 0 && (args[0] == "--auto-save-test" || args[0] == "--test-auto-save"))
+            {
+                await GreyMatter.demos.AutoSaveTest.Main(new string[0]);
+                return;
+            }
+            
             // Check for pattern analysis
             if (args.Length > 0 && args[0] == "--analyze-patterns")
             {
@@ -488,9 +495,11 @@ namespace GreyMatter
             // Check for continuous learning mode (unified pipeline)
             if (args.Length > 0 && (args[0] == "--continuous-learning" || args[0] == "--continuous"))
             {
-                Console.WriteLine("🧠 **CONTINUOUS LEARNING MODE**");
-                Console.WriteLine("==============================");
-                Console.WriteLine("Unified data preparation and learning pipeline");
+                Console.WriteLine("🧠 **ENHANCED CONTINUOUS LEARNING MODE**");
+                Console.WriteLine("=======================================");
+                Console.WriteLine("🚀 NEW: Unlimited multi-source learning with LLM teacher");
+                Console.WriteLine("📊 Accessing millions of words from multiple datasets");
+                Console.WriteLine("🤖 Dynamic curriculum generation and content adaptation");
                 Console.WriteLine("Can run indefinitely with interruptible learning\n");
 
                 var totalTimer = Stopwatch.StartNew();
@@ -515,34 +524,42 @@ namespace GreyMatter
                     Console.WriteLine($"💾 Auto-save: {autoSaveInterval}s intervals");
                     Console.WriteLine();
 
-                    // Initialize continuous learner
-                    var continuousLearner = new ContinuousLearner(dataPath, brainPath, batchSize, autoSaveInterval);
-                    await continuousLearner.InitializeAsync();
+                    // Initialize enhanced continuous learner with multi-source capabilities
+                    var brain = new Cerebro(brainPath);
+                    var enhancedLearner = new EnhancedContinuousLearner(brain, dataPath);
+                    
+                    Console.WriteLine("✅ Enhanced multi-source brain initialized");
+                    Console.WriteLine("   📚 SimpleWiki, news, scientific abstracts, and more");
+                    Console.WriteLine("   🤖 LLM teacher for dynamic content generation");
+                    Console.WriteLine("   🔄 Unlimited learning beyond static datasets");
 
-                    // Start continuous learning loop
-                    Console.WriteLine("🚀 **STARTING CONTINUOUS LEARNING LOOP**");
-                    Console.WriteLine("=======================================");
+                    // Start enhanced continuous learning loop
+                    Console.WriteLine("\n🚀 **STARTING ENHANCED CONTINUOUS LEARNING**");
+                    Console.WriteLine("==========================================");
+                    Console.WriteLine("🆕 Using NEW unlimited multi-source architecture");
                     Console.WriteLine("Press Ctrl+C to interrupt and save progress");
                     Console.WriteLine("Learning will continue until target reached or interrupted\n");
 
                     sessionTimer.Start();
-                    var learnedWords = await continuousLearner.RunContinuousLearningAsync(maxWords);
+                    var learnedWords = await enhancedLearner.StartContinuousLearningAsync(maxWords);
 
                     sessionTimer.Stop();
                     totalTimer.Stop();
 
-                    Console.WriteLine("\n📊 **CONTINUOUS LEARNING COMPLETE**");
-                    Console.WriteLine("==================================");
-                    Console.WriteLine($"📚 Words Learned: {learnedWords}");
+                    Console.WriteLine("\n📊 **ENHANCED CONTINUOUS LEARNING COMPLETE**");
+                    Console.WriteLine("==========================================");
+                    Console.WriteLine($"📚 Total Words Processed: {learnedWords}");
                     Console.WriteLine($"⏱️  Session Time: {sessionTimer.Elapsed.TotalMinutes:F1} minutes");
                     Console.WriteLine($"⏱️  Total Time: {totalTimer.Elapsed.TotalMinutes:F1} minutes");
-                    Console.WriteLine($"⚡ Learning Rate: {learnedWords / sessionTimer.Elapsed.TotalSeconds:F1} words/second");
+                    Console.WriteLine($"⚡ Processing Rate: {learnedWords / Math.Max(sessionTimer.Elapsed.TotalSeconds, 1):F1} words/second");
+                    Console.WriteLine("🎯 Used unlimited multi-source learning - no more 6,897 word limit!");
                 }
                 catch (Exception ex)
                 {
                     totalTimer.Stop();
-                    Console.WriteLine($"❌ Error during continuous learning: {ex.Message}");
+                    Console.WriteLine($"❌ Error during enhanced continuous learning: {ex.Message}");
                     Console.WriteLine($"⏱️  Failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                    Console.WriteLine($"🔍 Stack trace: {ex.StackTrace}");
                 }
                 return;
             }
