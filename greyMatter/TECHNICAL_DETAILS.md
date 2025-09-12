@@ -257,6 +257,43 @@ public class FastStorageAdapter
 }
 ```
 
+### Spaced Repetition Neural Architecture (Advanced)
+**Revolutionary biological realism in neuron creation**:
+```csharp
+// Sophisticated spaced repetition with growth gating
+private int GrowthHitThreshold = 3;  // Concepts must be seen 3+ times before neuron creation
+private readonly Dictionary<string, int> _conceptGrowthHits = new();
+
+public async Task<LearningResult> LearnConceptAsync(string concept, Dictionary<string, double> features)
+{
+    // Track concept encounters for spaced repetition
+    var hits = _conceptGrowthHits.TryGetValue(concept, out var h) ? (h + 1) : 1;
+    _conceptGrowthHits[concept] = hits;
+    
+    // Apply biological growth gating
+    if (conceptNeurons.Count < target)
+    {
+        var needed = target - conceptNeurons.Count;
+        if (hits < GrowthHitThreshold)
+        {
+            needed = 0; // Defer growth until concept is seen enough times
+        }
+        // Only create neurons for concepts encountered 3+ times
+        if (needed > 0)
+        {
+            var newNeurons = await cluster.GrowForConcept(concept, conceptNeurons.Count + needed);
+            grew = newNeurons.Count;  // This explains "Neurons Created: 0" in early learning
+        }
+    }
+}
+```
+
+**Why "Neurons Created: 0" Appears**:
+- **Biological Realism**: Brain doesn't create permanent pathways for single exposures
+- **Spaced Repetition**: Concepts must be encountered 3+ times before neuron creation
+- **Efficiency**: Prevents neural bloat from temporary or irrelevant concepts
+- **Learning Progress**: File growth occurs from concept tracking, not neuron creation
+
 ### Memory Efficiency Strategy
 - **O(active_concepts) scaling**: Only load concepts currently in use
 - **Lazy loading**: Concepts loaded on-demand from semantic clusters

@@ -184,32 +184,37 @@ namespace GreyMatter
         {
             try
             {
-                Console.Write("Loading existing vocabulary from FAST storage...");
-                var existingVocabulary = await _fastStorage.LoadVocabularyAsync();
+                Console.Write("Loading existing neural concepts from storage...");
+                var existingConcepts = await _fastStorage.LoadNeuralConceptsAsync();
                 
-                // Merge with word database, preferring existing data
-                foreach (var kvp in existingVocabulary)
+                // Extract words from neural concepts to populate word database for training input processing
+                foreach (var kvp in existingConcepts)
                 {
-                    if (!_wordDatabase.ContainsKey(kvp.Key))
+                    var conceptId = kvp.Key;
+                    
+                    // Extract word from concept ID (format: "concept_word" or just "word")
+                    var word = conceptId.StartsWith("concept_") ? conceptId.Substring(8) : conceptId;
+                    
+                    if (!_wordDatabase.ContainsKey(word))
                     {
-                        // Convert WordInfo back to WordData format
+                        // Create minimal word data for training processing - neural concepts hold the real learning
                         var wordData = new TatoebaDataConverter.WordData
                         {
-                            Word = kvp.Key,
-                            Frequency = kvp.Value.Frequency,
+                            Word = word,
+                            Frequency = 1, // Neural strength is stored in concepts, not here
                             SentenceContexts = new List<string>(),
                             CooccurringWords = new Dictionary<string, int>()
                         };
-                        _wordDatabase[kvp.Key] = wordData;
+                        _wordDatabase[word] = wordData;
                     }
                 }
                 
-                Console.WriteLine($" {existingVocabulary.Count:N0} existing words loaded");
+                Console.WriteLine($" {existingConcepts.Count:N0} neural concepts loaded (words available for training)");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️ Failed to load existing vocabulary: {ex.Message}");
-                // Continue without existing vocabulary - not a fatal error
+                Console.WriteLine($"⚠️ Failed to load existing neural concepts: {ex.Message}");
+                // Continue without existing concepts - not a fatal error
             }
         }
 
@@ -376,8 +381,8 @@ namespace GreyMatter
                     };
 
                     // TODO: Batch these individual saves for even better performance
-                    // Store word in semantic storage with biological encoding
-                    await _legacyStorageManager.SaveVocabularyWordAsync(word, wordInfo);
+                    // REMOVED: Legacy vocabulary storage - now using pure neural concepts
+                    // await _legacyStorageManager.SaveVocabularyWordAsync(word, wordInfo);
 
                     // Mark as learned - Thread-safe operation
                     lock (_learnedWordsLock)
@@ -517,37 +522,37 @@ namespace GreyMatter
                     }
                 }
                 
-                // 🚀 CRITICAL PERFORMANCE FIX: Use FAST storage (1,350x speedup)
-                // OLD: await _storageManager.StoreVocabularyAsync(vocabularyToSave); // 35+ minutes
+                // 🧠 BIOLOGICAL APPROACH: Save as neural concepts, not vocabulary 
                 if (vocabularyToSave.Any())
                 {
-                    Console.WriteLine($"💾 Saving {vocabularyToSave.Count:N0} vocabulary entries with FAST storage...");
+                    Console.WriteLine($"🧠 Converting {vocabularyToSave.Count:N0} learned words to neural concepts...");
                     var saveTimer = Stopwatch.StartNew();
                     
-                    // Convert WordInfo to TatoebaDataConverter.WordData format
-                    var fastStorageData = new Dictionary<string, TatoebaDataConverter.WordData>();
+                    // Convert learned words to neural concept format (biological approach)
+                    var neuralConcepts = new Dictionary<string, object>();
                     foreach (var kvp in vocabularyToSave)
                     {
-                        fastStorageData[kvp.Key] = new TatoebaDataConverter.WordData
-                        {
-                            Word = kvp.Value.Word,
-                            Frequency = kvp.Value.Frequency,
-                            SentenceContexts = new List<string>(), // Will be populated from _wordDatabase if needed
-                            CooccurringWords = new Dictionary<string, int>()
-                        };
+                        var word = kvp.Key;
+                        var wordInfo = kvp.Value;
                         
-                        // Add context from original word database if available
-                        if (_wordDatabase.TryGetValue(kvp.Key, out var originalData))
+                        // Create neural representation with activation patterns
+                        var conceptId = $"concept_{word}";
+                        neuralConcepts[conceptId] = new
                         {
-                            fastStorageData[kvp.Key].SentenceContexts = originalData.SentenceContexts ?? new List<string>();
-                            fastStorageData[kvp.Key].CooccurringWords = originalData.CooccurringWords ?? new Dictionary<string, int>();
-                        }
+                            ConceptId = conceptId,
+                            ActivationPattern = GenerateActivationPattern(word, wordInfo.Frequency),
+                            ActivationStrength = Math.Min(1.0, wordInfo.Frequency / 1000.0),
+                            LastActivated = DateTime.UtcNow,
+                            FirstActivated = wordInfo.FirstSeen,
+                            AssociatedConcepts = GetAssociatedConcepts(word), // From co-occurrence data
+                            NeuralType = "learned_concept"
+                        };
                     }
                     
-                    await _fastStorage.SaveVocabularyAsync(fastStorageData);
+                    await _fastStorage.SaveNeuralConceptsAsync(neuralConcepts);
                     
                     saveTimer.Stop();
-                    Console.WriteLine($"✅ Vocabulary saved in {saveTimer.Elapsed.TotalSeconds:F1}s (was 35+ minutes with old system)");
+                    Console.WriteLine($"✅ Neural concepts formed in {saveTimer.Elapsed.TotalSeconds:F1}s (biological learning complete)");
                 }
                 
                 // Save co-occurrence relationships as neural activation patterns
@@ -861,6 +866,48 @@ namespace GreyMatter
             {
                 Console.WriteLine($"⚠️ Warning during shutdown: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Generate Sparse Distributed Representation (SDR) for biological concept storage
+        /// </summary>
+        private int[] GenerateActivationPattern(string word, int frequency = 1)
+        {
+            // Create sparse activation pattern (~2% of 2048 neurons = ~40 active neurons)
+            var totalNeurons = 2048;
+            var activationPercent = 0.02; // Biological sparsity
+            var activeNeurons = (int)(totalNeurons * activationPercent);
+            
+            // Use deterministic seeding for consistency
+            var seed = word.GetHashCode() ^ frequency;
+            var random = new Random(seed);
+            
+            return Enumerable.Range(0, totalNeurons)
+                .OrderBy(x => random.Next())
+                .Take(activeNeurons)
+                .OrderBy(x => x)
+                .ToArray();
+        }
+
+        /// <summary>
+        /// Get associated concepts from co-occurrence data (biological associations)
+        /// </summary>
+        private List<string> GetAssociatedConcepts(string word)
+        {
+            var associations = new List<string>();
+            
+            // Extract from co-occurrence matrix
+            if (_cooccurrenceMatrix.TryGetValue(word, out var cooccurring))
+            {
+                associations.AddRange(
+                    cooccurring
+                        .OrderByDescending(kvp => kvp.Value) // Strongest associations first
+                        .Take(10) // Limit to top 10 associations
+                        .Select(kvp => $"concept_{kvp.Key}")
+                );
+            }
+            
+            return associations;
         }
     }
 }

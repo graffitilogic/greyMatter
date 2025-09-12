@@ -89,12 +89,9 @@ namespace GreyMatter.Core
 
         // Concept→cluster cache to bypass repeated similarity lookups
         private readonly Dictionary<string, Guid> _conceptClusterCache = new(StringComparer.OrdinalIgnoreCase);
-        // Per-run growth hit counters (simple frequency gating)
-        private readonly Dictionary<string, int> _conceptGrowthHits = new(StringComparer.OrdinalIgnoreCase);
 
         // Growth controls (tunable)
         private int MaxAddPerConceptPerRun = 64;        // cap growth per concept per run
-        private int GrowthHitThreshold = 3;             // require N hits before allowing growth
 
         // Stable hash for deterministic seeding across runs
         private static int StableHash(string s)
@@ -232,8 +229,7 @@ namespace GreyMatter.Core
             // Load concept capacities
             _conceptCapacities = await _storage.LoadConceptCapacitiesAsync();
 
-            // Reset per-run growth hits and cache
-            _conceptGrowthHits.Clear();
+            // Reset per-run cache
             _conceptClusterCache.Clear();
         }
 
@@ -243,10 +239,6 @@ namespace GreyMatter.Core
         public async Task<LearningResult> LearnConceptAsync(string concept, Dictionary<string, double> features)
         {
             var result = new LearningResult { Concept = concept };
-
-            // Growth gating counter
-            var hits = _conceptGrowthHits.TryGetValue(concept, out var h) ? (h + 1) : 1;
-            _conceptGrowthHits[concept] = hits;
 
             // Timing buckets
             var tAll = Stopwatch.StartNew();
@@ -267,18 +259,12 @@ namespace GreyMatter.Core
             var target = GetTargetNeuronsForConcept(concept, features);
             int grew = 0;
 
-            // Apply growth gating and per-run cap
+            // Dynamic creation balanced by reuse (removed arbitrary hit gating)
             if (conceptNeurons.Count < target)
             {
                 var needed = target - conceptNeurons.Count;
-                if (hits < GrowthHitThreshold)
-                {
-                    needed = 0; // defer growth until concept is seen enough times
-                }
-                else
-                {
-                    needed = Math.Min(needed, Math.Max(0, MaxAddPerConceptPerRun));
-                }
+                // Apply per-run cap only (keeps system stable)
+                needed = Math.Min(needed, Math.Max(0, MaxAddPerConceptPerRun));
                 if (needed > 0)
                 {
                     var tGrow = Stopwatch.StartNew();
@@ -288,7 +274,7 @@ namespace GreyMatter.Core
                     grew = newNeurons.Count;
                     conceptNeurons.AddRange(newNeurons);
                     TotalNeuronsCreated += grew;
-                    if (ShouldSampleLog()) Console.WriteLine($"   ◽ grow(gated): +{grew} (target {target}, hits {hits}) in {tGrow.Elapsed.TotalMilliseconds:F1} ms");
+                    if (ShouldSampleLog()) Console.WriteLine($"   ◽ grow: +{grew} (target {target}) in {tGrow.Elapsed.TotalMilliseconds:F1} ms");
                 }
             }
             tCapacity.Stop();

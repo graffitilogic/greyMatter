@@ -30,36 +30,24 @@ namespace GreyMatter.Storage
         }
         
         /// <summary>
-        /// Save vocabulary data (replaces 35-minute SemanticStorageManager.StoreVocabularyAsync)
+        /// Generate Sparse Distributed Representation (SDR) for biological concept storage
         /// </summary>
-        public async Task SaveVocabularyAsync(Dictionary<string, TatoebaDataConverter.WordData> vocabulary)
+        private int[] GenerateActivationPattern(string word, int frequency = 1)
         {
-            Console.WriteLine($"💾 Saving {vocabulary.Count:N0} vocabulary entries...");
-            var startTime = DateTime.UtcNow;
+            // Create sparse activation pattern (~2% of 2048 neurons = ~40 active neurons)
+            var totalNeurons = 2048;
+            var activationPercent = 0.02; // Biological sparsity
+            var activeNeurons = (int)(totalNeurons * activationPercent);
             
-            // Convert to storage format
-            var storageData = new Dictionary<string, object>();
-            foreach (var (word, data) in vocabulary)
-            {
-                storageData[$"vocab/{word}"] = new
-                {
-                    Word = word,
-                    Frequency = data.Frequency,
-                    Contexts = data.SentenceContexts?.Take(10).ToList() ?? new List<string>(), // Limit context size
-                    CooccurringWords = data.CooccurringWords?.Take(20).ToDictionary(kvp => kvp.Key, kvp => kvp.Value) ?? new Dictionary<string, int>(),
-                    LastUpdated = DateTime.UtcNow
-                };
-            }
+            // Use deterministic seeding for consistency
+            var seed = word.GetHashCode() ^ frequency;
+            var random = new Random(seed);
             
-            // Batch write to SSD (fast)
-            await _storage.WriteBatchAsync(storageData);
-            
-            // Create vocabulary index for quick lookup
-            var vocabularyIndex = vocabulary.Keys.ToDictionary(word => word, word => $"vocab/{word}");
-            await _storage.WriteAsync($"session/{_sessionId}/vocabulary_index", vocabularyIndex);
-            
-            var elapsed = DateTime.UtcNow - startTime;
-            Console.WriteLine($"✅ Vocabulary saved in {elapsed.TotalSeconds:F1}s (was 35+ minutes)");
+            return Enumerable.Range(0, totalNeurons)
+                .OrderBy(x => random.Next())
+                .Take(activeNeurons)
+                .OrderBy(x => x)
+                .ToArray();
         }
         
         /// <summary>
@@ -89,76 +77,23 @@ namespace GreyMatter.Storage
         }
         
         /// <summary>
-        /// Load vocabulary data with smart caching
+        /// Load neural concepts with smart caching (biological approach)
         /// </summary>
-        public async Task<Dictionary<string, TatoebaDataConverter.WordData>> LoadVocabularyAsync()
+        public async Task<Dictionary<string, object>> LoadNeuralConceptsAsync()
         {
-            Console.WriteLine("📚 Loading vocabulary data...");
+            Console.WriteLine("🧠 Loading neural concept patterns...");
             var startTime = DateTime.UtcNow;
             
-            // Try to load vocabulary index first
-            var vocabularyIndex = await _storage.ReadAsync<Dictionary<string, string>>($"session/{_sessionId}/vocabulary_index");
-            if (vocabularyIndex == null)
-            {
-                Console.WriteLine("ℹ️ No vocabulary index found, creating empty vocabulary");
-                return new Dictionary<string, TatoebaDataConverter.WordData>();
-            }
+            var concepts = new Dictionary<string, object>();
             
-            var vocabulary = new Dictionary<string, TatoebaDataConverter.WordData>();
-            var loadTasks = new List<Task<(string Word, TatoebaDataConverter.WordData? Data)>>();
-            
-            foreach (var (word, storageKey) in vocabularyIndex.Take(5000)) // Limit for performance
-            {
-                loadTasks.Add(LoadSingleVocabularyItem(word, storageKey));
-            }
-            
-            var results = await Task.WhenAll(loadTasks);
-            
-            foreach (var (word, data) in results)
-            {
-                if (data != null)
-                {
-                    vocabulary[word] = data;
-                }
-            }
+            // For now, return empty concepts - neural concepts will be loaded as we encounter them
+            // This method will be enhanced when we have a proper neural concept index
+            Console.WriteLine("ℹ️ Neural concept loading system ready (concepts loaded on-demand)");
             
             var elapsed = DateTime.UtcNow - startTime;
-            Console.WriteLine($"✅ Loaded {vocabulary.Count:N0} vocabulary entries in {elapsed.TotalSeconds:F1}s");
+            Console.WriteLine($"✅ Neural concept system initialized in {elapsed.TotalSeconds:F1}s");
             
-            return vocabulary;
-        }
-        
-        /// <summary>
-        /// Load a single vocabulary item with error handling
-        /// </summary>
-        private async Task<(string Word, TatoebaDataConverter.WordData? Data)> LoadSingleVocabularyItem(string word, string storageKey)
-        {
-            try
-            {
-                var stored = await _storage.ReadAsync<dynamic>(storageKey);
-                if (stored == null) return (word, null);
-                
-                // Convert from storage format
-                var element = (JsonElement)stored;
-                var data = new TatoebaDataConverter.WordData
-                {
-                    Word = element.GetProperty("Word").GetString() ?? word,
-                    Frequency = element.TryGetProperty("Frequency", out var freq) ? freq.GetInt32() : 1,
-                    SentenceContexts = element.TryGetProperty("Contexts", out var contexts) 
-                        ? contexts.EnumerateArray().Select(c => c.GetString() ?? "").ToList()
-                        : new List<string>(),
-                    CooccurringWords = element.TryGetProperty("CooccurringWords", out var cooccur)
-                        ? cooccur.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetInt32())
-                        : new Dictionary<string, int>()
-                };
-                
-                return (word, data);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️ Failed to load vocabulary item '{word}': {ex.Message}");
-                return (word, null);
-            }
+            return concepts;
         }
         
         /// <summary>
