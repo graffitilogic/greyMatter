@@ -78,6 +78,7 @@ namespace GreyMatter
 
             var wordDbPath = Path.Combine(_dataPath, "word_database.json");
             var cooccurrencePath = Path.Combine(_dataPath, "cooccurrence_matrix.json");
+            var learnedPatternsPath = Path.Combine(_dataPath, "learned_patterns.json");
 
             if (!File.Exists(wordDbPath) || !File.Exists(cooccurrencePath))
             {
@@ -91,6 +92,13 @@ namespace GreyMatter
             var cooccurrenceJson = await File.ReadAllTextAsync(cooccurrencePath);
             _cooccurrenceMatrix = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(cooccurrenceJson)
                 ?? new Dictionary<string, Dictionary<string, int>>();
+
+            // Load learned patterns for the encoder
+            if (File.Exists(learnedPatternsPath))
+            {
+                await _encoder.LoadLearnedPatternsFromFileAsync(learnedPatternsPath);
+                Console.WriteLine($"Loaded {_encoder.GetLearnedPatternsCount()} learned patterns");
+            }
 
             if (_wordDatabase == null || _cooccurrenceMatrix == null)
             {

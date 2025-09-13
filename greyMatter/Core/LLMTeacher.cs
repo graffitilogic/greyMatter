@@ -136,6 +136,49 @@ Examples of good topics:
         }
 
         /// <summary>
+        /// Generate training sentences for a specific domain to enrich learning data
+        /// </summary>
+        public async Task<List<string>> GenerateTrainingSentencesAsync(string domain, int maxSentences = 1000)
+        {
+            var prompt = $@"Generate {maxSentences} diverse, educational sentences about '{domain}' for language learning.
+
+Requirements:
+- Each sentence should be well-formed and grammatically correct
+- Use varied vocabulary appropriate to the domain
+- Include different sentence structures (simple, compound, complex)
+- Range from beginner to intermediate complexity
+- Focus on natural, conversational language
+- Include practical examples and real-world applications
+
+Domain: {domain}
+
+Generate sentences that would help someone learn both the language and concepts related to {domain}.
+Output only the sentences, one per line, without numbering or formatting.";
+
+            try
+            {
+                var response = await QueryLLM(prompt);
+
+                if (!string.IsNullOrEmpty(response))
+                {
+                    var sentences = response.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim())
+                        .Where(s => !string.IsNullOrWhiteSpace(s) && s.Length > 10 && s.Length < 200)
+                        .Take(maxSentences)
+                        .ToList();
+
+                    return sentences;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ LLM sentence generation failed for domain '{domain}': {ex.Message}");
+            }
+
+            return new List<string>();
+        }
+
+        /// <summary>
         /// Answer specific questions and provide learning content
         /// </summary>
         public async Task<AnswerResponse> AnswerQuestionAsync(string question, BrainState brainState)
@@ -332,6 +375,28 @@ Also suggest how this interaction could guide future learning priorities.";
                 stream = false,
                 format = format,
                 options = new { temperature = 0.1 }
+            };
+
+            var json = JsonSerializer.Serialize(request);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            
+            var response = await _httpClient.PostAsync(_apiUrl, content);
+            response.EnsureSuccessStatusCode();
+            
+            var responseText = await response.Content.ReadAsStringAsync();
+            var ollamaResponse = JsonSerializer.Deserialize<OllamaResponse>(responseText);
+            
+            return ollamaResponse.message.content;
+        }
+
+        private async Task<string> QueryLLM(string prompt)
+        {
+            var request = new
+            {
+                model = _model,
+                messages = new[] { new { role = "user", content = prompt } },
+                stream = false,
+                options = new { temperature = 0.3 } // Slightly higher temperature for more diverse sentences
             };
 
             var json = JsonSerializer.Serialize(request);

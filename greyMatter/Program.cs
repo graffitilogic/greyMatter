@@ -474,7 +474,7 @@ namespace GreyMatter
                     var realLangConfig = CerebroConfiguration.FromCommandLine(args);
                     realLangConfig.ValidateAndSetup();
 
-                    var dataPath = realLangConfig.TrainingDataRoot;
+                    var dataPath = Path.Combine(realLangConfig.TrainingDataRoot, "Tatoeba", "learning_data");
                     var brainPath = realLangConfig.BrainDataPath;
                     var maxWords = GetArgValue(args, "--max-words", 1000);
 

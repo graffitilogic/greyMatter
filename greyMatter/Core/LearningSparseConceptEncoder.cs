@@ -23,18 +23,12 @@ namespace GreyMatter.Core
         private readonly double _sparsity;
         private readonly SemanticStorageManager? _storageManager;
 
-        public LearningSparseConceptEncoder(int patternSize = 2048, double sparsity = 0.02)
-        {
-            _learnedPatterns = new Dictionary<string, LearnedSparsePattern>();
-            _wordRelationships = new Dictionary<string, List<string>>();
-            _semanticConcepts = new Dictionary<string, SemanticConcept>();
-            _random = new Random(42);
-            _patternSize = patternSize;
-            _sparsity = sparsity;
-            _storageManager = null;
-        }
+        /// <summary>
+        /// Check if this encoder has learned patterns from real data
+        /// </summary>
+        public bool HasLearnedPatterns => _learnedPatterns.Count > 0;
 
-        public LearningSparseConceptEncoder(SemanticStorageManager storageManager, int patternSize = 2048, double sparsity = 0.02)
+        public LearningSparseConceptEncoder(SemanticStorageManager? storageManager = null, int patternSize = 2048, double sparsity = 0.02)
         {
             _learnedPatterns = new Dictionary<string, LearnedSparsePattern>();
             _wordRelationships = new Dictionary<string, List<string>>();
@@ -480,6 +474,65 @@ namespace GreyMatter.Core
             {
                 Console.WriteLine($"   ⚠️ Failed to load learned patterns from storage: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Load learned patterns directly from JSON file
+        /// </summary>
+        public async Task LoadLearnedPatternsFromFileAsync(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                {
+                    Console.WriteLine($"⚠️ Learned patterns file not found: {filePath}");
+                    return;
+                }
+
+                var json = await File.ReadAllTextAsync(filePath);
+                var patterns = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json);
+
+                if (patterns != null)
+                {
+                    int loadedCount = 0;
+                    foreach (var kvp in patterns)
+                    {
+                        try
+                        {
+                            // Convert the pattern data into a LearnedSparsePattern
+                            var learnedPattern = new LearnedSparsePattern
+                            {
+                                ConceptId = kvp.Key,
+                                BasePattern = null, // We'll generate pattern based on the key
+                                LearnedFrom = new List<string> { "Tatoeba Dataset" },
+                                ConceptType = "Word",
+                                Confidence = 1.0
+                            };
+
+                            _learnedPatterns[kvp.Key.ToLower()] = learnedPattern;
+                            loadedCount++;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"⚠️ Failed to load pattern for '{kvp.Key}': {ex.Message}");
+                        }
+                    }
+
+                    Console.WriteLine($"✅ Loaded {loadedCount} learned patterns from file");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Failed to load learned patterns from file: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Get count of learned patterns
+        /// </summary>
+        public int GetLearnedPatternsCount()
+        {
+            return _learnedPatterns.Count;
         }
 
         /// <summary>

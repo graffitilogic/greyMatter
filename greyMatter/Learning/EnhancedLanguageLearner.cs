@@ -61,7 +61,7 @@ namespace GreyMatter
             var stopwatch = Stopwatch.StartNew();
 
             // Step 1: Load learning data
-            await LoadLearningDataAsync();
+            await LoadLearningDataAsync(targetVocabularySize);
 
             // Step 2: Load previously learned words
             await LoadLearnedWordsAsync();
@@ -99,85 +99,96 @@ namespace GreyMatter
             Console.WriteLine($"Learning rate: {(double)finalVocabSize / stopwatch.Elapsed.TotalMinutes:F0} words/minute");
         }
 
-        private async Task LoadLearningDataAsync()
+        private async Task LoadLearningDataAsync(int targetVocabularySize = 10000)
         {
-            Console.WriteLine("\n📚 **LOADING LEARNING DATA**");
+            Console.WriteLine($"\n📚 **ENHANCED MASSIVE DATA LEARNING** (Target: {targetVocabularySize:N0} words)");
 
-            // Try enhanced data files first, then fall back to standard Tatoeba files
-            var wordDbPath = Path.Combine(_dataPath, "enhanced_word_database.json");
-            var cooccurrencePath = Path.Combine(_dataPath, "enhanced_cooccurrence_matrix.json");
+            // DIRECTLY USE MASSIVE DATA SOURCES - No more pre-processed files!
+            await LearnFromMassiveDataSourcesAsync(targetVocabularySize);
+            
+            // Legacy fallback for compatibility (only if massive sources fail)
+            await LoadLegacyLearningDataIfNeeded(targetVocabularySize);
+        }
 
-            // If enhanced files don't exist, try standard Tatoeba files
-            if (!File.Exists(wordDbPath))
+        private async Task LoadLegacyLearningDataIfNeeded(int targetVocabularySize)
+        {
+            // Only use this if massive data sources completely failed
+            if (_encoder == null || !_encoder.HasLearnedPatterns)
             {
-                wordDbPath = Path.Combine(_dataPath, "word_database.json");
-                cooccurrencePath = Path.Combine(_dataPath, "cooccurrence_matrix.json");
-                Console.WriteLine("Using standard Tatoeba learning data");
-            }
-            else
-            {
-                Console.WriteLine("Using enhanced multi-source learning data");
-            }
-
-            if (!File.Exists(wordDbPath) || !File.Exists(cooccurrencePath))
-            {
-                Console.WriteLine($"⚠️ Learning data not found at: {wordDbPath}");
-                Console.WriteLine("🔄 Auto-converting Tatoeba data for continuous learning...");
+                Console.WriteLine("⚠️ Massive data learning failed - falling back to legacy pre-processed data");
                 
-                try
+                // Try enhanced data files first, then fall back to standard Tatoeba files
+                var wordDbPath = Path.Combine(_dataPath, "enhanced_word_database.json");
+                var cooccurrencePath = Path.Combine(_dataPath, "enhanced_cooccurrence_matrix.json");
+
+                // If enhanced files don't exist, try standard Tatoeba files
+                if (!File.Exists(wordDbPath))
                 {
-                    // Auto-convert Tatoeba data if it doesn't exist
-                    var tatoebaPath = Path.Combine(_dataPath, "Tatoeba", "sentences_eng_small.csv");
-                    if (!File.Exists(tatoebaPath))
+                    wordDbPath = Path.Combine(_dataPath, "word_database.json");
+                    cooccurrencePath = Path.Combine(_dataPath, "cooccurrence_matrix.json");
+                    Console.WriteLine("Using standard Tatoeba learning data");
+                }
+
+                if (!File.Exists(wordDbPath) || !File.Exists(cooccurrencePath))
+                {
+                    Console.WriteLine($"⚠️ Learning data not found at: {wordDbPath}");
+                    Console.WriteLine("🔄 Auto-converting Tatoeba data for continuous learning...");
+                    
+                    try
                     {
-                        // Try alternative common paths
-                        tatoebaPath = "/Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv";
+                        // Auto-convert Tatoeba data if it doesn't exist
+                        var tatoebaPath = Path.Combine(_dataPath, "Tatoeba", "sentences_eng_small.csv");
                         if (!File.Exists(tatoebaPath))
                         {
-                            throw new FileNotFoundException($"Tatoeba source data not found. Expected at: {tatoebaPath}");
+                            // Try alternative common paths
+                            tatoebaPath = "/Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv";
+                            if (!File.Exists(tatoebaPath))
+                            {
+                                throw new FileNotFoundException($"Tatoeba source data not found. Expected at: {tatoebaPath}");
+                            }
                         }
+                        
+                        // Use MUCH larger sentence count - no more artificial limits
+                        var targetSentences = Math.Max(500000, targetVocabularySize * 50); // 50 sentences per target word
+                        Console.WriteLine($"🔄 Converting {targetSentences:N0} sentences to support {targetVocabularySize:N0} word target...");
+                        
+                        var outputPath = Path.Combine(_dataPath, "Tatoeba", "learning_data");
+                        Directory.CreateDirectory(outputPath);
+                        
+                        var storage = new GreyMatter.Storage.SemanticStorageManager(_brainPath, _dataPath);
+                        var converter = new TatoebaDataConverter(tatoebaPath, outputPath, storage);
+                        await converter.ConvertAndBuildLearningDataAsync(targetSentences);
+                    
+                        Console.WriteLine("✅ Data conversion completed automatically");
+                        
+                        // Update paths to converted data
+                        wordDbPath = Path.Combine(outputPath, "word_database.json");
+                        cooccurrencePath = Path.Combine(outputPath, "cooccurrence_matrix.json");
                     }
-                    
-                    var outputPath = Path.Combine(_dataPath, "Tatoeba", "learning_data");
-                    Directory.CreateDirectory(outputPath);
-                    
-                    var storage = new GreyMatter.Storage.SemanticStorageManager(_brainPath, _dataPath);
-                    var converter = new TatoebaDataConverter(tatoebaPath, outputPath, storage);
-                    await converter.ConvertAndBuildLearningDataAsync(10000); // Reasonable default
-                    
-                    Console.WriteLine("✅ Data conversion completed automatically");
-                    
-                    // Update paths to converted data
-                    wordDbPath = Path.Combine(outputPath, "word_database.json");
-                    cooccurrencePath = Path.Combine(outputPath, "cooccurrence_matrix.json");
+                    catch (Exception ex)
+                    {
+                        throw new FileNotFoundException($"Failed to auto-convert learning data: {ex.Message}. You may need to run --convert-tatoeba-data manually.");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    throw new FileNotFoundException($"Failed to auto-convert learning data: {ex.Message}. You may need to run --convert-tatoeba-data manually.");
-                }
+
+                // Load word database with progress reporting
+                Console.Write("Loading legacy word database...");
+                var wordDbJson = await File.ReadAllTextAsync(wordDbPath);
+                _wordDatabase = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, TatoebaDataConverter.WordData>>(wordDbJson)
+                    ?? new Dictionary<string, TatoebaDataConverter.WordData>();
+                Console.WriteLine($" {_wordDatabase.Count:N0} words loaded");
+
+                // Load co-occurrence matrix
+                Console.Write("Loading legacy co-occurrence matrix...");
+                var cooccurrenceJson = await File.ReadAllTextAsync(cooccurrencePath);
+                _cooccurrenceMatrix = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(cooccurrenceJson)
+                    ?? new Dictionary<string, Dictionary<string, int>>();
+                Console.WriteLine($" {_cooccurrenceMatrix.Count:N0} entries loaded");
+
+                // Load existing vocabulary from storage manager
+                await LoadExistingVocabularyAsync();
+                await LoadLearnedWordsAsync();
             }
-
-            // Load word database with progress reporting
-            Console.Write("Loading word database...");
-            var wordDbJson = await File.ReadAllTextAsync(wordDbPath);
-            _wordDatabase = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, TatoebaDataConverter.WordData>>(wordDbJson)
-                ?? new Dictionary<string, TatoebaDataConverter.WordData>();
-            Console.WriteLine($" {_wordDatabase.Count:N0} words loaded");
-
-            // Load co-occurrence matrix
-            Console.Write("Loading co-occurrence matrix...");
-            var cooccurrenceJson = await File.ReadAllTextAsync(cooccurrencePath);
-            _cooccurrenceMatrix = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, int>>>(cooccurrenceJson)
-                ?? new Dictionary<string, Dictionary<string, int>>();
-            Console.WriteLine($" {_cooccurrenceMatrix.Count:N0} entries loaded");
-
-            // CRITICAL FIX: Learn from actual sentence data before processing words
-            await LearnFromSentenceDataAsync();
-
-            // Load existing vocabulary from storage manager
-            await LoadExistingVocabularyAsync();
-
-            await LoadLearnedWordsAsync();
         }
 
         private async Task LoadExistingVocabularyAsync()
@@ -567,8 +578,8 @@ namespace GreyMatter
                         var word = kvp.Key;
                         var cooccurrences = kvp.Value;
                         
-                        // Generate sparse activation pattern for word relationships
-                        var relationshipPattern = await _encoder.EncodeLearnedWordAsync($"cooccurrence_{word}");
+                        // Generate sparse activation pattern based on the word itself, not artificial cooccurrence_ prefix
+                        var relationshipPattern = await _encoder.EncodeLearnedWordAsync(word);
                         
                         // Create neural activation signature for the relationship
                         var neuralRelationship = new
@@ -649,6 +660,152 @@ namespace GreyMatter
             return selected;
         }
 
+        private async Task LearnFromMassiveDataSourcesAsync(int targetVocabularySize)
+        {
+            Console.WriteLine($"\n🌊 **LEARNING FROM MASSIVE DATA SOURCES**");
+            Console.WriteLine($"Target vocabulary: {targetVocabularySize:N0} words");
+            
+            // Calculate how many sentences we need to process to get the target vocabulary
+            var targetSentences = Math.Max(50000, targetVocabularySize * 50); // 50 sentences per word for rich context
+            
+            var allSentences = new List<string>();
+            
+            // 1. Load from Tatoeba (15+ million sentences)
+            await LoadTatoebaSentencesAsync(allSentences, targetSentences / 2);
+            
+            // 2. Load from SimpleWiki if available
+            await LoadSimpleWikiSentencesAsync(allSentences, targetSentences / 4);
+            
+            // 3. Generate from LLM Teacher for target vocabulary
+            await GenerateLLMTeacherSentencesAsync(allSentences, targetSentences / 4);
+            
+            Console.WriteLine($"📚 Collected {allSentences.Count:N0} sentences from massive data sources");
+            
+            // Learn patterns from this massive dataset
+            if (allSentences.Any())
+            {
+                Console.WriteLine("🧠 Learning neural patterns from massive dataset...");
+                await _encoder.LearnFromDataAsync(allSentences);
+                Console.WriteLine($"✅ Neural encoder trained on {allSentences.Count:N0} sentences");
+            }
+            else
+            {
+                Console.WriteLine("❌ No sentences available - falling back to limited data");
+                await LearnFromSentenceDataAsync(); // Fallback to old method
+            }
+        }
+
+        private async Task LoadTatoebaSentencesAsync(List<string> sentences, int maxSentences)
+        {
+            Console.Write($"🔤 Loading Tatoeba sentences (target: {maxSentences:N0})...");
+            
+            var tatoebaPath = "/Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv";
+            if (!File.Exists(tatoebaPath))
+            {
+                // Try alternative paths
+                var alternativePaths = new[]
+                {
+                    Path.Combine(_dataPath, "Tatoeba", "sentences_eng_small.csv"),
+                    "/Volumes/jarvis/trainData/Tatoeba/sentences.tsv",
+                    Path.Combine(_dataPath, "sentences.tsv")
+                };
+                
+                tatoebaPath = alternativePaths.FirstOrDefault(File.Exists);
+            }
+            
+            if (File.Exists(tatoebaPath))
+            {
+                var lines = await File.ReadAllLinesAsync(tatoebaPath);
+                var sentenceCount = 0;
+                
+                foreach (var line in lines.Skip(1).Take(maxSentences)) // Skip header
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    
+                    var parts = line.Split('\t');
+                    if (parts.Length >= 3 && parts[1] == "eng") // English sentences only
+                    {
+                        var sentence = parts[2].Trim();
+                        if (sentence.Length > 10 && sentence.Length < 200) // Reasonable length
+                        {
+                            sentences.Add(sentence);
+                            sentenceCount++;
+                        }
+                    }
+                    
+                    if (sentenceCount >= maxSentences) break;
+                }
+                
+                Console.WriteLine($" {sentenceCount:N0} loaded");
+            }
+            else
+            {
+                Console.WriteLine(" Tatoeba data not found");
+            }
+        }
+
+        private async Task LoadSimpleWikiSentencesAsync(List<string> sentences, int maxSentences)
+        {
+            Console.Write($"📖 Loading SimpleWiki sentences (target: {maxSentences:N0})...");
+            
+            // Look for SimpleWiki data
+            var wikiPaths = new[]
+            {
+                "/Volumes/jarvis/trainData/SimpleWiki/simple_wiki.txt",
+                Path.Combine(_dataPath, "SimpleWiki", "simple_wiki.txt"),
+                "/Volumes/jarvis/trainData/wiki_simple.txt"
+            };
+            
+            var wikiPath = wikiPaths.FirstOrDefault(File.Exists);
+            
+            if (wikiPath != null)
+            {
+                var content = await File.ReadAllTextAsync(wikiPath);
+                var wikiSentences = content.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(s => s.Trim())
+                    .Where(s => s.Length > 10 && s.Length < 200)
+                    .Take(maxSentences)
+                    .ToList();
+                
+                sentences.AddRange(wikiSentences);
+                Console.WriteLine($" {wikiSentences.Count:N0} loaded");
+            }
+            else
+            {
+                Console.WriteLine(" SimpleWiki data not found");
+            }
+        }
+
+        private async Task GenerateLLMTeacherSentencesAsync(List<string> sentences, int maxSentences)
+        {
+            Console.Write($"🤖 Generating LLM teacher sentences (target: {maxSentences:N0})...");
+            
+            try
+            {
+                // Use the LLM teacher to generate diverse sentence content
+                var llmTeacher = new LLMTeacher();
+                var generatedCount = 0;
+                
+                // Generate sentences across different domains
+                var domains = new[] { "science", "technology", "literature", "history", "philosophy", "mathematics", "art", "music", "sports", "nature" };
+                
+                foreach (var domain in domains)
+                {
+                    var domainSentences = await llmTeacher.GenerateTrainingSentencesAsync(domain, maxSentences / domains.Length);
+                    sentences.AddRange(domainSentences);
+                    generatedCount += domainSentences.Count;
+                    
+                    if (generatedCount >= maxSentences) break;
+                }
+                
+                Console.WriteLine($" {generatedCount:N0} generated");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($" LLM generation failed: {ex.Message}");
+            }
+        }
+
         private async Task LearnFromSentenceDataAsync()
         {
             Console.Write("Learning patterns from sentence data...");
@@ -707,7 +864,7 @@ namespace GreyMatter
             try
             {
                 // Step 1: Load learning data
-                await LoadLearningDataAsync();
+                await LoadLearningDataAsync(5000); // Default for continuous learning
                 await LoadLearnedWordsAsync();
 
                 int currentVocabCount;
