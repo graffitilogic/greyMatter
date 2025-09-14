@@ -111,8 +111,20 @@ namespace GreyMatter
                 try
                 {
                     // Initialize components
-                    var encoder = new GreyMatter.Core.LearningSparseConceptEncoder();
                     var storage = new GreyMatter.Storage.SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
+                    var encoder = new GreyMatter.Core.LearningSparseConceptEncoder(storage);
+                    
+                    // Load learned patterns from file
+                    var learnedPatternsPath = "/Volumes/jarvis/trainData/Tatoeba/learning_data/learned_patterns.json";
+                    if (System.IO.File.Exists(learnedPatternsPath))
+                    {
+                        await encoder.LoadLearnedPatternsFromFileAsync(learnedPatternsPath);
+                        Console.WriteLine("✅ Loaded learned patterns from file");
+                    }
+                    else
+                    {
+                        Console.WriteLine("⚠️ Learned patterns file not found");
+                    }
 
                     // Create validator
                     var validator = new GreyMatter.LearningValidationEvaluator(encoder, storage);

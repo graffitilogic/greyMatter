@@ -277,6 +277,32 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// Generate a base pattern for a learned word
+        /// </summary>
+        private bool[] GenerateBasePatternForWord(string word)
+        {
+            var pattern = new bool[_patternSize];
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes($"learned_word_{word.ToLower()}"));
+            var rng = new Random(BitConverter.ToInt32(hash, 0));
+            
+            // Create sparse pattern with proper density
+            var activeBits = (int)(_patternSize * _sparsity);
+            var indices = new HashSet<int>();
+            
+            while (indices.Count < activeBits)
+            {
+                indices.Add(rng.Next(_patternSize));
+            }
+            
+            foreach (var index in indices)
+            {
+                pattern[index] = true;
+            }
+            
+            return pattern;
+        }
+
+        /// <summary>
         /// Adapt learned pattern to specific context
         /// </summary>
         private async Task<SparsePattern> AdaptPatternToContextAsync(LearnedSparsePattern learnedPattern, string context)
@@ -499,11 +525,14 @@ namespace GreyMatter.Core
                     {
                         try
                         {
+                            // Generate a base pattern for this learned word
+                            var basePattern = GenerateBasePatternForWord(kvp.Key);
+                            
                             // Convert the pattern data into a LearnedSparsePattern
                             var learnedPattern = new LearnedSparsePattern
                             {
                                 ConceptId = kvp.Key,
-                                BasePattern = null, // We'll generate pattern based on the key
+                                BasePattern = basePattern,
                                 LearnedFrom = new List<string> { "Tatoeba Dataset" },
                                 ConceptType = "Word",
                                 Confidence = 1.0
