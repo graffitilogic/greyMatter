@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using GreyMatter.Core;
@@ -970,7 +971,8 @@ namespace GreyMatter.Storage
             return new JsonSerializerOptions
             {
                 WriteIndented = false,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Converters = { new GuidDictionaryConverter(), new GuidDictionaryConverterFactory(), new GuidListConverter() }
             };
         }
 

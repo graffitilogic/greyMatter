@@ -5,6 +5,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace GreyMatter.Storage
 {
@@ -25,6 +26,7 @@ namespace GreyMatter.Storage
         private readonly ConcurrentDictionary<string, DateTime> _lastAccessed;
         private readonly Timer _consolidationTimer;
         private readonly SemaphoreSlim _writeSemaphore;
+        private readonly JsonSerializerOptions _jsonOptions;
         
         public HybridTieredStorage(string workingSetPath = "/Users/billdodd/Desktop/Cerebro/working", 
                                   string coldStoragePath = "/Volumes/jarvis/brainData")
@@ -36,7 +38,13 @@ namespace GreyMatter.Storage
             _lastAccessed = new ConcurrentDictionary<string, DateTime>();
             _writeSemaphore = new SemaphoreSlim(10, 10); // Limit concurrent writes
             
-            // Ensure directories exist
+            // Configure JSON options with GUID dictionary support
+        _jsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = false,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new GuidDictionaryConverter(), new GuidDictionaryConverterFactory(), new GuidListConverter() }
+        };            // Ensure directories exist
             Directory.CreateDirectory(_workingSetPath);
             Directory.CreateDirectory(_coldStoragePath);
             
@@ -67,7 +75,7 @@ namespace GreyMatter.Storage
                     Directory.CreateDirectory(directory);
                 }
                 
-                var jsonData = JsonSerializer.Serialize(data);
+                var jsonData = JsonSerializer.Serialize(data, _jsonOptions);
                 await File.WriteAllTextAsync(filePath, jsonData);
                 
                 // Queue for background NAS consolidation
@@ -96,7 +104,7 @@ namespace GreyMatter.Storage
             if (File.Exists(fastPath))
             {
                 var content = await File.ReadAllTextAsync(fastPath);
-                var data = JsonSerializer.Deserialize<T>(content);
+                var data = JsonSerializer.Deserialize<T>(content, _jsonOptions);
                 _writeCache[key] = data;
                 _lastAccessed[key] = DateTime.UtcNow;
                 return data;
@@ -107,7 +115,7 @@ namespace GreyMatter.Storage
             if (File.Exists(coldPath))
             {
                 var content = await File.ReadAllTextAsync(coldPath);
-                var data = JsonSerializer.Deserialize<T>(content);
+                var data = JsonSerializer.Deserialize<T>(content, _jsonOptions);
                 _writeCache[key] = data;
                 _lastAccessed[key] = DateTime.UtcNow;
                 return data;
@@ -186,7 +194,7 @@ namespace GreyMatter.Storage
                     Directory.CreateDirectory(directory);
                 }
                 
-                var jsonData = JsonSerializer.Serialize(data);
+                var jsonData = JsonSerializer.Serialize(data, _jsonOptions);
                 await File.WriteAllTextAsync(filePath, jsonData);
             }
             catch (Exception ex)

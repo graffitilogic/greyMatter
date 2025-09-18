@@ -2,11 +2,185 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using GreyMatter.Core;
 
 namespace GreyMatter.Storage
 {
+    /// <summary>
+    /// Custom JSON converter for Dictionary<Guid, T> to handle GUID keys properly
+    /// </summary>
+    public class GuidDictionaryConverter : JsonConverter<Dictionary<Guid, double>>
+    {
+        public override Dictionary<Guid, double> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var dictionary = new Dictionary<Guid, double>();
+            
+            if (reader.TokenType != JsonTokenType.StartObject)
+                throw new JsonException("Expected StartObject token");
+            
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                    break;
+                
+                if (reader.TokenType != JsonTokenType.PropertyName)
+                    throw new JsonException("Expected PropertyName token");
+                
+                string? guidString = reader.GetString();
+                if (guidString == null || !Guid.TryParse(guidString, out Guid key))
+                    throw new JsonException($"Unable to parse GUID key: {guidString}");
+                
+                reader.Read();
+                if (reader.TokenType != JsonTokenType.Number)
+                    throw new JsonException("Expected Number token for dictionary value");
+                
+                double value = reader.GetDouble();
+                dictionary[key] = value;
+            }
+            
+            return dictionary;
+        }
+
+        public override void Write(Utf8JsonWriter writer, Dictionary<Guid, double> value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            
+            foreach (var kvp in value)
+            {
+                writer.WriteNumber(kvp.Key.ToString(), kvp.Value);
+            }
+            
+            writer.WriteEndObject();
+        }
+    }
+
+    /// <summary>
+    /// Generic converter factory for Dictionary<Guid, T> types
+    /// </summary>
+    public class GuidDictionaryConverterFactory : JsonConverterFactory
+    {
+        public override bool CanConvert(Type typeToConvert)
+        {
+            if (!typeToConvert.IsGenericType)
+                return false;
+
+            if (typeToConvert.GetGenericTypeDefinition() != typeof(Dictionary<,>))
+                return false;
+
+            var args = typeToConvert.GetGenericArguments();
+            return args[0] == typeof(Guid);
+        }
+
+        public override JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options)
+        {
+            var args = typeToConvert.GetGenericArguments();
+            var converterType = typeof(GuidDictionaryGenericConverter<>).MakeGenericType(args[1]);
+            return (JsonConverter)Activator.CreateInstance(converterType)!;
+        }
+    }
+
+    /// <summary>
+    /// Generic converter for Dictionary<Guid, T>
+    /// </summary>
+    public class GuidDictionaryGenericConverter<T> : JsonConverter<Dictionary<Guid, T>>
+    {
+        public override Dictionary<Guid, T> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var dictionary = new Dictionary<Guid, T>();
+            
+            if (reader.TokenType != JsonTokenType.StartObject)
+                throw new JsonException("Expected StartObject token");
+            
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndObject)
+                    break;
+                
+                if (reader.TokenType != JsonTokenType.PropertyName)
+                    throw new JsonException("Expected PropertyName token");
+                
+                string? guidString = reader.GetString();
+                if (guidString == null || !Guid.TryParse(guidString, out Guid key))
+                    throw new JsonException($"Unable to parse GUID key: {guidString}");
+                
+                reader.Read();
+                T? value = JsonSerializer.Deserialize<T>(ref reader, options);
+                if (value != null)
+                {
+                    dictionary[key] = value;
+                }
+            }
+            
+            return dictionary;
+        }
+
+        public override void Write(Utf8JsonWriter writer, Dictionary<Guid, T> value, JsonSerializerOptions options)
+        {
+            writer.WriteStartObject();
+            
+            foreach (var kvp in value)
+            {
+                writer.WritePropertyName(kvp.Key.ToString());
+                JsonSerializer.Serialize(writer, kvp.Value, options);
+            }
+            
+            writer.WriteEndObject();
+        }
+    }
+
+    /// <summary>
+    /// Custom converter for List<Guid> to handle GUID collections
+    /// </summary>
+    public class GuidListConverter : JsonConverter<List<Guid>>
+    {
+        public override List<Guid> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var list = new List<Guid>();
+            
+            if (reader.TokenType != JsonTokenType.StartArray)
+                throw new JsonException("Expected StartArray token");
+            
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.EndArray)
+                    break;
+                
+                if (reader.TokenType == JsonTokenType.String)
+                {
+                    string? guidString = reader.GetString();
+                    if (guidString != null && Guid.TryParse(guidString, out Guid guid))
+                    {
+                        list.Add(guid);
+                    }
+                    else
+                    {
+                        throw new JsonException($"Unable to parse GUID: {guidString}");
+                    }
+                }
+                else
+                {
+                    throw new JsonException("Expected String token for GUID");
+                }
+            }
+            
+            return list;
+        }
+
+        public override void Write(Utf8JsonWriter writer, List<Guid> value, JsonSerializerOptions options)
+        {
+            writer.WriteStartArray();
+            
+            foreach (var guid in value)
+            {
+                writer.WriteStringValue(guid.ToString());
+            }
+            
+            writer.WriteEndArray();
+        }
+    }
+
     /// <summary>
     /// Handles persistence of neuron clusters and brain state
     /// Optimized for lazy loading and efficient storage
@@ -19,13 +193,12 @@ namespace GreyMatter.Storage
         public BrainStorage(string basePath)
         {
             _basePath = basePath;
-            _jsonOptions = new JsonSerializerOptions
-            {
-                WriteIndented = false,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            };
-            
-            EnsureDirectoryStructure();
+        _jsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = false,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new GuidDictionaryConverter(), new GuidDictionaryConverterFactory(), new GuidListConverter() }
+        };            EnsureDirectoryStructure();
         }
 
         /// <summary>

@@ -574,6 +574,11 @@ namespace GreyMatter.Core
 
         #endregion
 
+        /// <summary>
+        /// Expose the MultiSourceLearningDataProvider for external access to quality reports
+        /// </summary>
+        public MultiSourceLearningDataProvider DataProvider => _dataProvider;
+
         public void Dispose()
         {
             _cancellationTokenSource?.Dispose();

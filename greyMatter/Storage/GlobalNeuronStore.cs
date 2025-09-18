@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using GreyMatter.Core;
 using System.Collections.Concurrent;
@@ -18,10 +19,11 @@ namespace GreyMatter.Storage
     public class GlobalNeuronStore
     {
         private readonly string _hierarchicalBasePath;
-        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
+        private readonly JsonSerializerOptions         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = false,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new GuidDictionaryConverter(), new GuidDictionaryConverterFactory(), new GuidListConverter() }
         };
 
         // Serialize writes per bank file to prevent concurrent writers thrashing the same partition

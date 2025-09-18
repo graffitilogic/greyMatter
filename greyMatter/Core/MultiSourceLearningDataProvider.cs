@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,6 +10,19 @@ using GreyMatter.DataIntegration;
 
 namespace GreyMatter.Core
 {
+    /// <summary>
+    /// Learning quality report containing session statistics and word occurrence data
+    /// </summary>
+    public class LearningQualityReport
+    {
+        public TimeSpan SessionDuration { get; set; }
+        public int TotalWordsProcessed { get; set; }
+        public int UniqueWordsLearned { get; set; }
+        public Dictionary<string, int> TopWordsByOccurrence { get; set; } = new Dictionary<string, int>();
+        public double AverageOccurrencePerWord { get; set; }
+        public DateTime GeneratedAt { get; set; }
+    }
+
     /// <summary>
     /// MultiSourceLearningDataProvider: Bridges the gap between multi-source data capabilities
     /// and actual learning implementation. Provides continuous streams of learning content
@@ -21,6 +35,12 @@ namespace GreyMatter.Core
         private readonly LLMTeacher _llmTeacher;
         private readonly string _nasPath;
         private readonly Random _random = new();
+        
+        // Thread-safe word occurrence tracking for quality monitoring
+        private readonly ConcurrentDictionary<string, int> _learnedWordOccurrences = new();
+        private readonly object _sessionStatsLock = new object();
+        private int _totalWordsProcessed = 0;
+        private DateTime _sessionStartTime = DateTime.Now;
         
         // Learning chunk management
         private readonly Queue<LearningChunk> _pendingChunks = new();
@@ -200,80 +220,129 @@ namespace GreyMatter.Core
 
         private async Task<LearningChunk> GenerateSimpleWikiChunk()
         {
-            // Simulate SimpleWiki data with educational content
-            var wikiWords = new[]
+            // Try to read actual SimpleWiki content from NAS
+            var simpleWikiPath = Path.Combine(_nasPath, "SimpleWiki", "simplewiki-latest-pages-articles-multistream.xml");
+            if (File.Exists(simpleWikiPath))
             {
-                "encyclopedia", "knowledge", "information", "article", "reference",
-                "facts", "education", "learning", "research", "scholarly", 
-                "academic", "scientific", "historical", "cultural", "social"
-            };
+                return await ReadWikiContentFromFileAsync(simpleWikiPath, DataSourceType.SimpleWiki);
+            }
             
-            return CreateChunkFromWords(wikiWords, DataSourceType.SimpleWiki, 0.4);
+            // Fallback to CBT data if SimpleWiki not available
+            var cbtPath = Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_train.txt");
+            if (File.Exists(cbtPath))
+            {
+                return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.SimpleWiki, 0.4);
+            }
+            
+            // No static arrays - return fallback only
+            return await GenerateFallbackChunk();
         }
 
         private async Task<LearningChunk> GenerateNewsChunk()
         {
-            // Simulate news data with current events vocabulary
-            var newsWords = new[]
+            // Try to read from enhanced learning data
+            var enhancedPath = Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json");
+            if (File.Exists(enhancedPath))
             {
-                "breaking", "headline", "reporter", "journalism", "current",
-                "events", "politics", "economy", "society", "government",
-                "policy", "international", "local", "national", "global"
-            };
+                return await ReadJsonContentFromFileAsync(enhancedPath, DataSourceType.NewsHeadlines, 0.5);
+            }
             
-            return CreateChunkFromWords(newsWords, DataSourceType.NewsHeadlines, 0.5);
+            // Try CBT data as news alternative
+            var cbtPath = Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_train.txt");
+            if (File.Exists(cbtPath))
+            {
+                return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.NewsHeadlines, 0.5);
+            }
+            
+            // No static arrays - return a chunk from actual files only
+            return await GenerateFallbackChunk();
         }
 
         private async Task<LearningChunk> GenerateScientificChunk()
         {
-            // Simulate scientific abstracts with technical vocabulary
-            var scienceWords = new[]
+            // Try reading from enhanced data
+            var enhancedPath = Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json");
+            if (File.Exists(enhancedPath))
             {
-                "hypothesis", "methodology", "analysis", "experiment", "research",
-                "findings", "conclusion", "theoretical", "empirical", "data",
-                "statistical", "correlation", "variable", "control", "observation"
-            };
+                return await ReadJsonContentFromFileAsync(enhancedPath, DataSourceType.ScientificAbstracts, 0.7);
+            }
             
-            return CreateChunkFromWords(scienceWords, DataSourceType.ScientificAbstracts, 0.7);
+            // Try CBT data for scientific vocabulary
+            var cbtPath = Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_train.txt");
+            if (File.Exists(cbtPath))
+            {
+                return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.ScientificAbstracts, 0.7);
+            }
+            
+            // No static arrays - return fallback
+            return await GenerateFallbackChunk();
         }
 
         private async Task<LearningChunk> GenerateTechnicalChunk()
         {
-            // Simulate technical documentation
-            var techWords = new[]
+            // Try enhanced data first
+            var enhancedPath = Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json");
+            if (File.Exists(enhancedPath))
             {
-                "algorithm", "implementation", "architecture", "framework", "protocol",
-                "interface", "optimization", "performance", "scalability", "reliability",
-                "specification", "documentation", "configuration", "deployment", "debugging"
-            };
+                return await ReadJsonContentFromFileAsync(enhancedPath, DataSourceType.TechnicalDocs, 0.8);
+            }
             
-            return CreateChunkFromWords(techWords, DataSourceType.TechnicalDocs, 0.8);
+            // Try CBT data for technical vocabulary
+            var cbtPath = Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_train.txt");
+            if (File.Exists(cbtPath))
+            {
+                return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.TechnicalDocs, 0.8);
+            }
+            
+            // No static arrays - return fallback
+            return await GenerateFallbackChunk();
         }
 
         private async Task<LearningChunk> GenerateSubtitlesChunk()
         {
-            // Simulate conversational language from subtitles
-            var conversationalWords = new[]
+            // Try to read from learning data sentences
+            var sentencesPath = Path.Combine(_nasPath, "learning_data", "sentences.csv");
+            if (File.Exists(sentencesPath))
             {
-                "conversation", "dialogue", "expression", "informal", "colloquial",
-                "speaking", "listening", "communication", "interaction", "response",
-                "question", "answer", "discussion", "chat", "talk"
-            };
+                return await ReadTextContentFromFileAsync(sentencesPath, DataSourceType.OpenSubtitles, 0.3);
+            }
             
-            return CreateChunkFromWords(conversationalWords, DataSourceType.OpenSubtitles, 0.3);
+            // Try CBT data for conversational language
+            var cbtPath = Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_train.txt");
+            if (File.Exists(cbtPath))
+            {
+                return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.OpenSubtitles, 0.3);
+            }
+            
+            // No static arrays - return fallback
+            return await GenerateFallbackChunk();
         }
 
         private async Task<LearningChunk> GenerateSocialMediaChunk()
         {
-            // Simulate social media language
-            var socialWords = new[]
+            // Try to read from learning data sentences (contains social language)
+            var sentencesPath = Path.Combine(_nasPath, "learning_data", "sentences.csv");
+            if (File.Exists(sentencesPath))
             {
-                "trending", "viral", "hashtag", "post", "comment", 
-                "share", "like", "follow", "network", "community",
-                "online", "digital", "social", "platform", "content"
-            };
+                return await ReadTextContentFromFileAsync(sentencesPath, DataSourceType.SocialMedia, 0.4);
+            }
             
-            return CreateChunkFromWords(socialWords, DataSourceType.SocialMedia, 0.4);
+            // Try enhanced learning data as alternative
+            var enhancedPath = Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json");
+            if (File.Exists(enhancedPath))
+            {
+                return await ReadJsonContentFromFileAsync(enhancedPath, DataSourceType.SocialMedia, 0.4);
+            }
+            
+            // Use CBT data as fallback instead of static arrays
+            var cbtPath = Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_train.txt");
+            if (File.Exists(cbtPath))
+            {
+                return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.SocialMedia, 0.4);
+            }
+            
+            // Last resort - use basic fallback
+            return await GenerateFallbackChunk();
         }
 
         private async Task<LearningChunk> GenerateLLMChunk()
@@ -321,34 +390,352 @@ namespace GreyMatter.Core
 
         private async Task<LearningChunk> GenerateFallbackChunk()
         {
-            // Emergency fallback using basic vocabulary
-            var fallbackWords = new List<string>
+            // Try to read from ANY available data file before using emergency static words
+            var possiblePaths = new[]
             {
-                "learning", "knowledge", "understanding", "wisdom", "intelligence",
-                "thinking", "reasoning", "analysis", "synthesis", "evaluation",
-                "creativity", "innovation", "discovery", "exploration", "investigation"
+                Path.Combine(_nasPath, "learning_data", "sentences.csv"),
+                Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json"),
+                Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_train.txt"),
+                Path.Combine(_nasPath, "CBT", "CBTest", "data", "cbt_valid.txt")
             };
             
-            return new LearningChunk
+            foreach (var path in possiblePaths)
             {
-                Words = fallbackWords.ToDictionary(w => w, w => new WordLearningData
+                if (File.Exists(path))
+                {
+                    if (path.EndsWith(".json"))
+                    {
+                        return await ReadJsonContentFromFileAsync(path, DataSourceType.Fallback, 0.5);
+                    }
+                    else
+                    {
+                        return await ReadTextContentFromFileAsync(path, DataSourceType.Fallback, 0.5);
+                    }
+                }
+            }
+            
+            // Emergency fallback ONLY if no files exist - generate basic words dynamically
+            var emergencyWords = new List<string>();
+            var baseWords = new[] { "learn", "think", "know", "understand", "discover" };
+            var prefixes = new[] { "re", "un", "pre", "over", "under" };
+            var suffixes = new[] { "ing", "ed", "er", "ly", "ness" };
+            
+            foreach (var baseWord in baseWords)
+            {
+                emergencyWords.Add(baseWord);
+                emergencyWords.Add(baseWord + suffixes[_random.Next(suffixes.Length)]);
+                emergencyWords.Add(prefixes[_random.Next(prefixes.Length)] + baseWord);
+            }
+            
+            return await Task.FromResult(new LearningChunk
+            {
+                Words = emergencyWords.Take(15).ToDictionary(w => w, w => new WordLearningData
                 {
                     Word = w,
                     Frequency = 1,
                     Difficulty = 0.5,
-                    Contexts = new List<string> { $"This is an example sentence using the word {w}." }
+                    Contexts = new List<string> { $"Emergency fallback context for {w}." }
                 }),
-                SentenceContexts = fallbackWords.Select(w => $"Learning about {w} is important for cognitive development.").ToList(),
+                SentenceContexts = emergencyWords.Take(15).Select(w => $"Emergency fallback using {w}.").ToList(),
                 SourceType = DataSourceType.Fallback,
                 AverageDifficulty = 0.5,
                 GeneratedAt = DateTime.UtcNow,
                 ChunkId = $"fallback_{Guid.NewGuid():N}",
                 Metadata = new Dictionary<string, string> { ["source"] = "emergency_fallback" }
+            });
+        }
+
+        private async Task<LearningChunk> ReadJsonContentFromFileAsync(string filePath, DataSourceType sourceType, double baseDifficulty)
+        {
+            try
+            {
+                var jsonContent = await File.ReadAllTextAsync(filePath);
+                
+                // Try to parse as word database format
+                if (jsonContent.Contains("words") || jsonContent.Contains("vocabulary"))
+                {
+                    // Extract words from JSON - this is a simplified approach
+                    // In practice, you'd want proper JSON parsing based on the actual structure
+                    var words = new HashSet<string>();
+                    var lines = jsonContent.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                                          .Where(line => line.Contains("\"") && !line.Contains("metadata"))
+                                          .Take(100);
+                    
+                    foreach (var line in lines)
+                    {
+                        var matches = System.Text.RegularExpressions.Regex.Matches(line, @"""([a-zA-Z]+)""");
+                        foreach (System.Text.RegularExpressions.Match match in matches)
+                        {
+                            var word = match.Groups[1].Value.ToLowerInvariant();
+                            
+                            // Skip JSON property names and metadata
+                            if (IsJsonPropertyName(word))
+                                continue;
+                            
+                            if (word.Length > 2 && word.Length < 20 && IsValidWord(word))
+                            {
+                                words.Add(word);
+                                if (words.Count >= 1000) break;
+                            }
+                        }
+                        if (words.Count >= 1000) break;
+                    }
+                    
+                    var selectedWords = words.OrderBy(x => _random.Next()).Take(15).ToArray();
+                    return CreateChunkFromWords(selectedWords, sourceType, baseDifficulty);
+                }
+                
+                // Fallback if JSON parsing fails - use emergency generation
+                return await GenerateEmergencyWords(sourceType, baseDifficulty);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading JSON from {filePath}: {ex.Message}");
+                return await GenerateEmergencyWords(sourceType, baseDifficulty);
+            }
+        }
+
+        private async Task<LearningChunk> ReadTextContentFromFileAsync(string filePath, DataSourceType sourceType, double baseDifficulty)
+        {
+            try
+            {
+                // Read file content in chunks to avoid memory issues
+                var lines = await Task.Run(() => File.ReadLines(filePath).Take(100).ToArray()); // Read first 100 lines
+                var words = new HashSet<string>();
+                
+                foreach (var line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    
+                    // Extract words from line, removing common punctuation
+                    var lineWords = line.Split(new[] { ' ', '\t', '\n', '\r', '.', ',', '!', '?', ';', ':', '"', '(', ')', '[', ']' }, 
+                                               StringSplitOptions.RemoveEmptyEntries)
+                                      .Where(w => w.Length > 2 && w.Length < 20 && IsValidWord(w))
+                                      .Select(w => w.ToLowerInvariant())
+                                      .Distinct();
+                    
+                    foreach (var word in lineWords)
+                    {
+                        words.Add(word);
+                        if (words.Count >= CHUNK_SIZE) break; // Use CHUNK_SIZE constant
+                    }
+                    if (words.Count >= CHUNK_SIZE) break;
+                }
+                
+                // Select random subset for this chunk - use 15 to match current chunk size
+                var selectedWords = words.OrderBy(x => _random.Next()).Take(15).ToArray();
+                
+                return CreateChunkFromWords(selectedWords, sourceType, baseDifficulty);
+            }
+            catch (Exception ex)
+            {
+                // Log error and use emergency generation
+                Console.WriteLine($"Error reading from {filePath}: {ex.Message}");
+                return await GenerateEmergencyWords(sourceType, baseDifficulty);
+            }
+        }
+
+        private async Task<LearningChunk> ReadWikiContentFromFileAsync(string filePath, DataSourceType sourceType)
+        {
+            try
+            {
+                // For XML files, we need special handling
+                // For now, treat as text file but we could add XML parsing later
+                return await ReadTextContentFromFileAsync(filePath, sourceType, 0.4);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading Wiki content from {filePath}: {ex.Message}");
+                return await GenerateEmergencyWords(sourceType, 0.4);
+            }
+        }
+
+        private async Task<LearningChunk> GenerateEmergencyWords(DataSourceType sourceType, double baseDifficulty)
+        {
+            // Generate words dynamically based on source type instead of static arrays
+            var words = new List<string>();
+            var baseWords = new[] { "word", "text", "content", "data", "item" };
+            var descriptors = sourceType.ToString().ToLowerInvariant().Replace("_", "").ToCharArray();
+            
+            // Generate words based on the source type name
+            for (int i = 0; i < 15; i++)
+            {
+                var baseWord = baseWords[i % baseWords.Length];
+                var suffix = i < 10 ? i.ToString() : descriptors[i % descriptors.Length].ToString();
+                words.Add($"{baseWord}{suffix}");
+            }
+            
+            return await Task.FromResult(CreateChunkFromWords(words.ToArray(), sourceType, baseDifficulty));
+        }
+
+        private bool IsJsonPropertyName(string word)
+        {
+            // Filter out common JSON property names that should not be learned as vocabulary
+            var propertyNames = new HashSet<string>
+            {
+                "word", "frequency", "difficulty", "contexts", "sentencecontexts", "metadata", 
+                "sourcetype", "averagedifficulty", "generatedat", "chunkid", "words", "data",
+                "id", "name", "value", "type", "source", "content", "text", "title", "url",
+                "created", "updated", "version", "count", "length", "size", "format",
+                "language", "encoding", "timestamp", "index", "key", "schema", "config"
             };
+            return propertyNames.Contains(word);
+        }
+
+        private bool IsValidWord(string word)
+        {
+            if (string.IsNullOrWhiteSpace(word)) return false;
+            
+            // Length constraints - too short or too long are likely garbage
+            if (word.Length < 2 || word.Length > 25) return false;
+            
+            // Must start and end with a letter (no leading/trailing punctuation)
+            if (!char.IsLetter(word[0]) || !char.IsLetter(word[^1])) return false;
+            
+            // Check for valid characters - only letters, hyphens, apostrophes, and periods (for abbreviations)
+            if (!word.All(c => char.IsLetter(c) || c == '-' || c == '\'' || c == '.')) return false;
+            
+            // Skip words that are mostly non-alphabetic
+            double letterRatio = word.Count(char.IsLetter) / (double)word.Length;
+            if (letterRatio < 0.7) return false;
+            
+            // Skip all-caps words (likely acronyms, sound effects, or technical terms)
+            if (word.All(c => char.IsUpper(c) || !char.IsLetter(c))) return false;
+            
+            // Skip words with excessive repetition (like "hahaha", "nooooo")
+            if (HasExcessiveRepetition(word)) return false;
+            
+            // Skip common subtitle garbage patterns
+            if (IsSubtitleGarbage(word)) return false;
+            
+            // Skip words with unusual character patterns (foreign encodings, corrupted text)
+            if (HasUnusualCharacterPatterns(word)) return false;
+            
+            // Skip words that are likely not English (too many consecutive consonants/vowels)
+            if (!HasReasonablePhonetics(word)) return false;
+            
+            return true;
+        }
+        
+        private bool HasExcessiveRepetition(string word)
+        {
+            // Check for patterns like "hahaha", "nooooo", "yessss"
+            for (int i = 0; i < word.Length - 2; i++)
+            {
+                char currentChar = word[i];
+                int consecutiveCount = 1;
+                
+                for (int j = i + 1; j < word.Length && word[j] == currentChar; j++)
+                {
+                    consecutiveCount++;
+                }
+                
+                // If any character repeats more than 3 times consecutively, likely garbage
+                if (consecutiveCount > 3) return true;
+            }
+            return false;
+        }
+        
+        private bool IsSubtitleGarbage(string word)
+        {
+            // Common subtitle artifacts and sound effects
+            string[] garbagePatterns = {
+                // Sound effects
+                "hmm", "uhh", "ahh", "ohh", "eww", "ugh", "heh", "pfft", "tsk", "shh",
+                "whoa", "huh", "duh", "meh", "bah", "psh", "tch", "oof", "yep", "nah",
+                
+                // Technical terms that appear in subtitles
+                "sync", "subs", "subtitle", "captioning", "encode", "decode", "fps",
+                "mkv", "avi", "mp4", "srt", "ass", "ssa", "vtt",
+                
+                // Common interjections that don't add learning value
+                "um", "uh", "er", "ah", "oh", "eh", "mm", "hm",
+                
+                // Internet/texting abbreviations
+                "lol", "wtf", "omg", "btw", "fyi", "imo", "tbh", "smh", "rip",
+                
+                // Single letters that shouldn't be learned as words
+                "a", "i", "o", "u", "e", "x", "y", "z"
+            };
+            
+            return garbagePatterns.Contains(word.ToLowerInvariant());
+        }
+        
+        private bool HasUnusualCharacterPatterns(string word)
+        {
+            // Check for patterns that suggest corrupted text or foreign encoding issues
+            
+            // Too many uppercase letters scattered throughout (not at beginning)
+            int uppercaseCount = word.Skip(1).Count(char.IsUpper);
+            if (uppercaseCount > word.Length / 3) return true;
+            
+            // Mixed case in unusual patterns (like "WoRd" or "woRD")
+            bool hasUnusualCasing = false;
+            for (int i = 1; i < word.Length - 1; i++)
+            {
+                if (char.IsUpper(word[i]) && char.IsLower(word[i-1]) && char.IsLower(word[i+1]))
+                {
+                    hasUnusualCasing = true;
+                    break;
+                }
+            }
+            if (hasUnusualCasing) return true;
+            
+            return false;
+        }
+        
+        private bool HasReasonablePhonetics(string word)
+        {
+            // Basic phonetic validation for English-like words
+            string vowels = "aeiouAEIOU";
+            string consonants = "bcdfghjklmnpqrstvwxyzBCDFGHJKLMNPQRSTVWXYZ";
+            
+            int maxConsecutiveConsonants = 0;
+            int maxConsecutiveVowels = 0;
+            int currentConsonants = 0;
+            int currentVowels = 0;
+            
+            foreach (char c in word)
+            {
+                if (!char.IsLetter(c)) continue;
+                
+                if (vowels.Contains(c))
+                {
+                    currentVowels++;
+                    currentConsonants = 0;
+                    maxConsecutiveVowels = Math.Max(maxConsecutiveVowels, currentVowels);
+                }
+                else if (consonants.Contains(c))
+                {
+                    currentConsonants++;
+                    currentVowels = 0;
+                    maxConsecutiveConsonants = Math.Max(maxConsecutiveConsonants, currentConsonants);
+                }
+            }
+            
+            // English words rarely have more than 4 consecutive consonants or 3 consecutive vowels
+            if (maxConsecutiveConsonants > 4 || maxConsecutiveVowels > 3) return false;
+            
+            // Word should have at least one vowel (with some exceptions for common words)
+            bool hasVowel = word.Any(c => vowels.Contains(c));
+            if (!hasVowel)
+            {
+                // Allow some common consonant-only words/abbreviations
+                string[] allowedConsonantWords = { "by", "my", "dry", "fly", "try", "cry", "spy", "sky", "why" };
+                if (!allowedConsonantWords.Contains(word.ToLowerInvariant()))
+                {
+                    return false;
+                }
+            }
+            
+            return true;
         }
 
         private LearningChunk CreateChunkFromWords(string[] words, DataSourceType sourceType, double baseDifficulty)
         {
+            // Track word occurrences for quality monitoring
+            TrackLearnedWords(words);
+            
             var chunkWords = words.ToDictionary(
                 word => word,
                 word => new WordLearningData
@@ -438,6 +825,124 @@ namespace GreyMatter.Core
                 _sourceStats[key].ChunksGenerated++;
                 _sourceStats[key].WordsProcessed += CHUNK_SIZE;
                 _sourceStats[key].LastAccessed = DateTime.UtcNow;
+            }
+        }
+
+        #endregion
+
+        #region Word Occurrence Tracking for Quality Monitoring
+
+        /// <summary>
+        /// Thread-safe method to track learned word occurrences across all learning threads
+        /// </summary>
+        private void TrackLearnedWords(string[] words)
+        {
+            foreach (var word in words)
+            {
+                // Thread-safe increment: if word exists, occurrence++, else add with count 1
+                _learnedWordOccurrences.AddOrUpdate(word, 1, (key, oldValue) => oldValue + 1);
+            }
+            
+            // Update session statistics
+            lock (_sessionStatsLock)
+            {
+                _totalWordsProcessed += words.Length;
+            }
+        }
+
+        /// <summary>
+        /// Get learning quality report showing top words by occurrence count
+        /// </summary>
+        public LearningQualityReport GetLearningQualityReport()
+        {
+            var sessionDuration = DateTime.Now - _sessionStartTime;
+            var topWords = _learnedWordOccurrences
+                .OrderByDescending(kvp => kvp.Value)
+                .Take(8)
+                .ToList();
+
+            return new LearningQualityReport
+            {
+                SessionDuration = sessionDuration,
+                TotalWordsProcessed = _totalWordsProcessed,
+                UniqueWordsLearned = _learnedWordOccurrences.Count,
+                TopWordsByOccurrence = topWords.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
+                AverageOccurrencePerWord = _learnedWordOccurrences.Count > 0 
+                    ? (double)_totalWordsProcessed / _learnedWordOccurrences.Count 
+                    : 0,
+                GeneratedAt = DateTime.Now
+            };
+        }
+
+        /// <summary>
+        /// Display learning quality report to console
+        /// </summary>
+        public void DisplayLearningQualityReport()
+        {
+            var report = GetLearningQualityReport();
+            
+            Console.WriteLine();
+            Console.WriteLine("📊 **LEARNING QUALITY REPORT**");
+            Console.WriteLine("=============================");
+            Console.WriteLine($"⏱️  Session Duration: {report.SessionDuration:hh\\:mm\\:ss}");
+            Console.WriteLine($"📚 Total Words Processed: {report.TotalWordsProcessed:N0}");
+            Console.WriteLine($"🔤 Unique Words Learned: {report.UniqueWordsLearned:N0}");
+            Console.WriteLine($"📈 Average Occurrences/Word: {report.AverageOccurrencePerWord:F2}");
+            Console.WriteLine();
+            Console.WriteLine("🏆 **TOP 8 LEARNED WORDS BY OCCURRENCE:**");
+            Console.WriteLine("========================================");
+            
+            int rank = 1;
+            foreach (KeyValuePair<string, int> kvp in report.TopWordsByOccurrence)
+            {
+                var indicator = GetQualityIndicator(kvp.Key, kvp.Value, report.AverageOccurrencePerWord);
+                Console.WriteLine($"   {rank}. {kvp.Key} ({kvp.Value} times) {indicator}");
+                rank++;
+            }
+            
+            Console.WriteLine();
+            Console.WriteLine("💡 Quality indicators: ✅ Expected, ⚠️  High frequency, 🚨 Potential anomaly");
+            Console.WriteLine();
+        }
+
+        /// <summary>
+        /// Get quality indicator for a word based on its occurrence pattern
+        /// </summary>
+        private string GetQualityIndicator(string word, int count, double averageOccurrence)
+        {
+            // Articles, prepositions, conjunctions are expected to have high frequency
+            string[] expectedHighFrequency = { "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "of", "for", "with", "by" };
+            
+            if (expectedHighFrequency.Contains(word.ToLowerInvariant()))
+            {
+                return "✅ (common word)";
+            }
+            
+            // If count is significantly higher than average, flag as potential anomaly
+            if (count > averageOccurrence * 3)
+            {
+                return "🚨 (potential anomaly)";
+            }
+            
+            // If count is moderately high, mark as high frequency
+            if (count > averageOccurrence * 1.5)
+            {
+                return "⚠️  (high frequency)";
+            }
+            
+            return "✅ (normal)";
+        }
+
+        /// <summary>
+        /// Reset word occurrence tracking for a new learning session
+        /// </summary>
+        public void ResetLearningQualityTracking()
+        {
+            _learnedWordOccurrences.Clear();
+            lock (_sessionStatsLock)
+            {
+                _totalWordsProcessed = 0;
+                _sessionStartTime = DateTime.Now;
             }
         }
 
