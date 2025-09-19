@@ -133,52 +133,39 @@ Centralized service that replaced 80+ scattered demo classes:
 - **Minimal Persistence**: Only essential patterns stored, details procedurally regenerated
 - **Semantic Clustering**: Related concepts grouped in biological-style "brain regions"
 
-## 📊 Current Status (September 2025)
+## 📊 Project Status (September 2025)
 
-### ✅ Production-Ready Components
-- **TrainingService**: Unified training interface replacing 80+ demo classes - **PRODUCTION READY**
-- **LLM-Guided Continuous Learning**: Revolutionary intelligent learning system with external LLM teacher
-- **Dynamic Curriculum Manager**: LLM analyzes progress and guides data source selection
-- **Multi-Source Data Integration**: 8+ data source types with automatic conversion
-- **True Neural Architecture**: Sparse Distributed Representations (SDRs) with biological activation patterns
-- **Ephemeral Neural Clusters**: Dynamic neural structure creation with shared neuron pools
-- **Semantic Storage System**: Huth-inspired brain-like organization with cortical columns
-- **FastStorageAdapter**: 1,350x performance improvement over legacy storage
-- **Real-time Interactive Learning**: Live `status`, `focus <topic>` commands during learning
-- **Zero Compilation Errors**: Production-ready codebase with full stability
+This repository is an active research prototype with several promising systems in place, plus areas that need consolidation and hardening. The sections below reflect the current, accurate state based on code and recent changes.
 
-### 🚀 Revolutionary LLM Teacher System
-- **External API Integration**: Ollama endpoint (http://192.168.69.138:11434) with deepseek-r1:1.5b model
-- **Intelligent Strategy Analysis**: LLM analyzes vocabulary size, learning rate, accuracy in real-time
-- **Dynamic Data Source Selection**: Automatic activation of scientific, conversational, news sources
-- **Structured JSON Responses**: Type-safe LLM communication with confidence scoring
-- **Background + Interactive Learning**: Continuous processing with LLM guidance overlay
-- **Automated Curriculum Generation**: LLM creates personalized learning paths
-- **Progress Monitoring**: Real-time analysis and strategy adjustment capabilities
+### ✅ What’s working now
+- Training entry points and demos build and run; core classes for brains, storage, learners, and evaluators are present.
+- TrainingService exists and is being adopted, but legacy demos still exist alongside it.
+- LLM Teacher integration (Ollama/deepseek-r1:1.5b) is wired up and can drive interactive sessions; analysis logic is evolving.
+- Multi-source data provider has been cleaned up to remove static fallback generators; it now expects real datasets on disk.
+- Storage layer includes a FastStorageAdapter implementation; migration from legacy paths is in progress.
+- Continuous learning can process large word counts and autosave; validation now reads the same storage used by training.
 
-### 🧬 True Biological Neural Learning
-- **Sparse Activation Patterns**: ~2% neuron activation per concept (biological realism)
-- **Neural Activation Storage**: Stores actual activation signatures `{ActivationSignature: [1,5,12,45], Strength: 0.85}`
-- **Synaptic Weight Encoding**: Word relationships as overlapping neural patterns
-- **Dynamic Memory Consolidation**: Repeated exposure strengthens activation patterns
-- **Shared Neuron Architecture**: Related concepts share neurons like biological brain regions
-- **Neural Fatigue**: Realistic usage-dependent performance patterns
+### 🛠️ In progress / needs work
+- Consolidating all training flows through TrainingService; retiring the many legacy demo entry points.
+- Finalizing the switch to FastStorageAdapter across all code paths; removing or isolating older storage managers.
+- Strengthening dataset handling (paths, formats, error messages) and adding minimal smoke tests per data source.
+- Tightening LLM Teacher loop (clear contracts, reliability, and evaluation hooks) and documenting failure modes.
+- Biological features (working memory, inter-column communication, attention/temporal binding) are mostly stubs/frameworks.
 
-### ⚡ Performance Achievements
-- **Processing Speed**: 8-15 concepts/second sustained
-- **Storage Performance**: 1,350x improvement (540s → 0.4s for 5K vocabulary)
-- **Memory Efficiency**: O(active_concepts) scaling achieved
-- **Build Stability**: 0 compilation errors, production-ready
-- **Continuous Learning**: 50,000+ words processed successfully with auto-save
-- **Real-time Guidance**: Sub-second LLM response times for strategy analysis
+### ⚠️ Known limitations
+- Some documentation previously overstated “production-ready” status; treat this repo as an R&D codebase.
+- Many demo classes remain; expect overlap and older patterns until consolidation completes.
+- Performance figures vary by configuration and are still being characterized; avoid assuming prior headline numbers.
+- Data sources require local files; no static, synthetic fallbacks remain. Missing data will error with clear messages.
 
-### 🎯 Advanced Capabilities
-- **Multi-Phase Learning**: Foundation → Intermediate → Advanced curriculum progression
-- **Real-time Brain Visualization**: FMRI-like activation pattern displays
-- **Procedural Cortical Columns**: Biological 80-120 neuron column generation
-- **Cross-Domain Knowledge Transfer**: Learned patterns applied across semantic domains
-- **Teacher-Student Validation**: LLM confirms and corrects learning progress
-- **Hierarchical Memory Organization**: Hippocampus-style indexing with cortical clustering
+### 📂 Training data location
+- Default training data root: `/Volumes/jarvis/trainData`
+- Expected examples:
+	- News: `news/headlines.txt`
+	- Scientific: `scientific/abstracts.txt`
+	- Technical: `technical/documentation.txt`
+	- Enhanced/CBT/Wiki files as configured in code
+	Ensure these exist or adjust the constructor/paths where appropriate.
 
 ## 🏗️ Technical Foundation
 
@@ -279,3 +266,38 @@ This is an experimental research project exploring the intersection of:
 ---
 
 **Bottom Line**: greyMatter has evolved from proof-of-concept to a **production-ready biologically-inspired neural learning system**. The revolutionary LLM-guided learning system demonstrates that external teacher integration + biological neural patterns + procedural generation can achieve sophisticated cognition more efficiently than massive parameter models. **We're no longer just experimenting - we're demonstrating working solutions.**
+
+## 🗺️ Roadmap to Desired End-State
+
+Goal: A trained system that hydrates cortical columns procedurally with minimal persistence during learning and can regenerate structures on demand during recognition/response, with continuous background consolidation.
+
+Phase 0 — Foundation cleanup (now → 2 weeks)
+- Remove synthetic/static fallbacks (done for multi-source provider); enforce real datasets with explicit errors.
+- Normalize configuration: single TrainingConfiguration (paths, batch sizes, storage adapter, teacher options).
+- Route CLI/Program.cs through TrainingService for all modes; retire legacy demo entry points incrementally.
+- Acceptance: one canonical “learn/validate” path; data path issues fail fast with actionable messages.
+
+Phase 1 — Storage and persistence (2–4 weeks)
+- Complete FastStorageAdapter migration; quarantine legacy storage behind a compatibility shim.
+- Add versioned schema and small integrity checks; implement periodic snapshots and quick-restore.
+- Acceptance: save/load within seconds for 50k–100k concepts; validated by Performance Validation task.
+
+Phase 2 — Procedural neural core (4–6 weeks)
+- Flesh out ProceduralCorticalColumnGenerator with consistent column templates and connection rules.
+- Implement working memory APIs and inter-column messaging primitives; basic attention/temporal gating.
+- Acceptance: measurable reuse/regeneration of columns across sessions; unit tests for regeneration correctness.
+
+Phase 3 — LLM Teacher maturation (parallel, 3–5 weeks)
+- Define strict contracts (inputs/outputs) for AnalyzeLearningState, ProvideConceptualMapping, SuggestCurriculum.
+- Add reliability guards: retries, timeouts, structured validation, and telemetry of teacher decisions.
+- Acceptance: teacher-driven focus measurably improves retention and learning rate on a fixed benchmark.
+
+Phase 4 — Data and evaluation harness (3–4 weeks)
+- Canonicalize data formats and loaders (news/science/tech/subtitles/wiki); add per-source smoke tests.
+- Build an evaluation harness for vocabulary growth, retention, and domain coverage.
+- Acceptance: green smoke tests on all sources; repeatable evaluation runs with tracked metrics.
+
+Phase 5 — Scaling and visualization (future)
+- Batch/parallel processing of concept clusters; live visualization hooks of “fmri-like” activity.
+- Multi-modal expansion (text-first → text+audio+vision) behind clean interfaces.
+- Acceptance: stable runs at 100k+ vocabulary, with interactive status and visualization.

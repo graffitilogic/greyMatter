@@ -29,8 +29,8 @@ public class TrainingService
 - **Maintainability**: 84+ demo classes → 1 service with methods
 - **Configuration**: Unified TrainingConfiguration management
 
-#### LLM-Guided Continuous Learning System (REVOLUTIONARY!)
-Complete transformation from simple prompt-based LLM teacher to intelligent continuous learning:
+#### LLM-Guided Continuous Learning System (functional prototype)
+Evolving from simple prompt-based LLM teacher toward an intelligent continuous learning loop:
 
 **Old System (Basic Prompts):**
 ```csharp
@@ -68,7 +68,7 @@ private async Task RunLLMGuidedContinuousLearning(LLMTeacher teacher, LLMTeacher
 }
 ```
 
-**LLM Intelligence Features:**
+**LLM Intelligence Features (implemented, evolving):**
 - **Learning State Analysis**: LLM analyzes vocabulary size, recent words, learning rate, accuracy
 - **Strategy Recommendation**: Suggests focus areas (vocabulary, concepts, relationships)
 - **Data Source Selection**: Maps topics to relevant data sources (scientific, social media, technical docs)
@@ -97,7 +97,7 @@ Implements Huth-inspired semantic architecture with:
 - **Shared neuron pool**: Global neuron management with location tracking
 - **Thread-safe operations**: Concurrent access via locks and semaphores
 
-### Storage Architecture (Biologically-Inspired)
+### Storage Architecture (Biologically-Inspired; migration in progress)
 
 ```
 /brainData/
@@ -257,8 +257,8 @@ public class FastStorageAdapter
 }
 ```
 
-### Spaced Repetition Neural Architecture (Advanced)
-**Revolutionary biological realism in neuron creation**:
+### Spaced Repetition Neural Architecture (Prototype)
+Biologically-inspired growth gating explaining early "Neurons Created: 0" observations:
 ```csharp
 // Sophisticated spaced repetition with growth gating
 private int GrowthHitThreshold = 3;  // Concepts must be seen 3+ times before neuron creation
@@ -294,11 +294,11 @@ public async Task<LearningResult> LearnConceptAsync(string concept, Dictionary<s
 - **Efficiency**: Prevents neural bloat from temporary or irrelevant concepts
 - **Learning Progress**: File growth occurs from concept tracking, not neuron creation
 
-### Memory Efficiency Strategy
-- **O(active_concepts) scaling**: Only load concepts currently in use
-- **Lazy loading**: Concepts loaded on-demand from semantic clusters
-- **LRU eviction**: Least recently used concepts removed from working memory
-- **Cluster caching**: Frequently accessed semantic domains cached in memory
+### Memory Efficiency Strategy (partial)
+- **O(active_concepts) scaling**: Partial
+- **Lazy loading**: Partial
+- **LRU eviction**: Basic
+- **Cluster caching**: Planned
 
 ## 🎓 Learning Pipeline (TrainingService-Based)
 
@@ -326,7 +326,7 @@ dotnet run -- --language-random-sample 1000  # Random sampling
 dotnet run -- --reading-comprehension         # Q&A capabilities
 ```
 
-### Data Processing Flow (Enhanced)
+### Data Processing Flow (Enhanced; requires local datasets)
 1. **TatoebaDataConverter**: Raw CSV → structured sentences
 2. **EnhancedDataIntegrator**: Multi-source data integration
    - **OpenSubtitles**: Conversational patterns from movies/TV
@@ -337,9 +337,9 @@ dotnet run -- --reading-comprehension         # Q&A capabilities
    - **News Headlines**: Current events vocabulary
 3. **ContinuousLearner**: Background processing with auto-save
 4. **LLMTeacher**: Intelligent analysis and guidance
-5. **ReadingComprehensionSystem**: Question-answer capabilities
+5. **ReadingComprehensionSystem**: Question-answer capabilities (prototype)
 
-### LLM-Guided Learning Modes
+### LLM-Guided Learning Modes (interactive loop present)
 
 #### Interactive Mode (Default)
 ```bash
@@ -542,9 +542,9 @@ GreyMatter.Demos.PerformanceBenchmarkRunner   // (Legacy - now via TrainingServi
 GreyMatter.Core.NeuronGrowthDiagnostic
 ```
 
-## 📊 Performance Metrics & Benchmarking (Updated - September 2025)
+## 📊 Performance Metrics & Benchmarking (September 2025)
 
-### Production Performance Metrics 
+### Observed Metrics (local runs; hardware/dataset dependent)
 ```
 Learning Performance (Production-Validated):
 ├── Processing Speed: 8-15 concepts/second sustained
@@ -554,7 +554,7 @@ Learning Performance (Production-Validated):
 ├── Storage Efficiency: ~120 bytes per concept (improved compression)
 └── Continuous Learning: 50,010 words processed at 6.6 words/second
 
-TrainingService Performance (Production Ready):
+TrainingService Adoption:
 ├── Unified Interface: 84+ demo classes → 1 parameterized service ✅
 ├── Type Safety: Parameter classes prevent argument errors ✅
 ├── Result Tracking: Standardized TrainingResult/ValidationResult ✅
@@ -562,7 +562,7 @@ TrainingService Performance (Production Ready):
 ├── Build Status: 0 compilation errors, production ready ✅
 └── API Stability: Zero breaking changes in 6+ months
 
-LLM-Guided Continuous Learning (Revolutionary):
+LLM-Guided Continuous Learning:
 ├── Background Processing: ContinuousLearner with auto-save every 100 words
 ├── Multi-Source Integration: 8+ data source types with intelligent selection
 ├── Real-time Analysis: Sub-second LLM response times for strategy guidance
@@ -571,7 +571,7 @@ LLM-Guided Continuous Learning (Revolutionary):
 ├── Success Rate: 100% learning success across 3,344 chunks processed
 └── Session Duration: 126.2 minutes sustained learning validated
 
-Storage Performance (Validated):
+Storage Performance (local tests):
 ├── Legacy System: 540 seconds for 5K vocabulary
 ├── FastStorageAdapter: 0.4 seconds for 5K vocabulary  
 ├── Improvement: 1,350x speedup validated in production
@@ -579,7 +579,7 @@ Storage Performance (Validated):
 ├── Compression: ~60% size reduction + hierarchical partitioning
 └── Auto-save: Every 100 words with memory consolidation (150MB→54MB)
 
-Semantic Classification (Enhanced):
+Semantic Classification:
 ├── Primary Domain Detection: ~98% accuracy on expanded test set
 ├── Subdomain Routing: Fully implemented with 24 semantic domains
 ├── Fallback Classification: LLM-based enhancement for unknown words
@@ -603,13 +603,10 @@ dotnet run -- --semantic-accuracy-test
 
 ## 🎯 Current Limitations & Optimization Targets
 
-### Resolved Issues ✅ (Production Status)
-1. **Architecture Complexity**: 84+ scattered demo classes → TrainingService with unified interface ✅
-2. **Documentation Sprawl**: 42+ scattered .md files → 3 organized documents ✅
-3. **LLM Teacher Limitations**: Basic prompts → Revolutionary intelligent continuous learning system ✅
-4. **Build Stability**: Compilation errors → 0 errors, production ready for 6+ months ✅
-5. **Performance Bottlenecks**: Legacy save times → FastStorageAdapter 1,350x improvement ✅
-6. **Learning Validation**: Theoretical system → 50,010 words successfully processed ✅
+### Recently Addressed
+1. Multi-source provider no longer generates synthetic fallback words; requires real data on disk.
+2. Validation now reads the same storage format used by training.
+3. Default training data root standardized (`/Volumes/jarvis/trainData`).
 
 ### Remaining Optimization Opportunities
 1. **Concept Loading**: Sequential loading → parallel batch loading (framework ready)
@@ -626,7 +623,7 @@ dotnet run -- --semantic-accuracy-test
 5. **Neural Structure Reuse**: Memory pool management across learning sessions for efficiency
 6. **Real-time Visualization**: Live 3D brain activity rendering for research and debugging
 
-### Production Scaling Targets (September 2025)
+### Scaling Targets (Aspirational)
 - **Vocabulary**: 100K+ words with sub-second access ✅ (framework validated)
 - **Concepts**: 1M+ concepts with efficient clustering (tested to 50K)
 - **Processing**: 100+ concepts/second sustained (current: 15/sec, scaling framework ready)
@@ -650,7 +647,7 @@ dotnet run -- --semantic-accuracy-test
 - **Emergence Testing**: Complex behaviors from simple interactions
 - **Scale Validation**: Performance at human brain scale (16B cortical neurons)
 
-### LLM-Guided Learning Studies (VALIDATED RESULTS!)
+### LLM-Guided Learning Studies (planned validation)
 - **Continuous vs. Batch Learning**: Real-time LLM guidance shows 34% improvement in learning efficiency
 - **Multi-Source Integration**: Optimal data source combination increases vocabulary retention by 28%
 - **Learning Strategy Optimization**: LLM-driven curriculum reduces time-to-competency by 41%
@@ -659,7 +656,7 @@ dotnet run -- --semantic-accuracy-test
 - **Teacher Confidence Correlation**: LLM confidence scores correlate 0.82 with actual learning success
 - **Real-time Adaptation**: Dynamic strategy adjustment based on progress improves outcomes 23%
 
-### Teacher-Student Learning Studies (PRODUCTION VALIDATED)
+### Teacher-Student Learning Studies (planned)
 - **Guided vs. Autonomous**: LLM teacher guidance shows 31% better retention than autonomous learning
 - **Curriculum Optimization**: Optimal concept introduction order reduces learning time by 26%
 - **Error Correction**: Real-time teacher feedback improves accuracy from 67% to 94%
@@ -668,7 +665,24 @@ dotnet run -- --semantic-accuracy-test
 - **Spaced Repetition**: Teacher-guided review cycles improve long-term retention by 52%
 - **Personalization**: Individual learning style adaptation increases engagement by 73%
 
-### TrainingService Evolution (Production Metrics)
+### TrainingService Evolution (tracking)
+
+---
+
+## 📂 Dataset Expectations & Paths
+
+Multi-source learning no longer uses synthetic/static fallbacks. Real files must be present, or the system will fail fast with clear errors.
+
+- Training data root (default): `/Volumes/jarvis/trainData`
+- Examples:
+    - News: `news/headlines.txt`
+    - Scientific: `scientific/abstracts.txt`
+    - Technical: `technical/documentation.txt`
+    - Enhanced: `enhanced_learning_data/enhanced_word_database.json`
+    - CBT: `CBT/CBTest/data/cbt_train.txt`
+    - SimpleWiki: `SimpleWiki/simplewiki-latest-pages-articles-multistream.xml`
+
+Configure via constructor/parameters or update paths to match your environment.
 - **Parameter Optimization**: Best practice parameter combinations validated across 15+ configurations
 - **Result Analytics**: Training outcome pattern analysis shows 94% success rate consistency
 - **Configuration Management**: Optimal settings documented for research, development, and production use cases
