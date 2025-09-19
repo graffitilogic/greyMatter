@@ -54,7 +54,7 @@ namespace GreyMatter.Core
         private DateTime _lastLLMGeneration = DateTime.MinValue;
         private readonly TimeSpan _llmGenerationInterval = TimeSpan.FromMinutes(30);
 
-        public MultiSourceLearningDataProvider(string nasPath = "/mnt/nas")
+        public MultiSourceLearningDataProvider(string nasPath = "/Volumes/jarvis/trainData")
         {
             _nasPath = nasPath;
             // Note: EnhancedDataIntegrator requires RealLanguageLearner parameter
@@ -240,7 +240,14 @@ namespace GreyMatter.Core
 
         private async Task<LearningChunk> GenerateNewsChunk()
         {
-            // Try to read from enhanced learning data
+            // Try to read from news-specific data sources
+            var newsPath = Path.Combine(_nasPath, "news", "headlines.txt");
+            if (File.Exists(newsPath))
+            {
+                return await ReadTextContentFromFileAsync(newsPath, DataSourceType.NewsHeadlines, 0.5);
+            }
+            
+            // Try enhanced learning data as fallback
             var enhancedPath = Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json");
             if (File.Exists(enhancedPath))
             {
@@ -254,12 +261,19 @@ namespace GreyMatter.Core
                 return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.NewsHeadlines, 0.5);
             }
             
-            // No static arrays - return a chunk from actual files only
-            return await GenerateFallbackChunk();
+            // No data files available - throw exception
+            throw new InvalidOperationException($"No news headlines data found. Expected files: {newsPath}, {enhancedPath}, or {cbtPath}");
         }
 
         private async Task<LearningChunk> GenerateScientificChunk()
         {
+            // Try scientific-specific data sources
+            var sciencePath = Path.Combine(_nasPath, "scientific", "abstracts.txt");
+            if (File.Exists(sciencePath))
+            {
+                return await ReadTextContentFromFileAsync(sciencePath, DataSourceType.ScientificAbstracts, 0.7);
+            }
+            
             // Try reading from enhanced data
             var enhancedPath = Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json");
             if (File.Exists(enhancedPath))
@@ -274,12 +288,19 @@ namespace GreyMatter.Core
                 return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.ScientificAbstracts, 0.7);
             }
             
-            // No static arrays - return fallback
-            return await GenerateFallbackChunk();
+            // No data files available - throw exception
+            throw new InvalidOperationException($"No scientific abstracts data found. Expected files: {sciencePath}, {enhancedPath}, or {cbtPath}");
         }
 
         private async Task<LearningChunk> GenerateTechnicalChunk()
         {
+            // Try technical-specific data sources
+            var techPath = Path.Combine(_nasPath, "technical", "documentation.txt");
+            if (File.Exists(techPath))
+            {
+                return await ReadTextContentFromFileAsync(techPath, DataSourceType.TechnicalDocs, 0.8);
+            }
+            
             // Try enhanced data first
             var enhancedPath = Path.Combine(_nasPath, "enhanced_learning_data", "enhanced_word_database.json");
             if (File.Exists(enhancedPath))
@@ -294,8 +315,8 @@ namespace GreyMatter.Core
                 return await ReadTextContentFromFileAsync(cbtPath, DataSourceType.TechnicalDocs, 0.8);
             }
             
-            // No static arrays - return fallback
-            return await GenerateFallbackChunk();
+            // No data files available - throw exception
+            throw new InvalidOperationException($"No technical documentation data found. Expected files: {techPath}, {enhancedPath}, or {cbtPath}");
         }
 
         private async Task<LearningChunk> GenerateSubtitlesChunk()
@@ -414,35 +435,8 @@ namespace GreyMatter.Core
                 }
             }
             
-            // Emergency fallback ONLY if no files exist - generate basic words dynamically
-            var emergencyWords = new List<string>();
-            var baseWords = new[] { "learn", "think", "know", "understand", "discover" };
-            var prefixes = new[] { "re", "un", "pre", "over", "under" };
-            var suffixes = new[] { "ing", "ed", "er", "ly", "ness" };
-            
-            foreach (var baseWord in baseWords)
-            {
-                emergencyWords.Add(baseWord);
-                emergencyWords.Add(baseWord + suffixes[_random.Next(suffixes.Length)]);
-                emergencyWords.Add(prefixes[_random.Next(prefixes.Length)] + baseWord);
-            }
-            
-            return await Task.FromResult(new LearningChunk
-            {
-                Words = emergencyWords.Take(15).ToDictionary(w => w, w => new WordLearningData
-                {
-                    Word = w,
-                    Frequency = 1,
-                    Difficulty = 0.5,
-                    Contexts = new List<string> { $"Emergency fallback context for {w}." }
-                }),
-                SentenceContexts = emergencyWords.Take(15).Select(w => $"Emergency fallback using {w}.").ToList(),
-                SourceType = DataSourceType.Fallback,
-                AverageDifficulty = 0.5,
-                GeneratedAt = DateTime.UtcNow,
-                ChunkId = $"fallback_{Guid.NewGuid():N}",
-                Metadata = new Dictionary<string, string> { ["source"] = "emergency_fallback" }
-            });
+            // No files found - throw exception instead of generating static content
+            throw new InvalidOperationException("No learning data files found at any of the expected paths. Please ensure training data is available.");
         }
 
         private async Task<LearningChunk> ReadJsonContentFromFileAsync(string filePath, DataSourceType sourceType, double baseDifficulty)
@@ -485,13 +479,13 @@ namespace GreyMatter.Core
                     return CreateChunkFromWords(selectedWords, sourceType, baseDifficulty);
                 }
                 
-                // Fallback if JSON parsing fails - use emergency generation
-                return await GenerateEmergencyWords(sourceType, baseDifficulty);
+                // Fallback if JSON parsing fails - return null to indicate failure
+                throw new InvalidOperationException($"Failed to parse JSON data from {filePath} - no valid learning content found");
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading JSON from {filePath}: {ex.Message}");
-                return await GenerateEmergencyWords(sourceType, baseDifficulty);
+                throw new InvalidOperationException($"Failed to read learning data from {filePath}: {ex.Message}");
             }
         }
 
@@ -529,9 +523,9 @@ namespace GreyMatter.Core
             }
             catch (Exception ex)
             {
-                // Log error and use emergency generation
+                // Log error and throw exception instead of generating static content
                 Console.WriteLine($"Error reading from {filePath}: {ex.Message}");
-                return await GenerateEmergencyWords(sourceType, baseDifficulty);
+                throw new InvalidOperationException($"Failed to read learning data from {filePath}: {ex.Message}");
             }
         }
 
@@ -546,26 +540,8 @@ namespace GreyMatter.Core
             catch (Exception ex)
             {
                 Console.WriteLine($"Error reading Wiki content from {filePath}: {ex.Message}");
-                return await GenerateEmergencyWords(sourceType, 0.4);
+                throw new InvalidOperationException($"Failed to read Wiki content from {filePath}: {ex.Message}");
             }
-        }
-
-        private async Task<LearningChunk> GenerateEmergencyWords(DataSourceType sourceType, double baseDifficulty)
-        {
-            // Generate words dynamically based on source type instead of static arrays
-            var words = new List<string>();
-            var baseWords = new[] { "word", "text", "content", "data", "item" };
-            var descriptors = sourceType.ToString().ToLowerInvariant().Replace("_", "").ToCharArray();
-            
-            // Generate words based on the source type name
-            for (int i = 0; i < 15; i++)
-            {
-                var baseWord = baseWords[i % baseWords.Length];
-                var suffix = i < 10 ? i.ToString() : descriptors[i % descriptors.Length].ToString();
-                words.Add($"{baseWord}{suffix}");
-            }
-            
-            return await Task.FromResult(CreateChunkFromWords(words.ToArray(), sourceType, baseDifficulty));
         }
 
         private bool IsJsonPropertyName(string word)
