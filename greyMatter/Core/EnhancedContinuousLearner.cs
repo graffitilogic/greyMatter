@@ -72,6 +72,11 @@ namespace GreyMatter.Core
             Console.WriteLine($"📊 Words per session: {WordsPerSession}");
         }
 
+        public EnhancedContinuousLearner(Cerebro brain, CerebroConfiguration config)
+            : this(brain, config.TrainingDataRoot)
+        {
+        }
+
         /// <summary>
         /// Start continuous learning with unlimited content from all sources
         /// </summary>

@@ -14,14 +14,12 @@ namespace GreyMatter
 {
     class Program
     {
-        private static TrainingService CreateTrainingService()
+        private static TrainingService CreateTrainingService(string[]? args = null)
         {
-            var config = new TrainingConfiguration
-            {
-                BrainDataPath = "/Volumes/jarvis/brainData",
-                TrainingDataRoot = "/Volumes/jarvis/trainData"
-            };
-            return new TrainingService(config);
+            // Build CerebroConfiguration from CLI args (or defaults) to keep paths centralized
+            var cfg = CerebroConfiguration.FromCommandLine(args ?? Array.Empty<string>());
+            cfg.ValidateAndSetup();
+            return new TrainingService(cfg);
         }
 
         static async Task Main(string[] args)
@@ -32,6 +30,49 @@ namespace GreyMatter
         // static async Task RunProgram(string[] args)
         static async Task RunProgram(string[] args)
         {
+            // Verify training data presence
+            if (args.Length > 0 && (args[0] == "--verify-training-data" || args[0] == "--verify-data"))
+            {
+                Console.WriteLine("🧪 Training Data Verification\n============================");
+                try
+                {
+                    var cfg = CerebroConfiguration.FromCommandLine(args);
+                    cfg.ValidateAndSetup();
+                    var root = cfg.TrainingDataRoot;
+
+                    var expected = new (string label, string path)[]
+                    {
+                        ("SimpleWiki XML", System.IO.Path.Combine(root, "SimpleWiki", "simplewiki-latest-pages-articles-multistream.xml")),
+                        ("News Headlines", System.IO.Path.Combine(root, "news", "headlines.txt")),
+                        ("Scientific Abstracts", System.IO.Path.Combine(root, "scientific", "abstracts.txt")),
+                        ("Technical Docs", System.IO.Path.Combine(root, "technical", "documentation.txt")),
+                        ("Enhanced Word DB", System.IO.Path.Combine(root, "enhanced_learning_data", "enhanced_word_database.json")),
+                        ("CBT Train", System.IO.Path.Combine(root, "CBT", "CBTest", "data", "cbt_train.txt")),
+                        ("Learning Sentences", System.IO.Path.Combine(root, "learning_data", "sentences.csv"))
+                    };
+
+                    int found = 0;
+                    foreach (var (label, path) in expected)
+                    {
+                        var exists = System.IO.File.Exists(path) || System.IO.Directory.Exists(path);
+                        Console.WriteLine($"{(exists ? "✅" : "❌")} {label}: {path}");
+                        if (exists) found++;
+                    }
+
+                    Console.WriteLine($"\n📁 Root: {root}");
+                    Console.WriteLine($"📊 Found {found}/{expected.Length} expected items");
+                    if (found == 0)
+                    {
+                        Console.WriteLine("🚫 No datasets detected. Ensure your NAS is mounted and TRAINING_DATA_ROOT is correct.");
+                        Console.WriteLine("Tip: dotnet run -- --verify-training-data -td /Volumes/jarvis/trainData");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Verification error: {ex.Message}");
+                }
+                return;
+            }
             // Legacy sparse encoding test (use --evaluate instead)
             if (args.Length > 0 && (args[0] == "--test-sparse" || args[0] == "--sparse-encoding"))
             {
@@ -231,7 +272,7 @@ namespace GreyMatter
                 var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("⏱️  Starting Tatoeba Hybrid Integration...");
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = 500,
@@ -257,7 +298,7 @@ namespace GreyMatter
                 Console.WriteLine();
                 Console.WriteLine("⏱️  Starting Full-Scale Hybrid Training...");
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = 100000, // Large scale
@@ -283,7 +324,7 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting Random Sampling Hybrid Training...");
                 Console.WriteLine();
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = 500,
@@ -309,7 +350,7 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting Debug Hybrid Training...");
                 Console.WriteLine();
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = 10,
@@ -334,7 +375,7 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting 1K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = 1000,
@@ -359,7 +400,7 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting 10K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = 10000,
@@ -384,7 +425,7 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting 100K Sentence Hybrid Training...");
                 Console.WriteLine();
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = 100000,
@@ -410,7 +451,7 @@ namespace GreyMatter
                 Console.WriteLine("⏱️  Starting Complete Dataset Hybrid Training...");
                 Console.WriteLine();
                 
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var parameters = new TatoebaTrainingParameters
                 {
                     SentenceCount = int.MaxValue, // Complete dataset
@@ -525,7 +566,7 @@ namespace GreyMatter
 
                     // Initialize enhanced continuous learner with multi-source capabilities
                     var brain = new Cerebro(brainPath);
-                    var enhancedLearner = new EnhancedContinuousLearner(brain, dataPath);
+                    var enhancedLearner = new EnhancedContinuousLearner(brain, continuousConfig);
                     
                     Console.WriteLine("✅ Enhanced multi-source brain initialized");
                     Console.WriteLine("   📚 SimpleWiki, news, scientific abstracts, and more");
@@ -598,7 +639,7 @@ namespace GreyMatter
 
                 try
                 {
-                    var trainingService = CreateTrainingService();
+                    var trainingService = CreateTrainingService(args);
                     var parameters = new LLMTeacherParameters
                     {
                         ApiEndpoint = "http://192.168.69.138:11434/api/chat",
@@ -641,7 +682,7 @@ namespace GreyMatter
             // Check for simple demo first
             if (args.Length > 0 && (args[0] == "--simple-demo" || args[0] == "--original-vision"))
             {
-                var trainingService = CreateTrainingService();
+                var trainingService = CreateTrainingService(args);
                 var result = trainingService.RunSimpleEphemeralDemo();
                 Console.WriteLine($"✅ Simple ephemeral demo completed - Success: {result.Success}, Concepts: {result.ConceptsLearned}");
                 return;

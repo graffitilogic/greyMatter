@@ -15,11 +15,11 @@ namespace GreyMatter.Core
     /// </summary>
     public class TrainingService
     {
-        private readonly TrainingConfiguration _config;
+        private readonly CerebroConfiguration _config;
         private readonly SemanticStorageManager _storage;
         private Cerebro? _cerebro;
 
-        public TrainingService(TrainingConfiguration config)
+        public TrainingService(CerebroConfiguration config)
         {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _storage = new SemanticStorageManager(_config.BrainDataPath, _config.TrainingDataRoot);
@@ -508,11 +508,6 @@ namespace GreyMatter.Core
 
     #region Configuration Classes
 
-    public class TrainingConfiguration
-    {
-        public string BrainDataPath { get; set; } = "/Volumes/jarvis/brainData";
-        public string TrainingDataRoot { get; set; } = "/Volumes/jarvis/trainData";
-    }
 
     public class TatoebaTrainingParameters
     {
