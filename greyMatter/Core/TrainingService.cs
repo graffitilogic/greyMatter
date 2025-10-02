@@ -262,6 +262,127 @@ namespace GreyMatter.Core
             return result;
         }
 
+        /// <summary>
+        /// Run continuous learning with background processing
+        /// Replaces EnhancedContinuousLearningDemo and legacy --continuous-learning
+        /// </summary>
+        public async Task<TrainingResult> RunContinuousLearningAsync(ContinuousLearningParameters parameters)
+        {
+            var result = new TrainingResult { StartTime = DateTime.UtcNow };
+
+            try
+            {
+                Console.WriteLine($"🔄 Starting Continuous Learning");
+                Console.WriteLine($"   Max words: {parameters.MaxWords:N0}");
+                Console.WriteLine($"   Batch size: {parameters.BatchSize}");
+                Console.WriteLine($"   Auto-save: {parameters.AutoSave}");
+                Console.WriteLine($"   Training data: {_config.TrainingDataRoot}");
+                Console.WriteLine();
+
+                // Initialize Cerebro with storage path
+                _cerebro = _cerebro ?? new Cerebro(_config.BrainDataPath);
+                await _cerebro.InitializeAsync();
+
+                // Initialize continuous learner with centralized config
+                using var continuousLearner = new EnhancedContinuousLearner(_cerebro, _config);
+                continuousLearner.WordsPerSession = parameters.BatchSize;
+
+                // Run continuous learning to target word count
+                var wordsLearned = await continuousLearner.StartContinuousLearningAsync(parameters.MaxWords);
+
+                result.Success = true;
+                result.ProcessedWords = wordsLearned;
+                Console.WriteLine($"✅ Continuous learning complete: {wordsLearned:N0} words processed");
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = ex.Message;
+                Console.WriteLine($"❌ Continuous learning failed: {ex.Message}");
+            }
+            finally
+            {
+                result.EndTime = DateTime.UtcNow;
+                result.Duration = result.EndTime - result.StartTime;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Convert Tatoeba data format
+        /// Replaces direct TatoebaDataConverter calls
+        /// </summary>
+        public async Task<ConversionResult> ConvertTatoebaDataAsync(string inputPath, string outputPath)
+        {
+            var result = new ConversionResult { StartTime = DateTime.UtcNow };
+
+            try
+            {
+                Console.WriteLine($"🔄 Converting Tatoeba Data");
+                Console.WriteLine($"   Input: {inputPath}");
+                Console.WriteLine($"   Output: {outputPath}");
+                Console.WriteLine();
+
+                var converter = new TatoebaDataConverter(inputPath, outputPath, _storage);
+                await converter.ConvertAndBuildLearningDataAsync(maxSentences: 50000);
+
+                result.Success = true;
+                result.RecordsProcessed = 50000; // Approximate - TatoebaDataConverter doesn't return count
+                Console.WriteLine($"✅ Conversion complete");
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = ex.Message;
+                Console.WriteLine($"❌ Conversion failed: {ex.Message}");
+            }
+            finally
+            {
+                result.EndTime = DateTime.UtcNow;
+                result.Duration = result.EndTime - result.StartTime;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Convert enhanced data format
+        /// Replaces direct EnhancedDataConverter calls
+        /// </summary>
+        public async Task<ConversionResult> ConvertEnhancedDataAsync(string inputPath, string outputPath)
+        {
+            var result = new ConversionResult { StartTime = DateTime.UtcNow };
+
+            try
+            {
+                Console.WriteLine($"🔄 Converting Enhanced Data");
+                Console.WriteLine($"   Input: {inputPath}");
+                Console.WriteLine($"   Output: {outputPath}");
+                Console.WriteLine();
+
+                var converter = new EnhancedDataConverter(inputPath, outputPath);
+                await converter.ConvertAllSourcesAsync(maxSentences: 50000);
+
+                result.Success = true;
+                result.RecordsProcessed = 50000; // Approximate - EnhancedDataConverter doesn't return count
+                Console.WriteLine($"✅ Conversion complete");
+            }
+            catch (Exception ex)
+            {
+                result.Success = false;
+                result.ErrorMessage = ex.Message;
+                Console.WriteLine($"❌ Conversion failed: {ex.Message}");
+            }
+            finally
+            {
+                result.EndTime = DateTime.UtcNow;
+                result.Duration = result.EndTime - result.StartTime;
+            }
+
+            return result;
+        }
+
         #region Private Helper Methods
 
         private Task InitializeTrainingSystemAsync(bool resetBrain)
@@ -532,6 +653,13 @@ namespace GreyMatter.Core
         public string[]? ConceptsToLearn { get; set; }
     }
 
+    public class ContinuousLearningParameters
+    {
+        public int MaxWords { get; set; } = 5000;
+        public int BatchSize { get; set; } = 100;
+        public bool AutoSave { get; set; } = true;
+    }
+
     public class ValidationParameters
     {
         public bool TestStorage { get; set; } = true;
@@ -581,6 +709,16 @@ namespace GreyMatter.Core
         public TimeSpan Duration { get; set; }
         public string? ErrorMessage { get; set; }
         public int ConceptsLearned { get; set; }
+    }
+
+    public class ConversionResult
+    {
+        public bool Success { get; set; }
+        public DateTime StartTime { get; set; }
+        public DateTime EndTime { get; set; }
+        public TimeSpan Duration { get; set; }
+        public string? ErrorMessage { get; set; }
+        public int RecordsProcessed { get; set; }
     }
 
     public class StorageMetrics
