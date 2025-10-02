@@ -470,32 +470,25 @@ namespace GreyMatter
             // Check for Tatoeba data conversion
             if (args.Length > 0 && (args[0] == "--convert-tatoeba-data" || args[0] == "--convert-tatoeba"))
             {
-                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🔄 **TATOEBA DATA CONVERSION**");
                 Console.WriteLine("==============================");
-                Console.WriteLine("⏱️  Starting Tatoeba Data Conversion...");
 
                 try
                 {
-                    var tatoebaPath = GetArgValue(args, "--input", "/Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv");
+                    var trainingService = CreateTrainingService(args);
+                    var inputPath = GetArgValue(args, "--input", "/Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv");
                     var outputPath = GetArgValue(args, "--output", "/Volumes/jarvis/trainData/Tatoeba/learning_data");
-                    var maxSentences = GetArgValue(args, "--max-sentences", 10000);
 
-                    var storage = new GreyMatter.Storage.SemanticStorageManager("/Volumes/jarvis/brainData", "/Volumes/jarvis/trainData");
-                    var converter = new TatoebaDataConverter(tatoebaPath, outputPath, storage);
-                    await converter.ConvertAndBuildLearningDataAsync(maxSentences);
+                    var result = await trainingService.ConvertTatoebaDataAsync(inputPath, outputPath);
 
-                    Console.WriteLine("\n✅ **DATA CONVERSION COMPLETE**");
-                    Console.WriteLine($"📁 Output saved to: {outputPath}");
-                    
-                    totalTimer.Stop();
-                    Console.WriteLine($"⏱️  Tatoeba Data Conversion completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                    if (result.Success)
+                    {
+                        Console.WriteLine($"📁 Output saved to: {outputPath}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    totalTimer.Stop();
                     Console.WriteLine($"❌ Error during conversion: {ex.Message}");
-                    Console.WriteLine($"⏱️  Tatoeba Data Conversion failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 return;
             }
@@ -503,31 +496,25 @@ namespace GreyMatter
             // Check for enhanced data conversion (multiple sources)
             if (args.Length > 0 && (args[0] == "--convert-enhanced-data" || args[0] == "--enhanced-data-converter"))
             {
-                var totalTimer = Stopwatch.StartNew();
                 Console.WriteLine("🚀 **ENHANCED DATA CONVERSION**");
                 Console.WriteLine("==============================");
-                Console.WriteLine("⏱️  Starting Enhanced Data Conversion...");
 
                 try
                 {
+                    var trainingService = CreateTrainingService(args);
                     var dataRoot = GetArgValue(args, "--data-root", "/Volumes/jarvis/trainData");
                     var outputPath = GetArgValue(args, "--output", "/Volumes/jarvis/trainData/enhanced_learning_data");
-                    var maxSentences = GetArgValue(args, "--max-sentences", 50000);
 
-                    var converter = new EnhancedDataConverter(dataRoot, outputPath);
-                    await converter.ConvertAllSourcesAsync(maxSentences);
+                    var result = await trainingService.ConvertEnhancedDataAsync(dataRoot, outputPath);
 
-                    Console.WriteLine("\n✅ **ENHANCED DATA CONVERSION COMPLETE**");
-                    Console.WriteLine($"📁 Output saved to: {outputPath}");
-                    
-                    totalTimer.Stop();
-                    Console.WriteLine($"⏱️  Enhanced Data Conversion completed in {totalTimer.Elapsed.TotalSeconds:F2} seconds");
+                    if (result.Success)
+                    {
+                        Console.WriteLine($"📁 Output saved to: {outputPath}");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    totalTimer.Stop();
                     Console.WriteLine($"❌ Error during enhanced conversion: {ex.Message}");
-                    Console.WriteLine($"⏱️  Enhanced Data Conversion failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
                 }
                 return;
             }
@@ -537,72 +524,32 @@ namespace GreyMatter
             {
                 Console.WriteLine("🧠 **ENHANCED CONTINUOUS LEARNING MODE**");
                 Console.WriteLine("=======================================");
-                Console.WriteLine("🚀 NEW: Unlimited multi-source learning with LLM teacher");
+                Console.WriteLine("🚀 Unlimited multi-source learning with LLM teacher");
                 Console.WriteLine("📊 Accessing millions of words from multiple datasets");
                 Console.WriteLine("🤖 Dynamic curriculum generation and content adaptation");
-                Console.WriteLine("Can run indefinitely with interruptible learning\n");
-
-                var totalTimer = Stopwatch.StartNew();
-                var sessionTimer = new Stopwatch();
+                Console.WriteLine();
 
                 try
                 {
-                    // Use CerebroConfiguration for consistent path handling
-                    var continuousConfig = CerebroConfiguration.FromCommandLine(args);
-                    continuousConfig.ValidateAndSetup();
+                    var trainingService = CreateTrainingService(args);
+                    var parameters = new ContinuousLearningParameters
+                    {
+                        MaxWords = GetArgValue(args, "--max-words", 10000),
+                        BatchSize = GetArgValue(args, "--batch-size", 1000),
+                        AutoSave = true // Always auto-save during continuous learning
+                    };
 
-                    var dataPath = continuousConfig.TrainingDataRoot;
-                    var brainPath = continuousConfig.BrainDataPath;
-                    var maxWords = GetArgValue(args, "--max-words", 10000);
-                    var batchSize = GetArgValue(args, "--batch-size", 1000);
-                    var autoSaveInterval = GetArgValue(args, "--auto-save", 300); // 5 minutes default
+                    var result = await trainingService.RunContinuousLearningAsync(parameters);
 
-                    Console.WriteLine($"📁 Data Path: {dataPath}");
-                    Console.WriteLine($"🧠 Brain Path: {brainPath}");
-                    Console.WriteLine($"📊 Target Words: {maxWords}");
-                    Console.WriteLine($"🔄 Batch Size: {batchSize}");
-                    Console.WriteLine($"💾 Auto-save: {autoSaveInterval}s intervals");
-                    Console.WriteLine();
-
-                    // Initialize enhanced continuous learner with multi-source capabilities
-                    var brain = new Cerebro(brainPath);
-                    var enhancedLearner = new EnhancedContinuousLearner(brain, continuousConfig);
-                    
-                    Console.WriteLine("✅ Enhanced multi-source brain initialized");
-                    Console.WriteLine("   📚 SimpleWiki, news, scientific abstracts, and more");
-                    Console.WriteLine("   🤖 LLM teacher for dynamic content generation");
-                    Console.WriteLine("   🔄 Unlimited learning beyond static datasets");
-
-                    // Start enhanced continuous learning loop
-                    Console.WriteLine("\n🚀 **STARTING ENHANCED CONTINUOUS LEARNING**");
-                    Console.WriteLine("==========================================");
-                    Console.WriteLine("🆕 Using NEW unlimited multi-source architecture");
-                    Console.WriteLine("Press Ctrl+C to interrupt and save progress");
-                    Console.WriteLine("Learning will continue until target reached or interrupted\n");
-
-                    sessionTimer.Start();
-                    var learnedWords = await enhancedLearner.StartContinuousLearningAsync(maxWords);
-
-                    sessionTimer.Stop();
-                    totalTimer.Stop();
-
-                    // Display learning quality report for session analysis
-                    enhancedLearner.DataProvider.DisplayLearningQualityReport();
-
-                    Console.WriteLine("\n📊 **ENHANCED CONTINUOUS LEARNING COMPLETE**");
-                    Console.WriteLine("==========================================");
-                    Console.WriteLine($"📚 Total Words Processed: {learnedWords}");
-                    Console.WriteLine($"⏱️  Session Time: {sessionTimer.Elapsed.TotalMinutes:F1} minutes");
-                    Console.WriteLine($"⏱️  Total Time: {totalTimer.Elapsed.TotalMinutes:F1} minutes");
-                    Console.WriteLine($"⚡ Processing Rate: {learnedWords / Math.Max(sessionTimer.Elapsed.TotalSeconds, 1):F1} words/second");
-                    Console.WriteLine("🎯 Used unlimited multi-source learning - no more 6,897 word limit!");
+                    if (result.Success)
+                    {
+                        Console.WriteLine($"\n⚡ Processing Rate: {result.ProcessedWords / Math.Max(result.Duration.TotalSeconds, 1):F1} words/second");
+                        Console.WriteLine("🎯 Used unlimited multi-source learning!");
+                    }
                 }
                 catch (Exception ex)
                 {
-                    totalTimer.Stop();
-                    Console.WriteLine($"❌ Error during enhanced continuous learning: {ex.Message}");
-                    Console.WriteLine($"⏱️  Failed after {totalTimer.Elapsed.TotalSeconds:F2} seconds");
-                    Console.WriteLine($"🔍 Stack trace: {ex.StackTrace}");
+                    Console.WriteLine($"❌ Error during continuous learning: {ex.Message}");
                 }
                 return;
             }
