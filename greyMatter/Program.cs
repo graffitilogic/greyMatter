@@ -8,6 +8,7 @@ using GreyMatter.Storage;
 using GreyMatter.Learning;
 using GreyMatter.Evaluations;
 using GreyMatter.DataIntegration;
+using GreyMatter.Demos; // Temporary: for deprecated demo stubs
 using greyMatter;
 
 namespace GreyMatter
@@ -262,7 +263,9 @@ namespace GreyMatter
             // Check for hybrid training test
             if (args.Length > 0 && (args[0] == "--hybrid-test" || args[0] == "--test-hybrid"))
             {
-                await TestHybridSystemVerification.RunTest();
+                Console.WriteLine("⚠️  --hybrid-test is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   Use: dotnet run -- --tatoeba-hybrid-1k");
+                Console.WriteLine("   Or: dotnet run -- --enhanced-learning --max-words 1000");
                 return;
             }
             
@@ -619,11 +622,15 @@ namespace GreyMatter
             }
             else if (args.Length > 0 && args[0] == "--quick-test")
             {
-                await QuickClassifierTest.RunAsync();
+                Console.WriteLine("⚠️  --quick-test is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   Use: dotnet run -- --tatoeba-hybrid-1k");
+                return;
             }
             else if (args.Length > 0 && args[0] == "--debug-classifier")
             {
-                await DebugClassifierTest.RunAsync();
+                Console.WriteLine("⚠️  --debug-classifier moved to archive");
+                Console.WriteLine("   Available in: demos/archive/DebugClassifierTest.cs");
+                return;
             }
             
             // Check for simple demo first
@@ -637,95 +644,49 @@ namespace GreyMatter
             
             if (args.Length > 0 && (args[0] == "--enhanced-demo" || args[0] == "--phase2-demo"))
             {
-                EnhancedEphemeralDemo.RunDemo();
+                Console.WriteLine("⚠️  --enhanced-demo is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   Use: dotnet run -- --llm-teacher");
                 return;
             }
             
             if (args.Length > 0 && (args[0] == "--text-demo" || args[0] == "--phase3-demo"))
             {
-                TextLearningDemo.RunDemo();
+                Console.WriteLine("⚠️  --text-demo is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   Use: dotnet run -- --tatoeba-hybrid-1k");
                 return;
             }
             
             if (args.Length > 0 && (args[0] == "--comprehensive" || args[0] == "--full-demo"))
             {
-                ComprehensiveDemo.RunDemo();
+                Console.WriteLine("⚠️  --comprehensive is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   Use specific demos:");
+                Console.WriteLine("   - LLM Teacher: dotnet run -- --llm-teacher");
+                Console.WriteLine("   - Quick Demo: dotnet run -- --tatoeba-hybrid-1k");
+                Console.WriteLine("   - Reading: dotnet run -- --reading-comprehension");
                 return;
             }
             
-                        // Scale Production Demos
+            // Scale Production Demos - Deprecated
             if (args.Length > 0 && args[0] == "--scale-demo")
             {
-                var conceptCount = GetArgValue(args, "--target-concepts", 100000);
-                var scaleConfig = CerebroConfiguration.FromCommandLine(args);
-                
-                var scaleDemo = new ScaleDemo(scaleConfig);
-                await scaleDemo.RunScaleDemo(conceptCount);
+                Console.WriteLine("⚠️  --scale-demo is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   Use: dotnet run -- --enhanced-learning --max-words 100000");
                 return;
             }
 
             if (args.Length > 0 && args[0] == "--wikipedia")
             {
-                var articleCount = GetArgValue(args, "--articles", 1000);
-                var wikiConfig = CerebroConfiguration.FromCommandLine(args);
-                wikiConfig.ValidateAndSetup();
-                
-                Console.WriteLine("📚 Wikipedia Learning Demo");
-                Console.WriteLine($"📁 Using training data from: {wikiConfig.TrainingDataRoot}");
-                
-                var ingester = new ExternalDataIngester(wikiConfig.TrainingDataRoot);
-                var concepts = await ingester.GenerateWikipediaLikeConcepts(articleCount);
-                
-                var brain = new greyMatter.Core.SimpleEphemeralBrain();
-                var stopwatch = System.Diagnostics.Stopwatch.StartNew();
-                
-                foreach (var concept in concepts)
-                {
-                    brain.Learn(concept);
-                }
-                
-                stopwatch.Stop();
-                var stats = brain.GetMemoryStats();
-                
-                Console.WriteLine($"✅ Learned {concepts.Count} Wikipedia concepts in {stopwatch.ElapsedMilliseconds}ms");
-                Console.WriteLine($"🧠 Brain: {stats.ConceptsRegistered} concepts, {stats.TotalNeurons} neurons");
-                Console.WriteLine($"⚡ Speed: {concepts.Count / stopwatch.Elapsed.TotalSeconds:F0} concepts/second");
-                Console.WriteLine($"💾 Data would be saved to: {wikiConfig.BrainDataPath}");
+                Console.WriteLine("⚠️  --wikipedia is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   ExternalDataIngester removed - use continuous learning instead");
+                Console.WriteLine("   Use: dotnet run -- --continuous-learning");
                 return;
             }
 
             if (args.Length > 0 && args[0] == "--evaluation")
             {
-                Console.WriteLine("🧪 Comprehension Evaluation Demo");
-                
-                // Load or create brain with test data
-                var brain = new greyMatter.Core.SimpleEphemeralBrain();
-                
-                // Quick learning for evaluation
-                var concepts = new[] { "red", "fruit", "apple", "science", "nature", "bright science", "red apple" };
-                foreach (var concept in concepts)
-                {
-                    brain.Learn(concept);
-                }
-                
-                var tester = new ComprehensionTester();
-                var tests = new[]
-                {
-                    ("Association Recall", await tester.TestAssociationRecall(brain)),
-                    ("Domain Knowledge", await tester.TestDomainKnowledge(brain)),
-                    ("Concept Completion", await tester.TestConceptCompletion(brain)),
-                    ("Semantic Similarity", await tester.TestSemanticSimilarity(brain))
-                };
-                
-                Console.WriteLine("📊 Test Results:");
-                foreach (var (testName, score) in tests)
-                {
-                    var grade = score >= 0.8 ? "🟢" : score >= 0.6 ? "🟡" : "🔴";
-                    Console.WriteLine($"   {grade} {testName}: {score:P1}");
-                }
-                
-                var overallScore = tests.Average(t => t.Item2);
-                Console.WriteLine($"🎯 Overall Score: {overallScore:P1}");
+                Console.WriteLine("⚠️  --evaluation is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   ComprehensionTester removed - use --reading-comprehension instead");
+                Console.WriteLine("   Use: dotnet run -- --reading-comprehension");
                 return;
             }
             
@@ -818,7 +779,8 @@ namespace GreyMatter
             // Check for demo modes
             if (args.Length > 0 && args[0] == "--developmental-demo")
             {
-                await DevelopmentalLearningDemo.RunDemo(args.Skip(1).ToArray());
+                Console.WriteLine("⚠️  --developmental-demo is deprecated (Phase 0 cleanup)");
+                Console.WriteLine("   Use: dotnet run -- --continuous-learning");
                 return;
             }
             

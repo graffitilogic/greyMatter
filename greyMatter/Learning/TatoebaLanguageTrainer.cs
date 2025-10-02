@@ -439,9 +439,16 @@ namespace greyMatter.Learning
 
         /// <summary>
         /// Save the trained brain to NAS storage
+        /// NOTE: Deprecated - ScalePersistence removed in Phase 0 cleanup
+        /// Use SaveBrainStateAsync() instead
         /// </summary>
+        [Obsolete("Use SaveBrainStateAsync() instead - ScalePersistence removed")]
         public async Task SaveTrainedBrain(string savePath = "")
         {
+            Console.WriteLine($"⚠️  SaveTrainedBrain is deprecated. Using SaveBrainStateAsync() instead.");
+            await SaveBrainStateAsync();
+            
+            /* ORIGINAL CODE - Commented out during Phase 0 cleanup
             if (string.IsNullOrEmpty(savePath))
             {
                 savePath = "/Volumes/jarvis/brainData";
@@ -454,6 +461,7 @@ namespace greyMatter.Learning
             await persistence.SaveBrain(_brain);
             
             Console.WriteLine("✅ Brain saved successfully!");
+            */
             
             // Also save vocabulary statistics
             var stats = _brain.GetLearningStats();
