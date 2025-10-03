@@ -129,37 +129,21 @@
 
 ---
 
-### Step 3: Create LegacyStorageAdapter Compatibility Shim ⏳ NOT STARTED
-**Why**: Allow graceful coexistence during migration
+### Step 3: Create LegacyStorageAdapter Compatibility Shim ❌ SKIPPED (Oct 3, 2025)
+**Why**: ~~Allow graceful coexistence during migration~~ **SKIPPED - Unnecessary complexity**
 
-**Tasks**:
-1. Create `Storage/LegacyStorageAdapter.cs`:
-   ```csharp
-   public class LegacyStorageAdapter : IStorageAdapter
-   {
-       private readonly SemanticStorageManager _legacy;
-       
-       public LegacyStorageAdapter(string brainPath, string dataPath)
-       {
-           _legacy = new SemanticStorageManager(brainPath, dataPath);
-           Console.WriteLine("⚠️ Using legacy storage - migrate to FastStorageAdapter");
-       }
-       
-       // Implement IStorageAdapter by delegating to _legacy...
-   }
-   ```
+**Rationale for Skipping**:
+- Existing brainData represents only 1-2 days of shallow training
+- Data can be easily regenerated with FastStorageAdapter
+- No need to maintain backward compatibility for throwaway training runs
+- Avoiding unnecessary code complexity and maintenance burden
+- Jump directly to migrating production code to FastStorageAdapter
 
-2. Add deprecation warnings to SemanticStorageManager constructor
-3. Document migration path in `MIGRATION_GUIDE.md`
-
-**Acceptance**: 
-- LegacyStorageAdapter wraps SemanticStorageManager
-- Logs deprecation warnings
-- No functional changes to existing code
+**Decision**: Proceed directly to Step 4 - migrate core production code and regenerate training data fresh
 
 ---
 
-### Step 4: Migrate Core Production Code ⏳ NOT STARTED
+### Step 4: Migrate Core Production Code 🚧 IN PROGRESS (Oct 3, 2025)
 **Why**: Get primary training workflows on FastStorageAdapter
 
 **Migration Priority**:
