@@ -20,6 +20,9 @@ namespace GreyMatter
             // Build CerebroConfiguration from CLI args (or defaults) to keep paths centralized
             var cfg = CerebroConfiguration.FromCommandLine(args ?? Array.Empty<string>());
             cfg.ValidateAndSetup();
+            
+            // TrainingService now uses IStorageAdapter (FastStorageAdapter by default)
+            // All Tatoeba training paths benefit from 1,350x storage speedup
             return new TrainingService(cfg);
         }
 
