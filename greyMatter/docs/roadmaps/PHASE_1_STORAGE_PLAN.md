@@ -146,6 +146,25 @@
 ### Step 4: Migrate Core Production Code 🚧 IN PROGRESS (Oct 3, 2025)
 **Why**: Get primary training workflows on FastStorageAdapter
 
+**Status**: 2 of 6 files migrated (33% complete)
+
+**Completed Migrations**:
+1. ✅ **TatoebaLanguageTrainer** - Fully migrated to IStorageAdapter
+   - Simplified vocabulary storage (HashSet<string>)
+   - Combined brain state storage (languageData + neurons)
+   - Performance: ~35min → <1s
+   
+2. ✅ **TrainingService** - Migrated to use IStorageAdapter
+   - Passes shared FastStorageAdapter to trainers
+   - Clean dependency injection pattern
+
+**Remaining Migrations**:
+3. ⏳ **EnhancedLanguageLearner** - Has FastStorage but also legacy storage
+4. ⏳ **RealLanguageLearner** - Needs encoder refactoring
+5. ⏳ **TatoebaDataConverter** - Optional storage parameter  
+6. ⏳ **Program.cs** - CLI entry points
+7. ⏳ **GeneralizationDiagnostic** - Diagnostic tool
+
 **Migration Priority**:
 1. **TrainingService** (HIGHEST) - Central training interface
 2. **TatoebaLanguageTrainer** (HIGH) - Primary training implementation
