@@ -408,7 +408,7 @@ namespace GreyMatter.Core
     }
 
     /// <summary>
-    /// Procedurally generated cortical column
+    /// Procedurally generated cortical column with working memory and messaging capability
     /// </summary>
     public class ProceduralCorticalColumn
     {
@@ -421,6 +421,66 @@ namespace GreyMatter.Core
         public Dictionary<string, SparsePattern> NeuralPatterns { get; set; }
         public DateTime GenerationTime { get; set; }
         public int AccessCount { get; set; }
+
+        /// <summary>
+        /// Working memory for this column (shared state)
+        /// </summary>
+        public WorkingMemory? WorkingMemory { get; set; }
+
+        /// <summary>
+        /// Reference to message bus for inter-column communication
+        /// </summary>
+        public MessageBus? MessageBus { get; set; }
+
+        /// <summary>
+        /// Process incoming messages from other columns
+        /// </summary>
+        public List<ColumnMessage> ProcessMessages(int maxMessages = 10)
+        {
+            if (MessageBus == null)
+                return new List<ColumnMessage>();
+
+            return MessageBus.GetMessages(Id, maxMessages);
+        }
+
+        /// <summary>
+        /// Send a message to another column or column type
+        /// </summary>
+        public void SendMessage(string receiverId, MessageType type, SparsePattern payload, double strength = 1.0)
+        {
+            if (MessageBus == null)
+                return;
+
+            var message = new ColumnMessage
+            {
+                SenderId = Id,
+                ReceiverId = receiverId,
+                Type = type,
+                Payload = payload,
+                Strength = strength
+            };
+
+            MessageBus.SendMessage(message);
+        }
+
+        /// <summary>
+        /// Broadcast message to all columns of a specific type
+        /// </summary>
+        public void BroadcastToType(string columnType, MessageType type, SparsePattern payload, double strength = 1.0)
+        {
+            if (MessageBus == null)
+                return;
+
+            var message = new ColumnMessage
+            {
+                SenderId = Id,
+                Type = type,
+                Payload = payload,
+                Strength = strength
+            };
+
+            MessageBus.Broadcast(columnType, message);
+        }
     }
 
     /// <summary>
