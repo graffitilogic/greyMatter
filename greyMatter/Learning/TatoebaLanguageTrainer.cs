@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using greyMatter.Core;
+using GreyMatter.Core;
 using GreyMatter.Learning;
 using GreyMatter.Storage;
 using CoreWordInfo = greyMatter.Core.WordInfo;
@@ -14,6 +15,7 @@ namespace greyMatter.Learning
     /// Enhanced Tatoeba trainer that uses LanguageEphemeralBrain for sentence structure learning
     /// Phase 1 of the language learning roadmap: Foundation sentence pattern learning
     /// Migrated to use FastStorageAdapter for 1000x+ performance improvement
+    /// Phase 2: Now supports column-based cognitive architecture
     /// </summary>
     public class TatoebaLanguageTrainer
     {
@@ -25,6 +27,13 @@ namespace greyMatter.Learning
         private Task? _backgroundSaveTask;
         private bool _isBackgroundSaveRunning;
         private readonly object _backgroundSaveLock = new object();
+
+        // Phase 2: Column-based cognitive architecture
+        private ProceduralCorticalColumnGenerator? _columnGenerator;
+        private WorkingMemory? _workingMemory;
+        private MessageBus? _messageBus;
+        private AttentionSystem? _attentionSystem;
+        private ColumnBasedProcessor? _columnProcessor;
 
         public LanguageEphemeralBrain Brain => _brain;
 
@@ -739,6 +748,166 @@ namespace greyMatter.Learning
 
             Console.WriteLine("   🚀 Background save initiated (non-blocking)");
             await Task.CompletedTask;
+        }
+
+        // ============================================================================
+        // PHASE 2: COLUMN-BASED COGNITIVE ARCHITECTURE INTEGRATION
+        // ============================================================================
+
+        /// <summary>
+        /// Initialize the column-based cognitive architecture (Phase 2)
+        /// Creates working memory, message bus, attention system, and column processor
+        /// </summary>
+        public void InitializeColumnArchitecture()
+        {
+            Console.WriteLine("\n🧠 === Initializing Column-Based Cognitive Architecture (Phase 2) ===");
+            
+            // Create cognitive systems with correct constructor calls
+            _workingMemory = new WorkingMemory(1000, 0.1); // maxCapacity, defaultDecayRate
+            _messageBus = new MessageBus(100, 1000); // maxInboxSize, maxHistorySize
+            _attentionSystem = new AttentionSystem(0.1, 0.05); // baselineActivation, decayRate
+            
+            // AttentionSystem has default profiles pre-loaded (comprehension, production, listening, reading, recall, learning)
+            // Set initial profile to "learning"
+            _attentionSystem.SetProfile("learning");
+            
+            // Create column generator (no seed parameter - uses fixed seed internally)
+            _columnGenerator = new ProceduralCorticalColumnGenerator(2048, 0.02); // basePatternSize, baseSparsity
+            _columnProcessor = new ColumnBasedProcessor(
+                _columnGenerator,
+                _workingMemory,
+                _messageBus,
+                _attentionSystem
+            );
+            
+            Console.WriteLine("   ✅ Working Memory initialized (capacity: 1000, decay: 0.1)");
+            Console.WriteLine("   ✅ Message Bus initialized (max inbox: 100, history: 1000)");
+            Console.WriteLine("   ✅ Attention System initialized with 6 default profiles");
+            Console.WriteLine("   ✅ Active profile: learning");
+            Console.WriteLine("   ✅ Column Generator initialized (pattern size: 2048, sparsity: 0.02)");
+            Console.WriteLine("   ✅ Column Processor ready for training");
+            Console.WriteLine("🧠 === Column Architecture Ready! ===\n");
+        }
+
+        /// <summary>
+        /// Train using column-based cognitive architecture (Phase 2)
+        /// This is the NEW approach that uses procedural columns, working memory, and attention
+        /// </summary>
+        public async Task TrainWithColumnArchitectureAsync(int maxSentences = 50, int batchSize = 10)
+        {
+            Console.WriteLine("\n🚀 === Column-Based Training (Phase 2 - EXPERIMENTAL) ===");
+            Console.WriteLine($"Training with {maxSentences} sentences, batch size {batchSize}\n");
+
+            // Initialize column architecture if not already done
+            if (_columnProcessor == null)
+            {
+                InitializeColumnArchitecture();
+            }
+
+            // Read sentences
+            var sentencesPath = Path.Combine(_dataPath, "sentences_eng_small.csv");
+            if (!File.Exists(sentencesPath))
+            {
+                sentencesPath = Path.Combine(_dataPath, "sentences.csv");
+                if (!File.Exists(sentencesPath))
+                {
+                    Console.WriteLine($"❌ Tatoeba data not found at {_dataPath}");
+                    return;
+                }
+            }
+
+            Console.WriteLine($"📖 Reading sentences from: {Path.GetFileName(sentencesPath)}");
+            
+            var sentences = _reader.ReadEnglishSentences(sentencesPath)
+                .Where(s => IsGoodLearningSentence(s))
+                .Take(maxSentences)
+                .ToList();
+
+            Console.WriteLine($"✅ Found {sentences.Count:N0} suitable learning sentences\n");
+            
+            if (sentences.Count == 0)
+            {
+                Console.WriteLine("❌ No suitable sentences found for learning");
+                return;
+            }
+
+            // Train through column pipeline
+            var startTime = DateTime.Now;
+            var totalPatternsLearned = 0;
+            var totalMessagesSent = 0;
+            var batchCount = 0;
+
+            for (int i = 0; i < sentences.Count; i += batchSize)
+            {
+                var batch = sentences.Skip(i).Take(batchSize).ToList();
+                batchCount++;
+                
+                Console.WriteLine($"📦 Batch {batchCount}/{(int)Math.Ceiling((double)sentences.Count / batchSize)}:");
+                
+                foreach (var sentence in batch)
+                {
+                    // Convert sentence to LanguageInput
+                    var input = LanguageInput.FromSentence(sentence, language: "en", domain: "general");
+                    
+                    // Process through column pipeline
+                    var result = await _columnProcessor!.ProcessInputAsync(input);
+                    
+                    totalPatternsLearned += result.TotalPatternsLearned;
+                    totalMessagesSent += result.MessagesSent;
+                    
+                    Console.WriteLine($"   📝 \"{sentence.Substring(0, Math.Min(50, sentence.Length))}...\"");
+                    Console.WriteLine($"      → {result.ProcessingSteps.Count} steps, {result.TotalPatternsLearned} patterns, {result.MessagesSent} messages");
+                }
+                
+                // Apply decay after each batch
+                _columnProcessor.ApplyDecay();
+                
+                // Show batch statistics
+                var stats = _columnProcessor.GetStats();
+                Console.WriteLine($"   📊 Batch stats:");
+                Console.WriteLine($"      • Active columns: {stats.ActiveColumns}");
+                Console.WriteLine($"      • Working memory: {stats.WorkingMemoryStats?.TotalPatterns ?? 0} patterns");
+                Console.WriteLine($"      • Message bus: {stats.MessageBusStats?.TotalMessagesSent ?? 0} total messages");
+                Console.WriteLine($"      • Attention: Top focus = {GetTopAttentionFocus(stats)}");
+                Console.WriteLine();
+            }
+
+            var elapsed = DateTime.Now - startTime;
+
+            // Display final results
+            Console.WriteLine("🎯 === Column-Based Training Complete ===");
+            Console.WriteLine($"⏱️  Time: {elapsed.TotalSeconds:F2}s ({(sentences.Count / elapsed.TotalSeconds):F1} sentences/sec)");
+            Console.WriteLine($"📊 Total patterns learned: {totalPatternsLearned:N0}");
+            Console.WriteLine($"💬 Total messages sent: {totalMessagesSent:N0}");
+            Console.WriteLine($"🧠 Working memory size: {_workingMemory?.Count ?? 0:N0}");
+            Console.WriteLine($"📮 Message bus stats: {(_messageBus != null ? _messageBus.GetStats().TotalMessagesSent : 0):N0} messages");
+            
+            var finalStats = _columnProcessor!.GetStats();
+            Console.WriteLine($"🎯 Final attention distribution:");
+            if (finalStats.AttentionStats != null)
+            {
+                Console.WriteLine($"   • Active profile: {finalStats.AttentionStats.ActiveProfile}");
+                Console.WriteLine($"   • Attended columns: {finalStats.AttentionStats.AttendedColumns}");
+                Console.WriteLine($"   • Average activation: {finalStats.AttentionStats.AverageActivation:F3}");
+                Console.WriteLine($"   • Highest activation: {finalStats.AttentionStats.HighestActivation:F3}");
+            }
+            
+            Console.WriteLine("\n✅ Phase 2 column-based training complete!");
+            Console.WriteLine("   Compare this to the traditional LanguageEphemeralBrain approach");
+            Console.WriteLine("   to see if emergence happens from column interactions.\n");
+        }
+
+        /// <summary>
+        /// Get the top attention focus from processor stats
+        /// </summary>
+        private string GetTopAttentionFocus(ProcessorStats stats)
+        {
+            if (stats.AttentionStats == null)
+            {
+                return "None";
+            }
+
+            return $"{stats.AttentionStats.ActiveProfile} (attended: {stats.AttentionStats.AttendedColumns})";
         }
     }
 }
