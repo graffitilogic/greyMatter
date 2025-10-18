@@ -208,6 +208,35 @@ namespace greyMatter.Core
             cluster2.AddSharedNeurons(sharedNeurons);
             
             Console.WriteLine($"Sharing {neuronsToShare} neurons between '{concept1}' and '{concept2}'");
+            
+            // Create bidirectional connections between neurons in related concepts
+            // This implements the biological "concepts that co-occur wire together" principle
+            CreateInterClusterConnections(cluster1, cluster2);
+        }
+        
+        /// <summary>
+        /// Create connections between neurons in related concept clusters
+        /// Implements biological learning: related concepts have connected neurons
+        /// </summary>
+        private void CreateInterClusterConnections(ConceptCluster cluster1, ConceptCluster cluster2)
+        {
+            // Sample a few neurons from each cluster to connect (not all combinations - too many)
+            var connectionsPerNeuron = 3; // Each neuron connects to ~3 neurons in related cluster
+            
+            foreach (var neuron1 in cluster1.ActiveNeurons.Take(10)) // Sample first 10
+            {
+                var targetNeurons = cluster2.ActiveNeurons
+                    .OrderBy(x => _random.Next())
+                    .Take(connectionsPerNeuron);
+                    
+                foreach (var neuron2 in targetNeurons)
+                {
+                    // Create bidirectional weak connections
+                    var initialWeight = 0.1 + _random.NextDouble() * 0.1; // 0.1-0.2 initial weight
+                    neuron1.ConnectTo(neuron2.Id, initialWeight);
+                    neuron2.ConnectTo(neuron1.Id, initialWeight);
+                }
+            }
         }
 
         private void LogSharedNeurons(string concept)
@@ -450,10 +479,11 @@ namespace greyMatter.Core
 
         public virtual void Learn()
         {
-            // Simple training: just mark that learning occurred
-            foreach (var neuron in ActiveNeurons)
+            // Hebbian learning: neurons in this cluster learn from each other
+            // Pass all active neurons so they can form connections
+            foreach (var neuron in ActiveNeurons.Where(n => n.IsActive))
             {
-                neuron.Learn();
+                neuron.Learn(ActiveNeurons); // Pass all neurons for Hebbian learning
             }
         }
 
@@ -489,6 +519,7 @@ namespace greyMatter.Core
     /// <summary>
     /// Simple neuron implementation focused on the ephemeral concept
     /// Can be activated/deactivated, can learn, has fatigue
+    /// Now includes connection weights for biological learning
     /// </summary>
     public class EphemeralNeuron
     {
@@ -497,6 +528,12 @@ namespace greyMatter.Core
         public double Strength { get; private set; }
         public double Fatigue { get; private set; }
         public int ActivationCount { get; private set; }
+        
+        /// <summary>
+        /// Connection weights to other neurons (neuron ID -> weight)
+        /// Implements Hebbian learning: "neurons that fire together, wire together"
+        /// </summary>
+        public Dictionary<int, double> Weights { get; } = new Dictionary<int, double>();
 
         public EphemeralNeuron(int id)
         {
@@ -505,6 +542,37 @@ namespace greyMatter.Core
             Strength = 0.5; // Start at medium strength
             Fatigue = 0.0;
             ActivationCount = 0;
+        }
+        
+        /// <summary>
+        /// Create a connection to another neuron
+        /// </summary>
+        public void ConnectTo(int targetNeuronId, double initialWeight = 0.1)
+        {
+            if (targetNeuronId == Id) return; // Don't connect to self
+            
+            if (!Weights.ContainsKey(targetNeuronId))
+            {
+                Weights[targetNeuronId] = initialWeight;
+            }
+        }
+        
+        /// <summary>
+        /// Strengthen (or weaken) connection to another neuron
+        /// Implements Hebbian learning rule
+        /// </summary>
+        public void StrengthenConnection(int targetNeuronId, double delta)
+        {
+            if (Weights.ContainsKey(targetNeuronId))
+            {
+                Weights[targetNeuronId] = Math.Clamp(Weights[targetNeuronId] + delta, 0.0, 1.0);
+                
+                // Prune very weak connections
+                if (Weights[targetNeuronId] < 0.01)
+                {
+                    Weights.Remove(targetNeuronId);
+                }
+            }
         }
 
         public void Activate()
@@ -523,11 +591,34 @@ namespace greyMatter.Core
             Fatigue = Math.Max(0, Fatigue - 0.05); // Recover from fatigue
         }
 
-        public void Learn()
+        /// <summary>
+        /// Learn by strengthening connections to co-active neurons
+        /// Implements Hebbian learning: neurons that fire together wire together
+        /// </summary>
+        public void Learn(IEnumerable<EphemeralNeuron>? coActiveNeurons = null)
         {
             if (IsActive)
             {
                 Strength = Math.Min(1.0, Strength + 0.01); // Strengthen with use
+                
+                // Hebbian learning: strengthen connections to neurons that are active at the same time
+                if (coActiveNeurons != null)
+                {
+                    foreach (var otherNeuron in coActiveNeurons)
+                    {
+                        if (otherNeuron.Id != Id && otherNeuron.IsActive)
+                        {
+                            // Create connection if doesn't exist
+                            if (!Weights.ContainsKey(otherNeuron.Id))
+                            {
+                                Weights[otherNeuron.Id] = 0.05; // Initial weak connection
+                            }
+                            
+                            // Strengthen existing connection
+                            StrengthenConnection(otherNeuron.Id, 0.01); // Small increment with each co-activation
+                        }
+                    }
+                }
             }
         }
 

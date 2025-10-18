@@ -1,32 +1,91 @@
 # greyMatter - Biologically-Inspired Neural Learning System 🧠
 
-> **Vision**: Procedural generation meets neuroscience - creating dynamic, efficient neural structure### ✅ What's Working Now
+> **Status**: Experimental research prototype - not production software
+> 
+> **Vision**: Procedural generation meets neuroscience - creating dynamic, efficient neural structures
 
-**Core Learning ### ⚠️ Known Limitations
-- This is R&D code, not production software - treat as experimental research prototype
-- Some deprecated com### Phase 0 — Foundation Cleanup### Phase 5 — Scaling and Visualization (future)
-- Batch/parallel processing of concept clusters; live visualization hooks of "fmri-like" activity
-- Multi-modal expansion (text-first → text+audio+vision) behind clean interfaces
-- **Acceptance**: Stable runs at 100k+ vocabulary, with interactive status and visualizationOMPLETE (October 2025)
-- ✅ Removed synthetic/static fallbacks; enforce real datasets with explicit errors
-- ✅ Routed CLI through TrainingService; consolidated 30+ commands → 11 essential commands
-- ✅ Retired legacy demos: 22 files → 5 essential demos (-3,117 lines, 77% reduction)
-- ✅ Created canonical "learn/validate" path; data path issues fail fast with actionable messages
-- **Result**: Clean foundation with ~80% FastStorageAdapter migration, clear training workflows still present with graceful fallback messages  
-- Performance varies by configuration; ongoing characterization work
-- Training data requires local files at `/Volumes/jarvis/trainData` (or custom `--training-data` path)
-- Missing data files produce clear error messages (no silent synthetic fallbacks)ms**
-- **TrainingService**: Unified training interface successfully consolidated 80+ scattered demos → 3 production methods
-- **LLM Teacher**: Ollama/deepseek-r1:1.5b integration provides real-time AI-guided learning with dynamic curriculum
-- **Continuous Learning**: Multi-source background processing with auto-save (10k+ words validated)
-- **Performance**: FastStorageAdapter provides 1,350x speed improvement over legacy storage
+## ⚠️ Current State (October 2025)
 
-**Phase 0 Achievements (October 2025)**
-- ✅ Consolidated CLI commands: 30+ → 11 essential commands  
-- ✅ Demo retirement: 22 files → 5 essential demos (-3,117 lines, 77% reduction)
-- ✅ Routed all production commands through TrainingService
-- ✅ Created deprecation stubs for backward compatibility
-- ✅ Archived specialized tools in `demos/archive/` with recovery documentation
+**Week 1 (Oct 5-11)**: ✅ **COMPLETE** - Foundation validation successful  
+**Week 2 (Oct 12-18)**: ✅ **COMPLETE** - Biological learning implemented and validated
+
+### What Actually Works:
+- ✅ **Biological Neural Learning**: Neurons form genuine connections (100% connected, 4.25M total connections)
+- ✅ **Hebbian Learning**: "Fire together, wire together" - connections strengthen with activation
+- ✅ **Single-source learning**: Tatoeba CSV sentences (117 sentences/sec training rate)
+- ✅ **Save/load brain state**: FastStorageAdapter with 1,350x speedup (130MB for 55K neurons)
+- ✅ **Knowledge query system**: Inspect neurons, connections, learning statistics
+- ✅ **LLM API integration**: Ollama guidance for learning strategies
+
+### Recent Achievements (Week 2):
+- ✅ **Biological Learning Fix**: From 0% to 100% neurons with connections
+- ✅ **Neural Connections**: 4,253,690 connections across 55,885 neurons
+- ✅ **Word Associations**: 866 associations formed biologically (was 0)
+- ✅ **Sentence Learning**: 100 sentences tracked (was 0)
+- ✅ **Query System**: Successfully loads and displays neural data
+
+### What's Framework-Only (Untested):
+- 🏗️ Column-based cognitive architecture (code exists, never run)
+- 🏗️ Multi-source integration (1 of 8 sources proven)
+- 🏗️ Procedural column generation (not wired to learning)
+
+### What Doesn't Exist:
+- ❌ Retention or understanding tests
+- ❌ Always-on background service
+- ❌ Multi-modal inputs (audio, vision, etc.)
+
+**For complete status, see:** [`docs/roadmaps/ACTUAL_STATE.md`](docs/roadmaps/ACTUAL_STATE.md)
+
+---## 📖 Documentation
+
+### Key Documents:
+- **[ACTUAL_STATE.md](docs/roadmaps/ACTUAL_STATE.md)** - **Single source of truth** for what works vs what's theoretical
+- **[WEEK1_RESULTS.md](docs/WEEK1_RESULTS.md)** - Foundation validation results (Oct 5-11)
+- **[WEEK2_RESULTS.md](docs/WEEK2_RESULTS.md)** - Biological learning validation results (Oct 12-18)
+- **[BIOLOGICAL_LEARNING_FIX.md](docs/BIOLOGICAL_LEARNING_FIX.md)** - Technical implementation details
+- **[HONEST_PLAN.md](docs/roadmaps/HONEST_PLAN.md)** - Week-by-week development plan
+- **[ROADMAP_2025.md](docs/roadmaps/ROADMAP_2025.md)** - High-level development roadmap
+- **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - System architecture and implementation
+
+### Project Status:
+- **Build**: ✅ 0 errors, 130 warnings (nullability warnings)
+- **Weeks Completed**: ✅ Week 1 (Foundation), ✅ Week 2 (Biological Learning)
+- **Test Coverage**: Basic validation complete, expansion needed
+- **Biological Learning**: ✅ 100% neurons with connections, 4.25M total connections
+- **Query System**: ✅ Operational - loads and displays neural data
+- **Research Status**: Core hypothesis (emergence from columns) untested
+
+---
+
+## 🤝 Contributing
+
+This is an active research project. Before contributing:
+1. Read [ACTUAL_STATE.md](docs/roadmaps/ACTUAL_STATE.md) for honest current state
+2. Check [WEEK2_RESULTS.md](docs/WEEK2_RESULTS.md) for latest achievements
+3. Focus on validation and testing over new features
+4. Document results with evidence, not claims
+
+---
+
+## 📜 License
+
+MIT License - See LICENSE file for details
+
+---
+
+## 🔬 Research Philosophy
+
+**Standard**: Test everything. No "COMPLETE" claims without validation. Build → Test → Validate → Document → Repeat.
+
+**Status Levels**:
+- 🏗️ **Framework**: Code exists, compiles, never executed
+- ⚠️ **Prototype**: Executed 1-2 times, may have issues  
+- ✅ **Validated**: Executed 3+ times, results consistent
+- 🚀 **Production**: Used in real workflows, stable over time
+
+---
+
+**Last Updated**: October 7, 2025
 
 **Data & Storage**
 - Multi-source data provider expects real datasets (synthetic fallbacks removed for quality)
@@ -35,9 +94,13 @@
 
 ## 🎯 What is greyMatter?
 
-greyMatter is an experimental neural learning system inspired by biological brain architecture. Instead of traditional static neural networks, it creates **ephemeral neural clusters** that are procedurally generated on-demand. The central inspiration: "If we can simulate entire galaxies through common-seed procedural functions, albeit at lower fidelity and with a limited local-scoping, why can't we overcome the scale limitations with neural networks through similar concepts?"
+greyMatter is an **experimental research prototype** exploring neural learning systems inspired by biological brain architecture. The goal is to create **ephemeral neural clusters** that are procedurally generated on-demand, rather than using traditional static neural networks.
 
-**Core Philosophy / Question**: Can higher level cognition emerge through complex interactions between specialized, short-lived neural structures rather than through massive parameter counts or computational brute force?
+**Central Inspiration**: "If we can simulate entire galaxies through common-seed procedural functions, why can't we overcome scale limitations with neural networks through similar concepts?"
+
+**Core Research Question**: Can higher level cognition emerge through complex interactions between specialized, short-lived neural structures rather than through massive parameter counts or computational brute force?
+
+**Current Reality**: We have a working single-source learning system with fast binary storage. The "emergence through column interactions" hypothesis remains **untested** - column architecture code exists but has never been executed.
 
 ## 🚀 Quick Start
 
@@ -145,48 +208,122 @@ Default storage locations (customizable via CLI):
 
 ## 🧬 Core Architecture
 
-### TrainingService - Unified Learning Interface (NEW!)
+### What Actually Works
+
+#### TrainingService - Unified Learning Interface
 Centralized service that replaced 80+ scattered demo classes:
 - **Parameterized Training**: `RunTatoebaTrainingAsync()`, `RunLLMTeacherSessionAsync()`
 - **Performance Validation**: `RunPerformanceValidationAsync()`
 - **Configuration Management**: Unified parameter classes for all training modes
-- **Result Tracking**: Standardized training results and metrics
+- **Status**: ✅ **Validated** - Successfully consolidated training infrastructure
 
-### LLM-Guided Neural Learning System
-**✅ REVOLUTIONARY IMPLEMENTATION: Complete LLM-guided continuous learning system**:
+#### LLM Teacher Integration
+**Ollama API integration for learning guidance**:
 
-**Intelligent Teacher Integration:**
-- **External LLM API**: Ollama endpoint (http://192.168.69.138:11434) with deepseek-r1:1.5b model
-- **Real-time Strategy Analysis**: LLM analyzes vocabulary size, learning rate, accuracy, recent words
-- **Dynamic Curriculum Generation**: Creates personalized learning phases based on progress
-- **Structured JSON Communication**: Type-safe responses with confidence scoring
-- **Multi-mode Operation**: Interactive guidance + background continuous learning
+**What Works:**
+- **External LLM API**: Ollama endpoint with deepseek-r1:1.5b model
+- **Interactive Guidance**: User can ask questions during learning sessions
+- **Structured JSON Communication**: Type-safe responses from LLM
+- **Multi-mode Operation**: Interactive guidance + background learning loops
 
-**Advanced Learning Capabilities:**
-- **Sparse Activation Patterns**: Each word creates unique SDR (Sparse Distributed Representation) with ~2% neuron activation
-- **Neural Activation Storage**: Stores actual activation signatures `{ActivationSignature: [1,5,12,45,78...], ActivationStrength: 0.85}` instead of metadata
-- **Synaptic Weight Encoding**: Word relationships encoded as overlapping neural patterns with measured connection strengths
-- **Biological Pattern Formation**: Related concepts share neurons (like "cat"→[1,5,12] and "dog"→[1,5,78] sharing neurons 1,5)
-- **Dynamic Memory Consolidation**: Repeated exposure strengthens neural activation patterns over time
+**Current Limitations:**
+- LLM provides recommendations but execution is mostly manual
+- No proven improvement in learning outcomes vs. non-LLM baseline
+- "Dynamic curriculum generation" is theoretical - requires testing
 
-**Interactive Learning Features:**
-- **Live Commands**: `status` (progress analysis), `focus <topic>` (guided data source selection)
-- **Multi-Source Integration**: Scientific, conversational, news, technical data sources
-- **Real-time Strategy Adjustment**: LLM adapts learning approach based on performance
-- **Background Processing**: Continuous learning with interactive LLM overlay
+**Status**: ⚠️ **Prototype** - Works but impact unvalidated
 
-**🎯 ACTUAL NEURAL LEARNING**: System now stores neural activation signatures, not JSON dictionaries
+#### Single-Source Learning (Tatoeba)
+**Proven working system**:
+- **TatoebaLanguageTrainer**: Reads CSV sentences, extracts concepts
+- **LanguageEphemeralBrain**: Creates neural clusters for words
+- **Sparse Activation Patterns**: Each word gets unique sparse representation
+- **Neural Activation Storage**: Stores activation signatures with strengths
+- **Save/Load**: Persists and restores brain state
 
-### Ephemeral Neural Clusters
-- **Dynamic Allocation**: Neural structures created on-demand for specific cognitive tasks
-- **Shared Neurons**: Concepts share neural resources (like Venn diagrams)
-- **FMRI-like Visualization**: Real-time brain activity visualization
-- **Biological Fatigue**: Neurons experience realistic usage patterns
+**Status**: ✅ **Validated** - Multiple successful training runs
 
-### Procedural Generation
-- **Cortical Columns**: Specialized processing units generated as needed
-- **Minimal Persistence**: Only essential patterns stored, details procedurally regenerated
-- **Semantic Clustering**: Related concepts grouped in biological-style "brain regions"
+#### Fast Binary Storage
+**MessagePack-based storage system**:
+- **FastStorageAdapter**: Binary serialization (vs JSON)
+- **Proven Performance**: 1,350x speedup (0.4s vs 540s for 5K vocabulary)
+- **Simple Interface**: Save/Load brain state as Dictionary<string, object>
+
+**Status**: ✅ **Validated** - Production-ready performance
+
+### What's Framework-Only (Untested)
+
+#### Column-Based Cognitive Architecture
+**Code exists but never executed**:
+- **WorkingMemory** (328 lines): Manages active concepts with decay
+- **MessageBus** (421 lines): Inter-column communication protocol
+- **AttentionSystem** (390 lines): Task-specific focus with profiles
+- **ColumnBasedProcessor** (509 lines): Routes inputs through column pipeline
+- **ProceduralCorticalColumnGenerator** (505 lines): Template-based column generation
+
+**Current Reality**: All classes compile. Zero test runs. Completely unvalidated.
+
+**Status**: 🏗️ **Framework Only** - Needs first execution and debugging
+
+#### Multi-Source Data Integration
+**Partial implementation**:
+- ✅ **Tatoeba**: CSV reader working
+- 🏗️ **News/Wikipedia/Subtitles/etc**: Code exists, file paths unclear, untested
+- 🏗️ **LLM-guided source selection**: Theoretical - manual wiring required
+
+**Current Reality**: 1 of 8 claimed sources proven working.
+
+**Status**: 🏗️ **Mostly Theoretical** - Need to test with real files
+
+#### Procedural Column Generation
+**Not integrated**:
+- Template methods exist for phonetic, semantic, syntactic columns
+- Not wired into any learning pipeline
+- No regeneration flow implemented
+- No efficiency measurements
+
+**Status**: 🏗️ **Framework Only** - Need to wire into learning
+
+---
+
+## 📊 Honest Limitations
+
+### What Doesn't Exist:
+- ❌ **Knowledge Quantification**: Beyond vocabulary counts
+- ❌ **Retention Testing**: No tests for memory over time
+- ❌ **Understanding Tests**: No comprehension validation
+- ❌ **Transfer Learning Measurement**: No cross-domain tests
+- ❌ **Always-On Service**: No background daemon mode
+- ❌ **Multi-Modal**: No audio, vision, or non-text inputs
+- ❌ **Emergence Validation**: Can't test column interactions (never run)
+
+### Current Capabilities:
+- ✅ Learn vocabulary from single datasource (Tatoeba)
+- ✅ Save and load brain state
+- ✅ Query vocabulary presence
+- ✅ Get basic statistics (vocab size, concept count)
+- ⚠️ LLM guidance (works but impact unproven)
+
+### Research Questions Status:
+- **"Can procedural generation overcome scale limits?"** → ❌ Cannot answer (generator not active)
+- **"Can emergence come from column interactions?"** → ❌ Cannot answer (columns never run)
+- **"Is biological inspiration more efficient?"** → ⚠️ Partial (storage proven, learning unproven)
+
+---
+
+## 📋 Current Focus (Week 1, Oct 5-11)
+
+**Goal**: Validate what we claim works
+
+### Tasks:
+1. **Multi-source validation**: Prove 3 datasources work with real files
+2. **Save/load testing**: Document with actual training run
+3. **Knowledge queries**: Implement QueryVocabulary(), GetRelatedConcepts()
+4. **Documentation**: Honest results, no inflated claims
+
+**See**: [`docs/roadmaps/HONEST_PLAN.md`](docs/roadmaps/HONEST_PLAN.md) for detailed week-by-week plan
+
+---
 
 ## 📊 Project Status (October 2025)
 

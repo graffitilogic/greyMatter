@@ -558,10 +558,10 @@ namespace greyMatter.Core
                         Id = neuronId,
                         ClusterId = clusterKvp.Key,
                         Type = "language", // All neurons in LanguageEphemeralBrain are language neurons
-                        Weights = new Dictionary<int, double>(), // Placeholder for neuron weights
+                        Weights = neuron.Weights.ToDictionary(kvp => kvp.Key, kvp => kvp.Value), // Export actual connection weights
                         ActiveConcepts = new HashSet<string> { clusterKvp.Key },
                         LastActivated = DateTime.UtcNow,
-                        ActivationCount = 1,
+                        ActivationCount = neuron.ActivationCount,
                         CreatedAt = DateTime.UtcNow
                     };
                     

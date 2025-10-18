@@ -13,123 +13,298 @@
 - Regenerates structures on-demand during recognition/response
 - Runs continuously (not dormant): re-evaluating, consolidating, testing ideas
 
-## 📊 Current State Assessment (October 2025)
+## 📊 Current State Assessment (October 5, 2025)
 
-### ✅ Foundational Systems (Working)
+### ⚠️ REALITY CHECK: See docs/roadmaps/ACTUAL_STATE.md for honest assessment
 
-#### 1. **Ephemeral Neural Clusters** (Core Architecture)
-- **SimpleEphemeralBrain**: ~300 lines implementing shared neuron pools between related concepts
-- **Venn Diagram Overlap**: Concepts share neurons (e.g., "cat" and "dog" share animal neurons)
-- **On-Demand Activation**: O(active_concepts) memory scaling
-- **Status**: ✅ **Proven Concept** - Production validated with batch learning
+**TL;DR**: We have ONE working datasource (Tatoeba), save/load works for basic state, and lots of untested framework code. Claims of "Phase 2 completion" were premature.
 
-#### 2. **Procedural Cortical Column Generation** (Framework Exists)
-- **ProceduralCorticalColumnGenerator**: Template-based column generation inspired by No Man's Sky
-- **Column Types**: Phonetic, Semantic, Syntactic, Contextual, Episodic templates defined
-- **Coordinate-Based Generation**: Semantic coordinates → consistent neural structures
-- **Status**: ⚠️ **Framework Only** - Templates exist but not integrated into learning pipeline
-- **Gap**: No active use in learn/recognize cycles; regeneration semantics undefined
+### ✅ What Actually Works (Validated)
 
-#### 3. **LLM-Guided Learning System** (Revolutionary Implementation)
-- **External LLM API**: Ollama endpoint with deepseek-r1:1.5b model
-- **Intelligent Analysis**: Real-time learning state analysis and strategy recommendations
-- **Multi-Source Integration**: 8+ data sources with LLM-guided selection
-- **Interactive Commands**: `status`, `focus <topic>` for live guidance
-- **Status**: ✅ **Production Ready** - Continuous learning sessions validated (126+ min runs)
+#### 1. **Single-Source Learning** (Tatoeba Only)
+- **TatoebaLanguageTrainer**: Reads Tatoeba CSV, processes sentences, creates concepts
+- **LanguageEphemeralBrain**: Creates neural clusters for word concepts
+- **Save/Load**: SaveBrainStateAsync/LoadBrainStateAsync functional
+- **Status**: ✅ **VALIDATED** - Can train on Tatoeba, save state, reload, continue
 
-#### 4. **Storage Architecture** (Migration In Progress)
-- **FastStorageAdapter**: MessagePack implementation with 1,350x speedup validated
-- **SemanticStorageManager**: Huth-inspired semantic domains (24 primary + 180+ secondary)
-- **Biologically-Inspired Structure**: Hippocampus indexing + cortical columns
-- **Status**: ⚠️ **Dual System** - FastStorageAdapter exists but legacy paths still active
-- **Gap**: Need complete migration and compatibility shim for old storage
+#### 2. **Fast Storage** (Binary Serialization)
+- **FastStorageAdapter**: MessagePack-based binary storage
+- **Performance**: 1,350x speedup proven (0.4s vs 540s for 5K vocabulary)
+- **Status**: ✅ **VALIDATED** - Proven with multiple test runs
+- **Gap**: No schema versioning, no corruption detection
 
-#### 5. **Training Infrastructure** (Consolidation Needed)
-- **TrainingService**: Unified interface replacing 80+ legacy demos (✅ exists)
-- **CerebroConfiguration**: Centralized config with CLI/env overrides (✅ working)
-- **Multi-Source Data Provider**: Real dataset enforcement (✅ fail-fast implemented)
-- **Status**: ⚠️ **Partial Adoption** - TrainingService exists but many legacy entry points remain
-- **Gap**: 22 demo files in `/demos` still active; need systematic retirement
+#### 3. **LLM API Integration** (Ollama)
+- **LLMTeacher**: Makes HTTP calls to Ollama, parses JSON responses
+- **Interactive Mode**: User can ask questions during learning
+- **Status**: ⚠️ **PROTOTYPE** - Works but guidance is mostly manual
+- **Reality Check**: No proven impact on learning quality vs baseline
 
-### 🛠️ Systems Needing Work
+### 🏗️ What Exists But Is UNTESTED
 
-#### 6. **Biological Neural Features** (Stubs/Frameworks Only)
-- **Working Memory**: Concept mentioned in docs; no implementation
-- **Inter-Column Communication**: Framework classes exist; no message passing
-- **Attention Mechanisms**: Mentioned in roadmaps; no gating implementation
-- **Temporal Binding**: No time-based concept association system
-- **Status**: ❌ **Not Implemented** - Critical gap for "emergence through interaction" goal
+#### 4. **Column Architecture** (Code Exists, Never Run)
+- **WorkingMemory** (328 lines): ✅ Compiles, ❌ Never executed
+- **MessageBus** (421 lines): ✅ Compiles, ❌ Never executed
+- **AttentionSystem** (390 lines): ✅ Compiles, ❌ Never executed
+- **ColumnBasedProcessor** (509 lines): ✅ Compiles, ❌ Never executed
+- **Status**: 🏗️ **FRAMEWORK ONLY** - Zero test runs, completely unvalidated
+- **Gap**: Need to actually run it, debug crashes, prove it works
 
-#### 7. **Continuous Cognition** (Partial Implementation)
-- **ContinuousProcessor**: Exists with ethical drive system and background processing
-- **EpisodicMemorySystem**: Framework for event storage exists
-- **Status**: ⚠️ **Partial** - Background processing works but lacks cross-column integration
+#### 5. **Multi-Source Data** (1 of 8 Sources Proven)
+- **Tatoeba**: ✅ Works
+- **News/Wiki/Subtitles/etc**: ⚠️ Code exists, file paths unclear, untested
+- **Status**: 🏗️ **MOSTLY THEORETICAL** - Framework exists but not validated
+- **Gap**: Need to test each source with real files
 
-#### 8. **Evaluation & Validation** (Ad-Hoc)
-- **Performance Validation**: CLI command exists via TrainingService
-- **Learning Metrics**: Vocabulary growth, concept counts tracked
-- **Status**: ⚠️ **Basic** - No standardized evaluation harness or retention tests
-- **Gap**: Need repeatable benchmarks for retention, transfer, domain coverage
+#### 6. **Procedural Generation** (Framework, No Integration)
+- **ProceduralCorticalColumnGenerator**: Template methods exist
+- **Status**: 🏗️ **FRAMEWORK ONLY** - Never used in learning pipeline
+- **Gap**: No regeneration flow, no efficiency measurement, not wired to anything
 
-## 🗺️ Development Roadmap
+### ❌ What Doesn't Exist
 
-### Phase 0: Foundation Cleanup (Now → 2 weeks) ⏳ IN PROGRESS
-**Goal**: Single canonical path for learn/validate; clean error messages; reduced code duplication
+#### 7. **Knowledge Quantification**
+- **Current**: Vocabulary count only
+- **Missing**: Retention tests, concept queries, relationship graphs
+- **Status**: ❌ **NOT IMPLEMENTED**
+- **Gap**: User requirement - "method to test, view or quantify accumulated knowledge"
+
+#### 8. **Always-On Learning**
+- **Current**: Manual start/stop, no daemon mode
+- **Missing**: Background service, auto-restart, system integration
+- **Status**: ❌ **NOT IMPLEMENTED**
+- **Gap**: User requirement - "always on state where it is constantly learning"
+
+#### 9. **Emergence Testing**
+- **Current**: No tests, no baselines, no measurements
+- **Missing**: Everything needed to validate emergence claims
+- **Status**: ❌ **NOT IMPLEMENTED**
+- **Gap**: Cannot test "complex interactions → emergence" hypothesis without working columns
+
+#### 10. **Multi-Modal Input**
+- **Current**: LanguageInput enum has 5 types, only Sentence used
+- **Missing**: Audio processing, image processing, all non-text modalities
+- **Status**: ❌ **NOT IMPLEMENTED**
+- **Gap**: Claims of "input-agnostic design" are theoretical
+
+## 🗺️ Honest Development Roadmap
+
+**See docs/roadmaps/HONEST_PLAN.md for detailed week-by-week plan**
+
+### Week 1: Foundation Validation (Oct 5-11) 🏗️ IN PROGRESS
+**Goal**: Prove current system works - no new features, just validation
 
 #### Tasks:
-- [x] Remove synthetic/static fallbacks (✅ MultiSourceLearningDataProvider hardened)
-- [x] Normalize configuration (✅ CerebroConfiguration centralized)
-- [x] Add dataset verification (✅ `--verify-training-data` CLI command)
-- [ ] **Route all CLI commands through TrainingService** (IN PROGRESS)
-  - Map `--continuous-learning`, `--performance-validation`, `--llm-teacher` to service methods
-  - Retire legacy Program.cs entry points incrementally
-- [ ] **Create demo retirement plan**
-  - Audit 22 demo files: identify unique functionality vs. duplicates
-  - Move unique functionality to TrainingService methods
-  - Archive/delete redundant demos
-- [ ] **Document canonical training flow**
-  - Update README with single recommended path
-  - Clear examples: CLI → TrainingService → Storage/Learning
+- [x] Reality check: Create ACTUAL_STATE.md (honest assessment)
+- [x] Create HONEST_PLAN.md (week-by-week with deliverables)
+- [ ] Test TatoebaLanguageTrainer end-to-end (1K sentences)
+- [ ] Verify save/load with actual files created
+- [ ] Audit NAS data: what sources actually exist?
+- [ ] Test 3 data sources with real files
+- [ ] Implement basic knowledge queries: QueryVocabulary(), GetRelatedConcepts()
+- [ ] Document results: what works, what doesn't
 
 #### Acceptance Criteria:
-- ✅ One TrainingService interface for all training modes
-- ✅ Data path issues fail fast with actionable messages
-- [ ] ≤5 active demo files (vs. current 22)
-- [ ] Build succeeds with zero errors (currently: 0 errors, 131 warnings ✅)
+- ✅ 3 data sources proven working
+- ✅ Save/load validated with test run
+- ✅ Basic knowledge queries functional
+- ✅ Honest documentation of results
 
 ---
 
-### Phase 1: Storage & Persistence (2-4 weeks)
-**Goal**: Fast, reliable, versioned storage with clear migration path from legacy systems
+### Week 2: Multi-Source Integration (Oct 12-18) ⏳ NOT STARTED
+**Goal**: Real multi-source learning pipeline
+
+**User Requirement**: "Functioning neural layer that can process a variety of data sources"
 
 #### Tasks:
-1. **Complete FastStorageAdapter Migration**
-   - Grep all `SemanticStorageManager` usage; replace with FastStorageAdapter
-   - Create `LegacyStorageShim` for backward compatibility during transition
-   - Add adapter selection flag in CerebroConfiguration
-   
-2. **Add Schema Versioning**
-   - Implement `StorageSchemaVersion` in saved files
-   - Add migration handlers for version mismatches
-   - Version 1.0: Current FastStorageAdapter format
-   
-3. **Implement Integrity Checks**
-   - Add checksum validation on load
-   - Detect corrupted files and suggest recovery
-   - Log storage health metrics
-   
-4. **Periodic Snapshots & Quick-Restore**
-   - Auto-snapshot every N concepts learned
-   - Keep last 3 snapshots for rollback
-   - Restore from snapshot in <5 seconds for 50k concepts
+- [ ] Create IDataSource interface
+- [ ] Implement for 3-5 proven sources
+- [ ] Multi-source training in single session
+- [ ] Track source attribution for concepts
+- [ ] Enhanced knowledge queries (filter by source)
 
 #### Acceptance Criteria:
-- Save/load completes in <5 seconds for 50-100k concepts
-- Legacy storage reads convert automatically to new format
-- Corruption detection catches ≥95% of file damage
-- Performance validation task passes with new storage
+- ✅ Brain learns from 3+ sources simultaneously
+- ✅ Can query: "concepts from Wikipedia"
+- ✅ Source breakdown in statistics
 
 ---
+
+### Week 3: Column Architecture First Run (Oct 19-25) ⏳ NOT STARTED
+**Goal**: Execute column code, prove it doesn't crash
+
+#### Tasks:
+- [ ] Create test runner: TrainWithColumnArchitectureAsync(50, 10)
+- [ ] Execute column training for first time
+- [ ] Debug crashes/errors
+- [ ] Add message logging
+- [ ] Verify column communication works
+- [ ] Baseline comparison: columns vs traditional
+
+#### Acceptance Criteria:
+- ✅ Column training completes without crashing
+- ✅ Evidence of inter-column communication
+- ✅ Comparison data: columns vs no-columns
+- ✅ Honest assessment of value added (if any)
+
+---
+
+### Week 4: Always-On Foundation (Oct 26-Nov 1) ⏳ NOT STARTED
+**Goal**: Background learning service
+
+**User Requirement**: "Eventually an always on state where it is constantly learning"
+
+#### Tasks:
+- [ ] ContinuousLearningService class
+- [ ] Infinite learning loop with auto-save
+- [ ] Graceful shutdown on signal
+- [ ] Monitor script + restart on crash
+- [ ] Test: 24h+ runtime
+
+#### Acceptance Criteria:
+- ✅ Service runs 24h+ without manual intervention
+- ✅ Auto-saves work (no data loss)
+- ✅ Survives system restart
+- ✅ Control interface (pause/resume/stop)
+
+---
+
+### Month 2-3: See HONEST_PLAN.md
+
+Topics: Knowledge representation, retention testing, performance characterization, procedural generation integration, emergence testing (if columns work)
+
+---
+
+## 🎯 Revised Success Metrics
+
+### Technical Metrics (Honest):
+- **Multi-Source**: ≥3 proven datasources working with real files
+- **Save/Load**: Validated with test runs, not just "code exists"
+- **Knowledge Query**: Can inspect brain state, query concepts, show relationships
+- **Always-On**: Service runs 24h+ with auto-save and restart
+- **Column Validation**: Runs without crashing, evidence of communication
+- **Emergence**: TBD after columns proven working (no claims without evidence)
+
+### Philosophical Metrics (Long-Term):
+- **Procedural Efficiency**: Compare memory/compute vs equivalent static network
+- **Emergent Behavior**: Observable behaviors not explicitly programmed (needs definition + tests)
+- **Cognitive Complexity**: Multi-step reasoning, transfer learning (needs baselines)
+
+---
+
+## 📋 Immediate Next Steps (This Week)
+
+### Monday (Oct 5) - DONE
+- [x] Create ACTUAL_STATE.md (reality check)
+- [x] Create HONEST_PLAN.md (detailed week-by-week)
+- [x] Update ROADMAP_2025.md (remove inflated claims)
+- [ ] Update README.md (realistic assessment)
+
+### Tuesday-Wednesday (Oct 6-7)
+- [ ] Audit /Volumes/jarvis/trainData contents
+- [ ] Test TatoebaLanguageTrainer with 1K sentences
+- [ ] Verify save/load creates actual files
+- [ ] Document file locations and contents
+
+### Thursday-Friday (Oct 8-9)
+- [ ] Test 2-3 additional data sources
+- [ ] Implement QueryVocabulary(word) → bool
+- [ ] Implement GetRelatedConcepts(word) → list
+- [ ] Create knowledge query demo
+- [ ] Document Week 1 results
+
+---
+
+## 🔬 Research Questions - Revised Status
+
+### Q1: "Can procedural generation overcome ML scale limitations?"
+
+**Previous Claim**: Framework ready, integration imminent
+**Current Reality**: ❌ **CANNOT ANSWER** - Generator exists but never used in learning
+**Blocking Issues**:
+1. ProceduralCorticalColumnGenerator not wired into any learning pipeline
+2. No regeneration flow implemented
+3. No efficiency measurements
+4. Pure framework code
+
+**Path to Answer**: Wire into learning, implement regeneration, measure % regenerated, compare to baseline
+
+---
+
+### Q2: "Can higher cognition emerge from interactions between short-lived structures?"
+
+**Previous Claim**: Phase 2 Week 5 complete, ready for testing
+**Current Reality**: ❌ **CANNOT ANSWER** - Column code exists but never executed
+**Blocking Issues**:
+1. Column architecture completely untested
+2. No evidence columns communicate (never run)
+3. No emergence tests defined
+4. No baseline comparisons
+
+**Path to Answer**: Run column code, prove it works, define emergence tests, measure against baseline
+
+---
+
+### Q3: "Is biological inspiration more efficient than brute force?"
+
+**Previous Claim**: Storage efficiency proven, learning optimized
+**Current Reality**: ⚠️ **PARTIAL** - Storage proven (1,350x), but learning efficiency unproven
+**Evidence So Far**:
+- ✅ FastStorageAdapter: 1,350x speedup validated
+- ✅ Ephemeral clusters: O(active_concepts) memory scaling
+- ❌ No head-to-head comparison with static network
+- ❌ No transfer learning tests
+- ❌ No efficiency measurements for "biological features"
+
+**Path to Answer**: Define equivalent-task benchmark, compare greyMatter vs traditional network, measure memory/compute/quality
+
+---
+
+## 🚫 What We're Removing from Claims
+
+### No Longer Claiming:
+- ❌ "Phase 2 Week 5 COMPLETE" → 🏗️ "Phase 2: Code written, untested"
+- ❌ "Production Ready" → ⚠️ "Experimental Prototype"
+- ❌ "Revolutionary Implementation" → ⚠️ "Novel Approach (requires validation)"
+- ❌ "Multi-Source Integration (8+ sources)" → ✅ "1 source proven, others untested"
+- ❌ "Complex interactions produce emergence" → ⚠️ "Hypothesis (untested)"
+- ❌ "Procedural generation active" → 🏗️ "Framework exists, no integration"
+
+### Now Claiming (Validated):
+- ✅ "Single-source learning works (Tatoeba)"
+- ✅ "Save/load functional"
+- ✅ "Fast binary storage (1,350x speedup)"
+- ✅ "LLM API integration works"
+- 🏗️ "Column architecture framework exists (untested)"
+- 🏗️ "Multi-source data loaders exist (mostly untested)"
+
+---
+
+## 📝 Documentation Standards Going Forward
+
+### Every "COMPLETE" Must Have:
+1. ✅ Code exists and compiles
+2. ✅ Executed at least 3 times successfully
+3. ✅ Results documented with output/logs
+4. ✅ Validated by independent test
+
+### Status Levels (Strict):
+- 🏗️ **Framework**: Code exists, compiles, never executed
+- ⚠️ **Prototype**: Executed 1-2 times, may have issues
+- ✅ **Validated**: Executed 3+ times, results consistent
+- 🚀 **Production**: Used in real workflows, stable over time
+
+### No More:
+- Claiming "COMPLETE" because code compiles
+- Confusing "framework exists" with "system works"
+- Inflating "API integration" to "intelligent system"
+- Theoretical features presented as working systems
+
+---
+
+**Last Updated**: October 5, 2025
+**Next Review**: October 11, 2025 (after Week 1 validation complete)
+**Philosophy**: Test everything. No claims without evidence. Build. Validate. Document. Repeat.
 
 ### Phase 2: Procedural Neural Core (4-6 weeks) 🎯 CRITICAL
 **Goal**: Demonstrate "No Man's Sky-style" neural generation with measurable reuse/regeneration

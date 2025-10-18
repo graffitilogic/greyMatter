@@ -34,6 +34,20 @@ namespace GreyMatter
         // static async Task RunProgram(string[] args)
         static async Task RunProgram(string[] args)
         {
+            // Test biological learning with neuron connections
+            if (args.Length > 0 && (args[0] == "--test-bio-learning" || args[0] == "--test-biological"))
+            {
+                GreyMatter.Tests.TestBiologicalLearning.Run();
+                return;
+            }
+            
+            // Full pipeline test with training and storage
+            if (args.Length > 0 && (args[0] == "--test-full-pipeline" || args[0] == "--full-pipeline-test"))
+            {
+                await GreyMatter.Tests.FullPipelineTest.Run();
+                return;
+            }
+            
             // Verify training data presence
             if (args.Length > 0 && (args[0] == "--verify-training-data" || args[0] == "--verify-data"))
             {
@@ -77,6 +91,30 @@ namespace GreyMatter
                 }
                 return;
             }
+            
+            // Week 1 Baseline Validation Test
+            if (args.Length > 0 && (args[0] == "--baseline-test" || args[0] == "--week1-baseline"))
+            {
+                await greyMatter.Validation.BaselineValidationTest.Main(new string[0]);
+                return;
+            }
+            
+            // Week 1 Multi-Source Validation Test
+            if (args.Length > 0 && (args[0] == "--multi-source-test" || args[0] == "--week1-multisource"))
+            {
+                await greyMatter.Validation.MultiSourceValidationTest.Main(new string[0]);
+                return;
+            }
+            
+            // Week 1 Knowledge Query System
+            if (args.Length > 0 && (args[0] == "--knowledge-query" || args[0] == "--query" || args[0] == "--week1-query"))
+            {
+                // Pass remaining args to query system
+                var queryArgs = args.Skip(1).ToArray();
+                await greyMatter.Validation.KnowledgeQuerySystem.Main(queryArgs);
+                return;
+            }
+            
             // Legacy sparse encoding test (use --evaluate instead)
             if (args.Length > 0 && (args[0] == "--test-sparse" || args[0] == "--sparse-encoding"))
             {
