@@ -164,6 +164,52 @@ namespace greyMatter.Validation
                     await ShowVocabularySample();
                     break;
                     
+                // Week 3: Multi-source query commands
+                case "--source":
+                case "--from-source":
+                    if (args.Length > 1)
+                    {
+                        var sourceName = args[1];
+                        await ListConceptsBySource(sourceName);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Usage: --source <sourceName>");
+                    }
+                    break;
+                    
+                case "--source-stats":
+                case "--sources":
+                    await ShowSourceStatistics();
+                    break;
+                    
+                case "--search":
+                case "-f":
+                    if (args.Length > 1)
+                    {
+                        var pattern = args[1];
+                        await SearchConcepts(pattern);
+                    }
+                    else
+                    {
+                        Console.WriteLine("Usage: --search <pattern>");
+                    }
+                    break;
+                    
+                case "--export":
+                case "--export-json":
+                    if (args.Length > 1)
+                    {
+                        var outputPath = args[1];
+                        await ExportToJson(outputPath);
+                    }
+                    else
+                    {
+                        var defaultPath = Path.Combine(BrainStoragePath, $"brain_export_{DateTime.Now:yyyyMMdd_HHmmss}.json");
+                        await ExportToJson(defaultPath);
+                    }
+                    break;
+                    
                 case "--help":
                 case "-h":
                     ShowHelp();
@@ -658,6 +704,223 @@ namespace greyMatter.Validation
             return d[s1.Length, s2.Length];
         }
 
+        /// <summary>
+        /// List concepts filtered by source (Week 3)
+        /// </summary>
+        private async Task ListConceptsBySource(string sourceName)
+        {
+            if (_brain == null)
+            {
+                Console.WriteLine("❌ Brain not loaded. Train first using multi-source trainer");
+                return;
+            }
+            
+            Console.WriteLine($"=== Concepts from '{sourceName}' ===\n");
+            
+            var vocab = _brain.ExportVocabulary();
+            var sourceWords = vocab.Where(kvp => 
+                kvp.Value.SourceFrequencies != null && 
+                kvp.Value.SourceFrequencies.ContainsKey(sourceName))
+                .OrderByDescending(kvp => kvp.Value.SourceFrequencies[sourceName])
+                .ToList();
+            
+            if (!sourceWords.Any())
+            {
+                Console.WriteLine($"❌ No concepts found from source: {sourceName}");
+                Console.WriteLine($"📚 Available sources:");
+                
+                var allSources = vocab.Values
+                    .Where(w => w.SourceFrequencies != null)
+                    .SelectMany(w => w.SourceFrequencies.Keys)
+                    .Distinct()
+                    .ToList();
+                    
+                foreach (var source in allSources)
+                {
+                    Console.WriteLine($"   • {source}");
+                }
+                return;
+            }
+            
+            Console.WriteLine($"✅ Found {sourceWords.Count} concepts from {sourceName}");
+            Console.WriteLine($"\n📊 Top 20 concepts (by frequency from this source):\n");
+            
+            int rank = 1;
+            foreach (var kvp in sourceWords.Take(20))
+            {
+                var word = kvp.Key;
+                var info = kvp.Value;
+                var sourceFreq = info.SourceFrequencies[sourceName];
+                Console.WriteLine($"   {rank,2}. {word,-20} (appeared {sourceFreq,3}x, type: {info.EstimatedType})");
+                rank++;
+            }
+            
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Get comprehensive source statistics (Week 3)
+        /// </summary>
+        private async Task ShowSourceStatistics()
+        {
+            if (_brain == null)
+            {
+                Console.WriteLine("❌ Brain not loaded. Train first using multi-source trainer");
+                return;
+            }
+            
+            Console.WriteLine("=== Multi-Source Statistics ===\n");
+            
+            var vocab = _brain.ExportVocabulary();
+            var wordsWithSources = vocab.Values.Where(w => w.SourceFrequencies != null && w.SourceFrequencies.Any()).ToList();
+            
+            if (!wordsWithSources.Any())
+            {
+                Console.WriteLine("❌ No multi-source data found");
+                Console.WriteLine("ℹ️ Train using MultiSourceTrainer to enable source tracking");
+                return;
+            }
+            
+            // Aggregate by source
+            var sourceStats = new Dictionary<string, (int words, int totalOccurrences)>();
+            
+            foreach (var word in wordsWithSources)
+            {
+                foreach (var sourceKvp in word.SourceFrequencies!)
+                {
+                    if (!sourceStats.ContainsKey(sourceKvp.Key))
+                    {
+                        sourceStats[sourceKvp.Key] = (0, 0);
+                    }
+                    
+                    var current = sourceStats[sourceKvp.Key];
+                    sourceStats[sourceKvp.Key] = (current.words + 1, current.totalOccurrences + sourceKvp.Value);
+                }
+            }
+            
+            Console.WriteLine($"📚 Total vocabulary: {vocab.Count:N0} words");
+            Console.WriteLine($"🔖 Words with source tracking: {wordsWithSources.Count:N0} ({(wordsWithSources.Count * 100.0 / vocab.Count):F1}%)");
+            Console.WriteLine($"\n📊 Breakdown by source:\n");
+            
+            foreach (var source in sourceStats.OrderByDescending(kvp => kvp.Value.words))
+            {
+                var stats = source.Value;
+                var percentage = (stats.words * 100.0) / vocab.Count;
+                Console.WriteLine($"   {source.Key,-15} {stats.words,6:N0} words ({percentage,5:F1}%) - {stats.totalOccurrences,8:N0} occurrences");
+            }
+            
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Search concepts by pattern (substring match) (Week 3)
+        /// </summary>
+        private async Task SearchConcepts(string pattern)
+        {
+            if (_brain == null)
+            {
+                Console.WriteLine("❌ Brain not loaded. Train first");
+                return;
+            }
+            
+            Console.WriteLine($"=== Searching for '{pattern}' ===\n");
+            
+            var vocab = _brain.ExportVocabulary();
+            var matches = vocab.Where(kvp => kvp.Key.Contains(pattern.ToLower()))
+                .OrderByDescending(kvp => kvp.Value.Frequency)
+                .ToList();
+            
+            if (!matches.Any())
+            {
+                Console.WriteLine($"❌ No concepts found matching: {pattern}");
+                return;
+            }
+            
+            Console.WriteLine($"✅ Found {matches.Count} matching concepts\n");
+            Console.WriteLine($"📊 Results (showing top 20):\n");
+            
+            int rank = 1;
+            foreach (var kvp in matches.Take(20))
+            {
+                var word = kvp.Key;
+                var info = kvp.Value;
+                
+                // Show source info if available
+                string sourceInfo = "";
+                if (info.SourceFrequencies != null && info.SourceFrequencies.Any())
+                {
+                    var sources = string.Join(", ", info.SourceFrequencies.Keys.Take(3));
+                    if (info.SourceFrequencies.Count > 3)
+                    {
+                        sources += "...";
+                    }
+                    sourceInfo = $" [from: {sources}]";
+                }
+                
+                Console.WriteLine($"   {rank,2}. {word,-25} (freq: {info.Frequency,4}, type: {info.EstimatedType}){sourceInfo}");
+                rank++;
+            }
+            
+            await Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Export brain knowledge to JSON (Week 3)
+        /// </summary>
+        private async Task ExportToJson(string outputPath)
+        {
+            if (_brain == null)
+            {
+                Console.WriteLine("❌ Brain not loaded. Train first");
+                return;
+            }
+            
+            Console.WriteLine($"=== Exporting Brain to JSON ===\n");
+            Console.WriteLine($"📁 Output: {outputPath}");
+            
+            try
+            {
+                var vocab = _brain.ExportVocabulary();
+                var neurons = _brain.ExportNeurons();
+                var languageData = _brain.ExportLanguageData();
+                
+                var export = new Dictionary<string, object>
+                {
+                    ["exportedAt"] = DateTime.UtcNow,
+                    ["vocabularySize"] = vocab.Count,
+                    ["neuronCount"] = neurons.Count,
+                    ["vocabulary"] = vocab.Select(kvp => new
+                    {
+                        word = kvp.Key,
+                        frequency = kvp.Value.Frequency,
+                        firstSeen = kvp.Value.FirstSeen,
+                        type = kvp.Value.EstimatedType.ToString(),
+                        conceptNeuronId = kvp.Value.ConceptNeuronId,
+                        attentionNeuronId = kvp.Value.AttentionNeuronId,
+                        associatedNeurons = kvp.Value.AssociatedNeuronIds,
+                        sources = kvp.Value.SourceFrequencies
+                    }).ToList(),
+                    ["languageData"] = languageData
+                };
+                
+                var json = System.Text.Json.JsonSerializer.Serialize(export, new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true
+                });
+                
+                await File.WriteAllTextAsync(outputPath, json);
+                
+                var fileInfo = new FileInfo(outputPath);
+                Console.WriteLine($"✅ Export successful");
+                Console.WriteLine($"📊 File size: {fileInfo.Length / 1024.0 / 1024.0:F2} MB");
+                Console.WriteLine($"📚 Exported: {vocab.Count:N0} words, {neurons.Count:N0} neurons");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Export failed: {ex.Message}");
+            }
+        }
+
         private void ShowHelp()
         {
             Console.WriteLine("=== Knowledge Query System - Help ===");
@@ -665,12 +928,19 @@ namespace greyMatter.Validation
             Console.WriteLine("Usage:");
             Console.WriteLine("  dotnet run -- --knowledge-query [command] [args]");
             Console.WriteLine();
-            Console.WriteLine("Commands:");
-            Console.WriteLine("  --query <word>     Query detailed information about a word");
-            Console.WriteLine("  --related <word>   Show semantically related concepts");
-            Console.WriteLine("  --stats            Show comprehensive brain statistics");
-            Console.WriteLine("  --sample           Show random vocabulary sample");
-            Console.WriteLine("  --help             Show this help");
+            Console.WriteLine("Basic Commands:");
+            Console.WriteLine("  --query <word>           Query detailed information about a word");
+            Console.WriteLine("  --related <word>         Show semantically related concepts");
+            Console.WriteLine("  --stats                  Show comprehensive brain statistics");
+            Console.WriteLine("  --sample                 Show random vocabulary sample");
+            Console.WriteLine();
+            Console.WriteLine("Multi-Source Commands (Week 3):");
+            Console.WriteLine("  --source <name>          List concepts from specific data source");
+            Console.WriteLine("  --source-stats           Show breakdown by data source");
+            Console.WriteLine("  --search <pattern>       Search concepts by substring pattern");
+            Console.WriteLine("  --export [path]          Export brain to JSON (optional path)");
+            Console.WriteLine();
+            Console.WriteLine("  --help                   Show this help");
             Console.WriteLine();
             Console.WriteLine("Interactive mode:");
             Console.WriteLine("  dotnet run -- --knowledge-query");
@@ -680,6 +950,9 @@ namespace greyMatter.Validation
             Console.WriteLine("  dotnet run -- --knowledge-query --query cat");
             Console.WriteLine("  dotnet run -- --knowledge-query --related computer");
             Console.WriteLine("  dotnet run -- --knowledge-query --stats");
+            Console.WriteLine("  dotnet run -- --knowledge-query --source Tatoeba");
+            Console.WriteLine("  dotnet run -- --knowledge-query --search animal");
+            Console.WriteLine("  dotnet run -- --knowledge-query --export brain.json");
         }
     }
 }

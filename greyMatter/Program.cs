@@ -33,6 +33,13 @@ namespace GreyMatter
 
         static async Task RunProgram(string[] args)
         {
+            // Week 3 end-to-end validation (Task 4)
+            if (args.Length > 0 && (args[0] == "--week3-validation" || args[0] == "--validate-week3"))
+            {
+                await Week3ValidationTest.Run();
+                return;
+            }
+            
             // Test multi-source training (Week 3 Task 2)
             if (args.Length > 0 && (args[0] == "--test-multi-source" || args[0] == "--multi-source-training"))
             {
