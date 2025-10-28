@@ -31,9 +31,22 @@ namespace GreyMatter
             await RunProgram(args);
         }
 
-        // static async Task RunProgram(string[] args)
         static async Task RunProgram(string[] args)
         {
+            // Test multi-source training (Week 3 Task 2)
+            if (args.Length > 0 && (args[0] == "--test-multi-source" || args[0] == "--multi-source-training"))
+            {
+                await MultiSourceTrainingTest.Run();
+                return;
+            }
+            
+            // Test data sources (Week 3 Task 1)
+            if (args.Length > 0 && (args[0] == "--test-data-sources" || args[0] == "--validate-sources"))
+            {
+                await GreyMatter.Tests.DataSourceValidationTest.Run();
+                return;
+            }
+            
             // Test biological learning with neuron connections
             if (args.Length > 0 && (args[0] == "--test-bio-learning" || args[0] == "--test-biological"))
             {

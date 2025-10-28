@@ -84,6 +84,9 @@ namespace greyMatter.Core
         public int? ConceptNeuronId { get; set; }
         public int? AttentionNeuronId { get; set; }
         public List<int> AssociatedNeuronIds { get; set; } = new();
+        
+        // Multi-source learning: Track which data sources contributed to learning this word
+        public Dictionary<string, int> SourceFrequencies { get; set; } = new();
     }
 
     public enum WordType
