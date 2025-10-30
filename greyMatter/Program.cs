@@ -10,6 +10,7 @@ using GreyMatter.Evaluations;
 using GreyMatter.DataIntegration;
 using GreyMatter.Demos; // Temporary: for deprecated demo stubs
 using greyMatter;
+using greyMatter.Tests;
 
 namespace GreyMatter
 {
@@ -33,6 +34,13 @@ namespace GreyMatter
 
         static async Task RunProgram(string[] args)
         {
+            // Week 4 Column Architecture Test Runner (Task 1)
+            if (args.Length > 0 && (args[0] == "--column-test" || args[0] == "--test-columns"))
+            {
+                await ColumnArchitectureTestRunner.Run();
+                return;
+            }
+            
             // Week 3 end-to-end validation (Task 4)
             if (args.Length > 0 && (args[0] == "--week3-validation" || args[0] == "--validate-week3"))
             {

@@ -135,6 +135,29 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// Register a column with the message bus (creates inbox)
+        /// </summary>
+        public void RegisterColumn(string columnId)
+        {
+            if (!_columnInboxes.ContainsKey(columnId))
+            {
+                _columnInboxes[columnId] = new Queue<ColumnMessage>();
+                Console.WriteLine($"📬 Registered column inbox: {columnId}");
+            }
+        }
+
+        /// <summary>
+        /// Unregister a column (cleanup)
+        /// </summary>
+        public void UnregisterColumn(string columnId)
+        {
+            if (_columnInboxes.Remove(columnId))
+            {
+                Console.WriteLine($"📭 Unregistered column inbox: {columnId}");
+            }
+        }
+
+        /// <summary>
         /// Broadcast message to all columns of a specific type
         /// </summary>
         public void Broadcast(string columnType, ColumnMessage message)
@@ -142,6 +165,17 @@ namespace GreyMatter.Core
             var targetColumns = _columnInboxes.Keys
                 .Where(id => ExtractColumnType(id) == columnType)
                 .ToList();
+
+            // Enhanced logging for debugging
+            Console.WriteLine($"📡 Broadcasting {message.Type} from {message.SenderId} to type '{columnType}'");
+            Console.WriteLine($"   Registered columns: {_columnInboxes.Count}");
+            Console.WriteLine($"   Target columns found: {targetColumns.Count}");
+            
+            if (targetColumns.Count == 0)
+            {
+                Console.WriteLine($"   ⚠️  No columns of type '{columnType}' registered!");
+                Console.WriteLine($"   Available column types: {string.Join(", ", _columnInboxes.Keys.Select(ExtractColumnType).Distinct())}");
+            }
 
             foreach (var columnId in targetColumns)
             {
@@ -156,6 +190,7 @@ namespace GreyMatter.Core
                     Timestamp = message.Timestamp
                 };
                 SendMessage(broadcastMessage);
+                Console.WriteLine($"   ✉️  Sent to {columnId}");
             }
         }
 

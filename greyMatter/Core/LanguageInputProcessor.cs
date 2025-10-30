@@ -265,6 +265,9 @@ namespace GreyMatter.Core
             column.WorkingMemory = _workingMemory;
             column.MessageBus = _messageBus;
 
+            // CRITICAL FIX: Register column with message bus so it can receive messages
+            _messageBus?.RegisterColumn(column.Id);
+
             // Track active column
             _activeColumns[column.Id] = column;
 
