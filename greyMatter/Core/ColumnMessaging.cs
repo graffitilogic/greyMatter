@@ -240,6 +240,18 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// Get recent messages from history within a time window (for pattern detection)
+        /// </summary>
+        public List<ColumnMessage> GetRecentMessages(int maxCount, DateTime cutoff)
+        {
+            return _messageHistory
+                .Where(m => m.Timestamp >= cutoff)
+                .OrderByDescending(m => m.Timestamp)
+                .Take(maxCount)
+                .ToList();
+        }
+
+        /// <summary>
         /// Purge messages older than specified age
         /// </summary>
         public void PurgeOldMessages(TimeSpan maxAge)

@@ -2,11 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using GreyMatter.Storage;
-using greyMatter.Core;
+using GreyMatter.Core;
 using CoreWordInfo = greyMatter.Core.WordInfo;
 using StorageWordInfo = GreyMatter.Storage.WordInfo;
 
-namespace greyMatter
+namespace GreyMatter
 {
     /// <summary>
     /// Test the Huth-inspired semantic domain categorization system

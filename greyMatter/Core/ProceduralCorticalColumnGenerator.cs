@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using GreyMatter.Core;
+using greyMatter.Core; // For IIntegratedBrain and support classes
 
 namespace GreyMatter.Core
 {
@@ -433,6 +434,17 @@ namespace GreyMatter.Core
         public MessageBus? MessageBus { get; set; }
 
         /// <summary>
+        /// Reference to integrated brain for bidirectional communication
+        /// Enables columns to trigger learning and query existing knowledge
+        /// </summary>
+        public IIntegratedBrain? Brain { get; set; }
+
+        // Integration tracking
+        private Dictionary<string, int> _patternFrequencies = new Dictionary<string, int>();
+        private Dictionary<string, DateTime> _lastSeen = new Dictionary<string, DateTime>();
+        private int _totalMessagesProcessed = 0;
+
+        /// <summary>
         /// Process incoming messages from other columns
         /// </summary>
         public List<ColumnMessage> ProcessMessages(int maxMessages = 10)
@@ -445,11 +457,24 @@ namespace GreyMatter.Core
 
         /// <summary>
         /// Send a message to another column or column type
+        /// Now with optional brain knowledge integration
         /// </summary>
-        public void SendMessage(string receiverId, MessageType type, SparsePattern payload, double strength = 1.0)
+        public async Task SendMessageAsync(string receiverId, MessageType type, SparsePattern payload, double strength = 1.0, string? concept = null)
         {
             if (MessageBus == null)
                 return;
+
+            // Query brain for knowledge about the pattern (if brain is connected and concept is provided)
+            if (Brain != null && !string.IsNullOrWhiteSpace(concept))
+            {
+                var familiarity = await Brain.GetWordFamiliarityAsync(concept);
+                
+                // Boost strength for known concepts (knowledge-guided processing)
+                if (familiarity > 0.5)
+                {
+                    strength *= (1.0 + familiarity * 0.5); // Up to 50% boost for familiar concepts
+                }
+            }
 
             var message = new ColumnMessage
             {
@@ -461,6 +486,15 @@ namespace GreyMatter.Core
             };
 
             MessageBus.SendMessage(message);
+            _totalMessagesProcessed++;
+        }
+
+        /// <summary>
+        /// Send a message to another column or column type (synchronous version)
+        /// </summary>
+        public void SendMessage(string receiverId, MessageType type, SparsePattern payload, double strength = 1.0)
+        {
+            SendMessageAsync(receiverId, type, payload, strength, null).Wait();
         }
 
         /// <summary>
@@ -480,6 +514,123 @@ namespace GreyMatter.Core
             };
 
             MessageBus.Broadcast(columnType, message);
+        }
+
+        /// <summary>
+        /// Track pattern and potentially notify brain of significant patterns
+        /// Implements pattern detection for column-triggered learning
+        /// </summary>
+        public async Task TrackAndNotifyPatternAsync(string concept, List<string> relatedConcepts, double confidence)
+        {
+            if (Brain == null || string.IsNullOrWhiteSpace(concept))
+                return;
+
+            // Update tracking
+            if (!_patternFrequencies.ContainsKey(concept))
+                _patternFrequencies[concept] = 0;
+            _patternFrequencies[concept]++;
+            _lastSeen[concept] = DateTime.Now;
+
+            // Determine if this is a significant pattern worth notifying brain about
+            PatternType patternType = DeterminePatternType(concept, relatedConcepts);
+            bool isSignificant = IsSignificantPattern(concept, confidence);
+
+            if (isSignificant)
+            {
+                var pattern = new ColumnPattern
+                {
+                    PrimaryConcept = concept,
+                    RelatedConcepts = relatedConcepts,
+                    Confidence = confidence,
+                    ColumnCount = 1, // Could track multiple columns in future
+                    MessageCount = _patternFrequencies[concept],
+                    Type = patternType,
+                    DetectedAt = DateTime.Now
+                };
+
+                await Brain.NotifyColumnPatternAsync(pattern);
+            }
+        }
+
+        /// <summary>
+        /// Determine what type of pattern this represents
+        /// </summary>
+        private PatternType DeterminePatternType(string concept, List<string> relatedConcepts)
+        {
+            // Check if this is a novel concept
+            if (!_patternFrequencies.ContainsKey(concept) || _patternFrequencies[concept] <= 2)
+                return PatternType.NovelWord;
+
+            // Check if this is reinforcement (repeated pattern)
+            if (_patternFrequencies[concept] > 5)
+                return PatternType.Reinforcement;
+
+            // Check for new associations
+            if (relatedConcepts.Count > 0)
+                return PatternType.NewAssociation;
+
+            // Default based on column type
+            return Type switch
+            {
+                "syntactic" => PatternType.SyntacticStructure,
+                "semantic" => PatternType.SemanticCluster,
+                _ => PatternType.NewAssociation
+            };
+        }
+
+        /// <summary>
+        /// Determine if pattern is significant enough to notify brain
+        /// </summary>
+        private bool IsSignificantPattern(string concept, double confidence)
+        {
+            // Require minimum confidence
+            if (confidence < 0.6)
+                return false;
+
+            // Novel patterns are always significant
+            if (!_patternFrequencies.ContainsKey(concept))
+                return true;
+
+            // Repeated patterns are significant at certain thresholds
+            int frequency = _patternFrequencies[concept];
+            return frequency == 1 || // First occurrence
+                   frequency == 3 || // Reinforcement threshold
+                   frequency == 10 || // Strong reinforcement
+                   frequency % 50 == 0; // Periodic updates for very common patterns
+        }
+
+        /// <summary>
+        /// Query brain for related concepts to guide message routing
+        /// Implements knowledge-guided column processing
+        /// </summary>
+        public async Task<List<string>> GetBrainRelatedConceptsAsync(string concept, int maxResults = 5)
+        {
+            if (Brain == null || string.IsNullOrWhiteSpace(concept))
+                return new List<string>();
+
+            return await Brain.GetRelatedConceptsAsync(concept, maxResults);
+        }
+
+        /// <summary>
+        /// Check if brain knows about a concept (fast check)
+        /// </summary>
+        public bool IsBrainKnownConcept(string concept)
+        {
+            if (Brain == null || string.IsNullOrWhiteSpace(concept))
+                return false;
+
+            return Brain.IsKnownWord(concept);
+        }
+
+        /// <summary>
+        /// Get full knowledge about a concept from brain
+        /// </summary>
+        public async Task<ConceptKnowledge?> GetBrainKnowledgeAsync(string concept)
+        {
+            if (Brain == null || string.IsNullOrWhiteSpace(concept))
+                return null;
+
+            return await Brain.QueryKnowledgeAsync(concept);
         }
     }
 
