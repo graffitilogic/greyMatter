@@ -34,6 +34,13 @@ namespace GreyMatter
 
         static async Task RunProgram(string[] args)
         {
+            // Week 4 Baseline Comparison (Task 5)
+            if (args.Length > 0 && (args[0] == "--baseline-comparison" || args[0] == "--compare-columns"))
+            {
+                await BaselineColumnComparisonTest.Run();
+                return;
+            }
+            
             // Week 4 Column Architecture Test Runner (Task 1)
             if (args.Length > 0 && (args[0] == "--column-test" || args[0] == "--test-columns"))
             {
