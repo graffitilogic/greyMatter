@@ -681,10 +681,10 @@ namespace greyMatter.Core
             
             try
             {
-                // Learn the primary concept
+                // Learn the primary concept (silently for continuous operation)
                 if (!string.IsNullOrWhiteSpace(pattern.PrimaryConcept))
                 {
-                    Learn(pattern.PrimaryConcept);
+                    LearnSilently(pattern.PrimaryConcept);
                     _integrationStats.LearningTriggersTotal++;
                 }
                 

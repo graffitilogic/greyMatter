@@ -1,0 +1,9 @@
+{
+  "State": 0,
+  "StartTime": "2025-11-06T09:52:49.098409-06:00",
+  "LastActivity": "2025-11-06T09:52:59.112306-06:00",
+  "SentencesProcessed": 965,
+  "VocabularySize": 69,
+  "CurrentDataSource": "simple_sentences.txt",
+  "Message": "Service stopped gracefully"
+}

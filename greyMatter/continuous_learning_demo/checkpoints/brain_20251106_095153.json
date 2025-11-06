@@ -1,0 +1,696 @@
+{
+  "Vocabulary": {
+    "birds": {
+      "Word": "birds",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993384Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "sing": {
+      "Word": "sing",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993475Z",
+      "EstimatedType": 2,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "beautiful": {
+      "Word": "beautiful",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993476Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "songs": {
+      "Word": "songs",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993476Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "children": {
+      "Word": "children",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993478Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "play": {
+      "Word": "play",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993478Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "in": {
+      "Word": "in",
+      "Frequency": 229,
+      "FirstSeen": "2025-11-06T15:51:53.993478Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "the": {
+      "Word": "the",
+      "Frequency": 403,
+      "FirstSeen": "2025-11-06T15:51:53.993478Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "garden": {
+      "Word": "garden",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993478Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "flowers": {
+      "Word": "flowers",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993479Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "bloom": {
+      "Word": "bloom",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993479Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "spring": {
+      "Word": "spring",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993479Z",
+      "EstimatedType": 2,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "rain": {
+      "Word": "rain",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993479Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "falls": {
+      "Word": "falls",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993479Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "from": {
+      "Word": "from",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.99348Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "clouds": {
+      "Word": "clouds",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.99348Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "planes": {
+      "Word": "planes",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.99348Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "fly": {
+      "Word": "fly",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993481Z",
+      "EstimatedType": 4,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "sky": {
+      "Word": "sky",
+      "Frequency": 58,
+      "FirstSeen": "2025-11-06T15:51:53.993481Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "mountains": {
+      "Word": "mountains",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993481Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "touch": {
+      "Word": "touch",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993483Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "fish": {
+      "Word": "fish",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993483Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "swim": {
+      "Word": "swim",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993483Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "ocean": {
+      "Word": "ocean",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993483Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "snow": {
+      "Word": "snow",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993484Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "covers": {
+      "Word": "covers",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993484Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "ground": {
+      "Word": "ground",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993484Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "sun": {
+      "Word": "sun",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993484Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "shines": {
+      "Word": "shines",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993484Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "brightly": {
+      "Word": "brightly",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993485Z",
+      "EstimatedType": 4,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "today": {
+      "Word": "today",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993485Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "books": {
+      "Word": "books",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993485Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "are": {
+      "Word": "are",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993486Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "found": {
+      "Word": "found",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993486Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "library": {
+      "Word": "library",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993486Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "wind": {
+      "Word": "wind",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993486Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "blows": {
+      "Word": "blows",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993486Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "through": {
+      "Word": "through",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993486Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "trees": {
+      "Word": "trees",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993487Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "cars": {
+      "Word": "cars",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993487Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "drive": {
+      "Word": "drive",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993487Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "on": {
+      "Word": "on",
+      "Frequency": 86,
+      "FirstSeen": "2025-11-06T15:51:53.993487Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "roads": {
+      "Word": "roads",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993487Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "cat": {
+      "Word": "cat",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993487Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "sat": {
+      "Word": "sat",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993487Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "mat": {
+      "Word": "mat",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993488Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "bird": {
+      "Word": "bird",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993488Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "flew": {
+      "Word": "flew",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993488Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "over": {
+      "Word": "over",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993488Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "tree": {
+      "Word": "tree",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993488Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "dog": {
+      "Word": "dog",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993488Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "ran": {
+      "Word": "ran",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "park": {
+      "Word": "park",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "moon": {
+      "Word": "moon",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "glows": {
+      "Word": "glows",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "at": {
+      "Word": "at",
+      "Frequency": 58,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "night": {
+      "Word": "night",
+      "Frequency": 58,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "water": {
+      "Word": "water",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "flows": {
+      "Word": "flows",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.993489Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "river": {
+      "Word": "river",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.99349Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "stars": {
+      "Word": "stars",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.99349Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "shine": {
+      "Word": "shine",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.99349Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "leaves": {
+      "Word": "leaves",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.99349Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "change": {
+      "Word": "change",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.99349Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "color": {
+      "Word": "color",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.99349Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "fall": {
+      "Word": "fall",
+      "Frequency": 28,
+      "FirstSeen": "2025-11-06T15:51:53.99349Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "trains": {
+      "Word": "trains",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993491Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "run": {
+      "Word": "run",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993491Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    },
+    "tracks": {
+      "Word": "tracks",
+      "Frequency": 29,
+      "FirstSeen": "2025-11-06T15:51:53.993491Z",
+      "EstimatedType": 0,
+      "ConceptNeuronId": null,
+      "AttentionNeuronId": null,
+      "AssociatedNeuronIds": [],
+      "SourceFrequencies": {}
+    }
+  },
+  "LearnedSentences": 574,
+  "VocabularySize": 69
+}

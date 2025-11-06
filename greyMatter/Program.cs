@@ -35,6 +35,41 @@ namespace GreyMatter
 
         static async Task RunProgram(string[] args)
         {
+            // Week 6 Continuous Learning Service
+            if (args.Length > 0 && (args[0] == "--continuous-learning" || args[0] == "--service" || args[0] == "--continuous"))
+            {
+                // Parse optional arguments
+                string dataPath = "./training_data";
+                int durationSeconds = 60;
+                bool controlDemo = false;
+                
+                for (int i = 1; i < args.Length; i++)
+                {
+                    if (args[i] == "-td" || args[i] == "--training-data")
+                    {
+                        dataPath = args[++i];
+                    }
+                    else if (args[i] == "-d" || args[i] == "--duration")
+                    {
+                        durationSeconds = int.Parse(args[++i]);
+                    }
+                    else if (args[i] == "--control-demo")
+                    {
+                        controlDemo = true;
+                    }
+                }
+                
+                if (controlDemo)
+                {
+                    await ContinuousLearningDemo.DemoControlFeaturesAsync(dataPath);
+                }
+                else
+                {
+                    await ContinuousLearningDemo.RunAsync(dataPath, durationSeconds);
+                }
+                return;
+            }
+            
             // Week 5 Integration Validation (Task 9)
             if (args.Length > 0 && (args[0] == "--week5-validation" || args[0] == "--integration-validation" || args[0] == "--validate-integration"))
             {
