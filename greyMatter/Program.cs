@@ -9,6 +9,7 @@ using GreyMatter.Learning;
 using GreyMatter.Evaluations;
 using GreyMatter.DataIntegration;
 using GreyMatter.Demos; // Temporary: for deprecated demo stubs
+using GreyMatter.Tests; // Week 5 integration tests
 using greyMatter;
 using greyMatter.Tests;
 
@@ -34,6 +35,13 @@ namespace GreyMatter
 
         static async Task RunProgram(string[] args)
         {
+            // Week 5 Integration Validation (Task 9)
+            if (args.Length > 0 && (args[0] == "--week5-validation" || args[0] == "--integration-validation" || args[0] == "--validate-integration"))
+            {
+                await IntegrationValidationTest.RunValidationAsync();
+                return;
+            }
+            
             // Week 4 Baseline Comparison (Task 5)
             if (args.Length > 0 && (args[0] == "--baseline-comparison" || args[0] == "--compare-columns"))
             {

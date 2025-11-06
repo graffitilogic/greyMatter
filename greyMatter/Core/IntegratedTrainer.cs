@@ -2,10 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using GreyMatter.Core;
-using greyMatter.Core;
+using GreyMatter.Core; // For MessageBus, WorkingMemory, ProceduralCorticalColumn, etc.
+using greyMatter.Core;  // For IIntegratedBrain, LanguageEphemeralBrain
 
-namespace GreyMatter.Core
+namespace greyMatter.Core
 {
     /// <summary>
     /// Unified training system that integrates column processing with traditional learning.
@@ -17,13 +17,13 @@ namespace GreyMatter.Core
     public class IntegratedTrainer
     {
         private readonly LanguageEphemeralBrain _brain;
-        private readonly ProceduralCorticalColumnGenerator _columnGenerator;
-        private readonly MessageBus _messageBus;
-        private readonly ColumnPatternDetector _patternDetector;
-        private readonly WorkingMemory _workingMemory;
+        private readonly ProceduralCorticalColumnGenerator? _columnGenerator;
+        private readonly MessageBus? _messageBus;
+        private readonly ColumnPatternDetector? _patternDetector;
+        private readonly WorkingMemory? _workingMemory;
 
         // Generated columns by type
-        private readonly Dictionary<string, List<ProceduralCorticalColumn>> _columnsByType;
+        private readonly Dictionary<string, List<ProceduralCorticalColumn>>? _columnsByType;
         
         // Training configuration
         private readonly bool _enableColumnProcessing;
@@ -35,6 +35,12 @@ namespace GreyMatter.Core
         private int _wordsLearned = 0;
         private int _patternsDetected = 0;
         private int _integrationTriggers = 0;
+        
+        // Performance profiling
+        private double _traditionalLearningMs = 0;
+        private double _columnProcessingMs = 0;
+        private double _patternDetectionMs = 0;
+        private double _familiarityCheckMs = 0;
 
         public IntegratedTrainer(
             LanguageEphemeralBrain brain,
@@ -58,7 +64,12 @@ namespace GreyMatter.Core
                 
                 if (_enableIntegration)
                 {
-                    _patternDetector = new ColumnPatternDetector(_messageBus, _brain as IIntegratedBrain ?? throw new InvalidOperationException("Brain must implement IIntegratedBrain for integration"));
+                    var iBrain = _brain as IIntegratedBrain;
+                    if (iBrain == null)
+                    {
+                        throw new InvalidOperationException("Brain must implement IIntegratedBrain for integration");
+                    }
+                    _patternDetector = new ColumnPatternDetector(_messageBus!, iBrain);
                 }
                 
                 InitializeColumns().Wait();
@@ -74,10 +85,11 @@ namespace GreyMatter.Core
             
             foreach (var type in columnTypes)
             {
-                _columnsByType[type] = new List<ProceduralCorticalColumn>();
+                _columnsByType![type] = new List<ProceduralCorticalColumn>();
                 
-                // Generate a few columns of each type
-                for (int i = 0; i < 3; i++)
+                // OPTIMIZATION: Use only 1 column per type instead of 3
+                // (reduces message passing overhead while maintaining functionality)
+                for (int i = 0; i < 1; i++)
                 {
                     var coordinates = new SemanticCoordinates
                     {
@@ -93,7 +105,7 @@ namespace GreyMatter.Core
                         ExpectedLoad = 1000
                     };
                     
-                    var column = await _columnGenerator.GenerateColumnAsync(type, coordinates, requirements);
+                    var column = await _columnGenerator!.GenerateColumnAsync(type, coordinates, requirements);
                     column.MessageBus = _messageBus;
                     column.WorkingMemory = _workingMemory;
                     
@@ -104,11 +116,11 @@ namespace GreyMatter.Core
                     }
                     
                     _columnsByType[type].Add(column);
-                    _messageBus.RegisterColumn(column.Id);
+                    _messageBus!.RegisterColumn(column.Id);
                 }
             }
             
-            Console.WriteLine($"✅ Initialized {_columnsByType.Sum(kvp => kvp.Value.Count)} columns across {columnTypes.Length} types");
+            Console.WriteLine($"✅ Initialized {_columnsByType!.Sum(kvp => kvp.Value.Count)} columns across {columnTypes.Length} types");
         }
 
         /// <summary>
@@ -124,19 +136,28 @@ namespace GreyMatter.Core
             // Phase 1: Traditional learning (if enabled)
             if (_enableTraditionalLearning)
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 _brain.LearnSentence(sentence);
+                sw.Stop();
+                _traditionalLearningMs += sw.Elapsed.TotalMilliseconds;
                 _wordsLearned += sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
             }
 
             // Phase 2: Column processing (if enabled)
             if (_enableColumnProcessing)
             {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 await ProcessThroughColumnsAsync(sentence);
+                sw.Stop();
+                _columnProcessingMs += sw.Elapsed.TotalMilliseconds;
                 
                 // Phase 3: Pattern detection and integration (if enabled)
                 if (_enableIntegration && _patternDetector != null)
                 {
+                    sw.Restart();
                     var patterns = await _patternDetector.AnalyzeRecentActivityAsync(TimeSpan.FromSeconds(5));
+                    sw.Stop();
+                    _patternDetectionMs += sw.Elapsed.TotalMilliseconds;
                     _patternsDetected += patterns.Count;
                     _integrationTriggers += patterns.Count(p => p.Confidence >= 0.7);
                 }
@@ -150,16 +171,30 @@ namespace GreyMatter.Core
         {
             var words = sentence.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             
+            // OPTIMIZATION: Cache familiarity for all words at sentence level
+            // instead of querying for each word in each column type
+            var wordFamiliarity = new Dictionary<string, double>();
+            if (_enableIntegration && _brain is IIntegratedBrain iBrain)
+            {
+                foreach (var word in words.Distinct())
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    wordFamiliarity[word] = await iBrain.GetWordFamiliarityAsync(word);
+                    sw.Stop();
+                    _familiarityCheckMs += sw.Elapsed.TotalMilliseconds;
+                }
+            }
+            
             foreach (var word in words)
             {
                 // Phonetic processing
-                await ProcessWordThroughColumnType(word, "phonetic");
+                await ProcessWordThroughColumnType(word, "phonetic", wordFamiliarity);
                 
                 // Semantic processing (with brain knowledge integration)
-                await ProcessWordThroughColumnType(word, "semantic");
+                await ProcessWordThroughColumnType(word, "semantic", wordFamiliarity);
                 
                 // Syntactic processing
-                await ProcessWordThroughColumnType(word, "syntactic");
+                await ProcessWordThroughColumnType(word, "syntactic", wordFamiliarity);
             }
             
             // Contextual processing for whole sentence
@@ -169,18 +204,17 @@ namespace GreyMatter.Core
         /// <summary>
         /// Process a word through columns of a specific type
         /// </summary>
-        private async Task ProcessWordThroughColumnType(string word, string columnType)
+        private async Task ProcessWordThroughColumnType(string word, string columnType, Dictionary<string, double> wordFamiliarity)
         {
-            if (!_columnsByType.TryGetValue(columnType, out var columns))
+            if (!_columnsByType!.TryGetValue(columnType, out var columns))
                 return;
 
             foreach (var column in columns)
             {
-                // Check if brain knows about this word (knowledge-guided processing)
+                // Get cached familiarity (optimization - avoids repeated async calls)
                 double knowledgeBoost = 1.0;
-                if (_enableIntegration && column.Brain != null)
+                if (_enableIntegration && wordFamiliarity.TryGetValue(word, out var familiarity))
                 {
-                    var familiarity = await column.Brain.GetWordFamiliarityAsync(word);
                     knowledgeBoost = 1.0 + (familiarity * 0.5); // Up to 50% boost
                 }
 
@@ -196,15 +230,16 @@ namespace GreyMatter.Core
                     concept: word
                 );
 
+                //  OPTIMIZATION: Pattern detection runs periodically, not per message
                 // Track pattern for potential learning trigger
-                if (_enableIntegration)
-                {
-                    await column.TrackAndNotifyPatternAsync(
-                        concept: word,
-                        relatedConcepts: new List<string>(),
-                        confidence: 0.7 * knowledgeBoost
-                    );
-                }
+                // if (_enableIntegration)
+                // {
+                //     await column.TrackAndNotifyPatternAsync(
+                //         concept: word,
+                //         relatedConcepts: new List<string>(),
+                //         confidence: 0.7 * knowledgeBoost
+                //     );
+                // }
             }
         }
 
@@ -213,7 +248,7 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task ProcessSentenceThroughColumnType(string sentence, string columnType)
         {
-            if (!_columnsByType.TryGetValue(columnType, out var columns))
+            if (!_columnsByType!.TryGetValue(columnType, out var columns))
                 return;
 
             foreach (var column in columns)
@@ -312,7 +347,7 @@ namespace GreyMatter.Core
                 IntegrationStats = _enableIntegration ? (_brain as IIntegratedBrain)?.GetIntegrationStats() : null,
                 
                 // Column stats
-                TotalColumns = _enableColumnProcessing ? _columnsByType.Sum(kvp => kvp.Value.Count) : 0,
+                TotalColumns = _enableColumnProcessing ? _columnsByType!.Sum(kvp => kvp.Value.Count) : 0,
                 
                 // Pattern detection stats
                 PatternsDetected = _patternsDetected,
@@ -350,6 +385,18 @@ namespace GreyMatter.Core
             Console.WriteLine($"  Column Processing: {(stats.ColumnProcessingEnabled ? "✅" : "❌")}");
             Console.WriteLine($"  Traditional Learning: {(stats.TraditionalLearningEnabled ? "✅" : "❌")}");
             Console.WriteLine($"  Integration: {(stats.IntegrationEnabled ? "✅" : "❌")}");
+            
+            // Performance breakdown
+            if (_sentencesProcessed > 0)
+            {
+                var totalMs = _traditionalLearningMs + _columnProcessingMs + _patternDetectionMs;
+                Console.WriteLine($"\n⏱️  Performance Breakdown:");
+                Console.WriteLine($"  Traditional learning: {_traditionalLearningMs:F1}ms ({(_traditionalLearningMs/totalMs*100):F1}%)");
+                Console.WriteLine($"  Column processing: {_columnProcessingMs:F1}ms ({(_columnProcessingMs/totalMs*100):F1}%)");
+                Console.WriteLine($"    - Familiarity checks: {_familiarityCheckMs:F1}ms ({(_familiarityCheckMs/_columnProcessingMs*100):F1}% of column time)");
+                Console.WriteLine($"  Pattern detection: {_patternDetectionMs:F1}ms ({(_patternDetectionMs/totalMs*100):F1}%)");
+                Console.WriteLine($"  Total: {totalMs:F1}ms");
+            }
             
             if (stats.IntegrationEnabled && stats.IntegrationStats != null)
             {

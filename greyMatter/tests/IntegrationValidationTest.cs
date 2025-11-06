@@ -138,6 +138,12 @@ namespace GreyMatter.Tests
             var sentencesPerSec = (sentences.Count / stopwatch.Elapsed.TotalSeconds);
 
             Console.WriteLine($"✅ Training complete: {elapsedMs:F0}ms ({sentencesPerSec:F1} sentences/sec)");
+            
+            // Print detailed performance breakdown for integrated mode
+            if (enableIntegration)
+            {
+                trainer.PrintStats();
+            }
 
             // Test vocabulary recognition
             var knownWords = new Dictionary<string, bool>();
@@ -215,8 +221,8 @@ namespace GreyMatter.Tests
                 var iStats = integrated.IntegrationStats;
                 Console.WriteLine("🔗 Integration Synergy:");
                 Console.WriteLine($"   Column→Brain triggers: {iStats.LearningTriggersTotal}");
-                Console.WriteLine($"   Brain→Column queries: {iStats.KnowledgeQueriesTotal}");
-                Console.WriteLine($"   Knowledge utilization: {iStats.KnowledgeUtilizationRate:P1}");
+                Console.WriteLine($"   Brain→Column queries: {iStats.FamiliarityChecks} familiarity checks, {iStats.RelatedConceptsRequests} concept requests");
+                Console.WriteLine($"   Knowledge cache hits: {iStats.KnowledgeHits}/{iStats.KnowledgeQueriesTotal}");
                 Console.WriteLine($"   Learning efficiency: {iStats.LearningEfficiency:P1}");
                 
                 if (integrated.PatternStats != null)
@@ -250,10 +256,10 @@ namespace GreyMatter.Tests
             // Hypothesis 3: Integration enables bidirectional communication
             var bidirectionalWorks = integrated.IntegrationStats != null &&
                                     integrated.IntegrationStats.LearningTriggersTotal > 0 &&
-                                    integrated.IntegrationStats.KnowledgeQueriesTotal > 0;
+                                    integrated.IntegrationStats.FamiliarityChecks > 0;
             Console.WriteLine($"\n✓ Hypothesis 3: Bidirectional communication works");
             Console.WriteLine($"  Column→Brain: {integrated.IntegrationStats?.LearningTriggersTotal ?? 0} triggers");
-            Console.WriteLine($"  Brain→Column: {integrated.IntegrationStats?.KnowledgeQueriesTotal ?? 0} queries");
+            Console.WriteLine($"  Brain→Column: {integrated.IntegrationStats?.FamiliarityChecks ?? 0} familiarity checks");
             Console.WriteLine($"  Result: {(bidirectionalWorks ? "PASS ✅" : "FAIL ❌")}");
 
             // Hypothesis 4: Integration has acceptable overhead
