@@ -22,9 +22,9 @@ namespace GreyMatter.Demos
             Console.WriteLine("╚════════════════════════════════════════════════════════════════╝\n");
 
             // Create brain
-            var brain = new LanguageEphemeralBrain(vocabularySize: 1000);
+            var brain = new LanguageEphemeralBrain();
             
-            Console.WriteLine("🧠 Brain created with vocabulary capacity: 1000\n");
+            Console.WriteLine("🧠 Brain created\n");
 
             // Test data
             var testSentences = new List<string>

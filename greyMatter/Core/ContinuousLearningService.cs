@@ -52,7 +52,10 @@ namespace GreyMatter.Core
             string workingDirectory = "./continuous_learning",
             int autoSaveInterval = 1000,
             int batchSize = 100,
-            bool useIntegration = true)
+            bool useIntegration = true,
+            bool enableAttention = false,
+            bool enableEpisodicMemory = false,
+            double attentionThreshold = 0.4)
         {
             _dataPath = dataPath ?? throw new ArgumentNullException(nameof(dataPath));
             _autoSaveInterval = autoSaveInterval;
@@ -74,14 +77,28 @@ namespace GreyMatter.Core
                 Directory.CreateDirectory(_checkpointPath);
             }
             
-            // Initialize brain and trainer
+            // Initialize brain and trainer (Week 7: with attention & episodic memory)
             _brain = new LanguageEphemeralBrain();
             _trainer = new IntegratedTrainer(
                 _brain,
                 enableColumnProcessing: useIntegration,
                 enableTraditionalLearning: true,
-                enableIntegration: useIntegration
+                enableIntegration: useIntegration,
+                enableAttention: enableAttention,
+                enableEpisodicMemory: enableEpisodicMemory,
+                attentionThreshold: attentionThreshold,
+                episodicMemoryPath: Path.Combine(workingDirectory, "episodic_memory")
             );
+            
+            // Log Week 7 features if enabled
+            if (enableAttention)
+            {
+                Console.WriteLine($"✨ Attention system enabled (threshold: {attentionThreshold:F2})");
+            }
+            if (enableEpisodicMemory)
+            {
+                Console.WriteLine($"✨ Episodic memory enabled");
+            }
             
             // Initialize status
             _status = new ServiceStatus
