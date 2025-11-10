@@ -35,6 +35,13 @@ namespace GreyMatter
 
         static async Task RunProgram(string[] args)
         {
+            // Week 7 Attention Showcase - Actually Interesting!
+            if (args.Length > 0 && (args[0] == "--attention-showcase" || args[0] == "--showcase" || args[0] == "--attention-demo"))
+            {
+                await AttentionShowcase.RunAsync();
+                return;
+            }
+
             // Week 6 Continuous Learning Service
             if (args.Length > 0 && (args[0] == "--continuous-learning" || args[0] == "--service" || args[0] == "--continuous"))
             {
