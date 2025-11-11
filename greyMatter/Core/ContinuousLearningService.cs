@@ -7,6 +7,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using greyMatter.Core;
+using GreyMatter.Storage;
 
 namespace GreyMatter.Core
 {
@@ -23,10 +24,10 @@ namespace GreyMatter.Core
     {
         private readonly IntegratedTrainer _trainer;
         private readonly LanguageEphemeralBrain _brain;
+        private readonly ProductionStorageManager _storage;
         private readonly string _dataPath;
         private readonly string _statusFilePath;
         private readonly string _controlFilePath;
-        private readonly string _checkpointPath;
         
         // Configuration
         private readonly int _autoSaveInterval; // Save every N sentences
@@ -49,7 +50,7 @@ namespace GreyMatter.Core
 
         public ContinuousLearningService(
             string dataPath,
-            string workingDirectory = "./continuous_learning",
+            ProductionStorageManager? storage = null,
             int autoSaveInterval = 1000,
             int batchSize = 100,
             bool useIntegration = true,
@@ -62,20 +63,12 @@ namespace GreyMatter.Core
             _batchSize = batchSize;
             _useIntegration = useIntegration;
             
-            // Setup working directory
-            if (!Directory.Exists(workingDirectory))
-            {
-                Directory.CreateDirectory(workingDirectory);
-            }
+            // Use centralized production storage
+            _storage = storage ?? new ProductionStorageManager();
             
-            _statusFilePath = Path.Combine(workingDirectory, "status.json");
-            _controlFilePath = Path.Combine(workingDirectory, "control.json");
-            _checkpointPath = Path.Combine(workingDirectory, "checkpoints");
-            
-            if (!Directory.Exists(_checkpointPath))
-            {
-                Directory.CreateDirectory(_checkpointPath);
-            }
+            // Legacy status/control files in live directory (production storage doesn't need separate directory)
+            _statusFilePath = Path.Combine(_storage.GetLivePath(""), "status.json");
+            _controlFilePath = Path.Combine(_storage.GetLivePath(""), "control.json");
             
             // Initialize brain and trainer (Week 7: with attention & episodic memory)
             _brain = new LanguageEphemeralBrain();
@@ -87,7 +80,7 @@ namespace GreyMatter.Core
                 enableAttention: enableAttention,
                 enableEpisodicMemory: enableEpisodicMemory,
                 attentionThreshold: attentionThreshold,
-                episodicMemoryPath: Path.Combine(workingDirectory, "episodic_memory")
+                episodicMemoryPath: _storage.GetEpisodicMemoryPath()
             );
             
             // Log Week 7 features if enabled
@@ -113,7 +106,7 @@ namespace GreyMatter.Core
             };
             
             // Try to load previous state
-            TryLoadCheckpoint();
+            Task.Run(async () => await TryLoadCheckpointAsync()).Wait();
         }
 
         /// <summary>
@@ -349,44 +342,31 @@ namespace GreyMatter.Core
         {
             try
             {
-                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-                var checkpointName = $"checkpoint_{timestamp}_{reason}.json";
-                var checkpointFile = Path.Combine(_checkpointPath, checkpointName);
+                // Save vocabulary to live state
+                await _storage.SaveLiveStateAsync("vocabulary.json", _brain.ExportVocabulary());
                 
-                // Save brain state using Export methods (only vocabulary for now - most critical data)
-                // Note: Neurons are huge and cause OutOfMemoryException. Vocabulary is sufficient for recovery.
-                var brainFile = Path.Combine(_checkpointPath, $"brain_{timestamp}.json");
-                var brainState = new Dictionary<string, object>
-                {
-                    ["Vocabulary"] = _brain.ExportVocabulary(),
-                    ["LearnedSentences"] = _brain.LearnedSentences,
-                    ["VocabularySize"] = _brain.VocabularySize
-                };
-                
-                var brainJson = JsonSerializer.Serialize(brainState, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(brainFile, brainJson);
-                
-                // Save service state
-                var checkpoint = new ServiceCheckpoint
+                // Save checkpoint with metadata using ProductionStorageManager
+                var checkpoint = new BrainCheckpoint
                 {
                     Timestamp = DateTime.Now,
-                    Reason = reason,
                     SentencesProcessed = _totalSentencesProcessed,
-                    VocabularySize = _totalVocabularyLearned,
-                    BrainStateFile = brainFile,
-                    Uptime = (DateTime.Now - _startTime).TotalHours
+                    VocabularySize = _brain.VocabularySize,
+                    SynapseCount = 0, // TODO: Track if needed
+                    TrainingHours = (DateTime.Now - _startTime).TotalHours,
+                    AverageTrainingRate = _totalSentencesProcessed / Math.Max(1, (DateTime.Now - _startTime).TotalSeconds),
+                    MemoryUsageGB = GC.GetTotalMemory(false) / (1024.0 * 1024.0 * 1024.0)
                 };
                 
-                var json = JsonSerializer.Serialize(checkpoint, new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(checkpointFile, json);
+                await _storage.SaveCheckpointAsync(checkpoint);
+                
+                // Log metrics
+                await _storage.LogMetricAsync("sentences_processed", _totalSentencesProcessed);
+                await _storage.LogMetricAsync("vocabulary_size", _brain.VocabularySize);
                 
                 _lastSaveTime = DateTime.Now;
                 _consecutiveSaveFailures = 0;
                 
-                Console.WriteLine($"💾 Checkpoint saved: {checkpointName}");
-                
-                // Cleanup old checkpoints (keep last 10)
-                CleanupOldCheckpoints();
+                Console.WriteLine($"💾 Checkpoint saved: {checkpoint.Timestamp:yyyy-MM-dd HH:mm:ss}");
             }
             catch (Exception ex)
             {
@@ -404,90 +384,43 @@ namespace GreyMatter.Core
         /// <summary>
         /// Try to load the most recent checkpoint
         /// </summary>
-        private void TryLoadCheckpoint()
+        private async Task TryLoadCheckpointAsync()
         {
             try
             {
-                if (!Directory.Exists(_checkpointPath))
-                    return;
-                
-                var checkpoints = Directory.GetFiles(_checkpointPath, "checkpoint_*.json")
-                    .OrderByDescending(f => File.GetCreationTime(f))
-                    .ToList();
-                
-                if (checkpoints.Count == 0)
-                    return;
-                
-                var latestCheckpoint = checkpoints[0];
-                var json = File.ReadAllText(latestCheckpoint);
-                var checkpoint = JsonSerializer.Deserialize<ServiceCheckpoint>(json);
-                
-                if (checkpoint != null && File.Exists(checkpoint.BrainStateFile))
+                var latestCheckpoint = await _storage.LoadLatestCheckpointAsync();
+                if (latestCheckpoint == null)
                 {
-                    // Load brain state using Import methods (only vocabulary - matches what we save)
-                    var brainJson = File.ReadAllText(checkpoint.BrainStateFile);
-                    var brainState = JsonSerializer.Deserialize<Dictionary<string, object>>(brainJson);
+                    Console.WriteLine("ℹ️  No checkpoint found - starting fresh");
+                    return;
+                }
+                
+                Console.WriteLine($"🔄 Loading checkpoint from {latestCheckpoint.Timestamp:yyyy-MM-dd HH:mm:ss}");
+                
+                // Load vocabulary separately from live state
+                var vocab = await _storage.LoadLiveStateAsync<Dictionary<string, greyMatter.Core.WordInfo>>("vocabulary.json");
+                if (vocab != null)
+                {
+                    _brain.ImportVocabulary(vocab);
+                    _totalVocabularyLearned = vocab.Count;
+                    _totalSentencesProcessed = latestCheckpoint.SentencesProcessed;
                     
-                    if (brainState != null && brainState.ContainsKey("Vocabulary"))
-                    {
-                        var vocabJson = JsonSerializer.Serialize(brainState["Vocabulary"]);
-                        var vocab = JsonSerializer.Deserialize<Dictionary<string, WordInfo>>(vocabJson);
-                        if (vocab != null)
-                        {
-                            _brain.ImportVocabulary(vocab);
-                            Console.WriteLine($"   Loaded {vocab.Count:N0} vocabulary words");
-                        }
-                    }
-                    
-                    _totalSentencesProcessed = checkpoint.SentencesProcessed;
-                    _totalVocabularyLearned = checkpoint.VocabularySize;
-                    
-                    Console.WriteLine($"✅ Loaded checkpoint from {checkpoint.Timestamp:g}");
-                    Console.WriteLine($"   Sentences: {_totalSentencesProcessed:N0}");
-                    Console.WriteLine($"   Vocabulary: {_totalVocabularyLearned:N0}");
+                    Console.WriteLine($"✅ Restored {vocab.Count} words, {latestCheckpoint.SentencesProcessed} sentences processed");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️  Could not load checkpoint: {ex.Message}");
+                Console.WriteLine($"⚠️  Failed to load checkpoint: {ex.Message}");
+                Console.WriteLine("Starting with fresh state");
             }
         }
 
         /// <summary>
-        /// Remove old checkpoints, keeping only the most recent N
+        /// Cleanup is now handled by ProductionStorageManager
         /// </summary>
-        private void CleanupOldCheckpoints(int keepCount = 10)
+        private void CleanupOldCheckpoints(int keepCount = 24)
         {
-            try
-            {
-                var checkpoints = Directory.GetFiles(_checkpointPath, "checkpoint_*.json")
-                    .OrderByDescending(f => File.GetCreationTime(f))
-                    .ToList();
-                
-                var toDelete = checkpoints.Skip(keepCount).ToList();
-                
-                foreach (var checkpoint in toDelete)
-                {
-                    // Also delete associated brain state file
-                    var json = File.ReadAllText(checkpoint);
-                    var data = JsonSerializer.Deserialize<ServiceCheckpoint>(json);
-                    if (data != null && File.Exists(data.BrainStateFile))
-                    {
-                        File.Delete(data.BrainStateFile);
-                    }
-                    
-                    File.Delete(checkpoint);
-                }
-                
-                if (toDelete.Count > 0)
-                {
-                    Console.WriteLine($"🧹 Cleaned up {toDelete.Count} old checkpoints");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"⚠️  Error during checkpoint cleanup: {ex.Message}");
-            }
+            // Cleanup now handled by ProductionStorageManager.CleanupOldCheckpoints()
         }
 
         /// <summary>

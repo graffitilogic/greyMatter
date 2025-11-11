@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using GreyMatter.Core;
 using greyMatter.Core;  // IntegratedTrainer lives here (lowercase namespace)
 using GreyMatter.Learning;
+using GreyMatter.Storage;
 
 namespace GreyMatter.Demos
 {
@@ -22,6 +22,9 @@ namespace GreyMatter.Demos
             Console.WriteLine("║  Watch how the system learns to ignore boring repetitive stuff   ║");
             Console.WriteLine("╚═══════════════════════════════════════════════════════════════════╝\n");
 
+            // Use centralized production storage
+            var storage = new ProductionStorageManager();
+            
             var brain = new LanguageEphemeralBrain();
             
             // Create three trainers with different attention strategies
@@ -52,7 +55,7 @@ namespace GreyMatter.Demos
                 enableAttention: true,
                 enableEpisodicMemory: true,
                 attentionThreshold: 0.5,
-                episodicMemoryPath: "./attention_showcase_memory"
+                episodicMemoryPath: storage.GetEpisodicMemoryPath()
             );
 
             // Scenario 1: Boring repetitive data (attention should skip most of it)

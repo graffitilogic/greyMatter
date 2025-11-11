@@ -25,10 +25,9 @@ namespace GreyMatter.Demos
             Console.WriteLine("  • Support pause/resume/stop via control file");
             Console.WriteLine();
             
-            // Create service
+            // Create service (now uses centralized production storage)
             var service = new ContinuousLearningService(
                 dataPath: dataPath,
-                workingDirectory: "./continuous_learning_demo",
                 autoSaveInterval: 1000,
                 batchSize: 50,
                 useIntegration: true
@@ -105,7 +104,6 @@ namespace GreyMatter.Demos
             
             var service = new ContinuousLearningService(
                 dataPath: dataPath,
-                workingDirectory: "./continuous_learning_control_demo",
                 autoSaveInterval: 500,
                 batchSize: 50,
                 useIntegration: true

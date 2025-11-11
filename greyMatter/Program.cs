@@ -35,6 +35,52 @@ namespace GreyMatter
 
         static async Task RunProgram(string[] args)
         {
+            // Production Training Service - 24/7 continuous training with checkpoint rehydration
+            if (args.Length > 0 && (args[0] == "--production-training" || args[0] == "--production"))
+            {
+                var dataPath = GetArgValue(args, "--data-path", "test_data/tatoeba/sentences_detailed.tsv");
+                var durationSec = int.Parse(GetArgValue(args, "--duration", "86400")); // Default 24 hours
+                
+                var service = new ProductionTrainingService(
+                    dataPath: dataPath,
+                    checkpointIntervalMinutes: 60,  // Hourly checkpoints
+                    validationIntervalHours: 6,     // 6-hour validation
+                    nasArchiveIntervalHours: 24,    // Daily NAS archive
+                    enableAttention: true,
+                    enableEpisodicMemory: true
+                );
+                
+                // Start service
+                var serviceTask = Task.Run(async () => await service.StartAsync());
+                
+                // Run for specified duration
+                await Task.Delay(durationSec * 1000);
+                
+                // Stop gracefully
+                await service.StopAsync();
+                
+                // Show final stats
+                var stats = service.GetStats();
+                Console.WriteLine("\n" + "═".PadRight(80, '═'));
+                Console.WriteLine("PRODUCTION TRAINING - FINAL STATISTICS");
+                Console.WriteLine("═".PadRight(80, '═'));
+                Console.WriteLine($"Total runtime: {stats.Uptime.TotalHours:F1} hours");
+                Console.WriteLine($"Sentences processed: {stats.TotalSentencesProcessed:N0}");
+                Console.WriteLine($"Vocabulary learned: {stats.VocabularySize:N0} words");
+                Console.WriteLine($"Checkpoints saved: {stats.CheckpointsSaved}");
+                Console.WriteLine($"Validations passed: {stats.ValidationsPassed}/{stats.ValidationsPassed + stats.ValidationsFailed}");
+                Console.WriteLine("═".PadRight(80, '═') + "\n");
+                
+                return;
+            }
+            
+            // Production Storage Migration - Run this ONCE to consolidate demo data
+            if (args.Length > 0 && (args[0] == "--migrate-storage" || args[0] == "--migrate"))
+            {
+                await MigrateToProductionStorage.RunAsync();
+                return;
+            }
+
             // Week 7 Attention Showcase - Actually Interesting!
             if (args.Length > 0 && (args[0] == "--attention-showcase" || args[0] == "--showcase" || args[0] == "--attention-demo"))
             {

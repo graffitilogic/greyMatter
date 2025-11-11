@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
-using GreyMatter.Core;
 using greyMatter.Core;
+using GreyMatter.Learning;
+using GreyMatter.Storage;
 
 namespace GreyMatter.Demos
 {
@@ -21,6 +23,9 @@ namespace GreyMatter.Demos
             Console.WriteLine("║  WEEK 7: Attention & Episodic Memory Integration Demo         ║");
             Console.WriteLine("╚════════════════════════════════════════════════════════════════╝\n");
 
+            // Use centralized production storage
+            var storage = new ProductionStorageManager();
+            
             // Create brain
             var brain = new LanguageEphemeralBrain();
             
@@ -147,6 +152,9 @@ namespace GreyMatter.Demos
             Console.WriteLine("SCENARIO 3: Attention + Episodic Memory");
             Console.WriteLine("═══════════════════════════════════════════════════════════\n");
 
+            // Use centralized production storage
+            var storage = new ProductionStorageManager();
+            
             var trainer = new IntegratedTrainer(
                 brain,
                 enableColumnProcessing: true,
@@ -156,7 +164,7 @@ namespace GreyMatter.Demos
                 enableEpisodicMemory: true,
                 attentionThreshold: 0.5,
                 attentionConfig: GreyMatter.Core.AttentionConfiguration.Default,
-                episodicMemoryPath: "./demo_episodic_memory"
+                episodicMemoryPath: storage.GetEpisodicMemoryPath()
             );
 
             Console.WriteLine("Training on all {0} sentences with attention + episodic memory...\n", sentences.Count);
