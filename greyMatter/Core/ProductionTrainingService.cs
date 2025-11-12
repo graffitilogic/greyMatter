@@ -29,8 +29,12 @@ namespace GreyMatter.Core
         private readonly ProductionStorageManager _storage;
         private readonly IntegratedTrainer _trainer;
         private readonly LanguageEphemeralBrain _brain;
-        private readonly string _dataPath;
+        private readonly TrainingDataProvider _dataProvider;
+        private readonly LLMTeacher? _llmTeacher;
+        private readonly string _datasetKey;
         private readonly string _controlFilePath;
+        private readonly bool _useLLMTeacher;
+        private readonly bool _useProgressiveCurriculum;
         
         // Configuration
         private readonly int _checkpointIntervalMinutes;
@@ -54,16 +58,24 @@ namespace GreyMatter.Core
         private int _validationsFailed = 0;
 
         public ProductionTrainingService(
-            string dataPath,
+            string? datasetKey = null,
             ProductionStorageManager? storage = null,
+            TrainingDataProvider? dataProvider = null,
+            LLMTeacher? llmTeacher = null,
+            bool useLLMTeacher = false,
+            bool useProgressiveCurriculum = true,
             int checkpointIntervalMinutes = 60,
             int validationIntervalHours = 6,
             int nasArchiveIntervalHours = 24,
             bool enableAttention = true,
             bool enableEpisodicMemory = true)
         {
-            _dataPath = dataPath ?? throw new ArgumentNullException(nameof(dataPath));
+            _datasetKey = datasetKey ?? "tatoeba_small";
             _storage = storage ?? new ProductionStorageManager();
+            _dataProvider = dataProvider ?? new TrainingDataProvider();
+            _llmTeacher = llmTeacher;
+            _useLLMTeacher = useLLMTeacher && llmTeacher != null;
+            _useProgressiveCurriculum = useProgressiveCurriculum;
             _checkpointIntervalMinutes = checkpointIntervalMinutes;
             _validationIntervalHours = validationIntervalHours;
             _nasArchiveIntervalHours = nasArchiveIntervalHours;
@@ -84,6 +96,9 @@ namespace GreyMatter.Core
             );
             
             Console.WriteLine("🏭 Production Training Service initialized");
+            Console.WriteLine($"   Dataset: {_datasetKey}");
+            Console.WriteLine($"   LLM Teacher: {(_useLLMTeacher ? "Enabled" : "Disabled")}");
+            Console.WriteLine($"   Progressive Curriculum: {_useProgressiveCurriculum}");
             Console.WriteLine($"   Checkpoint interval: {_checkpointIntervalMinutes} minutes");
             Console.WriteLine($"   Validation interval: {_validationIntervalHours} hours");
             Console.WriteLine($"   NAS archive interval: {_nasArchiveIntervalHours} hours");
@@ -435,29 +450,57 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
-        /// Load training data from file
+        /// Load training data using NAS-based provider with progressive curriculum
         /// </summary>
         private List<string> LoadTrainingData()
         {
             try
             {
-                if (!File.Exists(_dataPath))
+                // Get current curriculum phase based on sentences processed
+                TrainingPhase? currentPhase = null;
+                if (_useProgressiveCurriculum)
                 {
-                    Console.WriteLine($"⚠️  Data file not found: {_dataPath}");
-                    return new List<string> { "Default training sentence." };
+                    var curriculum = _dataProvider.GetProgressiveCurriculum(_datasetKey);
+                    currentPhase = curriculum.GetPhaseForSentenceCount(_totalSentencesProcessed);
+                    
+                    Console.WriteLine($"\n📖 Curriculum Phase: {currentPhase.Name}");
+                    Console.WriteLine($"   {currentPhase.Description}");
                 }
 
-                var lines = File.ReadAllLines(_dataPath)
-                    .Where(l => !string.IsNullOrWhiteSpace(l))
-                    .ToList();
+                // Load sentences from NAS
+                var sentences = currentPhase != null
+                    ? _dataProvider.LoadSentences(
+                        currentPhase.DatasetKey,
+                        maxSentences: currentPhase.MaxSentences,
+                        minWordCount: currentPhase.MinWordCount,
+                        maxWordCount: currentPhase.MaxWordCount,
+                        shuffle: true).ToList()
+                    : _dataProvider.LoadSentences(_datasetKey, shuffle: true).ToList();
 
-                Console.WriteLine($"📚 Loaded {lines.Count:N0} training sentences");
-                return lines;
+                if (sentences.Count == 0)
+                {
+                    Console.WriteLine($"⚠️  No sentences loaded from dataset '{_datasetKey}'");
+                    Console.WriteLine("   Falling back to minimal test data");
+                    return new List<string> 
+                    { 
+                        "The cat sat on the mat.",
+                        "The dog ran in the park.",
+                        "A bird flew over the tree."
+                    };
+                }
+
+                return sentences;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"⚠️  Failed to load training data: {ex.Message}");
-                return new List<string> { "Default training sentence." };
+                Console.WriteLine("   Falling back to minimal test data");
+                return new List<string> 
+                { 
+                    "The cat sat on the mat.",
+                    "The dog ran in the park.",
+                    "A bird flew over the tree."
+                };
             }
         }
 

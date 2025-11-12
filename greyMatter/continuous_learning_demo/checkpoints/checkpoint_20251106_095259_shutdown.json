@@ -1,8 +1,0 @@
-{
-  "Timestamp": "2025-11-06T09:52:59.134699-06:00",
-  "Reason": "shutdown",
-  "SentencesProcessed": 965,
-  "VocabularySize": 69,
-  "BrainStateFile": "./continuous_learning_demo/checkpoints/brain_20251106_095259.json",
-  "Uptime": 0.002787858888888889
-}

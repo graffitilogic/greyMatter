@@ -38,11 +38,15 @@ namespace GreyMatter
             // Production Training Service - 24/7 continuous training with checkpoint rehydration
             if (args.Length > 0 && (args[0] == "--production-training" || args[0] == "--production"))
             {
-                var dataPath = GetArgValue(args, "--data-path", "test_data/tatoeba/sentences_detailed.tsv");
+                var datasetKey = GetArgValue(args, "--dataset", "tatoeba_small");
                 var durationSec = int.Parse(GetArgValue(args, "--duration", "86400")); // Default 24 hours
+                var useLLMTeacher = args.Contains("--llm-teacher");
                 
                 var service = new ProductionTrainingService(
-                    dataPath: dataPath,
+                    datasetKey: datasetKey,
+                    llmTeacher: useLLMTeacher ? new LLMTeacher() : null,
+                    useLLMTeacher: useLLMTeacher,
+                    useProgressiveCurriculum: true,
                     checkpointIntervalMinutes: 60,  // Hourly checkpoints
                     validationIntervalHours: 6,     // 6-hour validation
                     nasArchiveIntervalHours: 24,    // Daily NAS archive
@@ -71,6 +75,13 @@ namespace GreyMatter
                 Console.WriteLine($"Validations passed: {stats.ValidationsPassed}/{stats.ValidationsPassed + stats.ValidationsFailed}");
                 Console.WriteLine("═".PadRight(80, '═') + "\n");
                 
+                return;
+            }
+            
+            // Test Diverse Training Data
+            if (args.Length > 0 && (args[0] == "--test-data" || args[0] == "--data-test"))
+            {
+                TestDiverseData.Run();
                 return;
             }
             
