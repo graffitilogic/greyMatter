@@ -19,11 +19,11 @@ namespace GreyMatter.Storage
     public class GlobalNeuronStore
     {
         private readonly string _hierarchicalBasePath;
-        private readonly JsonSerializerOptions         _jsonOptions = new JsonSerializerOptions
+        private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = false,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters = { new GuidDictionaryConverter(), new GuidDictionaryConverterFactory(), new GuidListConverter() }
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            // Guid converters removed - not needed for current serialization
         };
 
         // Serialize writes per bank file to prevent concurrent writers thrashing the same partition

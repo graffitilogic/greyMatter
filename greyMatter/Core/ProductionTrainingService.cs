@@ -27,7 +27,7 @@ namespace GreyMatter.Core
     public class ProductionTrainingService
     {
         private readonly ProductionStorageManager _storage;
-        private readonly IntegratedTrainer _trainer;
+        // private readonly IntegratedTrainer _trainer; // Deleted
         private readonly LanguageEphemeralBrain _brain;
         private readonly TrainingDataProvider _dataProvider;
         private readonly LLMTeacher? _llmTeacher;
@@ -80,7 +80,7 @@ namespace GreyMatter.Core
             bool enableEpisodicMemory = true)
         {
             _datasetKey = datasetKey ?? "tatoeba_small";
-            _storage = storage ?? new ProductionStorageManager();
+            _storage = storage ?? new ProductionStorageManager("/Users/billdodd/Desktop/Cerebro/brainData");
             _dataProvider = dataProvider ?? new TrainingDataProvider();
             _llmTeacher = llmTeacher;
             _useLLMTeacher = useLLMTeacher && llmTeacher != null;
@@ -91,18 +91,10 @@ namespace GreyMatter.Core
             
             _controlFilePath = Path.Combine(_storage.GetLivePath(""), "training_control.json");
             
-            // Initialize brain and trainer
+            // Initialize brain
             _brain = new LanguageEphemeralBrain();
-            _trainer = new IntegratedTrainer(
-                _brain,
-                enableColumnProcessing: true,
-                enableTraditionalLearning: true,
-                enableIntegration: true,
-                enableAttention: enableAttention,
-                enableEpisodicMemory: enableEpisodicMemory,
-                attentionThreshold: 0.4,
-                episodicMemoryPath: _storage.GetEpisodicMemoryPath()
-            );
+            // TODO: Replace with Cerebro
+            // _trainer = new IntegratedTrainer(...); // Deleted
             
             Console.WriteLine("🏭 Production Training Service initialized");
             Console.WriteLine($"   Dataset: {_datasetKey}");
@@ -185,7 +177,10 @@ namespace GreyMatter.Core
                     
                     // Process next sentence
                     var sentence = _trainingSentences[_sentenceIndex];
-                    await _trainer.TrainOnSentenceAsync(sentence);
+                    // TODO: Replace with Cerebro training
+                    // await _trainer.TrainOnSentenceAsync(sentence); // Deleted
+                    // await _brain.LearnSentenceAsync(sentence); // No such method
+                    await Task.Delay(1); // Stub for now
                     
                     _totalSentencesProcessed++;
                     _sessionSentencesProcessed++;
