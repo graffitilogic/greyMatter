@@ -41,6 +41,15 @@ namespace GreyMatter.Core
         private readonly int _validationIntervalHours;
         private readonly int _nasArchiveIntervalHours;
         
+        // Dynamic curriculum state
+        private TrainingPhase? _currentPhase = null;
+        private long _lastCurriculumCheck = 0;
+        private const int CURRICULUM_CHECK_INTERVAL = 100; // Check every 100 sentences
+        
+        // Training data management
+        private List<string> _trainingSentences = new();
+        private int _sentenceIndex = 0;
+        
         // State
         private bool _isRunning = false;
         private bool _isPaused = false;
@@ -147,12 +156,13 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
-        /// Main training loop - processes data continuously
+        /// Main training loop - processes data continuously with dynamic curriculum
         /// </summary>
         private async Task RunTrainingLoopAsync(CancellationToken cancellationToken)
         {
-            var sentences = LoadTrainingData();
-            var sentenceIndex = 0;
+            // Initial data load
+            _trainingSentences = LoadTrainingData();
+            _sentenceIndex = 0;
             var lastProgressUpdate = DateTime.Now;
 
             while (!cancellationToken.IsCancellationRequested)
@@ -165,13 +175,29 @@ namespace GreyMatter.Core
 
                 try
                 {
+                    // Check if we need to reload data (reached end of batch)
+                    if (_sentenceIndex >= _trainingSentences.Count)
+                    {
+                        Console.WriteLine($"\n📚 Batch exhausted ({_sentenceIndex} sentences processed)");
+                        Console.WriteLine($"   Reloading fresh training batch...");
+                        ReloadTrainingData();
+                    }
+                    
                     // Process next sentence
-                    var sentence = sentences[sentenceIndex % sentences.Count];
+                    var sentence = _trainingSentences[_sentenceIndex];
                     await _trainer.TrainOnSentenceAsync(sentence);
                     
                     _totalSentencesProcessed++;
                     _sessionSentencesProcessed++;
-                    sentenceIndex++;
+                    _sentenceIndex++;
+
+                    // Check curriculum advancement every N sentences
+                    if (_useProgressiveCurriculum && 
+                        _totalSentencesProcessed - _lastCurriculumCheck >= CURRICULUM_CHECK_INTERVAL)
+                    {
+                        CheckAndAdvanceCurriculum();
+                        _lastCurriculumCheck = _totalSentencesProcessed;
+                    }
 
                     // Progress update every 10 seconds
                     if ((DateTime.Now - lastProgressUpdate).TotalSeconds >= 10)
@@ -189,6 +215,71 @@ namespace GreyMatter.Core
                     Console.WriteLine($"⚠️  Training error: {ex.Message}");
                     await Task.Delay(1000, cancellationToken);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Check if curriculum should advance and reload data if needed
+        /// </summary>
+        private void CheckAndAdvanceCurriculum()
+        {
+            var curriculum = _dataProvider.GetProgressiveCurriculum();
+            var newPhase = curriculum.GetPhaseForSentenceCount(_totalSentencesProcessed);
+
+            if (newPhase != _currentPhase)
+            {
+                Console.WriteLine($"\n🎓 CURRICULUM ADVANCING");
+                Console.WriteLine($"   From: {_currentPhase?.Name ?? "Initial"}");
+                Console.WriteLine($"   To: {newPhase.Name}");
+                Console.WriteLine($"   Sentences: {_totalSentencesProcessed:N0}");
+                
+                _currentPhase = newPhase;
+                ReloadTrainingData();
+            }
+        }
+
+        /// <summary>
+        /// Reload training data - either for curriculum change or batch exhaustion
+        /// </summary>
+        private void ReloadTrainingData()
+        {
+            try
+            {
+                // Determine which dataset to load
+                string datasetName;
+                if (_currentPhase != null)
+                {
+                    datasetName = _currentPhase.DatasetKey;
+                    Console.WriteLine($"   Loading curriculum dataset: {datasetName}");
+                }
+                else
+                {
+                    // Use sentence count to determine phase
+                    var curriculum = _dataProvider.GetProgressiveCurriculum();
+                    var phase = curriculum.GetPhaseForSentenceCount(_totalSentencesProcessed);
+                    datasetName = phase.DatasetKey;
+                    Console.WriteLine($"   Loading dataset by count: {datasetName}");
+                }
+
+                // Load fresh batch
+                var sentences = _dataProvider.LoadSentences(datasetName, maxSentences: 5000);
+                var sentenceList = sentences.ToList();
+                
+                if (sentenceList.Any())
+                {
+                    _trainingSentences = sentenceList;
+                    _sentenceIndex = 0;
+                    Console.WriteLine($"✅ Loaded {sentenceList.Count:N0} fresh sentences from '{datasetName}'");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️  No sentences loaded from '{datasetName}', keeping current batch");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️  Failed to reload training data: {ex.Message}");
+                Console.WriteLine($"   Continuing with current batch");
             }
         }
 
@@ -224,9 +315,9 @@ namespace GreyMatter.Core
                         await ArchiveToNASAsync();
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
-                    Console.WriteLine($"⚠️  Maintenance error: {ex.Message}");
+                    Console.WriteLine($"⚠️  Maintenance error occurred");
                 }
             }
         }
@@ -265,7 +356,7 @@ namespace GreyMatter.Core
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // Ignore control file errors
                 }
@@ -342,8 +433,17 @@ namespace GreyMatter.Core
                 _lastCheckpoint = DateTime.Now;
                 _checkpointsSaved++;
 
+                // Memory management: Force GC after checkpoint
+                var beforeGC = GC.GetTotalMemory(false) / (1024.0 * 1024.0);
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                GC.Collect();
+                var afterGC = GC.GetTotalMemory(false) / (1024.0 * 1024.0);
+                var freedMB = beforeGC - afterGC;
+
                 Console.WriteLine($"✅ Checkpoint saved: {checkpoint.Timestamp:HH:mm:ss}");
                 Console.WriteLine($"   Total checkpoints: {_checkpointsSaved}");
+                Console.WriteLine($"   Memory: {afterGC:F1} MB (freed {freedMB:F1} MB)");
             }
             catch (Exception ex)
             {
