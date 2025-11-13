@@ -33,9 +33,9 @@ namespace GreyMatter.Core
                 "Real-world English sentences, varied complexity");
 
             AddIfExists(datasets, "tatoeba_full",
-                Path.Combine(_nasPath, "learning_data/sentences.csv"),
+                Path.Combine(_nasPath, "Tatoeba/sentences.csv"),
                 DatasetFormat.TatoebaTSV, -1, "beginner-advanced",
-                "Complete Tatoeba corpus (685MB)");
+                "Complete Tatoeba corpus (685MB) - maximum vocabulary diversity");
 
             // === DIVERSE CONTENT: Real-world variety ===
             AddIfExists(datasets, "scientific",
@@ -54,9 +54,9 @@ namespace GreyMatter.Core
                 "Technical documentation - precise language and instructions");
 
             AddIfExists(datasets, "dialogue",
-                Path.Combine(_nasPath, "enhanced_sources/OpenSubtitles/opensubtitles_sample.txt"),
-                DatasetFormat.DialogueText, -1, "intermediate",
-                "Movie/TV subtitles - conversational language and idioms");
+                Path.Combine(_nasPath, "Tatoeba/sentences.csv"),
+                DatasetFormat.TatoebaTSV, -1, "intermediate",
+                "Conversational English from Tatoeba - questions, responses, informal language");
 
             AddIfExists(datasets, "news",
                 Path.Combine(_nasPath, "enhanced_sources/NewsData/headlines_sample.txt"),
@@ -357,11 +357,11 @@ namespace GreyMatter.Core
                 Phase4_Mastery = new TrainingPhase
                 {
                     Name = "Mastery (15K+ sentences)",
-                    DatasetKey = "scientific",  // Complex technical content
+                    DatasetKey = "tatoeba_full",  // Full diverse Tatoeba corpus
                     MaxSentences = null,
                     MinWordCount = null,
                     MaxWordCount = null,
-                    Description = "Scientific and technical content - advanced vocabulary"
+                    Description = "Full Tatoeba corpus - maximum vocabulary diversity"
                 }
             };
         }

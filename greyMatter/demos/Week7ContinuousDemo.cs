@@ -106,7 +106,6 @@ namespace GreyMatter.Demos
 
             var service = new ContinuousLearningService(
                 dataPath: dataPath,
-                workingDirectory: workDir,
                 autoSaveInterval: 100,
                 batchSize: 50,
                 useIntegration: true,

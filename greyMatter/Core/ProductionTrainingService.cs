@@ -391,6 +391,22 @@ namespace GreyMatter.Core
                     Console.WriteLine($"   Sentences: {_totalSentencesProcessed:N0}");
                     Console.WriteLine($"   Training hours: {checkpoint.TrainingHours:F1}");
                 }
+
+                // Restore language data (word associations, patterns, etc.)
+                var languageData = await _storage.LoadLiveStateAsync<Dictionary<string, object>>("language_data.json");
+                if (languageData != null && languageData.Count > 0)
+                {
+                    _brain.ImportLanguageData(languageData);
+                    Console.WriteLine($"   Language data: {languageData.Count:N0} entries");
+                }
+
+                // Restore neurons (neural network structure)
+                var neurons = await _storage.LoadLiveStateAsync<Dictionary<int, object>>("neurons.json");
+                if (neurons != null && neurons.Count > 0)
+                {
+                    _brain.ImportNeurons(neurons);
+                    Console.WriteLine($"   Neurons: {neurons.Count:N0} restored");
+                }
             }
             catch (Exception ex)
             {
@@ -408,8 +424,11 @@ namespace GreyMatter.Core
             {
                 Console.WriteLine($"\n💾 Saving checkpoint ({reason})...");
 
-                // Save vocabulary to live state
+                // Save complete brain state to live state
                 await _storage.SaveLiveStateAsync("vocabulary.json", _brain.ExportVocabulary());
+                await _storage.SaveLiveStateAsync("language_data.json", _brain.ExportLanguageData());
+                await _storage.SaveLiveStateAsync("neural_concepts.json", _brain.ExportNeuralConcepts());
+                await _storage.SaveLiveStateAsync("neurons.json", _brain.ExportNeurons());
 
                 // Save checkpoint metadata
                 var checkpoint = new BrainCheckpoint
