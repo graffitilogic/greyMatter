@@ -17,7 +17,7 @@ namespace GreyMatter.Storage
     /// Enhanced storage system with neurobiologically-inspired hierarchical partitioning
     /// Designed for massive scale (100,000x+) while maintaining biological realism
     /// </summary>
-    public class EnhancedBrainStorage : BrainStorage
+    public class EnhancedBrainStorage
     {
         private readonly NeuroPartitioner _partitioner;
         private readonly string _hierarchicalBasePath;
