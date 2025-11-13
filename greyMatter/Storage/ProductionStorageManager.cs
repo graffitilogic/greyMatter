@@ -20,6 +20,12 @@ namespace GreyMatter.Storage
         private readonly string _episodicPath;         // Episodic memory events
         private readonly string _metricsPath;          // Performance tracking
         
+        // Public accessors for query systems
+        public string ActiveBrainPath => _activeBrainPath;
+        public string CheckpointPath => _checkpointPath;
+        public string EpisodicPath => _episodicPath;
+        public string MetricsPath => _metricsPath;
+        
         // Configuration
         private readonly int _maxCheckpoints = 24;     // Keep last 24 hours
         private bool _enableNASArchive;                // Enable NAS archival (not readonly)

@@ -85,6 +85,13 @@ namespace GreyMatter
                 return;
             }
             
+            // Knowledge Query CLI - Query accumulated brain knowledge
+            if (args.Length > 0 && (args[0] == "--query" || args[0] == "--knowledge"))
+            {
+                await KnowledgeQueryCLI.Run(args);
+                return;
+            }
+            
             // Production Storage Migration - Run this ONCE to consolidate demo data
             if (args.Length > 0 && (args[0] == "--migrate-storage" || args[0] == "--migrate"))
             {
