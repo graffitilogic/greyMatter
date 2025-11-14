@@ -145,10 +145,10 @@ namespace GreyMatter.Core
             // Load latest checkpoint if available
             await LoadLatestCheckpointAsync();
 
-            // Start background tasks (don't await - let them run in background)
-            _trainingTask = RunTrainingLoopAsync(_cancellationTokenSource.Token);
-            _maintenanceTask = RunMaintenanceLoopAsync(_cancellationTokenSource.Token);
-            _controlTask = MonitorControlFileAsync(_cancellationTokenSource.Token);
+            // Start background tasks (use Task.Run to ensure they truly run in background)
+            _trainingTask = Task.Run(() => RunTrainingLoopAsync(_cancellationTokenSource.Token));
+            _maintenanceTask = Task.Run(() => RunMaintenanceLoopAsync(_cancellationTokenSource.Token));
+            _controlTask = Task.Run(() => MonitorControlFileAsync(_cancellationTokenSource.Token));
 
             Console.WriteLine("✅ Production training service started");
             Console.WriteLine($"   Control file: {_controlFilePath}");
@@ -308,6 +308,7 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task RunMaintenanceLoopAsync(CancellationToken cancellationToken)
         {
+            Console.WriteLine("🔧 Maintenance loop started!");
             var iteration = 0;
             while (!cancellationToken.IsCancellationRequested)
             {

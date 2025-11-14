@@ -8,6 +8,12 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--cerebro-query")
+            {
+                await CerebroQueryCLI.Run(args);
+                return;
+            }
+            
             if (args.Length > 0 && (args[0] == "--production-training" || args[0] == "--production"))
             {
                 var datasetKey = GetArgValue(args, "--dataset", "tatoeba_small");
@@ -50,11 +56,22 @@ namespace GreyMatter
                 Console.WriteLine();
                 Console.WriteLine("Usage:");
                 Console.WriteLine("  dotnet run -- --production-training    Start 24/7 training");
+                Console.WriteLine("  dotnet run -- --cerebro-query <cmd>    Query trained brain");
                 Console.WriteLine();
-                Console.WriteLine("Options:");
+                Console.WriteLine("Query Commands:");
+                Console.WriteLine("  stats                    Show brain statistics");
+                Console.WriteLine("  think <concept>          Query what brain knows about concept");
+                Console.WriteLine("  clusters [limit]         List learned concepts");
+                Console.WriteLine();
+                Console.WriteLine("Training Options:");
                 Console.WriteLine("  --dataset <name>      Dataset to use (default: tatoeba_small)");
                 Console.WriteLine("  --duration <seconds>  Training duration (default: 86400)");
                 Console.WriteLine("  --llm-teacher         Enable LLM teacher assistance");
+                Console.WriteLine();
+                Console.WriteLine("Examples:");
+                Console.WriteLine("  dotnet run -- --cerebro-query stats");
+                Console.WriteLine("  dotnet run -- --cerebro-query think cat");
+                Console.WriteLine("  dotnet run -- --cerebro-query think pizza");
                 Console.WriteLine();
                 Console.WriteLine("Note: All other demo commands temporarily disabled.");
                 Console.WriteLine("      Full Program.cs backed up to Program.cs.backup");
