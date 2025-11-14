@@ -60,6 +60,11 @@ namespace GreyMatter.Core
         private DateTime _lastValidation;
         private DateTime _lastNASArchive;
         
+        // Background tasks
+        private Task? _trainingTask;
+        private Task? _maintenanceTask;
+        private Task? _controlTask;
+        
         // Statistics
         private long _totalSentencesProcessed = 0;
         private long _sessionSentencesProcessed = 0;
@@ -140,20 +145,17 @@ namespace GreyMatter.Core
             // Load latest checkpoint if available
             await LoadLatestCheckpointAsync();
 
-            // Start background tasks
-            var trainingTask = RunTrainingLoopAsync(_cancellationTokenSource.Token);
-            var maintenanceTask = RunMaintenanceLoopAsync(_cancellationTokenSource.Token);
-            var controlTask = MonitorControlFileAsync(_cancellationTokenSource.Token);
+            // Start background tasks (don't await - let them run in background)
+            _trainingTask = RunTrainingLoopAsync(_cancellationTokenSource.Token);
+            _maintenanceTask = RunMaintenanceLoopAsync(_cancellationTokenSource.Token);
+            _controlTask = MonitorControlFileAsync(_cancellationTokenSource.Token);
 
             Console.WriteLine("✅ Production training service started");
             Console.WriteLine($"   Control file: {_controlFilePath}");
             Console.WriteLine($"   Start time: {_startTime:yyyy-MM-dd HH:mm:ss}");
             Console.WriteLine();
-
-            // Wait for all tasks
-            await Task.WhenAll(trainingTask, maintenanceTask, controlTask);
-
-            Console.WriteLine("\n✅ Production training service stopped");
+            
+            // Return immediately - tasks run in background
         }
 
         /// <summary>
@@ -306,18 +308,28 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task RunMaintenanceLoopAsync(CancellationToken cancellationToken)
         {
+            var iteration = 0;
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
                     await Task.Delay(60000, cancellationToken); // Check every minute
+                    iteration++;
+
+                    // Heartbeat every 10 minutes to confirm loop is running
+                    if (iteration % 10 == 0)
+                    {
+                        Console.WriteLine($"💓 Maintenance loop heartbeat (iteration {iteration})");
+                    }
 
                     if (_isPaused)
                         continue;
 
                     // Checkpoint if needed
-                    if ((DateTime.Now - _lastCheckpoint).TotalMinutes >= _checkpointIntervalMinutes)
+                    var minutesSinceCheckpoint = (DateTime.Now - _lastCheckpoint).TotalMinutes;
+                    if (minutesSinceCheckpoint >= _checkpointIntervalMinutes)
                     {
+                        Console.WriteLine($"🔔 Checkpoint interval reached ({minutesSinceCheckpoint:F1} min >= {_checkpointIntervalMinutes} min)");
                         await SaveCheckpointAsync("hourly");
                     }
 
@@ -333,9 +345,10 @@ namespace GreyMatter.Core
                         await ArchiveToNASAsync();
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    Console.WriteLine($"⚠️  Maintenance error occurred");
+                    Console.WriteLine($"⚠️  Maintenance error occurred: {ex.Message}");
+                    Console.WriteLine($"   Stack trace: {ex.StackTrace}");
                 }
             }
         }
@@ -563,6 +576,24 @@ namespace GreyMatter.Core
 
             // Signal cancellation
             _cancellationTokenSource?.Cancel();
+            
+            // Wait for all tasks to complete
+            try
+            {
+                var tasksToWait = new List<Task>();
+                if (_trainingTask != null) tasksToWait.Add(_trainingTask);
+                if (_maintenanceTask != null) tasksToWait.Add(_maintenanceTask);
+                if (_controlTask != null) tasksToWait.Add(_controlTask);
+                
+                if (tasksToWait.Count > 0)
+                {
+                    await Task.WhenAll(tasksToWait);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when tasks are cancelled
+            }
 
             // Save final checkpoint
             await SaveCheckpointAsync("shutdown");
