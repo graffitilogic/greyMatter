@@ -46,6 +46,25 @@
     <Compile Remove="Core/LongTermGoalSystem.cs" />
     <Compile Remove="Evaluations/EvalHarness.cs" />
     <Compile Remove="demos/EnhancedContinuousLearningDemo.cs" />
+    
+    <!-- Archived redundant storage managers (superseded by EnhancedBrainStorage) -->
+    <Compile Remove="Storage/BiologicalStorageManager.cs" />
+    <Compile Remove="Storage/BrainStorage.cs" />
+    <Compile Remove="Storage/FastStorageAdapter.cs" />
+    <Compile Remove="Storage/HybridPersistenceManager.cs" />
+    <Compile Remove="Storage/HybridTieredStorage.cs" />
+    <Compile Remove="Storage/SemanticStorageManager.cs" />
+    <Compile Remove="Storage/archived/**" />
+    
+    <!-- Archived redundant brain implementations (superseded by Cerebro) -->
+    <Compile Remove="Core/SimpleEphemeralBrain.cs" />
+    <Compile Remove="Core/BiologicalEphemeralBrain.cs" />
+    <Compile Remove="Core/LanguageEphemeralBrain.cs" />
+    <Compile Remove="Core/archived/**" />
+    
+    <!-- Files that depend on archived brain implementations -->
+    <Compile Remove="Learning/RealisticTrainingRegimen.cs" />
+    <Compile Remove="Visualization/BrainScanVisualizer.cs" />
   </ItemGroup>
 
 </Project>
