@@ -1185,43 +1185,142 @@ namespace GreyMatter.Storage
         public DateTime LastActivity { get; set; }
     }
 
-    // Stub methods for Cerebro compatibility
+    // Extension methods for Cerebro compatibility
     public static class EnhancedBrainStorageExtensions
     {
+        /// <summary>
+        /// Get the hierarchical base path for this storage instance
+        /// </summary>
         public static string GetBasePath(this EnhancedBrainStorage storage)
         {
-            // Stub - return hardcoded path for now
-            return "/Users/billdodd/Desktop/Cerebro/brainData";
+            // Access via reflection since _hierarchicalBasePath is private
+            var field = typeof(EnhancedBrainStorage).GetField("_hierarchicalBasePath", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            return (string?)field?.GetValue(storage) ?? throw new InvalidOperationException("Unable to access _hierarchicalBasePath");
         }
 
-        public static async Task<FeatureMappings> LoadFeatureMappingsAsync(this EnhancedBrainStorage storage)
+        /// <summary>
+        /// Load feature mappings from storage
+        /// </summary>
+        public static async Task<GreyMatter.Core.FeatureMappingSnapshot> LoadFeatureMappingsAsync(this EnhancedBrainStorage storage)
         {
-            // Stub - return empty mappings
-            return new FeatureMappings { Mappings = new Dictionary<string, int>() };
+            var basePath = storage.GetBasePath();
+            var path = Path.Combine(basePath, "feature_mappings.json");
+            
+            if (!File.Exists(path))
+            {
+                return new GreyMatter.Core.FeatureMappingSnapshot 
+                { 
+                    FeatureMappings = new Dictionary<string, Guid>() 
+                };
+            }
+            
+            try
+            {
+                var json = await File.ReadAllTextAsync(path);
+                return JsonSerializer.Deserialize<GreyMatter.Core.FeatureMappingSnapshot>(json) 
+                       ?? new GreyMatter.Core.FeatureMappingSnapshot { FeatureMappings = new Dictionary<string, Guid>() };
+            }
+            catch
+            {
+                return new GreyMatter.Core.FeatureMappingSnapshot { FeatureMappings = new Dictionary<string, Guid>() };
+            }
         }
 
-        public static async Task<List<SynapseSnapshot>> LoadSynapsesAsync(this EnhancedBrainStorage storage)
+        /// <summary>
+        /// Load synapses from storage
+        /// </summary>
+        public static async Task<List<GreyMatter.Core.SynapseSnapshot>> LoadSynapsesAsync(this EnhancedBrainStorage storage)
         {
-            // Stub - return empty list
-            return new List<SynapseSnapshot>();
+            var basePath = storage.GetBasePath();
+            var path = Path.Combine(basePath, "synapses.json");
+            
+            if (!File.Exists(path))
+            {
+                return new List<GreyMatter.Core.SynapseSnapshot>();
+            }
+            
+            try
+            {
+                var json = await File.ReadAllTextAsync(path);
+                return JsonSerializer.Deserialize<List<GreyMatter.Core.SynapseSnapshot>>(json) 
+                       ?? new List<GreyMatter.Core.SynapseSnapshot>();
+            }
+            catch
+            {
+                return new List<GreyMatter.Core.SynapseSnapshot>();
+            }
         }
 
+        /// <summary>
+        /// Load cluster index from storage (returns partition metadata)
+        /// </summary>
         public static async Task<Dictionary<string, object>> LoadClusterIndexAsync(this EnhancedBrainStorage storage)
         {
-            // Stub - return empty index
-            return new Dictionary<string, object>();
+            var basePath = storage.GetBasePath();
+            var path = Path.Combine(basePath, "partition_metadata.json");
+            
+            if (!File.Exists(path))
+            {
+                return new Dictionary<string, object>();
+            }
+            
+            try
+            {
+                var json = await File.ReadAllTextAsync(path);
+                return JsonSerializer.Deserialize<Dictionary<string, object>>(json) 
+                       ?? new Dictionary<string, object>();
+            }
+            catch
+            {
+                return new Dictionary<string, object>();
+            }
         }
-    }
 
-    // Stub classes for Cerebro compatibility
-    public class FeatureMappings
-    {
-        public Dictionary<string, int> Mappings { get; set; } = new();
-    }
+        /// <summary>
+        /// Save feature mappings to storage
+        /// </summary>
+        public static async Task SaveFeatureMappingsAsync(this EnhancedBrainStorage storage, GreyMatter.Core.FeatureMappingSnapshot snapshot)
+        {
+            var basePath = storage.GetBasePath();
+            Directory.CreateDirectory(basePath);
+            var path = Path.Combine(basePath, "feature_mappings.json");
+            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(path, json);
+        }
 
-    public class SynapseSnapshot
-    {
-        public Guid Id { get; set; }
+        /// <summary>
+        /// Save synapses to storage
+        /// </summary>
+        public static async Task SaveSynapsesAsync(this EnhancedBrainStorage storage, List<GreyMatter.Core.SynapseSnapshot> snapshots)
+        {
+            var basePath = storage.GetBasePath();
+            Directory.CreateDirectory(basePath);
+            var path = Path.Combine(basePath, "synapses.json");
+            var json = JsonSerializer.Serialize(snapshots, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(path, json);
+        }
+
+        /// <summary>
+        /// Save cluster index to storage
+        /// </summary>
+        public static async Task SaveClusterIndexAsync<T>(this EnhancedBrainStorage storage, List<T> clusterSnapshots)
+        {
+            var basePath = storage.GetBasePath();
+            Directory.CreateDirectory(basePath);
+            var path = Path.Combine(basePath, "cluster_index.json");
+            var json = JsonSerializer.Serialize(clusterSnapshots, new JsonSerializerOptions { WriteIndented = true });
+            await File.WriteAllTextAsync(path, json);
+        }
+
+        /// <summary>
+        /// Load a cluster by identifier - wrapper around LoadClusterWithPartitioningAsync
+        /// </summary>
+        public static async Task<List<NeuronSnapshot>> LoadClusterAsync(this EnhancedBrainStorage storage, string identifier)
+        {
+            var context = new BrainContext();
+            return await storage.LoadClusterWithPartitioningAsync(identifier, context);
+        }
     }
 }
 

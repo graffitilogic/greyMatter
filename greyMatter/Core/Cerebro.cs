@@ -20,7 +20,7 @@ namespace GreyMatter.Core
         private readonly FeatureMapper _featureMapper = new();
         private readonly Random _random = new();
         private readonly ConceptDependencyGraph _dependencyGraph = new();
-        private ContinuousProcessor? _continuousProcessor; // Add consciousness processor
+        // private ContinuousProcessor? _continuousProcessor; // Temporarily disabled - ContinuousProcessor excluded from build
         
         // Brain configuration
         public int MaxLoadedClusters { get; set; } = 10;
@@ -178,7 +178,7 @@ namespace GreyMatter.Core
         public Cerebro(string storagePath)
         {
             _storage = new EnhancedBrainStorage(storagePath);
-            _continuousProcessor = new ContinuousProcessor(this); // Initialize consciousness
+            // _continuousProcessor = new ContinuousProcessor(this); // Temporarily disabled - ContinuousProcessor excluded from build
         }
 
         /// <summary>
@@ -374,6 +374,8 @@ namespace GreyMatter.Core
             
             // Enhanced: Integrate emotional processing if consciousness is active
             // BUT avoid recursive loops for internal consciousness processing
+            // TEMPORARILY DISABLED - ContinuousProcessor excluded from build
+            /*
             if (_continuousProcessor != null && _continuousProcessor.IsProcessing && 
                 !IsInternalCognitionInput(input))
             {
@@ -391,6 +393,7 @@ namespace GreyMatter.Core
                     await goalSystem.AssessGoalAlignmentAsync(input, features);
                 }
             }
+            */
             
             if (ShouldSampleLog()) Console.WriteLine($"💭 Generated response with confidence {result.Confidence:F2}");
             
@@ -645,10 +648,14 @@ namespace GreyMatter.Core
         /// </summary>
         public async Task AwakeCognitionAsync()
         {
+            // TEMPORARILY DISABLED - ContinuousProcessor excluded from build
+            /*
             if (_continuousProcessor != null)
             {
                 await _continuousProcessor.StartCognitionAsync();
             }
+            */
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -656,10 +663,14 @@ namespace GreyMatter.Core
         /// </summary>
         public async Task SleepCognitionAsync()
         {
+            // TEMPORARILY DISABLED - ContinuousProcessor excluded from build
+            /*
             if (_continuousProcessor != null)
             {
                 await _continuousProcessor.StopCognitionAsync();
             }
+            */
+            await Task.CompletedTask;
         }
 
         /// <summary>
@@ -667,6 +678,10 @@ namespace GreyMatter.Core
         /// </summary>
         public CognitionStats GetCognitionStats()
         {
+            // TEMPORARILY DISABLED - ContinuousProcessor excluded from build
+            return new CognitionStats { IsConscious = false };
+            
+            /*
             if (_continuousProcessor == null)
             {
                 return new CognitionStats { IsConscious = false };
@@ -701,6 +716,7 @@ namespace GreyMatter.Core
             // Formatted summaries are computed via read-only properties now; no direct assignment needed
             
             return stats;
+            */
         }
 
         /// <summary>
@@ -854,7 +870,9 @@ namespace GreyMatter.Core
                 }
             }
             
-            // Fallback to legacy cluster index search if needed
+            // TEMPORARILY DISABLED - Fallback to legacy cluster index search (incompatible format)
+            // The LoadClusterIndexAsync returns Dictionary<string,object> but this code expects objects with AssociatedConcepts
+            /*
             if (allClusters.Count < 3)
             {
                 var clusterIndex = await _storage.LoadClusterIndexAsync();
@@ -876,6 +894,7 @@ namespace GreyMatter.Core
                     }
                 }
             }
+            */
             
             return allClusters
                 .Where(c => c != null)

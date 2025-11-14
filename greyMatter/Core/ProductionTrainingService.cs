@@ -16,19 +16,20 @@ namespace GreyMatter.Core
     /// validation cycles, and NAS archival.
     /// 
     /// Features:
+    /// - Uses Cerebro for procedural generation and lazy loading
     /// - Loads from latest checkpoint on startup
-    /// - Hourly checkpoint saves
-    /// - 6-hour validation cycles (retention, generalization, performance)
+    /// - Hourly checkpoint saves (lightweight cluster metadata)
+    /// - 6-hour validation cycles
     /// - Daily NAS archival
     /// - Control via JSON file (pause/resume/stop)
     /// - Graceful shutdown with state preservation
-    /// - Memory leak protection
+    /// - Constant memory usage (no growth over time)
     /// </summary>
     public class ProductionTrainingService
     {
         private readonly ProductionStorageManager _storage;
-        // private readonly IntegratedTrainer _trainer; // Deleted
-        private readonly LanguageEphemeralBrain _brain;
+        private readonly Cerebro _cerebro;
+        private readonly EnhancedBrainStorage _brainStorage;
         private readonly TrainingDataProvider _dataProvider;
         private readonly LLMTeacher? _llmTeacher;
         private readonly string _datasetKey;
@@ -80,8 +81,12 @@ namespace GreyMatter.Core
             bool enableEpisodicMemory = true)
         {
             _datasetKey = datasetKey ?? "tatoeba_small";
-            _storage = storage ?? new ProductionStorageManager("/Users/billdodd/Desktop/Cerebro/brainData");
-            _dataProvider = dataProvider ?? new TrainingDataProvider();
+            
+            // Use NAS for persistent storage (not SSD!)
+            var nasStoragePath = "/Volumes/jarvis/brainData";
+            _storage = storage ?? new ProductionStorageManager(nasStoragePath);
+            _dataProvider = dataProvider ?? new TrainingDataProvider("/Volumes/jarvis/trainData");
+            
             _llmTeacher = llmTeacher;
             _useLLMTeacher = useLLMTeacher && llmTeacher != null;
             _useProgressiveCurriculum = useProgressiveCurriculum;
@@ -91,12 +96,12 @@ namespace GreyMatter.Core
             
             _controlFilePath = Path.Combine(_storage.GetLivePath(""), "training_control.json");
             
-            // Initialize brain
-            _brain = new LanguageEphemeralBrain();
-            // TODO: Replace with Cerebro
-            // _trainer = new IntegratedTrainer(...); // Deleted
+            // Initialize Cerebro with EnhancedBrainStorage on NAS
+            _brainStorage = new EnhancedBrainStorage(nasStoragePath);
+            _cerebro = new Cerebro(nasStoragePath);
             
-            Console.WriteLine("🏭 Production Training Service initialized");
+            Console.WriteLine("🏭 Production Training Service initialized with Cerebro");
+            Console.WriteLine($"   Brain storage: {nasStoragePath}");
             Console.WriteLine($"   Dataset: {_datasetKey}");
             Console.WriteLine($"   LLM Teacher: {(_useLLMTeacher ? "Enabled" : "Disabled")}");
             Console.WriteLine($"   Progressive Curriculum: {_useProgressiveCurriculum}");
@@ -128,6 +133,10 @@ namespace GreyMatter.Core
             _lastNASArchive = _startTime;
             _cancellationTokenSource = new CancellationTokenSource();
 
+            // Initialize Cerebro
+            Console.WriteLine("🧠 Initializing Cerebro...");
+            await _cerebro.InitializeAsync();
+            
             // Load latest checkpoint if available
             await LoadLatestCheckpointAsync();
 
@@ -177,10 +186,22 @@ namespace GreyMatter.Core
                     
                     // Process next sentence
                     var sentence = _trainingSentences[_sentenceIndex];
-                    // TODO: Replace with Cerebro training
-                    // await _trainer.TrainOnSentenceAsync(sentence); // Deleted
-                    // await _brain.LearnSentenceAsync(sentence); // No such method
-                    await Task.Delay(1); // Stub for now
+                    
+                    // Extract features from sentence (simple word-based features)
+                    var features = ExtractFeatures(sentence);
+                    
+                    // Learn each word as a concept with Cerebro
+                    var words = sentence.ToLower()
+                        .Split(new[] { ' ', '.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']' }, 
+                               StringSplitOptions.RemoveEmptyEntries);
+                    
+                    foreach (var word in words)
+                    {
+                        if (word.Length > 1) // Skip single characters
+                        {
+                            await _cerebro.LearnConceptAsync(word, features);
+                        }
+                    }
                     
                     _totalSentencesProcessed++;
                     _sessionSentencesProcessed++;
@@ -198,10 +219,12 @@ namespace GreyMatter.Core
                     if ((DateTime.Now - lastProgressUpdate).TotalSeconds >= 10)
                     {
                         var rate = _sessionSentencesProcessed / (DateTime.Now - _startTime).TotalSeconds;
+                        var stats = await _cerebro.GetStatsAsync();
                         Console.WriteLine($"📊 Training: {_totalSentencesProcessed:N0} total | " +
                                         $"{_sessionSentencesProcessed:N0} session | " +
                                         $"{rate:F1} sent/sec | " +
-                                        $"Vocab: {_brain.VocabularySize:N0}");
+                                        $"Clusters: {stats.TotalClusters:N0} | " +
+                                        $"Neurons: {stats.TotalNeuronsCreated:N0}");
                         lastProgressUpdate = DateTime.Now;
                     }
                 }
@@ -373,35 +396,19 @@ namespace GreyMatter.Core
                 }
 
                 Console.WriteLine($"🔄 Loading checkpoint from {checkpoint.Timestamp:yyyy-MM-dd HH:mm:ss}");
-
-                // Restore vocabulary
-                var vocab = await _storage.LoadLiveStateAsync<Dictionary<string, greyMatter.Core.WordInfo>>("vocabulary.json");
-                if (vocab != null)
-                {
-                    _brain.ImportVocabulary(vocab);
-                    _totalSentencesProcessed = checkpoint.SentencesProcessed;
-                    
-                    Console.WriteLine($"✅ Restored state:");
-                    Console.WriteLine($"   Vocabulary: {vocab.Count:N0} words");
-                    Console.WriteLine($"   Sentences: {_totalSentencesProcessed:N0}");
-                    Console.WriteLine($"   Training hours: {checkpoint.TrainingHours:F1}");
-                }
-
-                // Restore language data (word associations, patterns, etc.)
-                var languageData = await _storage.LoadLiveStateAsync<Dictionary<string, object>>("language_data.json");
-                if (languageData != null && languageData.Count > 0)
-                {
-                    _brain.ImportLanguageData(languageData);
-                    Console.WriteLine($"   Language data: {languageData.Count:N0} entries");
-                }
-
-                // Restore neurons (neural network structure)
-                var neurons = await _storage.LoadLiveStateAsync<Dictionary<int, object>>("neurons.json");
-                if (neurons != null && neurons.Count > 0)
-                {
-                    _brain.ImportNeurons(neurons);
-                    Console.WriteLine($"   Neurons: {neurons.Count:N0} restored");
-                }
+                
+                // Cerebro loads its own state during InitializeAsync()
+                // Just restore training progress
+                _totalSentencesProcessed = checkpoint.SentencesProcessed;
+                
+                var stats = await _cerebro.GetStatsAsync();
+                Console.WriteLine($"✅ Restored state:");
+                Console.WriteLine($"   Clusters: {stats.TotalClusters:N0}");
+                Console.WriteLine($"   Neurons: {stats.TotalNeuronsCreated:N0}");
+                Console.WriteLine($"   Synapses: {stats.TotalSynapses:N0}");
+                Console.WriteLine($"   Sentences: {_totalSentencesProcessed:N0}");
+                Console.WriteLine($"   Training hours: {checkpoint.TrainingHours:F1}");
+                Console.WriteLine($"   Storage: {stats.StorageSizeFormatted}");
             }
             catch (Exception ex)
             {
@@ -419,19 +426,18 @@ namespace GreyMatter.Core
             {
                 Console.WriteLine($"\n💾 Saving checkpoint ({reason})...");
 
-                // Save complete brain state to live state
-                await _storage.SaveLiveStateAsync("vocabulary.json", _brain.ExportVocabulary());
-                await _storage.SaveLiveStateAsync("language_data.json", _brain.ExportLanguageData());
-                await _storage.SaveLiveStateAsync("neural_concepts.json", _brain.ExportNeuralConcepts());
-                await _storage.SaveLiveStateAsync("neurons.json", _brain.ExportNeurons());
+                // Save Cerebro state (lightweight cluster metadata)
+                await _cerebro.SaveAsync();
+                
+                var stats = await _cerebro.GetStatsAsync();
 
                 // Save checkpoint metadata
                 var checkpoint = new BrainCheckpoint
                 {
                     Timestamp = DateTime.Now,
                     SentencesProcessed = _totalSentencesProcessed,
-                    VocabularySize = _brain.VocabularySize,
-                    SynapseCount = 0, // TODO: Track if needed
+                    VocabularySize = stats.TotalNeuronsCreated, // Use total neurons as proxy for vocabulary
+                    SynapseCount = stats.TotalSynapses,
                     TrainingHours = (DateTime.Now - _startTime).TotalHours,
                     AverageTrainingRate = _sessionSentencesProcessed / Math.Max(1, (DateTime.Now - _startTime).TotalSeconds),
                     MemoryUsageGB = GC.GetTotalMemory(false) / (1024.0 * 1024.0 * 1024.0)
@@ -441,7 +447,9 @@ namespace GreyMatter.Core
 
                 // Log metrics
                 await _storage.LogMetricAsync("sentences_processed", _totalSentencesProcessed);
-                await _storage.LogMetricAsync("vocabulary_size", _brain.VocabularySize);
+                await _storage.LogMetricAsync("total_neurons", stats.TotalNeuronsCreated);
+                await _storage.LogMetricAsync("total_clusters", stats.TotalClusters);
+                await _storage.LogMetricAsync("total_synapses", stats.TotalSynapses);
                 await _storage.LogMetricAsync("memory_usage_gb", checkpoint.MemoryUsageGB);
 
                 _lastCheckpoint = DateTime.Now;
@@ -457,6 +465,7 @@ namespace GreyMatter.Core
 
                 Console.WriteLine($"✅ Checkpoint saved: {checkpoint.Timestamp:HH:mm:ss}");
                 Console.WriteLine($"   Total checkpoints: {_checkpointsSaved}");
+                Console.WriteLine($"   Storage size: {stats.StorageSizeFormatted}");
                 Console.WriteLine($"   Memory: {afterGC:F1} MB (freed {freedMB:F1} MB)");
             }
             catch (Exception ex)
@@ -478,10 +487,10 @@ namespace GreyMatter.Core
 
                 _lastValidation = DateTime.Now;
 
-                // Test 1: Vocabulary retention
-                var vocabSize = _brain.VocabularySize;
-                var retentionPass = vocabSize > 0;
-                Console.WriteLine($"✓ Vocabulary retention: {vocabSize:N0} words ({(retentionPass ? "PASS" : "FAIL")})");
+                // Test 1: Cluster/Neuron growth
+                var stats = await _cerebro.GetStatsAsync();
+                var retentionPass = stats.TotalNeuronsCreated > 0;
+                Console.WriteLine($"✓ Neural growth: {stats.TotalNeuronsCreated:N0} neurons, {stats.TotalClusters:N0} clusters ({(retentionPass ? "PASS" : "FAIL")})");
 
                 // Test 2: Learning rate
                 var rate = _sessionSentencesProcessed / Math.Max(1, (DateTime.Now - _startTime).TotalSeconds);
@@ -582,6 +591,9 @@ namespace GreyMatter.Core
                 }
 
                 // Load sentences from NAS
+                var datasetToLoad = currentPhase?.DatasetKey ?? _datasetKey;
+                Console.WriteLine($"📂 Loading dataset: {datasetToLoad}");
+                
                 var sentences = currentPhase != null
                     ? _dataProvider.LoadSentences(
                         currentPhase.DatasetKey,
@@ -593,28 +605,18 @@ namespace GreyMatter.Core
 
                 if (sentences.Count == 0)
                 {
-                    Console.WriteLine($"⚠️  No sentences loaded from dataset '{_datasetKey}'");
-                    Console.WriteLine("   Falling back to minimal test data");
-                    return new List<string> 
-                    { 
-                        "The cat sat on the mat.",
-                        "The dog ran in the park.",
-                        "A bird flew over the tree."
-                    };
+                    Console.WriteLine($"❌ ERROR: No sentences loaded from dataset '{datasetToLoad}'");
+                    Console.WriteLine($"   Dataset should be at NAS: /Volumes/jarvis/trainData");
+                    throw new InvalidOperationException($"Failed to load dataset '{datasetToLoad}' - no training data available. Refusing to fall back to toy data.");
                 }
 
                 return sentences;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"⚠️  Failed to load training data: {ex.Message}");
-                Console.WriteLine("   Falling back to minimal test data");
-                return new List<string> 
-                { 
-                    "The cat sat on the mat.",
-                    "The dog ran in the park.",
-                    "A bird flew over the tree."
-                };
+                Console.WriteLine($"❌ FATAL ERROR loading training data: {ex.Message}");
+                Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+                throw;  // Don't fall back to toy data - this is a real error that needs to be fixed
             }
         }
 
@@ -623,6 +625,9 @@ namespace GreyMatter.Core
         /// </summary>
         public ProductionTrainingStats GetStats()
         {
+            // Get Cerebro stats synchronously (GetStatsAsync can't be called from sync method)
+            var cerebroStats = _cerebro.GetStatsAsync().Result;
+            
             return new ProductionTrainingStats
             {
                 IsRunning = _isRunning,
@@ -630,7 +635,7 @@ namespace GreyMatter.Core
                 Uptime = _isRunning ? DateTime.Now - _startTime : TimeSpan.Zero,
                 TotalSentencesProcessed = _totalSentencesProcessed,
                 SessionSentencesProcessed = _sessionSentencesProcessed,
-                VocabularySize = _brain.VocabularySize,
+                VocabularySize = cerebroStats.TotalNeuronsCreated, // Use neurons as proxy for vocabulary
                 CheckpointsSaved = _checkpointsSaved,
                 ValidationsPassed = _validationsPassed,
                 ValidationsFailed = _validationsFailed,
@@ -638,6 +643,32 @@ namespace GreyMatter.Core
                 LastValidation = _lastValidation,
                 LastNASArchive = _lastNASArchive
             };
+        }
+
+        /// <summary>
+        /// Extract simple features from a sentence for Cerebro learning
+        /// </summary>
+        private Dictionary<string, double> ExtractFeatures(string sentence)
+        {
+            var features = new Dictionary<string, double>();
+            var lowerSentence = sentence.ToLower();
+            
+            // Basic features
+            features["length"] = sentence.Length / 100.0; // Normalized
+            features["words"] = sentence.Split(' ').Length / 20.0; // Normalized
+            
+            // Character type features
+            features["hasUpper"] = sentence.Any(char.IsUpper) ? 1.0 : 0.0;
+            features["hasDigit"] = sentence.Any(char.IsDigit) ? 1.0 : 0.0;
+            features["hasPunctuation"] = sentence.Any(c => char.IsPunctuation(c)) ? 1.0 : 0.0;
+            
+            // Simple position encoding (first few characters as features)
+            for (int i = 0; i < Math.Min(5, sentence.Length); i++)
+            {
+                features[$"pos_{i}"] = (double)char.ToLower(sentence[i]) / 128.0;
+            }
+            
+            return features;
         }
     }
 

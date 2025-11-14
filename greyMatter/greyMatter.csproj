@@ -14,7 +14,7 @@
     <PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
   </ItemGroup>
 
-  <!-- Exclude broken demo/test files that reference deleted types or Cerebro -->
+  <!-- Exclude broken demo/test files that reference deleted types -->
   <ItemGroup>
     <!-- Exclude all root-level test files -->
     <Compile Remove="*Test*.cs" />
@@ -33,9 +33,7 @@
     <Compile Remove="ColumnArchitectureTestRunner.cs" />
     <Compile Remove="Evaluations/UnifiedTrainingEvaluator.cs" />
     <Compile Remove="tests/RunIntegrationValidation.cs" />
-    <!-- Cerebro and all dependent files excluded for now - will be reintegrated properly later -->
-    <Compile Remove="Core/Cerebro.cs" />
-    <Compile Remove="Core/CerebroOptimizations.cs" />
+    <!-- Keep other dependent files excluded until properly integrated -->
     <Compile Remove="Core/DevelopmentalLearningSystem.cs" />
     <Compile Remove="Core/ComprehensiveLanguageTrainer.cs" />
     <Compile Remove="Core/EnvironmentalLearner.cs" />

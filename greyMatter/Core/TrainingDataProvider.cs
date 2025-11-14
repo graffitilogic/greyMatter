@@ -330,38 +330,38 @@ namespace GreyMatter.Core
                 Phase1_Foundation = new TrainingPhase
                 {
                     Name = "Foundation (0-1K sentences)",
-                    DatasetKey = "childrens_stories",  // Start with simple narratives
+                    DatasetKey = baseDataset,  // Start with simple short sentences
                     MaxSentences = 1000,
                     MinWordCount = 3,
                     MaxWordCount = 12,
-                    Description = "Children's stories - simple vocabulary and clear narratives"
+                    Description = "Short simple sentences - basic vocabulary and grammar"
                 },
                 Phase2_Expansion = new TrainingPhase
                 {
-                    Name = "Expansion (1K-5K sentences)",
-                    DatasetKey = baseDataset,  // Real-world varied sentences
-                    MaxSentences = 5000,
+                    Name = "Expansion (1K-10K sentences)",
+                    DatasetKey = baseDataset,  // Continue with varied sentences
+                    MaxSentences = 10000,
                     MinWordCount = 5,
-                    MaxWordCount = 20,
-                    Description = "Real-world sentences - varied topics and structures"
+                    MaxWordCount = 25,
+                    Description = "Longer sentences - varied topics and structures"
                 },
                 Phase3_Advanced = new TrainingPhase
                 {
-                    Name = "Advanced (5K-15K sentences)",
-                    DatasetKey = "dialogue",  // Conversational language
-                    MaxSentences = 10000,
-                    MinWordCount = null,
-                    MaxWordCount = null,
-                    Description = "Dialogue and conversation - idiomatic expressions"
-                },
-                Phase4_Mastery = new TrainingPhase
-                {
-                    Name = "Mastery (15K+ sentences)",
-                    DatasetKey = "tatoeba_full",  // Full diverse Tatoeba corpus
-                    MaxSentences = null,
+                    Name = "Advanced (10K-50K sentences)",
+                    DatasetKey = "tatoeba_full",  // Expand to full corpus
+                    MaxSentences = 50000,
                     MinWordCount = null,
                     MaxWordCount = null,
                     Description = "Full Tatoeba corpus - maximum vocabulary diversity"
+                },
+                Phase4_Mastery = new TrainingPhase
+                {
+                    Name = "Mastery (50K+ sentences)",
+                    DatasetKey = "tatoeba_full",  // Continue with full corpus
+                    MaxSentences = null,
+                    MinWordCount = null,
+                    MaxWordCount = null,
+                    Description = "Unlimited training - continuous learning from diverse corpus"
                 }
             };
         }
