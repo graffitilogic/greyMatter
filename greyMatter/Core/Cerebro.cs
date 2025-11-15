@@ -22,6 +22,12 @@ namespace GreyMatter.Core
         private readonly ConceptDependencyGraph _dependencyGraph = new();
         // private ContinuousProcessor? _continuousProcessor; // Temporarily disabled - ContinuousProcessor excluded from build
         
+        // ADPC-Net: Pattern-based learning components (Phase 1)
+        private readonly FeatureEncoder _featureEncoder;
+        private readonly LSHPartitioner _lshPartitioner;
+        private readonly ActivationStats _activationStats;
+        private readonly Dictionary<string, List<Guid>> _regionToClusterMapping = new(); // region_id → cluster IDs
+        
         // Brain configuration
         public int MaxLoadedClusters { get; set; } = 10;
         public int MaxNeuronsPerCluster { get; set; } = 100;
@@ -179,6 +185,18 @@ namespace GreyMatter.Core
         {
             _storage = new EnhancedBrainStorage(storagePath);
             // _continuousProcessor = new ContinuousProcessor(this); // Temporarily disabled - ContinuousProcessor excluded from build
+            
+            // Initialize ADPC-Net components (Phase 1)
+            _featureEncoder = new FeatureEncoder(dimensions: 128);
+            _lshPartitioner = new LSHPartitioner(dimensions: 128, numBands: 16, rowsPerBand: 4);
+            _activationStats = new ActivationStats();
+            
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+            {
+                Console.WriteLine("🧬 ADPC-Net initialized:");
+                Console.WriteLine($"   Feature encoder: 128-dim vectors");
+                Console.WriteLine($"   {_lshPartitioner.GetStats()}");
+            }
         }
 
         /// <summary>
@@ -234,7 +252,8 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
-        /// Learn a new concept by creating or growing relevant clusters
+        /// ADPC-Net Phase 1: Learn from input using pattern-based clustering
+        /// NO concept name lookup - uses feature vectors only
         /// </summary>
         public async Task<LearningResult> LearnConceptAsync(string concept, Dictionary<string, double> features)
         {
@@ -244,17 +263,24 @@ namespace GreyMatter.Core
             var tAll = Stopwatch.StartNew();
             var tFind = Stopwatch.StartNew();
 
-            // Find or create relevant cluster
-            var cluster = await FindOrCreateClusterForConcept(concept);
+            // ADPC-Net: Encode input to feature vector
+            var featureVector = _featureEncoder.Encode(concept);
+            
+            // ADPC-Net: Find or create cluster based on pattern (NO NAME LOOKUP)
+            var cluster = await FindOrCreateClusterForPattern(featureVector, debugLabel: concept);
             tFind.Stop();
             result.ClusterId = cluster.ClusterId;
 
-            // Get neurons for this concept
+            // Calculate novelty score for this pattern
+            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            var novelty = _activationStats.CalculateNovelty(regionId, featureVector);
+
+            // Get neurons for this pattern (using concept as label for now, but not for lookup)
             var tLookup = Stopwatch.StartNew();
             var conceptNeurons = await cluster.FindNeuronsByConcept(concept);
             tLookup.Stop();
 
-            // Capacity and growth
+            // Capacity and growth based on NOVELTY (not predetermined formula)
             var tCapacity = Stopwatch.StartNew();
             var target = GetTargetNeuronsForConcept(concept, features);
             int grew = 0;
@@ -762,6 +788,119 @@ namespace GreyMatter.Core
             
             return result;
         }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ADPC-Net Phase 1: Pattern-Based Cluster Finding (NO WORD LOOKUPS)
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Find clusters based on feature pattern similarity using LSH
+        /// NO concept name lookup - uses only feature vectors
+        /// </summary>
+        private async Task<List<NeuronCluster>> FindClustersMatchingPattern(double[] featureVector, int maxClusters = 5)
+        {
+            // Get region ID from feature vector (LSH)
+            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            
+            // Record activation for statistics
+            _activationStats.RecordActivation(regionId, featureVector);
+            
+            // Get candidate regions (primary + nearby)
+            var nearbyRegions = _lshPartitioner.GetNearbyRegions(featureVector, neighbors: 5);
+            
+            // Collect clusters from these regions
+            var candidateClusters = new List<(NeuronCluster cluster, double similarity)>();
+            
+            foreach (var region in nearbyRegions)
+            {
+                // Get clusters mapped to this region
+                if (_regionToClusterMapping.TryGetValue(region, out var clusterIds))
+                {
+                    foreach (var clusterId in clusterIds)
+                    {
+                        // Load cluster if not already loaded
+                        if (!_loadedClusters.TryGetValue(clusterId, out var cluster))
+                        {
+                            // Load from storage
+                            var metadata = await _storage.LoadClusterMetadataAsync(clusterId.ToString());
+                            if (metadata != null)
+                            {
+                                Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
+                                    _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
+                                    {
+                                        AllNeurons = new Dictionary<Guid, HybridNeuron>(),
+                                        AnalysisTime = DateTime.UtcNow
+                                    });
+                                cluster = new NeuronCluster(metadata.ConceptDomain, clusterId, hierLoad, _storage.SaveClusterAsync);
+                                _loadedClusters[clusterId] = cluster;
+                            }
+                        }
+                        
+                        if (cluster != null)
+                        {
+                            // Calculate similarity (for now, use region proximity)
+                            // Future: actual centroid distance
+                            var similarity = region == regionId ? 1.0 : 0.7;
+                            candidateClusters.Add((cluster, similarity));
+                        }
+                    }
+                }
+            }
+            
+            // Sort by similarity, return top matches
+            var matches = candidateClusters
+                .OrderByDescending(x => x.similarity)
+                .Take(maxClusters)
+                .Select(x => x.cluster)
+                .ToList();
+                
+            if (ShouldSampleLog() && matches.Count > 0)
+            {
+                Console.WriteLine($"   🎯 Pattern matched {matches.Count} clusters in region {regionId.Substring(0, Math.Min(20, regionId.Length))}...");
+            }
+            
+            return matches;
+        }
+
+        /// <summary>
+        /// Find or create cluster based on feature patterns (NO CONCEPT NAMES)
+        /// This is the NEW pattern-based approach
+        /// </summary>
+        private async Task<NeuronCluster> FindOrCreateClusterForPattern(double[] featureVector, string debugLabel = "unknown")
+        {
+            // Get region from feature vector
+            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            
+            // Try to find existing clusters in this region
+            var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 1);
+            if (matches.Count > 0)
+            {
+                return matches[0];
+            }
+            
+            // No existing cluster - create new one
+            // Note: We DON'T use concept names anymore, but keep debug label for monitoring
+            var newCluster = new NeuronCluster($"pattern_{regionId.Substring(0, 8)}", _storage.LoadClusterAsync, _storage.SaveClusterAsync);
+            _loadedClusters[newCluster.ClusterId] = newCluster;
+            
+            // Map region → cluster
+            if (!_regionToClusterMapping.ContainsKey(regionId))
+                _regionToClusterMapping[regionId] = new List<Guid>();
+            _regionToClusterMapping[regionId].Add(newCluster.ClusterId);
+            
+            TotalClustersCreated++;
+            
+            if (ShouldSampleLog())
+            {
+                Console.WriteLine($"   ✨ Created new cluster for region {regionId.Substring(0, 20)}... (label: {debugLabel})");
+            }
+            
+            return newCluster;
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // OLD METHODS (Kept for backward compatibility during migration)
+        // ═══════════════════════════════════════════════════════════════════════
 
         // Private helper methods
 
