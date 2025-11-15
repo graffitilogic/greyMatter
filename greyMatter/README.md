@@ -1,17 +1,25 @@
 # greyMatter - Procedural Neural Architecture 🧠
 
-> **Status**: Active development - ADPC-Net Phase 1 complete, pattern-based learning validated
+> **Status**: Active development - ADPC-Net Phase 2 complete, dynamic neuron generation working
 > 
-> **Latest**: ✅ Replaced hash-table concept lookup with feature-based pattern matching (Nov 14, 2025)
+> **Latest**: ✅ Hypernetwork-driven neuron allocation (Nov 14, 2025)
 
 ## 🎯 What Actually Works (Nov 14, 2025)
 
-**Pattern-Based Learning (ADPC-Net Phase 1)** ✅ **NEW**
+**Dynamic Neuron Generation (ADPC-Net Phase 2)** ✅ **NEW**
+- Hypernetwork formula: `N = α*log(freq) + β*novelty + γ*complexity`
+- Variable neuron counts: 5-500 per cluster (not fixed!)
+- Pattern-driven allocation: Complex patterns get more neurons
+- Deterministic generation: Same pattern → same neuron count
+- **100% test passing**: All 6 Phase 2 validation tests pass
+- **Observed range**: 82-97 neurons (vs Phase 1: all ~64)
+
+**Pattern-Based Learning (ADPC-Net Phase 1)** ✅
 - Feature encoding: 128-dim vectors (deterministic, reproducible)
 - LSH partitioning: Efficient region-based clustering
 - Novelty detection: Activation statistics track pattern familiarity
 - Storage: Region mappings and activation stats persist correctly
-- **100% test passing**: All 6 validation tests pass
+- **100% test passing**: All 6 Phase 1 validation tests pass
 - **No word list cheating**: Pattern similarity drives retrieval
 
 **Infrastructure (Production-Ready)** ✅
@@ -26,7 +34,7 @@
 - ✅ **Feature encoding** (128-dim vectors from text)
 - ✅ **LSH clustering** (locality-sensitive hashing for similarity)
 - ✅ **Novelty tracking** (activation statistics)
-- ⏳ Fixed neuron bucket sizes (Phase 2: hypernetwork generation)
+- ✅ **Dynamic neuron allocation** (hypernetwork generation) **NEW**
 - ⏳ Distributed representations (Phase 3: sparse synaptic graph)
 
 **See ADPC_PHASE1_COMPLETE.md for implementation details and test results.**
@@ -90,6 +98,9 @@
 # Test ADPC-Net Phase 1 (pattern-based learning)
 dotnet run -- --adpc-test
 
+# Test ADPC-Net Phase 2 (dynamic neuron generation)
+dotnet run -- --adpc-phase2-test
+
 # Production training (continuous learning)
 dotnet run -- --production-training --duration 28800  # 8 hours
 
@@ -128,4 +139,4 @@ MIT License - See LICENSE file for details
 ---
 
 **Last Updated**: November 14, 2025  
-**Latest Achievement**: ✅ ADPC-Net Phase 1 complete - 100% test passing, pattern-based learning validated
+**Latest Achievement**: ✅ ADPC-Net Phase 2 complete - Hypernetwork dynamic neuron generation working!
