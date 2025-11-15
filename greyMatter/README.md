@@ -1,12 +1,24 @@
 # greyMatter - Procedural Neural Architecture 🧠
 
-> **Status**: Active development - ADPC-Net Phase 3 complete, sparse synaptic graph implemented
+**"A trillion-parameter model in a gigabyte of RAM."**
+
+> **Status**: Active development - ADPC-Net Phase 4 complete, learned vector quantization implemented
 > 
-> **Latest**: ✅ Hebbian learning with sparse connectivity (Dec 2024)
+> **Latest**: ✅ VQ-VAE codebook with EMA learning (Dec 2025)
 
-## 🎯 What Actually Works (Dec 2024)
+## 🎯 What Actually Works (Dec 2025)
 
-**Sparse Synaptic Graph (ADPC-Net Phase 3)** ✅ **NEW**
+**VQ-VAE Codebook (ADPC-Net Phase 4)** ✅ **NEW**
+- Learned vector quantization: 512-code codebook adapts to data
+- Replaces fixed LSH with adaptive learned similarity
+- EMA updates: Codebook continuously refines (γ=0.99)
+- Perplexity tracking: 209/256 efficiency (81.6%)
+- Commitment loss: Prevents encoder drift (β=0.25)
+- **100% test passing**: All 6 Phase 4 validation tests pass
+- **Utilization**: 94.9% (243/256 codes active)
+- **Learned clustering**: 100% similar inputs → same code
+
+**Sparse Synaptic Graph (ADPC-Net Phase 3)** ✅
 - Hebbian learning: "Neurons that fire together, wire together"
 - Sparse storage: Dictionary-based (O(E) not O(N²))
 - Automatic pruning: Weak synapses removed below threshold
@@ -37,15 +49,16 @@
 - Progressive curriculum: 4-phase learning pipeline operational
 - Cluster partitioning: On-demand loading prevents memory bloat
 
-**Neural Realism Progress** ✅ **COMPLETE (Phases 1-3)**
+**Neural Realism Progress** ✅ **COMPLETE (Phases 1-4)**
 - ✅ **Pattern-based retrieval** (replaces word list lookup)
 - ✅ **Feature encoding** (128-dim vectors from text)
 - ✅ **LSH clustering** (locality-sensitive hashing for similarity)
 - ✅ **Novelty tracking** (activation statistics)
 - ✅ **Dynamic neuron allocation** (hypernetwork generation)
-- ✅ **Sparse synaptic graph** (Hebbian learning, pruning, decay) **NEW**
+- ✅ **Sparse synaptic graph** (Hebbian learning, pruning, decay)
+- ✅ **VQ-VAE codebook** (learned vector quantization, EMA updates) **NEW**
 
-**See ADPC_PHASE3_COMPLETE.md for Phase 3 details and test results.**
+**See ADPC_PHASE4_COMPLETE.md for Phase 4 details and test results.**
 
 ## 🏗️ Architecture
 
@@ -86,7 +99,8 @@
 ## 📖 Documentation
 
 ### Essential Reading
-- **[ADPC_PHASE3_COMPLETE.md](ADPC_PHASE3_COMPLETE.md)** - Sparse synaptic graph (Hebbian learning) ⭐ NEW
+- **[ADPC_PHASE4_COMPLETE.md](ADPC_PHASE4_COMPLETE.md)** - VQ-VAE codebook (learned vector quantization) ⭐ NEW
+- **[ADPC_PHASE3_COMPLETE.md](ADPC_PHASE3_COMPLETE.md)** - Sparse synaptic graph (Hebbian learning) ⭐
 - **[ADPC_PHASE2_COMPLETE.md](ADPC_PHASE2_COMPLETE.md)** - Dynamic neuron generation ⭐
 - **[ADPC_PHASE1_COMPLETE.md](ADPC_PHASE1_COMPLETE.md)** - Pattern-based learning implementation ⭐
 - **[ADPC_TESTING_SUMMARY.md](ADPC_TESTING_SUMMARY.md)** - Test results and bugs fixed
@@ -98,7 +112,8 @@
 - **Architecture**: Cerebro (procedural generation) ✅ Implemented
 - **Pattern Learning**: ADPC-Net Phase 1 (feature-based) ✅ Complete & Validated
 - **Dynamic Neurons**: ADPC-Net Phase 2 (hypernetwork) ✅ Complete & Validated
-- **Sparse Synapses**: ADPC-Net Phase 3 (Hebbian learning) ✅ Complete & Validated **NEW**
+- **Sparse Synapses**: ADPC-Net Phase 3 (Hebbian learning) ✅ Complete & Validated
+- **VQ-VAE Codebook**: ADPC-Net Phase 4 (learned quantization) ✅ Complete & Validated **NEW**
 - **Training**: Production service with diverse NAS data ✅ Operational
 - **Storage**: EnhancedBrainStorage + BinaryStorageManager ✅ Clean
 - **Query System**: Knowledge inspection CLI ⏳ In progress
@@ -113,8 +128,11 @@ dotnet run -- --adpc-test
 # Test ADPC-Net Phase 2 (dynamic neuron generation)
 dotnet run -- --adpc-phase2-test
 
-# Test ADPC-Net Phase 3 (sparse synaptic graph) ⭐ NEW
+# Test ADPC-Net Phase 3 (sparse synaptic graph)
 dotnet run -- --adpc-phase3-test
+
+# Test ADPC-Net Phase 4 (VQ-VAE codebook) ⭐ NEW
+dotnet run -- --adpc-phase4-test
 
 # Production training (continuous learning)
 dotnet run -- --production-training --duration 28800  # 8 hours
