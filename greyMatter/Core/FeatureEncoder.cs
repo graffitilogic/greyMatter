@@ -14,12 +14,10 @@ namespace GreyMatter.Core
     public class FeatureEncoder
     {
         private readonly int _dimensions;
-        private readonly Dictionary<string, double> _frequencyEstimates;
         
         public FeatureEncoder(int dimensions = 128)
         {
             _dimensions = dimensions;
-            _frequencyEstimates = new Dictionary<string, double>();
         }
 
         /// <summary>
@@ -246,27 +244,38 @@ namespace GreyMatter.Core
 
         private double GetFrequencyEstimate(string word)
         {
-            // Track observed frequencies (simple online estimate)
-            if (!_frequencyEstimates.ContainsKey(word))
-            {
-                _frequencyEstimates[word] = 1.0;
-            }
-            else
-            {
-                _frequencyEstimates[word] += 1.0;
-            }
+            // Deterministic frequency estimate based on word characteristics
+            // (not tracking actual frequencies - that would make encoding non-deterministic)
             
-            return _frequencyEstimates[word];
+            // Simple heuristic: shorter common words are more frequent
+            var lengthScore = Math.Max(0, 10 - word.Length) / 10.0;
+            
+            // Common letter patterns boost frequency estimate
+            var commonPatterns = new[] { "the", "ing", "er", "ed", "ly", "s" };
+            var patternScore = commonPatterns.Count(p => word.Contains(p)) * 0.1;
+            
+            // Combine heuristics
+            return Math.Max(1.0, lengthScore * 10 + patternScore * 5);
         }
 
         private int EstimateRank(string word)
         {
-            // Estimate corpus rank (simple heuristic for now)
-            // Future: Use actual corpus statistics
-            var freq = _frequencyEstimates.GetValueOrDefault(word, 1.0);
-            var allFreqs = _frequencyEstimates.Values.OrderByDescending(f => f).ToList();
-            var rank = allFreqs.IndexOf(freq);
-            return rank >= 0 ? rank + 1 : allFreqs.Count + 1;
+            // Deterministic rank estimate (not using actual frequency tracking)
+            // Estimate based on word characteristics
+            
+            var freq = GetFrequencyEstimate(word);
+            
+            // Simple mapping: higher frequency → lower rank
+            // Common words (freq > 5) → rank 1-1000
+            // Uncommon words (freq 1-5) → rank 1000-10000
+            // Rare words (freq < 1) → rank > 10000
+            
+            if (freq > 5.0)
+                return (int)(1000 * (10.0 / freq));
+            else if (freq > 1.0)
+                return (int)(1000 + 9000 * (5.0 - freq) / 4.0);
+            else
+                return 10000 + (int)(1000 * (1.0 / Math.Max(0.1, freq)));
         }
 
         private string GetWordShape(string word)
