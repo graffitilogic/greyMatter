@@ -1,10 +1,18 @@
 # greyMatter - Procedural Neural Architecture 🧠
 
-> **Status**: Active development - infrastructure working, neural realism needs work
+> **Status**: Active development - ADPC-Net Phase 1 complete, pattern-based learning validated
 > 
-> **Current Reality**: Stable training pipeline with hash-table-based storage (see ARCHITECTURE_REALITY_CHECK.md)
+> **Latest**: ✅ Replaced hash-table concept lookup with feature-based pattern matching (Nov 14, 2025)
 
 ## 🎯 What Actually Works (Nov 14, 2025)
+
+**Pattern-Based Learning (ADPC-Net Phase 1)** ✅ **NEW**
+- Feature encoding: 128-dim vectors (deterministic, reproducible)
+- LSH partitioning: Efficient region-based clustering
+- Novelty detection: Activation statistics track pattern familiarity
+- Storage: Region mappings and activation stats persist correctly
+- **100% test passing**: All 6 validation tests pass
+- **No word list cheating**: Pattern similarity drives retrieval
 
 **Infrastructure (Production-Ready)** ✅
 - Long-term training stability: 10+ hours, no crashes, constant memory (20-25 MB)
@@ -13,14 +21,15 @@
 - Progressive curriculum: 4-phase learning pipeline operational
 - Cluster partitioning: On-demand loading prevents memory bloat
 
-**Neural Realism (Needs Work)** ⚠️
-- ❌ Uses cluster_index.json for concept lookup (word list, not pattern matching)
-- ❌ Fixed neuron bucket sizes (439 clusters with exactly 503 neurons - not biological)
-- ❌ Deterministic neuron allocation (same concept → same count via hash)
-- ❌ 1:1 concept→cluster mapping (no distributed representations)
-- ✅ cluster_index.json kept as DEBUG SIDECAR for testing (not integrated into retrieval)
+**Neural Realism Progress** 🚧
+- ✅ **Pattern-based retrieval** (replaces word list lookup)
+- ✅ **Feature encoding** (128-dim vectors from text)
+- ✅ **LSH clustering** (locality-sensitive hashing for similarity)
+- ✅ **Novelty tracking** (activation statistics)
+- ⏳ Fixed neuron bucket sizes (Phase 2: hypernetwork generation)
+- ⏳ Distributed representations (Phase 3: sparse synaptic graph)
 
-**See ARCHITECTURE_REALITY_CHECK.md for honest assessment and roadmap.**
+**See ADPC_PHASE1_COMPLETE.md for implementation details and test results.**
 
 ## 🏗️ Architecture
 
@@ -61,19 +70,26 @@
 ## 📖 Documentation
 
 ### Essential Reading
+- **[ADPC_PHASE1_COMPLETE.md](ADPC_PHASE1_COMPLETE.md)** - Pattern-based learning implementation ⭐ NEW
+- **[ADPC_TESTING_SUMMARY.md](ADPC_TESTING_SUMMARY.md)** - Test results and bugs fixed ⭐ NEW
 - **[ARCHITECTURE_AUDIT.md](ARCHITECTURE_AUDIT.md)** - Architectural principles and cleanup plan
 - **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - Implementation details
 - **[docs/QUICK_START.md](docs/QUICK_START.md)** - Getting started guide
 
 ### Project Status
 - **Architecture**: Cerebro (procedural generation) ✅ Implemented
+- **Pattern Learning**: ADPC-Net Phase 1 (feature-based) ✅ Complete & Validated
 - **Training**: Production service with diverse NAS data ✅ Operational
 - **Storage**: EnhancedBrainStorage + BinaryStorageManager ✅ Clean
 - **Query System**: Knowledge inspection CLI ⏳ In progress
+- **Next**: Phase 2 - Hypernetwork neuron generation ⏳ Planned
 
 ## 🚀 Quick Start
 
 ```bash
+# Test ADPC-Net Phase 1 (pattern-based learning)
+dotnet run -- --adpc-test
+
 # Production training (continuous learning)
 dotnet run -- --production-training --duration 28800  # 8 hours
 
@@ -111,4 +127,5 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Last Updated**: November 13, 2025
+**Last Updated**: November 14, 2025  
+**Latest Achievement**: ✅ ADPC-Net Phase 1 complete - 100% test passing, pattern-based learning validated
