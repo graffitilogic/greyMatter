@@ -31,6 +31,9 @@ namespace GreyMatter.Core
         // ADPC-Net Phase 2: Hypernetwork for dynamic neuron generation
         private readonly NeuronHypernetwork _neuronHypernetwork;
         
+        // ADPC-Net Phase 3: Sparse synaptic graph for Hebbian learning
+        private readonly SparseSynapticGraph _synapticGraph;
+        
         // Brain configuration
         public int MaxLoadedClusters { get; set; } = 10;
         public int MaxNeuronsPerCluster { get; set; } = 100;
@@ -181,6 +184,28 @@ namespace GreyMatter.Core
             }
             // Else: keep capacity unchanged to avoid churn when on target
         }
+        
+        /// <summary>
+        /// ADPC-Net Phase 3: Record Hebbian co-activation between neurons
+        /// Neurons that fire together, wire together
+        /// </summary>
+        private void RecordHebbianCoactivation(List<HybridNeuron> activeNeurons)
+        {
+            if (activeNeurons.Count < 2)
+                return; // Need at least 2 neurons for connections
+            
+            // Build activation list with neuron IDs and activations
+            var activations = activeNeurons
+                .Select(n => (n.Id, activation: (float)n.CurrentPotential))
+                .Where(pair => pair.activation > 0.1f) // Only consider significantly active neurons
+                .ToList();
+            
+            if (activations.Count < 2)
+                return;
+            
+            // Record co-activation pattern in sparse graph
+            _synapticGraph.RecordCoactivationPattern(activations);
+        }
 
         public Cerebro(string storagePath)
         {
@@ -202,12 +227,21 @@ namespace GreyMatter.Core
                 seed: 42                // Deterministic seed
             );
             
+            // Initialize ADPC-Net Phase 3: Sparse synaptic graph
+            _synapticGraph = new SparseSynapticGraph(
+                learningRate: 0.01f,     // Hebbian learning rate
+                minWeight: 0.0f,         // Minimum synapse weight
+                maxWeight: 1.0f,         // Maximum synapse weight
+                pruneThreshold: 0.1f     // Prune synapses below this weight
+            );
+            
             if ((_configForLogging?.Verbosity ?? 0) > 0)
             {
                 Console.WriteLine("🧬 ADPC-Net initialized:");
                 Console.WriteLine($"   Feature encoder: 128-dim vectors");
                 Console.WriteLine($"   {_lshPartitioner.GetStats()}");
                 Console.WriteLine($"   Hypernetwork: 5-500 dynamic neurons/cluster");
+                Console.WriteLine($"   Synaptic graph: Sparse Hebbian connections");
             }
         }
 
@@ -346,6 +380,11 @@ namespace GreyMatter.Core
                 await TrainNeuronWithFeatures(neuron, features);
             }
             tTrain.Stop();
+
+            // ADPC-Net Phase 3: Record Hebbian co-activation
+            var tHebbian = Stopwatch.StartNew();
+            RecordHebbianCoactivation(conceptNeurons);
+            tHebbian.Stop();
 
             // Capacity adjust
             var tAdjust = Stopwatch.StartNew();

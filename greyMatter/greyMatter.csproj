@@ -22,6 +22,7 @@
     <!-- Include ADPC validation tests -->
     <Compile Include="AdpcPhase1ValidationTests.cs" />
     <Compile Include="AdpcPhase2ValidationTests.cs" />
+    <Compile Include="AdpcPhase3ValidationTests.cs" />
     <Compile Remove="*Diagnostic*.cs" />
     <Compile Remove="Learning/TatoebaLanguageTrainer.cs" />
     <Compile Remove="Learning/MultiSourceTrainer.cs" />

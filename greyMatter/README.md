@@ -1,12 +1,20 @@
 # greyMatter - Procedural Neural Architecture 🧠
 
-> **Status**: Active development - ADPC-Net Phase 2 complete, dynamic neuron generation working
+> **Status**: Active development - ADPC-Net Phase 3 complete, sparse synaptic graph implemented
 > 
-> **Latest**: ✅ Hypernetwork-driven neuron allocation (Nov 14, 2025)
+> **Latest**: ✅ Hebbian learning with sparse connectivity (Dec 2024)
 
-## 🎯 What Actually Works (Nov 14, 2025)
+## 🎯 What Actually Works (Dec 2024)
 
-**Dynamic Neuron Generation (ADPC-Net Phase 2)** ✅ **NEW**
+**Sparse Synaptic Graph (ADPC-Net Phase 3)** ✅ **NEW**
+- Hebbian learning: "Neurons that fire together, wire together"
+- Sparse storage: Dictionary-based (O(E) not O(N²))
+- Automatic pruning: Weak synapses removed below threshold
+- Synaptic decay: Forgetting mechanism (0.99 default)
+- **100% test passing**: All 6 Phase 3 validation tests pass
+- **Sparsity**: >90% (only meaningful connections stored)
+
+**Dynamic Neuron Generation (ADPC-Net Phase 2)** ✅
 - Hypernetwork formula: `N = α*log(freq) + β*novelty + γ*complexity`
 - Variable neuron counts: 5-500 per cluster (not fixed!)
 - Pattern-driven allocation: Complex patterns get more neurons
@@ -29,15 +37,15 @@
 - Progressive curriculum: 4-phase learning pipeline operational
 - Cluster partitioning: On-demand loading prevents memory bloat
 
-**Neural Realism Progress** 🚧
+**Neural Realism Progress** ✅ **COMPLETE (Phases 1-3)**
 - ✅ **Pattern-based retrieval** (replaces word list lookup)
 - ✅ **Feature encoding** (128-dim vectors from text)
 - ✅ **LSH clustering** (locality-sensitive hashing for similarity)
 - ✅ **Novelty tracking** (activation statistics)
-- ✅ **Dynamic neuron allocation** (hypernetwork generation) **NEW**
-- ⏳ Distributed representations (Phase 3: sparse synaptic graph)
+- ✅ **Dynamic neuron allocation** (hypernetwork generation)
+- ✅ **Sparse synaptic graph** (Hebbian learning, pruning, decay) **NEW**
 
-**See ADPC_PHASE1_COMPLETE.md for implementation details and test results.**
+**See ADPC_PHASE3_COMPLETE.md for Phase 3 details and test results.**
 
 ## 🏗️ Architecture
 
@@ -78,8 +86,10 @@
 ## 📖 Documentation
 
 ### Essential Reading
-- **[ADPC_PHASE1_COMPLETE.md](ADPC_PHASE1_COMPLETE.md)** - Pattern-based learning implementation ⭐ NEW
-- **[ADPC_TESTING_SUMMARY.md](ADPC_TESTING_SUMMARY.md)** - Test results and bugs fixed ⭐ NEW
+- **[ADPC_PHASE3_COMPLETE.md](ADPC_PHASE3_COMPLETE.md)** - Sparse synaptic graph (Hebbian learning) ⭐ NEW
+- **[ADPC_PHASE2_COMPLETE.md](ADPC_PHASE2_COMPLETE.md)** - Dynamic neuron generation ⭐
+- **[ADPC_PHASE1_COMPLETE.md](ADPC_PHASE1_COMPLETE.md)** - Pattern-based learning implementation ⭐
+- **[ADPC_TESTING_SUMMARY.md](ADPC_TESTING_SUMMARY.md)** - Test results and bugs fixed
 - **[ARCHITECTURE_AUDIT.md](ARCHITECTURE_AUDIT.md)** - Architectural principles and cleanup plan
 - **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - Implementation details
 - **[docs/QUICK_START.md](docs/QUICK_START.md)** - Getting started guide
@@ -87,10 +97,12 @@
 ### Project Status
 - **Architecture**: Cerebro (procedural generation) ✅ Implemented
 - **Pattern Learning**: ADPC-Net Phase 1 (feature-based) ✅ Complete & Validated
+- **Dynamic Neurons**: ADPC-Net Phase 2 (hypernetwork) ✅ Complete & Validated
+- **Sparse Synapses**: ADPC-Net Phase 3 (Hebbian learning) ✅ Complete & Validated **NEW**
 - **Training**: Production service with diverse NAS data ✅ Operational
 - **Storage**: EnhancedBrainStorage + BinaryStorageManager ✅ Clean
 - **Query System**: Knowledge inspection CLI ⏳ In progress
-- **Next**: Phase 2 - Hypernetwork neuron generation ⏳ Planned
+- **Next**: Phase 4 - VQ-VAE Codebook ⏳ Planned
 
 ## 🚀 Quick Start
 
@@ -100,6 +112,9 @@ dotnet run -- --adpc-test
 
 # Test ADPC-Net Phase 2 (dynamic neuron generation)
 dotnet run -- --adpc-phase2-test
+
+# Test ADPC-Net Phase 3 (sparse synaptic graph) ⭐ NEW
+dotnet run -- --adpc-phase3-test
 
 # Production training (continuous learning)
 dotnet run -- --production-training --duration 28800  # 8 hours

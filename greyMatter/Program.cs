@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using GreyMatter.Core;
+using GreyMatter.Validation;
 
 namespace GreyMatter
 {
@@ -21,6 +22,13 @@ namespace GreyMatter
                 Console.WriteLine("🧬 Running ADPC-Net Phase 2 validation tests...\n");
                 var tests = new AdpcPhase2ValidationTests();
                 await tests.RunAllTests();
+                return;
+            }
+
+            if (args.Length > 0 && args[0] == "--adpc-phase3-test")
+            {
+                Console.WriteLine("🕸️  Running ADPC-Net Phase 3 validation tests...\n");
+                AdpcPhase3ValidationTests.RunAllTests();
                 return;
             }
 
@@ -75,6 +83,7 @@ namespace GreyMatter
                 Console.WriteLine("  dotnet run -- --cerebro-query <cmd>    Query trained brain");
                 Console.WriteLine("  dotnet run -- --adpc-test              Run ADPC-Net Phase 1 tests");
                 Console.WriteLine("  dotnet run -- --adpc-phase2-test       Run ADPC-Net Phase 2 tests");
+                Console.WriteLine("  dotnet run -- --adpc-phase3-test       Run ADPC-Net Phase 3 tests");
                 Console.WriteLine();
                 Console.WriteLine("Query Commands:");
                 Console.WriteLine("  stats                    Show brain statistics");
@@ -84,6 +93,7 @@ namespace GreyMatter
                 Console.WriteLine("Testing:");
                 Console.WriteLine("  --adpc-test              Validate pattern-based learning (Phase 1)");
                 Console.WriteLine("  --adpc-phase2-test       Validate dynamic neuron generation (Phase 2)");
+                Console.WriteLine("  --adpc-phase3-test       Validate sparse synaptic graph (Phase 3)");
                 Console.WriteLine();
                 Console.WriteLine("Training Options:");
                 Console.WriteLine("  --dataset <name>      Dataset to use (default: tatoeba_small)");
@@ -93,6 +103,7 @@ namespace GreyMatter
                 Console.WriteLine("Examples:");
                 Console.WriteLine("  dotnet run -- --adpc-test");
                 Console.WriteLine("  dotnet run -- --adpc-phase2-test");
+                Console.WriteLine("  dotnet run -- --adpc-phase3-test");
                 Console.WriteLine("  dotnet run -- --cerebro-query stats");
                 Console.WriteLine("  dotnet run -- --cerebro-query think cat");
                 Console.WriteLine("  dotnet run -- --cerebro-query think pizza");
