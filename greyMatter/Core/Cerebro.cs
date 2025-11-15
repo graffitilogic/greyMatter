@@ -119,34 +119,32 @@ namespace GreyMatter.Core
 
         private int CalculateRequiredNeuronsDeterministic(string concept, Dictionary<string, double> features)
         {
-            var seed = StableHash(concept);
-            var random = new Random(seed);
-            var baseNeurons = 50 + random.Next(-20, 80);
-            double emergenceScore = 0.0;
-
-            var frequencyFactor = CalculateStochasticFrequency(concept, random);
-            emergenceScore -= frequencyFactor;
-
-            var featureEmergence = CalculateFeatureEmergence(features, random);
-            emergenceScore += featureEmergence;
-
-            var networkPosition = CalculateNetworkPosition(concept, random);
-            emergenceScore += networkPosition;
-
-            var developmentalFactor = CalculateDevelopmentalVariation(concept, random);
-            emergenceScore += developmentalFactor;
-
-            var contextualDemand = CalculateContextualDemand(concept, features, random);
-            emergenceScore += contextualDemand;
-
-            var geneticVariation = (random.NextDouble() - 0.5) * 50.0;
-            emergenceScore += geneticVariation;
-
-            var powerLawExponent = 1.3 + (random.NextDouble() * 0.4);
-            var emergentComplexity = Math.Pow(Math.Abs(emergenceScore), powerLawExponent) * Math.Sign(emergenceScore);
-            var adjustedComplexity = emergentComplexity; // no resource pressure factor in base target
-            var neuronsNeeded = (int)Math.Ceiling(baseNeurons + adjustedComplexity);
-            return Math.Max(MinConceptNeurons, Math.Min(MaxConceptNeurons, neuronsNeeded));
+            // ADPC-Net Phase 2: Use hypernetwork for dynamic neuron generation
+            
+            // Encode concept to get feature vector
+            var featureVector = _featureEncoder.Encode(concept);
+            
+            // Get region ID for novelty calculation
+            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            
+            // Calculate novelty (0.0 = repeated, 1.0 = first time)
+            var novelty = _activationStats.CalculateNovelty(regionId, featureVector);
+            
+            // Get activation frequency for this region
+            var frequency = _activationStats.GetRegionFrequency(regionId);
+            
+            // Calculate pattern complexity from feature vector
+            var complexity = _neuronHypernetwork.CalculateComplexity(featureVector);
+            
+            // Use hypernetwork formula to determine neuron count
+            var neuronCount = _neuronHypernetwork.CalculateNeuronCount(novelty, frequency, complexity);
+            
+            if ((_configForLogging?.Verbosity ?? 0) > 1)
+            {
+                Console.WriteLine($"   🧬 Hypernetwork: '{concept}' → novelty={novelty:F3}, freq={frequency:F3}, complexity={complexity:F3} → {neuronCount} neurons");
+            }
+            
+            return neuronCount;
         }
 
         private int GetTargetNeuronsForConcept(string concept, Dictionary<string, double> features)
@@ -319,8 +317,14 @@ namespace GreyMatter.Core
             if (conceptNeurons.Count < target)
             {
                 var needed = target - conceptNeurons.Count;
-                // Apply per-run cap only (keeps system stable)
-                needed = Math.Min(needed, Math.Max(0, MaxAddPerConceptPerRun));
+                // ADPC-Net Phase 2: Allow hypernetwork to allocate full target on first run
+                // Only apply growth cap for subsequent runs (prevents runaway growth)
+                if (conceptNeurons.Count > 0)
+                {
+                    // Apply per-run cap only when growing existing clusters (keeps system stable)
+                    needed = Math.Min(needed, Math.Max(0, MaxAddPerConceptPerRun));
+                }
+                
                 if (needed > 0)
                 {
                     var tGrow = Stopwatch.StartNew();
