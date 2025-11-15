@@ -8,6 +8,14 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--adpc-test")
+            {
+                Console.WriteLine("🧪 Running ADPC-Net Phase 1 validation tests...\n");
+                var tests = new AdpcPhase1ValidationTests();
+                tests.RunAllTests();
+                return;
+            }
+            
             if (args.Length > 0 && args[0] == "--cerebro-query")
             {
                 await CerebroQueryCLI.Run(args);
@@ -57,11 +65,15 @@ namespace GreyMatter
                 Console.WriteLine("Usage:");
                 Console.WriteLine("  dotnet run -- --production-training    Start 24/7 training");
                 Console.WriteLine("  dotnet run -- --cerebro-query <cmd>    Query trained brain");
+                Console.WriteLine("  dotnet run -- --adpc-test              Run ADPC-Net Phase 1 tests");
                 Console.WriteLine();
                 Console.WriteLine("Query Commands:");
                 Console.WriteLine("  stats                    Show brain statistics");
                 Console.WriteLine("  think <concept>          Query what brain knows about concept");
                 Console.WriteLine("  clusters [limit]         List learned concepts");
+                Console.WriteLine();
+                Console.WriteLine("Testing:");
+                Console.WriteLine("  --adpc-test              Validate pattern-based learning");
                 Console.WriteLine();
                 Console.WriteLine("Training Options:");
                 Console.WriteLine("  --dataset <name>      Dataset to use (default: tatoeba_small)");
@@ -69,6 +81,7 @@ namespace GreyMatter
                 Console.WriteLine("  --llm-teacher         Enable LLM teacher assistance");
                 Console.WriteLine();
                 Console.WriteLine("Examples:");
+                Console.WriteLine("  dotnet run -- --adpc-test");
                 Console.WriteLine("  dotnet run -- --cerebro-query stats");
                 Console.WriteLine("  dotnet run -- --cerebro-query think cat");
                 Console.WriteLine("  dotnet run -- --cerebro-query think pizza");

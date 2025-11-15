@@ -18,6 +18,9 @@
   <ItemGroup>
     <!-- Exclude all root-level test files -->
     <Compile Remove="*Test*.cs" />
+    
+    <!-- Include ADPC Phase 1 validation tests -->
+    <Compile Include="AdpcPhase1ValidationTests.cs" />
     <Compile Remove="*Diagnostic*.cs" />
     <Compile Remove="Learning/TatoebaLanguageTrainer.cs" />
     <Compile Remove="Learning/MultiSourceTrainer.cs" />

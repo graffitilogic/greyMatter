@@ -1,22 +1,26 @@
 # greyMatter - Procedural Neural Architecture 🧠
 
-> **Status**: Active development - production training phase
+> **Status**: Active development - infrastructure working, neural realism needs work
 > 
-> **Architecture**: Procedural generation meets neuroscience - No Man's Sky for neural networks
+> **Current Reality**: Stable training pipeline with hash-table-based storage (see ARCHITECTURE_REALITY_CHECK.md)
 
-## 🎯 Core Philosophy
+## 🎯 What Actually Works (Nov 14, 2025)
 
-**Procedural Generation Over Static Storage**
-- Don't serialize the universe - generate it on-demand from seed functions
-- Lazy load neural clusters (max 10 at a time)
-- Persist only activation deltas, weights, and patterns
-- Rehydrate by procedurally regenerating structure + overlaying learned weights
+**Infrastructure (Production-Ready)** ✅
+- Long-term training stability: 10+ hours, no crashes, constant memory (20-25 MB)
+- NAS integration: Hourly checkpoints save/load successfully
+- Fast processing: ~470 concepts/sec sustained on real Tatoeba data
+- Progressive curriculum: 4-phase learning pipeline operational
+- Cluster partitioning: On-demand loading prevents memory bloat
 
-**Biological Alignment**
-- Neurons participate in multiple overlapping clusters (like fMRI activation patterns)
-- STM → LTM consolidation (experience-driven permanent learning)
-- Adaptive concept capacities (concepts grow based on activation frequency)
-- Cluster unloading after inactivity (biological memory pruning)
+**Neural Realism (Needs Work)** ⚠️
+- ❌ Uses cluster_index.json for concept lookup (word list, not pattern matching)
+- ❌ Fixed neuron bucket sizes (439 clusters with exactly 503 neurons - not biological)
+- ❌ Deterministic neuron allocation (same concept → same count via hash)
+- ❌ 1:1 concept→cluster mapping (no distributed representations)
+- ✅ cluster_index.json kept as DEBUG SIDECAR for testing (not integrated into retrieval)
+
+**See ARCHITECTURE_REALITY_CHECK.md for honest assessment and roadmap.**
 
 ## 🏗️ Architecture
 

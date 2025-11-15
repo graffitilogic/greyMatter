@@ -1321,6 +1321,110 @@ namespace GreyMatter.Storage
             var context = new BrainContext();
             return await storage.LoadClusterWithPartitioningAsync(identifier, context);
         }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ADPC-Net Phase 1: Storage for Region→Cluster Mappings & Activation Stats
+        // ═══════════════════════════════════════════════════════════════════════
+
+        /// <summary>
+        /// Save region→cluster mappings for ADPC-Net pattern-based retrieval
+        /// </summary>
+        public static async Task SaveRegionMappingsAsync(this EnhancedBrainStorage storage, Dictionary<string, List<Guid>> regionMappings)
+        {
+            var basePath = storage.GetBasePath();
+            Directory.CreateDirectory(basePath);
+            var path = Path.Combine(basePath, "adpc_region_mappings.json");
+            
+            try
+            {
+                var json = JsonSerializer.Serialize(regionMappings, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(path, json);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error saving region mappings: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load region→cluster mappings for ADPC-Net pattern-based retrieval
+        /// </summary>
+        public static async Task<Dictionary<string, List<Guid>>> LoadRegionMappingsAsync(this EnhancedBrainStorage storage)
+        {
+            var basePath = storage.GetBasePath();
+            var path = Path.Combine(basePath, "adpc_region_mappings.json");
+            
+            if (!File.Exists(path))
+            {
+                return new Dictionary<string, List<Guid>>();
+            }
+            
+            try
+            {
+                var json = await File.ReadAllTextAsync(path);
+                return JsonSerializer.Deserialize<Dictionary<string, List<Guid>>>(json) 
+                       ?? new Dictionary<string, List<Guid>>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error loading region mappings: {ex.Message}");
+                return new Dictionary<string, List<Guid>>();
+            }
+        }
+
+        /// <summary>
+        /// Save activation statistics for ADPC-Net novelty detection
+        /// </summary>
+        public static async Task SaveActivationStatsAsync(this EnhancedBrainStorage storage, ActivationStats stats)
+        {
+            var basePath = storage.GetBasePath();
+            Directory.CreateDirectory(basePath);
+            var path = Path.Combine(basePath, "adpc_activation_stats.json");
+            
+            try
+            {
+                var summary = stats.GetSummary();
+                var json = JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(path, json);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error saving activation stats: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load activation statistics for ADPC-Net novelty detection
+        /// </summary>
+        public static async Task<ActivationStats> LoadActivationStatsAsync(this EnhancedBrainStorage storage)
+        {
+            var basePath = storage.GetBasePath();
+            var path = Path.Combine(basePath, "adpc_activation_stats.json");
+            
+            // Always return a new instance - we can't fully reconstruct from summary
+            // This is acceptable since activation stats rebuild naturally during training
+            var stats = new ActivationStats();
+            
+            if (File.Exists(path))
+            {
+                try
+                {
+                    var json = await File.ReadAllTextAsync(path);
+                    var summary = JsonSerializer.Deserialize<ActivationStatsSummary>(json);
+                    
+                    if (summary != null && summary.TotalActivations > 0)
+                    {
+                        Console.WriteLine($"📊 Found previous activation stats ({summary.TotalActivations} activations) - will rebuild during training");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Error loading activation stats: {ex.Message}");
+                }
+            }
+            
+            return stats;
+        }
     }
 }
 

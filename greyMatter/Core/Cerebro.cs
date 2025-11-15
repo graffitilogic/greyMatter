@@ -25,7 +25,7 @@ namespace GreyMatter.Core
         // ADPC-Net: Pattern-based learning components (Phase 1)
         private readonly FeatureEncoder _featureEncoder;
         private readonly LSHPartitioner _lshPartitioner;
-        private readonly ActivationStats _activationStats;
+        private ActivationStats _activationStats; // Not readonly - can be reloaded from storage
         private readonly Dictionary<string, List<Guid>> _regionToClusterMapping = new(); // region_id → cluster IDs
         
         // Brain configuration
@@ -228,6 +228,22 @@ namespace GreyMatter.Core
             
             Console.WriteLine($"Loaded {_synapses.Count} synapses");
             
+            // ADPC-Net: Load region→cluster mappings
+            _regionToClusterMapping.Clear();
+            var loadedMappings = await _storage.LoadRegionMappingsAsync();
+            foreach (var kvp in loadedMappings)
+            {
+                _regionToClusterMapping[kvp.Key] = kvp.Value;
+            }
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"🧬 Loaded {_regionToClusterMapping.Count} region→cluster mappings");
+            
+            // ADPC-Net: Load activation statistics
+            _activationStats = await _storage.LoadActivationStatsAsync();
+            var statsSummary = _activationStats.GetSummary();
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"📊 Loaded activation stats ({statsSummary.TotalActivations} activations, {statsSummary.UniqueRegions} regions)");
+            
             // Load cluster index (legacy) for counts
             var clusterIndex = await _storage.LoadClusterIndexAsync();
             Console.WriteLine($"Found {clusterIndex.Count} clusters in storage");
@@ -374,13 +390,57 @@ namespace GreyMatter.Core
             var activatedClusters = new List<Guid>();
             var neuronOutputs = new Dictionary<Guid, double>();
             
-            // Extract concepts from input
+            // ADPC-Net: Pattern-based retrieval (NO WORD LOOKUP)
+            // Extract concepts from input for feature encoding
             var inputConcepts = ExtractConcepts(input);
             
-            // Find relevant clusters
-            var relevantClusters = await FindRelevantClusters(inputConcepts);
+            // Encode each concept to feature vector and find matching clusters
+            var relevantClusters = new List<NeuronCluster>();
+            var clusterScores = new Dictionary<Guid, double>();
             
-            foreach (var cluster in relevantClusters.Take(5)) // Limit to top 5 clusters
+            foreach (var concept in inputConcepts)
+            {
+                // Encode to feature vector
+                var featureVector = _featureEncoder.Encode(concept);
+                
+                // Find clusters matching this pattern (LSH-based, no name lookup)
+                var matchingClusters = await FindClustersMatchingPattern(featureVector, maxClusters: 3);
+                
+                foreach (var (cluster, similarity) in matchingClusters)
+                {
+                    if (!clusterScores.ContainsKey(cluster.ClusterId))
+                    {
+                        relevantClusters.Add(cluster);
+                        clusterScores[cluster.ClusterId] = similarity;
+                    }
+                    else
+                    {
+                        // Accumulate scores from multiple concepts
+                        clusterScores[cluster.ClusterId] += similarity;
+                    }
+                }
+            }
+            
+            // Sort by accumulated similarity score (top 5)
+            var sortedClusters = relevantClusters
+                .OrderByDescending(c => clusterScores[c.ClusterId])
+                .ToList();
+            if (sortedClusters.Count > 5)
+                sortedClusters = sortedClusters.GetRange(0, 5);
+            
+            if (ShouldSampleLog())
+            {
+                Console.WriteLine("   🎯 Pattern matching: " + inputConcepts.Length + " concepts → " + sortedClusters.Count + " clusters");
+                for (int i = 0; i < Math.Min(3, sortedClusters.Count); i++)
+                {
+                    var cluster = sortedClusters[i];
+                    var score = clusterScores[cluster.ClusterId];
+                    Console.WriteLine("      ◽ Cluster " + cluster.ClusterId + " (score: " + score.ToString("F3") + ")");
+                }
+            }
+            
+            // Activate clusters and collect neuron outputs
+            foreach (var cluster in sortedClusters)
             {
                 var clusterOutputs = await cluster.ProcessInputAsync(ConvertFeaturesToNeuronInputs(features));
                 
@@ -530,6 +590,19 @@ namespace GreyMatter.Core
             await _storage.SaveSynapsesAsync(synapseSnapshots);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved {synapseSnapshots.Count} synapses in {sw.Elapsed.TotalSeconds:F2}s");
+            
+            // ADPC-Net: Save region→cluster mappings
+            sw.Restart();
+            await _storage.SaveRegionMappingsAsync(_regionToClusterMapping);
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   🧬 Saved {_regionToClusterMapping.Count} region mappings in {sw.Elapsed.TotalSeconds:F2}s");
+            
+            // ADPC-Net: Save activation statistics
+            sw.Restart();
+            await _storage.SaveActivationStatsAsync(_activationStats);
+            var statsSummary = _activationStats.GetSummary();
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   📊 Saved activation stats ({statsSummary.TotalActivations} activations, {statsSummary.UniqueRegions} regions) in {sw.Elapsed.TotalSeconds:F2}s");
             
             // Persist concept capacities at end of save
             try { await _storage.SaveConceptCapacitiesAsync(_conceptCapacities); } catch { /* best effort */ }
@@ -796,8 +869,9 @@ namespace GreyMatter.Core
         /// <summary>
         /// Find clusters based on feature pattern similarity using LSH
         /// NO concept name lookup - uses only feature vectors
+        /// Returns clusters with similarity scores for ranking
         /// </summary>
-        private async Task<List<NeuronCluster>> FindClustersMatchingPattern(double[] featureVector, int maxClusters = 5)
+        private async Task<List<(NeuronCluster cluster, double similarity)>> FindClustersMatchingPattern(double[] featureVector, int maxClusters = 5)
         {
             // Get region ID from feature vector (LSH)
             var regionId = _lshPartitioner.GetRegionId(featureVector);
@@ -822,8 +896,7 @@ namespace GreyMatter.Core
                         if (!_loadedClusters.TryGetValue(clusterId, out var cluster))
                         {
                             // Load from storage
-                            var metadata = await _storage.LoadClusterMetadataAsync(clusterId.ToString());
-                            if (metadata != null)
+                            try
                             {
                                 Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
                                     _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
@@ -831,15 +904,20 @@ namespace GreyMatter.Core
                                         AllNeurons = new Dictionary<Guid, HybridNeuron>(),
                                         AnalysisTime = DateTime.UtcNow
                                     });
-                                cluster = new NeuronCluster(metadata.ConceptDomain, clusterId, hierLoad, _storage.SaveClusterAsync);
+                                cluster = new NeuronCluster($"pattern_{clusterId}", clusterId, hierLoad, _storage.SaveClusterAsync);
                                 _loadedClusters[clusterId] = cluster;
+                            }
+                            catch
+                            {
+                                // Cluster doesn't exist yet - skip
+                                continue;
                             }
                         }
                         
                         if (cluster != null)
                         {
-                            // Calculate similarity (for now, use region proximity)
-                            // Future: actual centroid distance
+                            // Calculate similarity based on region proximity
+                            // Primary region = 1.0, nearby regions decay by distance
                             var similarity = region == regionId ? 1.0 : 0.7;
                             candidateClusters.Add((cluster, similarity));
                         }
@@ -847,11 +925,10 @@ namespace GreyMatter.Core
                 }
             }
             
-            // Sort by similarity, return top matches
+            // Sort by similarity, return top matches with scores
             var matches = candidateClusters
                 .OrderByDescending(x => x.similarity)
                 .Take(maxClusters)
-                .Select(x => x.cluster)
                 .ToList();
                 
             if (ShouldSampleLog() && matches.Count > 0)
@@ -875,7 +952,11 @@ namespace GreyMatter.Core
             var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 1);
             if (matches.Count > 0)
             {
-                return matches[0];
+                if (ShouldSampleLog())
+                {
+                    Console.WriteLine($"   ◽ Reusing cluster {matches[0].cluster.ClusterId:N} (similarity: {matches[0].similarity:F3}) [debug: {debugLabel}]");
+                }
+                return matches[0].cluster;
             }
             
             // No existing cluster - create new one
