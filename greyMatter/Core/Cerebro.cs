@@ -28,6 +28,9 @@ namespace GreyMatter.Core
         private ActivationStats _activationStats; // Not readonly - can be reloaded from storage
         private readonly Dictionary<string, List<Guid>> _regionToClusterMapping = new(); // region_id → cluster IDs
         
+        // ADPC-Net Phase 2: Hypernetwork for dynamic neuron generation
+        private readonly NeuronHypernetwork _neuronHypernetwork;
+        
         // Brain configuration
         public int MaxLoadedClusters { get; set; } = 10;
         public int MaxNeuronsPerCluster { get; set; } = 100;
@@ -191,11 +194,22 @@ namespace GreyMatter.Core
             _lshPartitioner = new LSHPartitioner(dimensions: 128, numBands: 16, rowsPerBand: 4);
             _activationStats = new ActivationStats();
             
+            // Initialize ADPC-Net Phase 2: Hypernetwork
+            _neuronHypernetwork = new NeuronHypernetwork(
+                alphaFrequency: 20.0,   // Log-scaled frequency component
+                betaNovelty: 100.0,     // Linear novelty boost
+                gammaComplexity: 50.0,  // Pattern complexity factor
+                minNeurons: 5,          // Minimum cluster size
+                maxNeurons: 500,        // Maximum cluster size
+                seed: 42                // Deterministic seed
+            );
+            
             if ((_configForLogging?.Verbosity ?? 0) > 0)
             {
                 Console.WriteLine("🧬 ADPC-Net initialized:");
                 Console.WriteLine($"   Feature encoder: 128-dim vectors");
                 Console.WriteLine($"   {_lshPartitioner.GetStats()}");
+                Console.WriteLine($"   Hypernetwork: 5-500 dynamic neurons/cluster");
             }
         }
 
