@@ -16,12 +16,6 @@ namespace GreyMatter
                 return;
             }
 
-            if (args.Length > 0 && args[0] == "--debug-encoding")
-            {
-                DebugEncodingTest.Run();
-                return;
-            }
-            
             if (args.Length > 0 && args[0] == "--cerebro-query")
             {
                 await CerebroQueryCLI.Run(args);
