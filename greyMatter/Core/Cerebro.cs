@@ -24,7 +24,7 @@ namespace GreyMatter.Core
         
         // ADPC-Net: Pattern-based learning components (Phase 1)
         private readonly FeatureEncoder _featureEncoder;
-        private readonly LSHPartitioner _lshPartitioner;
+        private readonly LSHPartitioner _lshPartitioner; // Legacy - replaced by VQ-VAE in Phase 5
         private ActivationStats _activationStats; // Not readonly - can be reloaded from storage
         private readonly Dictionary<string, List<Guid>> _regionToClusterMapping = new(); // region_id → cluster IDs
         
@@ -33,6 +33,10 @@ namespace GreyMatter.Core
         
         // ADPC-Net Phase 3: Sparse synaptic graph for Hebbian learning
         private readonly SparseSynapticGraph _synapticGraph;
+        
+        // ADPC-Net Phase 4 & 5: Learned vector quantization
+        private VectorQuantizer _vectorQuantizer;  // Not readonly - can be reloaded from storage
+        private bool _useVQVAE = true;  // Toggle between LSH (legacy) and VQ-VAE (new)
         
         // Brain configuration
         public int MaxLoadedClusters { get; set; } = 10;
@@ -127,8 +131,8 @@ namespace GreyMatter.Core
             // Encode concept to get feature vector
             var featureVector = _featureEncoder.Encode(concept);
             
-            // Get region ID for novelty calculation
-            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            // Get region ID for novelty calculation (Phase 5: VQ-VAE or legacy LSH)
+            var regionId = GetRegionId(featureVector);
             
             // Calculate novelty (0.0 = repeated, 1.0 = first time)
             var novelty = _activationStats.CalculateNovelty(regionId, featureVector);
@@ -235,16 +239,62 @@ namespace GreyMatter.Core
                 pruneThreshold: 0.1f     // Prune synapses below this weight
             );
             
+            // Initialize ADPC-Net Phase 4: VQ-VAE codebook (replaces LSH)
+            _vectorQuantizer = new VectorQuantizer(
+                codebookSize: 512,       // 512 learned codes
+                embeddingDim: 128,       // Match feature encoder
+                commitment: 0.25f,       // Commitment loss coefficient
+                emaDecay: 0.99f          // Codebook EMA decay
+            );
+            
             if ((_configForLogging?.Verbosity ?? 0) > 0)
             {
                 Console.WriteLine("🧬 ADPC-Net initialized:");
                 Console.WriteLine($"   Feature encoder: 128-dim vectors");
                 Console.WriteLine($"   {_lshPartitioner.GetStats()}");
+                Console.WriteLine($"   VQ-VAE: 512-code learned codebook");
                 Console.WriteLine($"   Hypernetwork: 5-500 dynamic neurons/cluster");
                 Console.WriteLine($"   Synaptic graph: Sparse Hebbian connections");
             }
         }
 
+        /// <summary>
+        /// Get region ID for a feature vector using VQ-VAE (Phase 5) or LSH (legacy)
+        /// </summary>
+        private string GetRegionId(double[] featureVector)
+        {
+            if (_useVQVAE)
+            {
+                // Phase 5: Use learned VQ-VAE codebook with EMA updates
+                var floatVector = featureVector.Select(x => (float)x).ToArray();
+                var (code, distance) = _vectorQuantizer.QuantizeAndUpdate(floatVector);
+                return $"vq_{code}";
+            }
+            else
+            {
+                // Phase 1: Legacy LSH partitioning
+                return _lshPartitioner.GetRegionId(featureVector);
+            }
+        }
+
+        /// <summary>
+        /// Get nearby region IDs for k-nearest codes (VQ-VAE) or LSH neighbors
+        /// </summary>
+        private List<string> GetNearbyRegions(double[] featureVector, int neighbors = 5)
+        {
+            if (_useVQVAE)
+            {
+                // Phase 5: Get k-nearest codes from VQ-VAE codebook
+                var floatVector = featureVector.Select(x => (float)x).ToArray();
+                var nearestCodes = _vectorQuantizer.GetNearestCodes(floatVector, neighbors);
+                return nearestCodes.Select(code => $"vq_{code}").ToList();
+            }
+            else
+            {
+                // Phase 1: Legacy LSH nearby regions
+                return _lshPartitioner.GetNearbyRegions(featureVector, neighbors);
+            }
+        }
         /// <summary>
         /// Get the storage path for this brain instance
         /// </summary>
@@ -290,6 +340,28 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"📊 Loaded activation stats ({statsSummary.TotalActivations} activations, {statsSummary.UniqueRegions} regions)");
             
+            // ADPC-Net Phase 5: Load VQ-VAE codebook (if available)
+            if (_useVQVAE)
+            {
+                try
+                {
+                    var codebookSnapshot = await _storage.LoadVQCodebookAsync();
+                    if (codebookSnapshot != null)
+                    {
+                        _vectorQuantizer.ImportCodebook(codebookSnapshot);
+                        var vqStats = _vectorQuantizer.GetStats();
+                        if ((_configForLogging?.Verbosity ?? 0) > 0)
+                            Console.WriteLine($"🧬 Loaded VQ-VAE codebook (perplexity: {vqStats.Perplexity:F2}, utilization: {vqStats.CodebookUtilization:P1})");
+                    }
+                }
+                catch (FileNotFoundException)
+                {
+                    // First run - codebook not yet saved
+                    if ((_configForLogging?.Verbosity ?? 0) > 0)
+                        Console.WriteLine($"🧬 VQ-VAE codebook not found (first run - will be created during training)");
+                }
+            }
+            
             // Load cluster index (legacy) for counts
             var clusterIndex = await _storage.LoadClusterIndexAsync();
             Console.WriteLine($"Found {clusterIndex.Count} clusters in storage");
@@ -333,8 +405,8 @@ namespace GreyMatter.Core
             tFind.Stop();
             result.ClusterId = cluster.ClusterId;
 
-            // Calculate novelty score for this pattern
-            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            // Calculate novelty score for this pattern (Phase 5: VQ-VAE or legacy LSH)
+            var regionId = GetRegionId(featureVector);
             var novelty = _activationStats.CalculateNovelty(regionId, featureVector);
 
             // Get neurons for this pattern (using concept as label for now, but not for lookup)
@@ -661,6 +733,17 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   📊 Saved activation stats ({statsSummary.TotalActivations} activations, {statsSummary.UniqueRegions} regions) in {sw.Elapsed.TotalSeconds:F2}s");
             
+            // ADPC-Net Phase 5: Save VQ-VAE codebook
+            if (_useVQVAE && _vectorQuantizer != null)
+            {
+                sw.Restart();
+                var codebookSnapshot = _vectorQuantizer.ExportCodebook();
+                await _storage.SaveVQCodebookAsync(codebookSnapshot);
+                var vqStats = _vectorQuantizer.GetStats();
+                if ((_configForLogging?.Verbosity ?? 0) > 0)
+                    Console.WriteLine($"   🧬 Saved VQ-VAE codebook (perplexity: {vqStats.Perplexity:F2}, utilization: {vqStats.CodebookUtilization:P1}) in {sw.Elapsed.TotalSeconds:F2}s");
+            }
+            
             // Persist concept capacities at end of save
             try { await _storage.SaveConceptCapacitiesAsync(_conceptCapacities); } catch { /* best effort */ }
             if ((_configForLogging?.Verbosity ?? 0) > 0)
@@ -924,20 +1007,20 @@ namespace GreyMatter.Core
         // ═══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Find clusters based on feature pattern similarity using LSH
+        /// Find clusters based on feature pattern similarity using VQ-VAE or LSH
         /// NO concept name lookup - uses only feature vectors
         /// Returns clusters with similarity scores for ranking
         /// </summary>
         private async Task<List<(NeuronCluster cluster, double similarity)>> FindClustersMatchingPattern(double[] featureVector, int maxClusters = 5)
         {
-            // Get region ID from feature vector (LSH)
-            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            // Get region ID from feature vector (Phase 5: VQ-VAE or legacy LSH)
+            var regionId = GetRegionId(featureVector);
             
             // Record activation for statistics
             _activationStats.RecordActivation(regionId, featureVector);
             
             // Get candidate regions (primary + nearby)
-            var nearbyRegions = _lshPartitioner.GetNearbyRegions(featureVector, neighbors: 5);
+            var nearbyRegions = GetNearbyRegions(featureVector, neighbors: 5);
             
             // Collect clusters from these regions
             var candidateClusters = new List<(NeuronCluster cluster, double similarity)>();
@@ -1002,8 +1085,8 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task<NeuronCluster> FindOrCreateClusterForPattern(double[] featureVector, string debugLabel = "unknown")
         {
-            // Get region from feature vector
-            var regionId = _lshPartitioner.GetRegionId(featureVector);
+            // Get region from feature vector (Phase 5: VQ-VAE or legacy LSH)
+            var regionId = GetRegionId(featureVector);
             
             // Try to find existing clusters in this region
             var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 1);
@@ -1018,7 +1101,8 @@ namespace GreyMatter.Core
             
             // No existing cluster - create new one
             // Note: We DON'T use concept names anymore, but keep debug label for monitoring
-            var newCluster = new NeuronCluster($"pattern_{regionId.Substring(0, 8)}", _storage.LoadClusterAsync, _storage.SaveClusterAsync);
+            var regionLabel = regionId.Length > 8 ? regionId.Substring(0, 8) : regionId;
+            var newCluster = new NeuronCluster($"pattern_{regionLabel}", _storage.LoadClusterAsync, _storage.SaveClusterAsync);
             _loadedClusters[newCluster.ClusterId] = newCluster;
             
             // Map region → cluster
@@ -1030,7 +1114,8 @@ namespace GreyMatter.Core
             
             if (ShouldSampleLog())
             {
-                Console.WriteLine($"   ✨ Created new cluster for region {regionId.Substring(0, 20)}... (label: {debugLabel})");
+                var regionPreview = regionId.Length > 20 ? regionId.Substring(0, 20) + "..." : regionId;
+                Console.WriteLine($"   ✨ Created new cluster for region {regionPreview} (label: {debugLabel})");
             }
             
             return newCluster;

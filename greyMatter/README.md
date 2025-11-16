@@ -2,13 +2,23 @@
 
 **"A trillion-parameter model in a gigabyte of RAM."**
 
-> **Status**: Active development - ADPC-Net Phase 4 complete, learned vector quantization implemented
+> **Status**: Active development - ADPC-Net Phase 5 complete, VQ-VAE production integration
 > 
-> **Latest**: ✅ VQ-VAE codebook with EMA learning (Dec 2025)
+> **Latest**: ✅ VQ-VAE integrated into Cerebro production training (Dec 2025)
 
 ## 🎯 What Actually Works (Dec 2025)
 
-**VQ-VAE Codebook (ADPC-Net Phase 4)** ✅ **NEW**
+**VQ-VAE Production Integration (ADPC-Net Phase 5)** ✅ **NEW**
+- Cerebro uses VQ-VAE for all region ID generation (replaces LSH)
+- Codebook learns during training (EMA updates with γ=0.99)
+- Full persistence: Codebook saves/loads across training sessions
+- Similar concepts cluster together (verified in tests)
+- Deterministic assignments: Same pattern → same code
+- **100% test passing**: All 6 Phase 5 validation tests pass
+- **Perplexity growth**: 1.0 → 5.66 (codebook learns patterns)
+- **Production ready**: Toggle support for LSH fallback
+
+**VQ-VAE Codebook (ADPC-Net Phase 4)** ✅
 - Learned vector quantization: 512-code codebook adapts to data
 - Replaces fixed LSH with adaptive learned similarity
 - EMA updates: Codebook continuously refines (γ=0.99)
@@ -49,16 +59,17 @@
 - Progressive curriculum: 4-phase learning pipeline operational
 - Cluster partitioning: On-demand loading prevents memory bloat
 
-**Neural Realism Progress** ✅ **COMPLETE (Phases 1-4)**
+**Neural Realism Progress** ✅ **COMPLETE (All 5 Phases)**
 - ✅ **Pattern-based retrieval** (replaces word list lookup)
 - ✅ **Feature encoding** (128-dim vectors from text)
 - ✅ **LSH clustering** (locality-sensitive hashing for similarity)
 - ✅ **Novelty tracking** (activation statistics)
 - ✅ **Dynamic neuron allocation** (hypernetwork generation)
 - ✅ **Sparse synaptic graph** (Hebbian learning, pruning, decay)
-- ✅ **VQ-VAE codebook** (learned vector quantization, EMA updates) **NEW**
+- ✅ **VQ-VAE codebook** (learned vector quantization, EMA updates)
+- ✅ **Production integration** (VQ-VAE in Cerebro training pipeline) **NEW**
 
-**See ADPC_PHASE4_COMPLETE.md for Phase 4 details and test results.**
+**See ADPC_PHASE5_COMPLETE.md for Phase 5 details and test results.**
 
 ## 🏗️ Architecture
 
@@ -131,8 +142,11 @@ dotnet run -- --adpc-phase2-test
 # Test ADPC-Net Phase 3 (sparse synaptic graph)
 dotnet run -- --adpc-phase3-test
 
-# Test ADPC-Net Phase 4 (VQ-VAE codebook) ⭐ NEW
+# Test ADPC-Net Phase 4 (VQ-VAE codebook)
 dotnet run -- --adpc-phase4-test
+
+# Test ADPC-Net Phase 5 (VQ-VAE production integration) ⭐ NEW
+dotnet run -- --adpc-phase5-test
 
 # Production training (continuous learning)
 dotnet run -- --production-training --duration 28800  # 8 hours

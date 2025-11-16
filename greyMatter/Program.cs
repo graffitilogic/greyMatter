@@ -39,6 +39,13 @@ namespace GreyMatter
                 return;
             }
 
+            if (args.Length > 0 && args[0] == "--adpc-phase5-test")
+            {
+                Console.WriteLine("🚀 Running ADPC-Net Phase 5 validation tests...\n");
+                await AdpcPhase5ValidationTests.RunAllTests();
+                return;
+            }
+
             if (args.Length > 0 && args[0] == "--cerebro-query")
             {
                 await CerebroQueryCLI.Run(args);
@@ -92,6 +99,7 @@ namespace GreyMatter
                 Console.WriteLine("  dotnet run -- --adpc-phase2-test       Run ADPC-Net Phase 2 tests");
                 Console.WriteLine("  dotnet run -- --adpc-phase3-test       Run ADPC-Net Phase 3 tests");
                 Console.WriteLine("  dotnet run -- --adpc-phase4-test       Run ADPC-Net Phase 4 tests");
+                Console.WriteLine("  dotnet run -- --adpc-phase5-test       Run ADPC-Net Phase 5 tests");
                 Console.WriteLine();
                 Console.WriteLine("Query Commands:");
                 Console.WriteLine("  stats                    Show brain statistics");
@@ -103,6 +111,7 @@ namespace GreyMatter
                 Console.WriteLine("  --adpc-phase2-test       Validate dynamic neuron generation (Phase 2)");
                 Console.WriteLine("  --adpc-phase3-test       Validate sparse synaptic graph (Phase 3)");
                 Console.WriteLine("  --adpc-phase4-test       Validate VQ-VAE codebook (Phase 4)");
+                Console.WriteLine("  --adpc-phase5-test       Validate production training integration (Phase 5)");
                 Console.WriteLine();
                 Console.WriteLine("Training Options:");
                 Console.WriteLine("  --dataset <name>      Dataset to use (default: tatoeba_small)");
@@ -111,6 +120,7 @@ namespace GreyMatter
                 Console.WriteLine();
                 Console.WriteLine("Examples:");
                 Console.WriteLine("  dotnet run -- --adpc-test");
+                Console.WriteLine("  dotnet run -- --adpc-phase5-test");
                 Console.WriteLine("  dotnet run -- --adpc-phase2-test");
                 Console.WriteLine("  dotnet run -- --adpc-phase3-test");
                 Console.WriteLine("  dotnet run -- --adpc-phase4-test");

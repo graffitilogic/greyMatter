@@ -1425,6 +1425,51 @@ namespace GreyMatter.Storage
             
             return stats;
         }
+
+        /// <summary>
+        /// Save VQ-VAE codebook for ADPC-Net Phase 5 learned vector quantization
+        /// </summary>
+        public static async Task SaveVQCodebookAsync(this EnhancedBrainStorage storage, CodebookSnapshot snapshot)
+        {
+            var basePath = storage.GetBasePath();
+            Directory.CreateDirectory(basePath);
+            var path = Path.Combine(basePath, "adpc_vqvae_codebook.json");
+            
+            try
+            {
+                var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+                await File.WriteAllTextAsync(path, json);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error saving VQ-VAE codebook: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Load VQ-VAE codebook for ADPC-Net Phase 5 learned vector quantization
+        /// </summary>
+        public static async Task<CodebookSnapshot?> LoadVQCodebookAsync(this EnhancedBrainStorage storage)
+        {
+            var basePath = storage.GetBasePath();
+            var path = Path.Combine(basePath, "adpc_vqvae_codebook.json");
+            
+            if (!File.Exists(path))
+            {
+                return null; // First run - no codebook yet
+            }
+            
+            try
+            {
+                var json = await File.ReadAllTextAsync(path);
+                var snapshot = JsonSerializer.Deserialize<CodebookSnapshot>(json);
+                return snapshot;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error loading VQ-VAE codebook: {ex.Message}");
+                return null;
+            }
+        }
     }
 }
-
