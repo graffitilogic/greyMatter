@@ -308,7 +308,7 @@ namespace GreyMatter.Core
         /// </summary>
         public async Task InitializeAsync()
         {
-            Console.WriteLine("🧠 Initializing Brain in Jar...");
+            Console.WriteLine("Initializing Cerebro...");
             
             // Load feature mappings first
             var featureMappings = await _storage.LoadFeatureMappingsAsync();
@@ -1085,6 +1085,15 @@ namespace GreyMatter.Core
                                         AnalysisTime = DateTime.UtcNow
                                     });
                                 cluster = new NeuronCluster($"pattern_{clusterId}", clusterId, hierLoad, _storage.SaveClusterAsync);
+                                
+                                // CRITICAL: Restore centroid from persisted metadata for pattern matching!
+                                var metadata = _storage.GetClusterMetadata(clusterId);
+                                if (metadata?.Centroid != null && metadata.Centroid.Length > 0)
+                                {
+                                    // Restore centroid directly without recalculation
+                                    cluster.RestoreCentroid(metadata.Centroid, metadata.CentroidNeuronCount);
+                                }
+                                
                                 _loadedClusters[clusterId] = cluster;
                             }
                             catch

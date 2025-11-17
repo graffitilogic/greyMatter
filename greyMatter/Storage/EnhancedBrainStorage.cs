@@ -691,6 +691,15 @@ namespace GreyMatter.Storage
         }
 
         /// <summary>
+        /// Get cluster metadata by ID (includes centroid for pattern matching)
+        /// </summary>
+        public ClusterMetadata? GetClusterMetadata(Guid clusterId)
+        {
+            var key = clusterId.ToString("N");
+            return _partitionMetadata.TryGetValue(key, out var metadata) ? metadata : null;
+        }
+
+        /// <summary>
         /// Get storage statistics with partition-level breakdown
         /// </summary>
         public async Task<EnhancedStorageStats> GetEnhancedStorageStatsAsync()
@@ -832,7 +841,10 @@ namespace GreyMatter.Storage
                 NeuronCount = cluster.NeuronCount,
                 AverageImportance = cluster.AverageImportance,
                 LastAccessed = cluster.LastAccessed,
-                CreatedAt = cluster.CreatedAt
+                CreatedAt = cluster.CreatedAt,
+                // CRITICAL: Save centroid for pattern-based matching after reload
+                Centroid = cluster.Centroid != null ? cluster.Centroid.ToArray() : null,
+                CentroidNeuronCount = cluster.Centroid != null ? cluster.NeuronCount : 0
             };
         }
 
@@ -1149,6 +1161,10 @@ namespace GreyMatter.Storage
         public double AverageImportance { get; set; }
         public DateTime LastAccessed { get; set; }
         public DateTime CreatedAt { get; set; }
+        
+        // CRITICAL: Persist centroid for pattern-based cluster matching
+        public double[]? Centroid { get; set; } = null;
+        public int CentroidNeuronCount { get; set; } = 0;
     }
 
     /// <summary>

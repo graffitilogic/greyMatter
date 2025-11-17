@@ -73,6 +73,9 @@ namespace GreyMatter.Core
         private int _checkpointsSaved = 0;
         private int _validationsPassed = 0;
         private int _validationsFailed = 0;
+        
+        // Synchronization for checkpoint saves
+        private readonly SemaphoreSlim _checkpointLock = new SemaphoreSlim(1, 1);
 
         public ProductionTrainingService(
             string? datasetKey = null,
@@ -141,7 +144,6 @@ namespace GreyMatter.Core
             _cancellationTokenSource = new CancellationTokenSource();
 
             // Initialize Cerebro
-            Console.WriteLine("🧠 Initializing Cerebro...");
             await _cerebro.InitializeAsync();
             
             // Load latest checkpoint if available
@@ -180,6 +182,13 @@ namespace GreyMatter.Core
 
                 try
                 {
+                    // Yield if checkpoint is in progress (non-blocking check)
+                    if (_checkpointLock.CurrentCount == 0)
+                    {
+                        await Task.Delay(100, cancellationToken); // Brief pause during checkpoint
+                        continue;
+                    }
+                    
                     // Check if we need to reload data (reached end of batch)
                     if (_sentenceIndex >= _trainingSentences.Count)
                     {
@@ -451,6 +460,8 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task SaveCheckpointAsync(string reason)
         {
+            // Use semaphore to prevent concurrent saves and ensure training pauses
+            await _checkpointLock.WaitAsync();
             try
             {
                 Console.WriteLine($"\n💾 Saving checkpoint ({reason})...");
@@ -500,6 +511,10 @@ namespace GreyMatter.Core
             catch (Exception ex)
             {
                 Console.WriteLine($"❌ Failed to save checkpoint: {ex.Message}");
+            }
+            finally
+            {
+                _checkpointLock.Release();
             }
         }
 

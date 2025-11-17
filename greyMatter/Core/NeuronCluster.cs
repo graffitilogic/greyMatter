@@ -499,6 +499,24 @@ namespace GreyMatter.Core
         }
         
         /// <summary>
+        /// Restore centroid from persisted metadata (CRITICAL for checkpoint rehydration)
+        /// Use this when loading cluster from storage to avoid expensive recalculation
+        /// </summary>
+        public void RestoreCentroid(double[] centroid, int neuronCount)
+        {
+            if (centroid == null || centroid.Length == 0)
+            {
+                _centroid = null;
+                _centroidNeuronCount = 0;
+                return;
+            }
+            
+            _centroid = new double[centroid.Length];
+            Array.Copy(centroid, _centroid, centroid.Length);
+            _centroidNeuronCount = neuronCount;
+        }
+        
+        /// <summary>
         /// Recalculate centroid from all loaded neurons (used when loading from storage)
         /// </summary>
         public async Task RecalculateCentroidAsync()
