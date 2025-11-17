@@ -52,6 +52,12 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length > 0 && args[0] == "--inspect-brain")
+            {
+                await BrainInspector.Run(args);
+                return;
+            }
+            
             if (args.Length > 0 && (args[0] == "--production-training" || args[0] == "--production"))
             {
                 var datasetKey = GetArgValue(args, "--dataset", "tatoeba_small");
