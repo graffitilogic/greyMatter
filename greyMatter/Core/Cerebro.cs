@@ -1153,6 +1153,10 @@ namespace GreyMatter.Core
             // Note: We DON'T use concept names anymore, but keep debug label for monitoring
             var regionLabel = regionId.Length > 8 ? regionId.Substring(0, 8) : regionId;
             var newCluster = new NeuronCluster($"pattern_{regionLabel}", _storage.LoadClusterAsync, _storage.SaveClusterAsync);
+            
+            // Initialize centroid with the first pattern - CRITICAL for pattern matching!
+            newCluster.UpdateCentroid(featureVector);
+            
             _loadedClusters[newCluster.ClusterId] = newCluster;
             
             // Map region → cluster
