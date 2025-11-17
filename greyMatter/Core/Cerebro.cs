@@ -440,6 +440,10 @@ namespace GreyMatter.Core
                     grew = newNeurons.Count;
                     conceptNeurons.AddRange(newNeurons);
                     TotalNeuronsCreated += grew;
+                    
+                    // Update cluster centroid with new pattern
+                    cluster.UpdateCentroid(featureVector);
+                    
                     if (ShouldSampleLog()) Console.WriteLine($"   ◽ grow: +{grew} (target {target}) in {tGrow.Elapsed.TotalMilliseconds:F1} ms");
                 }
             }
@@ -641,15 +645,25 @@ namespace GreyMatter.Core
             // Take snapshot of loaded clusters to avoid concurrent modification
             var loadedClustersSnapshot = _loadedClusters.Values.ToList();
 
-            // Create lightweight brain context (no need to load all neurons)
+            // Gather all neurons from loaded clusters for partitioning context
             var sw = Stopwatch.StartNew();
+            var allNeurons = new Dictionary<Guid, HybridNeuron>();
+            foreach (var cluster in loadedClustersSnapshot)
+            {
+                var neurons = await cluster.GetNeuronsAsync();
+                foreach (var neuron in neurons.Values)
+                {
+                    allNeurons[neuron.Id] = neuron;
+                }
+            }
+            
             var context = new BrainContext
             {
-                AllNeurons = new Dictionary<Guid, HybridNeuron>(), // Empty - partitioning uses metadata only
+                AllNeurons = allNeurons,
                 AnalysisTime = DateTime.UtcNow
             };
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   ⏱️  Created context in {sw.Elapsed.TotalMilliseconds:F1}ms");
+                Console.WriteLine($"   ⏱️  Gathered {allNeurons.Count} neurons in {sw.Elapsed.TotalMilliseconds:F1}ms");
 
             // STM->LTM consolidation with collection
             sw.Restart();
@@ -1000,6 +1014,33 @@ namespace GreyMatter.Core
         // ═══════════════════════════════════════════════════════════════════════
 
         /// <summary>
+        /// Calculate cosine similarity between two feature vectors
+        /// Returns value between 0.0 (orthogonal) and 1.0 (identical)
+        /// </summary>
+        private double CosineSimilarity(double[] a, double[] b)
+        {
+            if (a == null || b == null || a.Length == 0 || b.Length == 0)
+                return 0.0;
+                
+            int minLen = Math.Min(a.Length, b.Length);
+            double dotProduct = 0.0;
+            double magA = 0.0;
+            double magB = 0.0;
+            
+            for (int i = 0; i < minLen; i++)
+            {
+                dotProduct += a[i] * b[i];
+                magA += a[i] * a[i];
+                magB += b[i] * b[i];
+            }
+            
+            if (magA == 0.0 || magB == 0.0)
+                return 0.0;
+                
+            return dotProduct / (Math.Sqrt(magA) * Math.Sqrt(magB));
+        }
+
+        /// <summary>
         /// Find clusters based on feature pattern similarity using VQ-VAE or LSH
         /// NO concept name lookup - uses only feature vectors
         /// Returns clusters with similarity scores for ranking
@@ -1049,9 +1090,21 @@ namespace GreyMatter.Core
                         
                         if (cluster != null)
                         {
-                            // Calculate similarity based on region proximity
-                            // Primary region = 1.0, nearby regions decay by distance
-                            var similarity = region == regionId ? 1.0 : 0.7;
+                            // Calculate ACTUAL cosine similarity between input and cluster centroid
+                            double similarity = 0.0;
+                            
+                            if (cluster.Centroid != null)
+                            {
+                                // Use real pattern matching
+                                similarity = CosineSimilarity(featureVector, cluster.Centroid);
+                            }
+                            else
+                            {
+                                // Cluster has no centroid yet (newly created or not initialized)
+                                // Give it a moderate similarity based on region match
+                                similarity = region == regionId ? 0.8 : 0.5;
+                            }
+                            
                             candidateClusters.Add((cluster, similarity));
                         }
                     }
@@ -1081,15 +1134,19 @@ namespace GreyMatter.Core
             // Get region from feature vector (Phase 5: VQ-VAE or legacy LSH)
             var regionId = GetRegionId(featureVector);
             
-            // Try to find existing clusters in this region
-            var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 1);
-            if (matches.Count > 0)
+            // Try to find existing clusters in this region with sufficient similarity
+            const double SIMILARITY_THRESHOLD = 0.85; // Reuse cluster only if >= 85% similar
+            
+            var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 5);
+            var bestMatch = matches.FirstOrDefault(m => m.similarity >= SIMILARITY_THRESHOLD);
+            
+            if (bestMatch != default)
             {
                 if (ShouldSampleLog())
                 {
-                    Console.WriteLine($"   ◽ Reusing cluster {matches[0].cluster.ClusterId:N} (similarity: {matches[0].similarity:F3}) [debug: {debugLabel}]");
+                    Console.WriteLine($"   ✓ Reusing cluster {bestMatch.cluster.ClusterId.ToString().Substring(0, 8)} (similarity: {bestMatch.similarity:F3}) [debug: {debugLabel}]");
                 }
-                return matches[0].cluster;
+                return bestMatch.cluster;
             }
             
             // No existing cluster - create new one

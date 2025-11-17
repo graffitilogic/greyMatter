@@ -39,6 +39,11 @@ namespace GreyMatter.Core
         public double CohesionStrength { get; private set; } = 0.0; // How tightly connected neurons are
         public double SpecializationLevel { get; private set; } = 0.0; // How specialized this cluster is
         
+        // Pattern-based clustering: Track centroid (average feature vector)
+        private double[]? _centroid = null;
+        private int _centroidNeuronCount = 0; // Number of neurons contributing to centroid
+        public double[]? Centroid => _centroid;
+        
         // Dependencies for lazy loading
         private readonly Func<string, Task<List<NeuronSnapshot>>>? _loadFunction;
         private readonly Func<string, List<NeuronSnapshot>, Task>? _saveFunction;
@@ -461,7 +466,94 @@ namespace GreyMatter.Core
         /// <summary>
         /// Get the set of neuron IDs added since last membership persistence.
         /// </summary>
-        public IReadOnlyCollection<Guid> GetNewNeuronIdsSincePersist() => _newNeuronIdsSincePersist;
+        public HashSet<Guid> GetNewNeuronIdsSincePersist()
+        {
+            return new HashSet<Guid>(_newNeuronIdsSincePersist);
+        }
+        
+        /// <summary>
+        /// Update cluster centroid based on neuron feature vector
+        /// Call this when adding neurons to maintain accurate cluster center
+        /// </summary>
+        public void UpdateCentroid(double[] neuronFeatureVector)
+        {
+            if (neuronFeatureVector == null || neuronFeatureVector.Length == 0)
+                return;
+                
+            if (_centroid == null)
+            {
+                // Initialize centroid with first neuron's features
+                _centroid = new double[neuronFeatureVector.Length];
+                Array.Copy(neuronFeatureVector, _centroid, neuronFeatureVector.Length);
+                _centroidNeuronCount = 1;
+            }
+            else
+            {
+                // Incremental centroid update: centroid = (centroid * n + newVector) / (n + 1)
+                for (int i = 0; i < Math.Min(_centroid.Length, neuronFeatureVector.Length); i++)
+                {
+                    _centroid[i] = (_centroid[i] * _centroidNeuronCount + neuronFeatureVector[i]) / (_centroidNeuronCount + 1);
+                }
+                _centroidNeuronCount++;
+            }
+        }
+        
+        /// <summary>
+        /// Recalculate centroid from all loaded neurons (used when loading from storage)
+        /// </summary>
+        public async Task RecalculateCentroidAsync()
+        {
+            await EnsureLoadedAsync();
+            
+            if (_neurons.Count == 0)
+            {
+                _centroid = null;
+                _centroidNeuronCount = 0;
+                return;
+            }
+            
+            // Collect all feature vectors from neurons
+            var allFeatures = new List<double[]>();
+            foreach (var neuron in _neurons.Values)
+            {
+                // Get neuron's feature vector (from its associated concepts/activations)
+                // For now, use a simple representation - in production would extract from neuron state
+                var features = neuron.AssociatedConcepts
+                    .SelectMany(c => c.ToCharArray())
+                    .Select(ch => (double)ch / 255.0)
+                    .Take(128) // Fixed dimensionality
+                    .ToArray();
+                    
+                if (features.Length > 0)
+                    allFeatures.Add(features);
+            }
+            
+            if (allFeatures.Count == 0)
+            {
+                _centroid = null;
+                _centroidNeuronCount = 0;
+                return;
+            }
+            
+            // Calculate average across all dimensions
+            int dims = allFeatures.Max(f => f.Length);
+            _centroid = new double[dims];
+            
+            foreach (var features in allFeatures)
+            {
+                for (int i = 0; i < features.Length; i++)
+                {
+                    _centroid[i] += features[i];
+                }
+            }
+            
+            for (int i = 0; i < dims; i++)
+            {
+                _centroid[i] /= allFeatures.Count;
+            }
+            
+            _centroidNeuronCount = allFeatures.Count;
+        }
     }
 
     /// <summary>

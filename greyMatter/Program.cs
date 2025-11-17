@@ -63,7 +63,7 @@ namespace GreyMatter
                     llmTeacher: useLLMTeacher ? new LLMTeacher() : null,
                     useLLMTeacher: useLLMTeacher,
                     useProgressiveCurriculum: true,
-                    checkpointIntervalMinutes: 60,
+                    checkpointIntervalMinutes: 10, // Frequent checkpoints for data safety
                     validationIntervalHours: 6,
                     nasArchiveIntervalHours: 24,
                     enableAttention: true,
