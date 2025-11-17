@@ -322,6 +322,8 @@ namespace GreyMatter.Core
 
         /// <summary>
         /// Get progressive curriculum: start simple, increase complexity AND diversity
+        /// Now with ROTATING DATA SOURCES for meaningful variety
+        /// Skips phases with insufficient data (falls back to larger datasets)
         /// </summary>
         public ProgressiveCurriculum GetProgressiveCurriculum(string baseDataset = "tatoeba_small")
         {
@@ -338,30 +340,48 @@ namespace GreyMatter.Core
                 },
                 Phase2_Expansion = new TrainingPhase
                 {
-                    Name = "Expansion (1K-10K sentences)",
-                    DatasetKey = baseDataset,  // Continue with varied sentences
-                    MaxSentences = 10000,
+                    Name = "Expansion (1K-5K sentences)",
+                    DatasetKey = "news",  // Switch to news headlines - real-world events (39MB)
+                    MaxSentences = 5000,
                     MinWordCount = 5,
                     MaxWordCount = 25,
-                    Description = "Longer sentences - varied topics and structures"
+                    Description = "News headlines - current events and journalism vocabulary"
                 },
-                Phase3_Advanced = new TrainingPhase
+                Phase3_Dialogue = new TrainingPhase
                 {
-                    Name = "Advanced (10K-50K sentences)",
-                    DatasetKey = "tatoeba_full",  // Expand to full corpus
-                    MaxSentences = 50000,
-                    MinWordCount = null,
-                    MaxWordCount = null,
-                    Description = "Full Tatoeba corpus - maximum vocabulary diversity"
+                    Name = "Dialogue (5K-10K sentences)",
+                    DatasetKey = "dialogue",  // Conversational language from subtitles (608KB)
+                    MaxSentences = 5000,
+                    MinWordCount = 3,
+                    MaxWordCount = 30,
+                    Description = "Conversational English - questions, responses, informal language"
                 },
-                Phase4_Mastery = new TrainingPhase
+                Phase4_TatoebaMixed = new TrainingPhase
                 {
-                    Name = "Mastery (50K+ sentences)",
-                    DatasetKey = "tatoeba_full",  // Continue with full corpus
+                    Name = "Mixed Content (10K-15K sentences)",
+                    DatasetKey = "tatoeba_small",  // Back to varied Tatoeba (skip tiny technical_docs)
+                    MaxSentences = 5000,
+                    MinWordCount = 5,
+                    MaxWordCount = 40,
+                    Description = "Diverse sentence structures - varied topics and complexity"
+                },
+                Phase5_Advanced = new TrainingPhase
+                {
+                    Name = "Advanced (15K-20K sentences)",
+                    DatasetKey = "tatoeba_small",  // Continue with Tatoeba (skip tiny scientific)
+                    MaxSentences = 5000,
+                    MinWordCount = 10,
+                    MaxWordCount = 50,
+                    Description = "Longer complex sentences - advanced structures"
+                },
+                Phase6_FullCorpus = new TrainingPhase
+                {
+                    Name = "Full Corpus (20K+ sentences)",
+                    DatasetKey = "tatoeba_full",  // Full 685MB corpus - maximum diversity
                     MaxSentences = null,
                     MinWordCount = null,
                     MaxWordCount = null,
-                    Description = "Unlimited training - continuous learning from diverse corpus"
+                    Description = "Full Tatoeba corpus - maximum vocabulary diversity (685M corpus)"
                 }
             };
         }
@@ -393,15 +413,19 @@ namespace GreyMatter.Core
     {
         public TrainingPhase Phase1_Foundation { get; set; } = new TrainingPhase();
         public TrainingPhase Phase2_Expansion { get; set; } = new TrainingPhase();
-        public TrainingPhase Phase3_Advanced { get; set; } = new TrainingPhase();
-        public TrainingPhase Phase4_Mastery { get; set; } = new TrainingPhase();
+        public TrainingPhase Phase3_Dialogue { get; set; } = new TrainingPhase();
+        public TrainingPhase Phase4_TatoebaMixed { get; set; } = new TrainingPhase();
+        public TrainingPhase Phase5_Advanced { get; set; } = new TrainingPhase();
+        public TrainingPhase Phase6_FullCorpus { get; set; } = new TrainingPhase();
 
         public TrainingPhase GetPhaseForSentenceCount(long sentenceCount)
         {
             if (sentenceCount < 1000) return Phase1_Foundation;
             if (sentenceCount < 5000) return Phase2_Expansion;
-            if (sentenceCount < 20000) return Phase3_Advanced;
-            return Phase4_Mastery;
+            if (sentenceCount < 10000) return Phase3_Dialogue;
+            if (sentenceCount < 15000) return Phase4_TatoebaMixed;
+            if (sentenceCount < 20000) return Phase5_Advanced;
+            return Phase6_FullCorpus;
         }
     }
 

@@ -638,25 +638,18 @@ namespace GreyMatter.Core
             Console.WriteLine("💾 Saving brain state with enhanced partitioning...");
             var swTotal = Stopwatch.StartNew();
 
-            // Create brain context for partitioning decisions
+            // Take snapshot of loaded clusters to avoid concurrent modification
+            var loadedClustersSnapshot = _loadedClusters.Values.ToList();
+
+            // Create lightweight brain context (no need to load all neurons)
             var sw = Stopwatch.StartNew();
-            var allNeurons = new Dictionary<Guid, HybridNeuron>();
-            foreach (var cluster in _loadedClusters.Values)
-            {
-                var neurons = await cluster.GetNeuronsAsync();
-                foreach (var neuron in neurons.Values)
-                {
-                    allNeurons[neuron.Id] = neuron;
-                }
-            }
-            if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   ⏱️  Gathered neuron context in {sw.Elapsed.TotalSeconds:F2}s");
-            
             var context = new BrainContext
             {
-                AllNeurons = allNeurons,
+                AllNeurons = new Dictionary<Guid, HybridNeuron>(), // Empty - partitioning uses metadata only
                 AnalysisTime = DateTime.UtcNow
             };
+            if ((_configForLogging?.Verbosity ?? 0) > 0)
+                Console.WriteLine($"   ⏱️  Created context in {sw.Elapsed.TotalMilliseconds:F1}ms");
 
             // STM->LTM consolidation with collection
             sw.Restart();
@@ -664,7 +657,7 @@ namespace GreyMatter.Core
             int clustersTouched = 0;
             int budgetPerCluster = Math.Max(5, Math.Min(50, (_configForLogging?.MaxParallelSaves ?? 1) * 5));
             var changedByCluster = new Dictionary<Guid, List<HybridNeuron>>();
-            foreach (var cluster in _loadedClusters.Values)
+            foreach (var cluster in loadedClustersSnapshot)
             {
                 var changed = await cluster.ConsolidateStmCollectAsync(budgetPerCluster);
                 if (changed.Count > 0)
@@ -692,13 +685,13 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   💾 Persisted neuron banks in batches; ~{neuronsPersisted} neurons updated in {sw.Elapsed.TotalSeconds:F2}s");
 
-            // Determine clusters requiring membership/metadata save
-            var dirtyClusters = _loadedClusters.Values
+            // Determine clusters requiring membership/metadata save (use snapshot to avoid concurrent modification)
+            var dirtyClusters = loadedClustersSnapshot
                 .Where(c => c.HasUnsavedChanges)
                 .Distinct()
                 .ToList();
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   🧮 Clusters: total={_loadedClusters.Count}, dirty={dirtyClusters.Count}, skipped={_loadedClusters.Count - dirtyClusters.Count}");
+                Console.WriteLine($"   🧮 Clusters: total={loadedClustersSnapshot.Count}, dirty={dirtyClusters.Count}, skipped={loadedClustersSnapshot.Count - dirtyClusters.Count}");
 
             // Save clusters (membership + metadata) with throttling
             sw.Restart();
@@ -706,9 +699,9 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved {dirtyClusters.Count} clusters in {sw.Elapsed.TotalSeconds:F2}s (parallel={_storage.MaxParallelSaves}, gzip={_storage.CompressClusters})");
             
-            // Save cluster index
+            // Save cluster index (use snapshot)
             sw.Restart();
-            var clusterSnapshots = _loadedClusters.Values.Select(c => c.CreateSnapshot()).ToList();
+            var clusterSnapshots = loadedClustersSnapshot.Select(c => c.CreateSnapshot()).ToList();
             await _storage.SaveClusterIndexAsync(clusterSnapshots);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved cluster index in {sw.Elapsed.TotalSeconds:F2}s");

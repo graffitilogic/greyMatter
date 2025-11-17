@@ -50,6 +50,8 @@ namespace GreyMatter.Core
         // Training data management
         private List<string> _trainingSentences = new();
         private int _sentenceIndex = 0;
+        private int _batchNumber = 0; // Track which batch we're on for shuffling
+        private Random _random = new Random();
         
         // State
         private bool _isRunning = false;
@@ -79,7 +81,7 @@ namespace GreyMatter.Core
             LLMTeacher? llmTeacher = null,
             bool useLLMTeacher = false,
             bool useProgressiveCurriculum = true,
-            int checkpointIntervalMinutes = 60,
+            int checkpointIntervalMinutes = 10, // Changed from 60 to 10 for safer persistence
             int validationIntervalHours = 6,
             int nasArchiveIntervalHours = 24,
             bool enableAttention = true,
@@ -246,7 +248,8 @@ namespace GreyMatter.Core
             var curriculum = _dataProvider.GetProgressiveCurriculum();
             var newPhase = curriculum.GetPhaseForSentenceCount(_totalSentencesProcessed);
 
-            if (newPhase != _currentPhase)
+            // Only reload if phase actually changed (not just checking)
+            if (newPhase.Name != _currentPhase?.Name)
             {
                 Console.WriteLine($"\n🎓 CURRICULUM ADVANCING");
                 Console.WriteLine($"   From: {_currentPhase?.Name ?? "Initial"}");
@@ -260,6 +263,7 @@ namespace GreyMatter.Core
 
         /// <summary>
         /// Reload training data - either for curriculum change or batch exhaustion
+        /// Shuffles data each time to provide variety even within same dataset
         /// </summary>
         private void ReloadTrainingData()
         {
@@ -281,15 +285,20 @@ namespace GreyMatter.Core
                     Console.WriteLine($"   Loading dataset by count: {datasetName}");
                 }
 
-                // Load fresh batch
-                var sentences = _dataProvider.LoadSentences(datasetName, maxSentences: 5000);
+                // Load fresh batch (with shuffling for variety!)
+                _batchNumber++;
+                var sentences = _dataProvider.LoadSentences(
+                    datasetName, 
+                    maxSentences: 5000,
+                    shuffle: true  // SHUFFLE each batch for variety!
+                );
                 var sentenceList = sentences.ToList();
                 
                 if (sentenceList.Any())
                 {
                     _trainingSentences = sentenceList;
                     _sentenceIndex = 0;
-                    Console.WriteLine($"✅ Loaded {sentenceList.Count:N0} fresh sentences from '{datasetName}'");
+                    Console.WriteLine($"✅ Loaded {sentenceList.Count:N0} fresh sentences from '{datasetName}' (batch #{_batchNumber}, shuffled)");
                 }
                 else
                 {
@@ -345,6 +354,12 @@ namespace GreyMatter.Core
                     {
                         await ArchiveToNASAsync();
                     }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Normal cancellation - service is stopping
+                    Console.WriteLine("🛑 Maintenance loop stopping (cancellation requested)");
+                    break;
                 }
                 catch (Exception ex)
                 {
