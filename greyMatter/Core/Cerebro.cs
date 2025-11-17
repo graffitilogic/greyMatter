@@ -1056,6 +1056,12 @@ namespace GreyMatter.Core
             // Get candidate regions (primary + nearby)
             var nearbyRegions = GetNearbyRegions(featureVector, neighbors: 5);
             
+            // CRITICAL: Ensure the primary region is ALWAYS included in search!
+            if (!nearbyRegions.Contains(regionId))
+            {
+                nearbyRegions.Insert(0, regionId);  // Add primary region at front
+            }
+            
             // Collect clusters from these regions
             var candidateClusters = new List<(NeuronCluster cluster, double similarity)>();
             
@@ -1139,6 +1145,12 @@ namespace GreyMatter.Core
             
             var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 5);
             var bestMatch = matches.FirstOrDefault(m => m.similarity >= SIMILARITY_THRESHOLD);
+            
+            // DEBUG: ALWAYS log first few attempts to see what's happening
+            if (TotalClustersCreated < 20 || (TotalClustersCreated % 500 == 0))
+            {
+                Console.WriteLine($"   🔍 DEBUG cluster={TotalClustersCreated}: candidates={matches.Count()}, best={matches.FirstOrDefault().similarity:F3}, threshold={SIMILARITY_THRESHOLD:F2} [debug: {debugLabel}]");
+            }
             
             if (bestMatch != default)
             {
