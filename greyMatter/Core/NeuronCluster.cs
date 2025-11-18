@@ -13,6 +13,7 @@ namespace GreyMatter.Core
     {
         public Guid ClusterId { get; private set; } = Guid.NewGuid();
         public string ConceptDomain { get; private set; }
+        public string ConceptLabel { get; set; } = ""; // Primary concept this cluster represents (e.g., "cat", "government")
         public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
         public DateTime LastAccessed { get; set; } = DateTime.UtcNow;
         public DateTime LastModified { get; set; } = DateTime.UtcNow;
@@ -381,6 +382,7 @@ namespace GreyMatter.Core
             return new ClusterSnapshot
             {
                 ClusterId = ClusterId,
+                ConceptLabel = ConceptLabel,
                 ConceptDomain = ConceptDomain,
                 AssociatedConcepts = AssociatedConcepts.ToList(),
                 NeuronCount = NeuronCount,
@@ -580,6 +582,7 @@ namespace GreyMatter.Core
     public class ClusterSnapshot
     {
         public Guid ClusterId { get; set; }
+        public string ConceptLabel { get; set; } = ""; // Primary concept this cluster represents
         public string ConceptDomain { get; set; } = "";
         public List<string> AssociatedConcepts { get; set; } = new();
         public int NeuronCount { get; set; }

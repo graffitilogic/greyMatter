@@ -70,6 +70,9 @@ namespace GreyMatter.Core
         private double _tFindMsSum = 0, _tLookupMsSum = 0, _tCapacityMsSum = 0, _tTrainMsSum = 0, _tSynMsSum = 0, _tTotalMsSum = 0;
         private long _neuronsAddedSum = 0, _neuronsUsedSum = 0;
 
+        // Save lock to prevent concurrent save operations
+        private readonly SemaphoreSlim _saveLock = new SemaphoreSlim(1, 1);
+
         private bool ShouldSampleLog() => (_configForLogging?.Verbosity ?? 0) >= 2 && _reportRand.NextDouble() <= _reportingSampleRate;
         private void ReportSampler(string concept, int neuronsUsed, Guid clusterId)
         {
@@ -639,11 +642,15 @@ namespace GreyMatter.Core
         /// </summary>
         public async Task SaveAsync()
         {
-            Console.WriteLine("💾 Saving brain state with enhanced partitioning...");
-            var swTotal = Stopwatch.StartNew();
+            // Ensure only one save operation at a time
+            await _saveLock.WaitAsync();
+            try
+            {
+                Console.WriteLine("💾 Saving brain state with enhanced partitioning...");
+                var swTotal = Stopwatch.StartNew();
 
-            // Take snapshot of loaded clusters to avoid concurrent modification
-            var loadedClustersSnapshot = _loadedClusters.Values.ToList();
+                // Take snapshot of loaded clusters to avoid concurrent modification
+                var loadedClustersSnapshot = _loadedClusters.Values.ToList();
 
             // Gather all neurons from loaded clusters for partitioning context
             var sw = Stopwatch.StartNew();
@@ -765,6 +772,11 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
             {
                 try { await RunIntegritySamplerAsync(5); } catch { /* best effort */ }
+            }
+            }
+            finally
+            {
+                _saveLock.Release();
             }
         }
 
@@ -1094,6 +1106,13 @@ namespace GreyMatter.Core
                                     cluster.RestoreCentroid(metadata.Centroid, metadata.CentroidNeuronCount);
                                 }
                                 
+                                // Restore concept label for queryability
+                                if (!string.IsNullOrEmpty(metadata?.ConceptLabel))
+                                {
+                                    cluster.ConceptLabel = metadata.ConceptLabel;
+                                    _conceptClusterCache[metadata.ConceptLabel] = clusterId;
+                                }
+                                
                                 _loadedClusters[clusterId] = cluster;
                             }
                             catch
@@ -1175,6 +1194,9 @@ namespace GreyMatter.Core
             var regionLabel = regionId.Length > 8 ? regionId.Substring(0, 8) : regionId;
             var newCluster = new NeuronCluster($"pattern_{regionLabel}", _storage.LoadClusterAsync, _storage.SaveClusterAsync);
             
+            // CRITICAL: Set ConceptLabel to the actual word for queryability
+            newCluster.ConceptLabel = debugLabel;
+            
             // Initialize centroid with the first pattern - CRITICAL for pattern matching!
             newCluster.UpdateCentroid(featureVector);
             
@@ -1250,6 +1272,7 @@ namespace GreyMatter.Core
 
             // Create new cluster
             var newCluster = new NeuronCluster(concept, _storage.LoadClusterAsync, _storage.SaveClusterAsync);
+            newCluster.ConceptLabel = concept; // Set the primary concept label for queryability
             _loadedClusters[newCluster.ClusterId] = newCluster;
             _conceptClusterCache[concept] = newCluster.ClusterId;
             TotalClustersCreated++;

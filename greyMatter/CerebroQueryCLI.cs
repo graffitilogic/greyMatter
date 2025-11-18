@@ -108,6 +108,47 @@ Commands:
             Console.WriteLine($"🔍 Querying concept: '{concept}'");
             Console.WriteLine("════════════════════════════════════════════════════════════════════════════════\n");
 
+            // First try: Direct lookup by ConceptLabel in storage metadata
+            var storage = cerebro.GetType().GetField("_storage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(cerebro);
+            if (storage != null)
+            {
+                var metadataDict = storage.GetType().GetField("_partitionMetadata", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(storage) as System.Collections.IDictionary;
+                if (metadataDict != null)
+                {
+                    var matches = new List<dynamic>();
+                    foreach (System.Collections.DictionaryEntry entry in metadataDict)
+                    {
+                        var metadata = entry.Value;
+                        var conceptLabel = metadata.GetType().GetProperty("ConceptLabel")?.GetValue(metadata) as string;
+                        if (!string.IsNullOrEmpty(conceptLabel) && conceptLabel.Equals(concept, StringComparison.OrdinalIgnoreCase))
+                        {
+                            matches.Add(metadata);
+                        }
+                    }
+
+                    if (matches.Count > 0)
+                    {
+                        Console.WriteLine($"✅ Found {matches.Count} cluster(s) for '{concept}':\n");
+                        foreach (var match in matches.Take(5))
+                        {
+                            var clusterId = match.GetType().GetProperty("ClusterId")?.GetValue(match);
+                            var neuronCount = match.GetType().GetProperty("NeuronCount")?.GetValue(match);
+                            var importance = match.GetType().GetProperty("AverageImportance")?.GetValue(match);
+                            var domain = match.GetType().GetProperty("ConceptDomain")?.GetValue(match);
+                            
+                            Console.WriteLine($"   Cluster: {clusterId}");
+                            Console.WriteLine($"   Domain:  {domain}");
+                            Console.WriteLine($"   Neurons: {neuronCount:N0}");
+                            Console.WriteLine($"   Importance: {importance:F3}");
+                            Console.WriteLine();
+                        }
+                        Console.WriteLine("════════════════════════════════════════════════════════════════════════════════\n");
+                        return;
+                    }
+                }
+            }
+
+            // Second try: Neural processing (may create new neurons for the concept)
             // Create features for the concept (simple word features)
             var features = new Dictionary<string, double>
             {

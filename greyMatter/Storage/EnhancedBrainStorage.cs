@@ -22,6 +22,7 @@ namespace GreyMatter.Storage
         private readonly NeuroPartitioner _partitioner;
         private readonly string _hierarchicalBasePath;
         private readonly Dictionary<string, ClusterMetadata> _partitionMetadata = new();
+        private readonly object _metadataLock = new object();
 
         // NEW: Save performance tuning
         public int MaxParallelSaves { get; set; } = 2; // keep low for NAS
@@ -178,23 +179,26 @@ namespace GreyMatter.Storage
                     var dict = JsonSerializer.Deserialize<Dictionary<string, ClusterMetadata>>(json, GetJsonOptions());
                     if (dict != null)
                     {
-                        _partitionMetadata.Clear();
-                        foreach (var kvp in dict)
+                        lock (_metadataLock)
                         {
-                            var key = kvp.Key;
-                            if (Guid.TryParse(key, out var gid))
+                            _partitionMetadata.Clear();
+                            foreach (var kvp in dict)
                             {
-                                // Normalize to 'N' format
-                                _partitionMetadata[gid.ToString("N")] = kvp.Value;
+                                var key = kvp.Key;
+                                if (Guid.TryParse(key, out var gid))
+                                {
+                                    // Normalize to 'N' format
+                                    _partitionMetadata[gid.ToString("N")] = kvp.Value;
+                                }
+                                else
+                                {
+                                    _partitionMetadata[key] = kvp.Value;
+                                }
                             }
-                            else
-                            {
-                                _partitionMetadata[key] = kvp.Value;
-                            }
+                            // Build inverted index once
+                            BuildConceptIndexFromMetadata();
+                            _conceptIndexDirty = false;
                         }
-                        // Build inverted index once
-                        BuildConceptIndexFromMetadata();
-                        _conceptIndexDirty = false;
                     }
                 }
             }
@@ -836,6 +840,7 @@ namespace GreyMatter.Storage
             {
                 ClusterId = cluster.ClusterId,
                 ConceptDomain = cluster.ConceptDomain,
+                ConceptLabel = cluster.ConceptLabel,
                 PartitionPath = partition,
                 AssociatedConcepts = cluster.AssociatedConcepts.ToList(),
                 NeuronCount = cluster.NeuronCount,
@@ -852,8 +857,11 @@ namespace GreyMatter.Storage
         {
             var metadata = CreateClusterMetadata(cluster, partition);
             var key = cluster.ClusterId.ToString("N");
-            _partitionMetadata[key] = metadata;
-            _conceptIndexDirty = true; // defer rebuild
+            lock (_metadataLock)
+            {
+                _partitionMetadata[key] = metadata;
+                _conceptIndexDirty = true; // defer rebuild
+            }
             
             if (_batchMode)
             {
@@ -873,18 +881,24 @@ namespace GreyMatter.Storage
         private async Task PersistPartitionMetadataAsync()
         {
             var metadataPath = Path.Combine(_hierarchicalBasePath, "partition_metadata.json");
-            var json = JsonSerializer.Serialize(_partitionMetadata, GetJsonOptions());
+            string json;
+            int count;
+            lock (_metadataLock)
+            {
+                json = JsonSerializer.Serialize(_partitionMetadata, GetJsonOptions());
+                count = _partitionMetadata.Count;
+                if (_conceptIndexDirty)
+                {
+                    BuildConceptIndexFromMetadata();
+                    _conceptIndexDirty = false;
+                }
+            }
             var tmp = metadataPath + ".tmp";
             await File.WriteAllTextAsync(tmp, json);
             if (File.Exists(metadataPath)) File.Delete(metadataPath);
             File.Move(tmp, metadataPath, overwrite: true);
-            if (_conceptIndexDirty)
-            {
-                BuildConceptIndexFromMetadata();
-                _conceptIndexDirty = false;
-            }
             // Also refresh cached cluster count fast; background refresh will correct sizes
-            _statsCache.ClusterCount = _partitionMetadata.Count;
+            _statsCache.ClusterCount = count;
             _statsCache.LastUpdatedUtc = DateTime.UtcNow;
             await SaveStatsCacheAsync();
         }
@@ -1155,6 +1169,7 @@ namespace GreyMatter.Storage
     {
         public Guid ClusterId { get; set; }
         public string ConceptDomain { get; set; } = "";
+        public string ConceptLabel { get; set; } = ""; // Primary concept label for queries
         public PartitionPath PartitionPath { get; set; } = new();
         public List<string> AssociatedConcepts { get; set; } = new();
         public int NeuronCount { get; set; }
