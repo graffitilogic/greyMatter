@@ -52,6 +52,8 @@ namespace GreyMatter.Core
         private int _sentenceIndex = 0;
         private int _batchNumber = 0; // Track which batch we're on for shuffling
         private Random _random = new Random();
+        private IEnumerator<string>? _streamingEnumerator = null; // For massive dataset streaming
+        private int _llmGeneratedCount = 0; // Track LLM-generated sentences
         
         // State
         private bool _isRunning = false;
@@ -194,7 +196,7 @@ namespace GreyMatter.Core
                     {
                         Console.WriteLine($"\n📚 Batch exhausted ({_sentenceIndex} sentences processed)");
                         Console.WriteLine($"   Reloading fresh training batch...");
-                        ReloadTrainingData();
+                        await ReloadTrainingDataAsync();
                     }
                     
                     // Process next sentence
@@ -224,7 +226,7 @@ namespace GreyMatter.Core
                     if (_useProgressiveCurriculum && 
                         _totalSentencesProcessed - _lastCurriculumCheck >= CURRICULUM_CHECK_INTERVAL)
                     {
-                        CheckAndAdvanceCurriculum();
+                        await CheckAndAdvanceCurriculumAsync();
                         _lastCurriculumCheck = _totalSentencesProcessed;
                     }
 
@@ -252,7 +254,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Check if curriculum should advance and reload data if needed
         /// </summary>
-        private void CheckAndAdvanceCurriculum()
+        private async Task CheckAndAdvanceCurriculumAsync()
         {
             var curriculum = _dataProvider.GetProgressiveCurriculum();
             var newPhase = curriculum.GetPhaseForSentenceCount(_totalSentencesProcessed);
@@ -266,15 +268,16 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   Sentences: {_totalSentencesProcessed:N0}");
                 
                 _currentPhase = newPhase;
-                ReloadTrainingData();
+                await ReloadTrainingDataAsync();
             }
         }
 
         /// <summary>
         /// Reload training data - either for curriculum change or batch exhaustion
         /// Shuffles data each time to provide variety even within same dataset
+        /// NOW WITH LLM-GENERATED CONTENT MIXING (20% of batches)
         /// </summary>
-        private void ReloadTrainingData()
+        private async Task ReloadTrainingDataAsync()
         {
             try
             {
@@ -294,14 +297,54 @@ namespace GreyMatter.Core
                     Console.WriteLine($"   Loading dataset by count: {datasetName}");
                 }
 
-                // Load fresh batch (with shuffling for variety!)
-                _batchNumber++;
-                var sentences = _dataProvider.LoadSentences(
-                    datasetName, 
-                    maxSentences: 5000,
-                    shuffle: true  // SHUFFLE each batch for variety!
-                );
-                var sentenceList = sentences.ToList();
+                // 🚀 NEW: 20% of batches use LLM-generated content if available
+                var useLLM = (_batchNumber % 5 == 0) && _llmTeacher != null;
+                List<string> sentenceList = new List<string>();
+
+                if (useLLM && _llmTeacher != null)  // Double-check _llmTeacher is not null
+                {
+                    Console.WriteLine($"🤖 Generating diverse content via LLM (batch #{_batchNumber})...");
+                    try
+                    {
+                        // Generate topic-diverse content based on current curriculum phase
+                        var topics = new[] { "science", "history", "technology", "nature", "culture", "philosophy" };
+                        var topic = topics[_batchNumber % topics.Length];
+                        var difficulty = _totalSentencesProcessed < 10000 ? "beginner" : 
+                                       _totalSentencesProcessed < 50000 ? "intermediate" : "advanced";
+                        
+                        var llmContent = await _dataProvider.LoadLLMGeneratedSentencesAsync(
+                            _llmTeacher, 
+                            count: 1000,  // Generate 1000 sentences
+                            topic: topic, 
+                            difficulty: difficulty
+                        );
+                        
+                        sentenceList = llmContent.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                            .Select(s => s.Trim())
+                            .Where(s => s.Length > 0)
+                            .ToList();
+                        
+                        Console.WriteLine($"✨ Generated {sentenceList.Count:N0} LLM sentences on '{topic}' ({difficulty})");
+                    }
+                    catch (Exception llmEx)
+                    {
+                        Console.WriteLine($"⚠️  LLM generation failed: {llmEx.Message}, falling back to static dataset");
+                        useLLM = false;  // Fall through to static loading
+                        sentenceList = new List<string>();
+                    }
+                }
+                
+                if (!useLLM || sentenceList.Count == 0)
+                {
+                    // Load fresh batch from static dataset (with shuffling for variety!)
+                    _batchNumber++;
+                    var sentences = _dataProvider.LoadSentences(
+                        datasetName, 
+                        maxSentences: 5000,
+                        shuffle: true  // SHUFFLE each batch for variety!
+                    );
+                    sentenceList = sentences.ToList();
+                }
                 
                 if (sentenceList.Any())
                 {

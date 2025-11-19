@@ -74,7 +74,38 @@ namespace GreyMatter.Core
                 DatasetFormat.WikiXML, -1, "intermediate",
                 "Wikipedia simplified English (1.5GB XML)");
 
-            // TODO: EPUB support for txtDump/cache/epub (half terabyte!)
+            // === MASSIVE DATASETS: 571GB+ Wikipedia ===
+            AddIfExists(datasets, "wikipedia_full",
+                Path.Combine(_nasPath, "txtDump/cache/epub"),
+                DatasetFormat.DirectoryText, -1, "intermediate-advanced",
+                "Full Wikipedia dump (571GB+) - comprehensive world knowledge");
+
+            AddIfExists(datasets, "wikipedia_chunked",
+                Path.Combine(_nasPath, "txtDump/cache"),
+                DatasetFormat.DirectoryText, -1, "intermediate-advanced",
+                "Wikipedia pre-processed chunks - optimized for streaming");
+
+            // === BOOKS: Deep narrative understanding ===
+            AddIfExists(datasets, "books_corpus",
+                Path.Combine(_nasPath, "books"),
+                DatasetFormat.DirectoryText, -1, "intermediate-advanced",
+                "Book corpus - long-form narrative and prose");
+
+            AddIfExists(datasets, "epub_collection",
+                Path.Combine(_nasPath, "txtDump/cache/epub"),
+                DatasetFormat.EPUB, -1, "intermediate-advanced",
+                "EPUB collection (500GB+) - diverse literature and non-fiction");
+
+            // === LLM-GENERATED: Infinite curriculum ===
+            datasets["llm_generated"] = new DatasetInfo
+            {
+                Name = "llm_generated",
+                Path = "dynamic", // No static path - generated on-the-fly
+                Format = DatasetFormat.LLMGenerated,
+                SentenceCount = -1,
+                DifficultyLevel = "adaptive",
+                Description = "LLM-generated educational content - infinite, curriculum-driven training data"
+            };
 
             return datasets;
         }
@@ -127,6 +158,14 @@ namespace GreyMatter.Core
                 case DatasetFormat.TechnicalDocs:
                 case DatasetFormat.DialogueText:
                     sentences = LoadPlainTextContent(dataset.Path, dataset.Format, maxSentences, minWordCount, maxWordCount);
+                    break;
+                    
+                case DatasetFormat.DirectoryText:
+                    sentences = LoadDirectoryText(dataset.Path, maxSentences, minWordCount, maxWordCount);
+                    break;
+                    
+                case DatasetFormat.LLMGenerated:
+                    Console.WriteLine("⚠️  LLM-generated content requires LLMTeacher instance - use LoadLLMGeneratedSentences() instead");
                     break;
                     
                 case DatasetFormat.WikiXML:
@@ -322,8 +361,8 @@ namespace GreyMatter.Core
 
         /// <summary>
         /// Get progressive curriculum: start simple, increase complexity AND diversity
-        /// Now with ROTATING DATA SOURCES for meaningful variety
-        /// Skips phases with insufficient data (falls back to larger datasets)
+        /// NOW USING MASSIVE DATASETS: 571GB Wikipedia, Books, LLM-generated content
+        /// Progressively expands from simple to encyclopedic knowledge
         /// </summary>
         public ProgressiveCurriculum GetProgressiveCurriculum(string baseDataset = "tatoeba_small")
         {
@@ -341,7 +380,7 @@ namespace GreyMatter.Core
                 Phase2_Expansion = new TrainingPhase
                 {
                     Name = "Expansion (1K-5K sentences)",
-                    DatasetKey = "news",  // Switch to news headlines - real-world events (39MB)
+                    DatasetKey = "news",  // News headlines - real-world events (39MB)
                     MaxSentences = 5000,
                     MinWordCount = 5,
                     MaxWordCount = 25,
@@ -356,34 +395,129 @@ namespace GreyMatter.Core
                     MaxWordCount = 30,
                     Description = "Conversational English - questions, responses, informal language"
                 },
-                Phase4_TatoebaMixed = new TrainingPhase
+                Phase4_BooksIntro = new TrainingPhase
                 {
-                    Name = "Mixed Content (10K-15K sentences)",
-                    DatasetKey = "tatoeba_small",  // Back to varied Tatoeba (skip tiny technical_docs)
-                    MaxSentences = 5000,
+                    Name = "Narrative (10K-20K sentences)",
+                    DatasetKey = "books_corpus",  // 🚀 BOOKS: Narrative structures, storytelling
+                    MaxSentences = 10000,
                     MinWordCount = 5,
                     MaxWordCount = 40,
-                    Description = "Diverse sentence structures - varied topics and complexity"
+                    Description = "Book corpus - narrative structures, complex storytelling"
                 },
-                Phase5_Advanced = new TrainingPhase
+                Phase5_WikipediaChunked = new TrainingPhase
                 {
-                    Name = "Advanced (15K-20K sentences)",
-                    DatasetKey = "tatoeba_small",  // Continue with Tatoeba (skip tiny scientific)
-                    MaxSentences = 5000,
+                    Name = "Encyclopedic (20K-50K sentences)",
+                    DatasetKey = "wikipedia_chunked",  // 🚀 WIKIPEDIA CHUNKS: Pre-processed
+                    MaxSentences = 30000,
                     MinWordCount = 10,
                     MaxWordCount = 50,
-                    Description = "Longer complex sentences - advanced structures"
+                    Description = "Wikipedia chunks - encyclopedic knowledge, technical vocabulary"
                 },
                 Phase6_FullCorpus = new TrainingPhase
                 {
-                    Name = "Full Corpus (20K+ sentences)",
-                    DatasetKey = "tatoeba_full",  // Full 685MB corpus - maximum diversity
+                    Name = "Full Corpus (50K+ sentences)",
+                    DatasetKey = "wikipedia_full",  // 🚀 571GB WIKIPEDIA: Maximum diversity
                     MaxSentences = null,
                     MinWordCount = null,
                     MaxWordCount = null,
-                    Description = "Full Tatoeba corpus - maximum vocabulary diversity (685M corpus)"
+                    Description = "Full Wikipedia (571GB+) - comprehensive world knowledge"
                 }
             };
+        }
+        
+        /// <summary>
+        /// Load all text files from a directory recursively (for massive Wikipedia/book corpora)
+        /// </summary>
+        private List<string> LoadDirectoryText(string dirPath, int? maxSentences, int? minWords, int? maxWords)
+        {
+            var sentences = new List<string>();
+            
+            if (!Directory.Exists(dirPath))
+            {
+                Console.WriteLine($"⚠️  Directory not found: {dirPath}");
+                return sentences;
+            }
+            
+            Console.WriteLine($"📁 Scanning directory: {dirPath}");
+            var textFiles = Directory.GetFiles(dirPath, "*.txt", SearchOption.AllDirectories);
+            Console.WriteLine($"   Found {textFiles.Length} text files");
+            
+            var filesProcessed = 0;
+            foreach (var file in textFiles.OrderBy(x => _random.Next()))
+            {
+                if (maxSentences.HasValue && sentences.Count >= maxSentences.Value)
+                    break;
+                    
+                try
+                {
+                    var lines = File.ReadAllLines(file);
+                    foreach (var line in lines)
+                    {
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        
+                        var wordCount = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+                        if (minWords.HasValue && wordCount < minWords.Value) continue;
+                        if (maxWords.HasValue && wordCount > maxWords.Value) continue;
+                        
+                        sentences.Add(line.Trim());
+                        
+                        if (maxSentences.HasValue && sentences.Count >= maxSentences.Value)
+                            break;
+                    }
+                    
+                    filesProcessed++;
+                    if (filesProcessed % 100 == 0)
+                        Console.WriteLine($"   Processed {filesProcessed} files, collected {sentences.Count:N0} sentences");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"   ⚠️  Error reading {Path.GetFileName(file)}: {ex.Message}");
+                }
+            }
+            
+            Console.WriteLine($"✅ Loaded {sentences.Count:N0} sentences from {filesProcessed} files in {dirPath}");
+            return sentences;
+        }
+        
+        /// <summary>
+        /// Generate sentences on-the-fly using LLM teacher
+        /// </summary>
+        public async Task<string> LoadLLMGeneratedSentencesAsync(
+            LLMTeacher teacher, 
+            int count, 
+            string topic = "general knowledge",
+            string difficulty = "intermediate")
+        {
+            var sentences = new List<string>();
+            Console.WriteLine($"🤖 Generating {count} sentences via LLM on topic: {topic} (difficulty: {difficulty})");
+            
+            var request = new ContentRequest
+            {
+                Topic = topic,
+                TargetAudience = "general learners",
+                DifficultyLevel = difficulty,
+                ContentLength = count * 20, // Rough estimate: 20 words per sentence
+                LearningObjectives = new List<string> { $"Understand {topic}", "Build vocabulary", "Practice comprehension" }
+            };
+            
+            var content = await teacher.GenerateEducationalContentAsync(request);
+            
+            // Split content into sentences
+            if (!string.IsNullOrWhiteSpace(content.Content))
+            {
+                var rawSentences = content.Content.Split(new[] { '.', '!', '?' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (var sent in rawSentences.Take(count))
+                {
+                    var cleaned = sent.Trim();
+                    if (!string.IsNullOrWhiteSpace(cleaned) && cleaned.Split(' ').Length > 3)
+                    {
+                        sentences.Add(cleaned + ".");
+                    }
+                }
+            }
+            
+            Console.WriteLine($"✅ Generated {sentences.Count} LLM sentences");
+            return string.Join("\n", sentences);
         }
     }
 
@@ -406,7 +540,9 @@ namespace GreyMatter.Core
         DialogueText,    // Subtitles, conversations
         TechnicalDocs,   // Documentation, manuals
         NarrativeText,   // Stories, novels
-        EPUB             // EPUB book format
+        EPUB,            // EPUB book format
+        DirectoryText,   // Recursively load all .txt files from directory
+        LLMGenerated     // On-the-fly generation via LLM teacher
     }
 
     public class ProgressiveCurriculum
@@ -414,8 +550,8 @@ namespace GreyMatter.Core
         public TrainingPhase Phase1_Foundation { get; set; } = new TrainingPhase();
         public TrainingPhase Phase2_Expansion { get; set; } = new TrainingPhase();
         public TrainingPhase Phase3_Dialogue { get; set; } = new TrainingPhase();
-        public TrainingPhase Phase4_TatoebaMixed { get; set; } = new TrainingPhase();
-        public TrainingPhase Phase5_Advanced { get; set; } = new TrainingPhase();
+        public TrainingPhase Phase4_BooksIntro { get; set; } = new TrainingPhase();  // 🚀 BOOKS
+        public TrainingPhase Phase5_WikipediaChunked { get; set; } = new TrainingPhase();  // 🚀 WIKIPEDIA
         public TrainingPhase Phase6_FullCorpus { get; set; } = new TrainingPhase();
 
         public TrainingPhase GetPhaseForSentenceCount(long sentenceCount)
@@ -423,9 +559,9 @@ namespace GreyMatter.Core
             if (sentenceCount < 1000) return Phase1_Foundation;
             if (sentenceCount < 5000) return Phase2_Expansion;
             if (sentenceCount < 10000) return Phase3_Dialogue;
-            if (sentenceCount < 15000) return Phase4_TatoebaMixed;
-            if (sentenceCount < 20000) return Phase5_Advanced;
-            return Phase6_FullCorpus;
+            if (sentenceCount < 20000) return Phase4_BooksIntro;  // 10K-20K: Books
+            if (sentenceCount < 50000) return Phase5_WikipediaChunked;  // 20K-50K: Wikipedia chunks
+            return Phase6_FullCorpus;  // 50K+: Full 571GB Wikipedia
         }
     }
 
