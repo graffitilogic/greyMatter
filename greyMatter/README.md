@@ -2,13 +2,24 @@
 
 **"A trillion-parameter model in a gigabyte of RAM."**
 
-> **Status**: Active development - ADPC-Net Phase 5 complete, VQ-VAE production integration
+> **Status**: Active development - Massive dataset activation complete
 > 
-> **Latest**: ✅ VQ-VAE integrated into Cerebro production training (Dec 2025)
+> **Latest**: ✅ 571GB Wikipedia, books, and LLM teacher fully integrated (Nov 2025)
 
-## 🎯 What Actually Works (Dec 2025)
+## 🎯 What Actually Works (Nov 2025)
 
-**VQ-VAE Production Integration (ADPC-Net Phase 5)** ✅ **NEW**
+**Massive Dataset Training Infrastructure** ✅ **NEW**
+- **571GB Wikipedia corpus**: DirectoryText format, recursive .txt loading
+- **500GB book collections**: Narrative structures and storytelling patterns
+- **LLM teacher integration**: Ollama deepseek-r1:1.5b generates content on-demand
+- **Progressive curriculum**: Simple → News → Dialogue → Books → Wikipedia
+- **Smart sampling**: 5000-sentence batches (never exhausts datasets)
+- **LLM mixing**: Every 5th batch uses dynamic generation (6 rotating topics)
+- **Fixed checkpoints**: NaN/Infinity sanitization prevents JSON crashes
+- **Fixed queries**: Direct ConceptLabel lookup with case-insensitive matching
+- **See**: MASSIVE_DATASET_ACTIVATION.md and PRODUCTION_TRAINING_GUIDE.md
+
+**VQ-VAE Production Integration (ADPC-Net Phase 5)** ✅
 - Cerebro uses VQ-VAE for all region ID generation (replaces LSH)
 - Codebook learns during training (EMA updates with γ=0.99)
 - Full persistence: Codebook saves/loads across training sessions
@@ -102,20 +113,24 @@
 - Diverse content formats: dialogue, narrative, technical, scientific
 
 **TrainingDataProvider** (`Core/TrainingDataProvider.cs`)
-- Reads from NAS: `/Volumes/jarvis/trainData/`
-- 685MB Tatoeba corpus (full sentences)
-- Format-appropriate chunking (paragraphs vs lines vs sentences)
-- No data copying - direct NAS access
+- **571GB Wikipedia**: `/Volumes/jarvis/trainData/txtDump/cache/epub`
+- **500GB Books**: `/Volumes/jarvis/trainData/books`
+- **LLM-generated**: Dynamic content via Ollama (science, history, tech, nature, culture, philosophy)
+- **685MB Tatoeba**: Full sentences for foundation training
+- **39MB News**: Headlines and journalism
+- **DirectoryText format**: Recursive .txt file loading for massive corpora
+- No data copying - direct NAS access with smart sampling (5000 sentences/batch)
 
 ## 📖 Documentation
 
 ### Essential Reading
-- **[ADPC_PHASE4_COMPLETE.md](ADPC_PHASE4_COMPLETE.md)** - VQ-VAE codebook (learned vector quantization) ⭐ NEW
+- **[MASSIVE_DATASET_ACTIVATION.md](MASSIVE_DATASET_ACTIVATION.md)** - 571GB Wikipedia + LLM integration ⭐ **NEW**
+- **[PRODUCTION_TRAINING_GUIDE.md](PRODUCTION_TRAINING_GUIDE.md)** - Quick start for massive-scale training ⭐ **NEW**
+- **[ADPC_PHASE5_COMPLETE.md](ADPC_PHASE5_COMPLETE.md)** - VQ-VAE production integration ⭐
+- **[ADPC_PHASE4_COMPLETE.md](ADPC_PHASE4_COMPLETE.md)** - VQ-VAE codebook (learned vector quantization) ⭐
 - **[ADPC_PHASE3_COMPLETE.md](ADPC_PHASE3_COMPLETE.md)** - Sparse synaptic graph (Hebbian learning) ⭐
 - **[ADPC_PHASE2_COMPLETE.md](ADPC_PHASE2_COMPLETE.md)** - Dynamic neuron generation ⭐
 - **[ADPC_PHASE1_COMPLETE.md](ADPC_PHASE1_COMPLETE.md)** - Pattern-based learning implementation ⭐
-- **[ADPC_TESTING_SUMMARY.md](ADPC_TESTING_SUMMARY.md)** - Test results and bugs fixed
-- **[ARCHITECTURE_AUDIT.md](ARCHITECTURE_AUDIT.md)** - Architectural principles and cleanup plan
 - **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - Implementation details
 - **[docs/QUICK_START.md](docs/QUICK_START.md)** - Getting started guide
 
@@ -124,11 +139,13 @@
 - **Pattern Learning**: ADPC-Net Phase 1 (feature-based) ✅ Complete & Validated
 - **Dynamic Neurons**: ADPC-Net Phase 2 (hypernetwork) ✅ Complete & Validated
 - **Sparse Synapses**: ADPC-Net Phase 3 (Hebbian learning) ✅ Complete & Validated
-- **VQ-VAE Codebook**: ADPC-Net Phase 4 (learned quantization) ✅ Complete & Validated **NEW**
-- **Training**: Production service with diverse NAS data ✅ Operational
+- **VQ-VAE Codebook**: ADPC-Net Phase 4 (learned quantization) ✅ Complete & Validated
+- **VQ-VAE Integration**: ADPC-Net Phase 5 (production) ✅ Complete & Validated
+- **Massive Datasets**: 571GB Wikipedia + Books + LLM ✅ Activated **NEW**
+- **Training**: Production service with progressive curriculum ✅ Operational
 - **Storage**: EnhancedBrainStorage + BinaryStorageManager ✅ Clean
-- **Query System**: Knowledge inspection CLI ⏳ In progress
-- **Next**: Phase 4 - VQ-VAE Codebook ⏳ Planned
+- **Query System**: Direct ConceptLabel lookup ✅ Working
+- **Next**: Scale testing with full 571GB corpus ⏳ In progress
 
 ## 🚀 Quick Start
 
@@ -148,12 +165,13 @@ dotnet run -- --adpc-phase4-test
 # Test ADPC-Net Phase 5 (VQ-VAE production integration) ⭐ NEW
 dotnet run -- --adpc-phase5-test
 
-# Production training (continuous learning)
-dotnet run -- --production-training --duration 28800  # 8 hours
+# Production training (massive datasets - 571GB Wikipedia + Books + LLM)
+dotnet run -- --production-training
 
-# Knowledge query
-dotnet run -- --query stats
-dotnet run -- --query associations <word>
+# Knowledge query (with direct ConceptLabel lookup)
+dotnet run -- CerebroQueryCLI.cs
+# Query: red
+# Query: technology
 
 # Build project
 dotnet build
@@ -185,5 +203,5 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Last Updated**: November 14, 2025  
-**Latest Achievement**: ✅ ADPC-Net Phase 2 complete - Hypernetwork dynamic neuron generation working!
+**Last Updated**: November 18, 2025  
+**Latest Achievement**: ✅ Massive dataset activation - 571GB Wikipedia, 500GB books, and LLM teacher fully integrated!
