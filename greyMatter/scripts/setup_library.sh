@@ -77,7 +77,7 @@ mkdir -p "$LIBRARY_PATH/interactive/games/puzzle"
 mkdir -p "$LIBRARY_PATH/interactive/exercises/math"
 mkdir -p "$LIBRARY_PATH/interactive/exercises/programming"
 
-echo "✅ Directory structure created!"
+echo " Directory structure created!"
 echo ""
 
 echo "📚 **RECOMMENDED RESOURCES TO COLLECT**"
@@ -280,4 +280,4 @@ echo "5. Consider deduplication tools"
 echo "6. Run the greyMatter learning system!"
 echo ""
 
-echo "✅ Setup complete! Your brain now has a library to explore."
+echo " Setup complete! Your brain now has a library to explore."

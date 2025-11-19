@@ -31,7 +31,7 @@ if [ ! -f "opensubtitles_sample.txt" ]; then
     "https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/en/en_50k.txt" || true
 
   if [ -f "OpenSubtitles/opensubtitles_sample.txt" ]; then
-    echo "✅ OpenSubtitles sample downloaded"
+    echo " OpenSubtitles sample downloaded"
   else
     echo "⚠️  OpenSubtitles download failed, creating fallback conversational data"
     cat > "OpenSubtitles/conversational_patterns.txt" << 'EOF'
@@ -57,7 +57,7 @@ if [ ! -f "news_headlines.txt" ]; then
     "https://raw.githubusercontent.com/sunnysai12345/News_Summary/master/news_summary_more.csv" || true
 
   if [ -f "NewsData/headlines_sample.txt" ]; then
-    echo "✅ News headlines downloaded"
+    echo " News headlines downloaded"
   else
     echo "⚠️  News download failed, creating sample headlines"
     cat > "NewsData/headlines_sample.txt" << 'EOF'
@@ -89,7 +89,7 @@ Genetic research has revealed complex interactions between environmental factors
 
 Renewable energy technologies continue to advance rapidly. Solar panel efficiency has reached new heights, while wind turbine designs optimize energy capture across varying conditions.
 EOF
-  echo "✅ Scientific abstracts created"
+  echo " Scientific abstracts created"
 fi
 
 # 4. Children's Stories - Age-appropriate narrative content
@@ -110,7 +110,7 @@ Finally, Peter reached the magic pond. He closed his eyes and made a wish for hi
 
 Peter hopped home feeling wiser and happier than ever before. He learned that the greatest adventures are those that touch our hearts.
 EOF
-  echo "✅ Children's stories created"
+  echo " Children's stories created"
 fi
 
 # 5. Technical Documentation - Programming and technical language
@@ -128,7 +128,7 @@ Security measures include input validation, SQL injection prevention, and secure
 
 Deployment automation uses containerization technologies with orchestration for seamless scaling and high availability.
 EOF
-  echo "✅ Technical documentation created"
+  echo " Technical documentation created"
 fi
 
 # 6. Social Media Language - Informal communication patterns
@@ -145,7 +145,7 @@ Travel plans for next week - so excited! ✈️ Where's your next adventure?
 New recipe turned out great! Cooking is my new hobby 👨‍🍳
 Beautiful sunset tonight 🌅 Nature never ceases to amaze me
 EOF
-  echo "✅ Social media patterns created"
+  echo " Social media patterns created"
 fi
 
 # 7. Idioms and Expressions - Figurative language
@@ -172,7 +172,7 @@ if [ ! -f "idioms_expressions.json" ]; then
   ]
 }
 EOF
-  echo "✅ Idioms and expressions database created"
+  echo " Idioms and expressions database created"
 fi
 
 # 8. Multilingual Parallel Corpus (Sample)
@@ -198,11 +198,11 @@ if [ ! -f "parallel_corpus.json" ]; then
   ]
 }
 EOF
-  echo "✅ Multilingual parallel corpus created"
+  echo " Multilingual parallel corpus created"
 fi
 
 echo ""
-echo "✅ Enhanced training data sources setup complete!"
+echo " Enhanced training data sources setup complete!"
 echo "📁 New datasets available in: $ROOT/enhanced_sources/"
 echo ""
 echo "🎯 Available datasets:"

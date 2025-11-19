@@ -475,7 +475,7 @@ namespace GreyMatter.Core
                 }
             }
             
-            Console.WriteLine($"✅ Loaded {sentences.Count:N0} sentences from {filesProcessed} files in {dirPath}");
+            Console.WriteLine($" Loaded {sentences.Count:N0} sentences from {filesProcessed} files in {dirPath}");
             return sentences;
         }
         
@@ -516,7 +516,7 @@ namespace GreyMatter.Core
                 }
             }
             
-            Console.WriteLine($"✅ Generated {sentences.Count} LLM sentences");
+            Console.WriteLine($" Generated {sentences.Count} LLM sentences");
             return string.Join("\n", sentences);
         }
     }

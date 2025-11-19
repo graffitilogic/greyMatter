@@ -79,7 +79,7 @@ namespace GreyMatter.Core
             if (ShouldSampleLog())
             {
                 Console.WriteLine($"🎓 Learning concept: {concept}");
-                Console.WriteLine($"✅ Learned '{concept}' using {neuronsUsed} neurons in cluster {clusterId:N}");
+                Console.WriteLine($" Learned '{concept}' using {neuronsUsed} neurons in cluster {clusterId:N}");
             }
         }
         private void AccumulateReportBlock(string concept, int neuronsUsed, Guid clusterId)
@@ -766,7 +766,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   📈 Save metrics: clustersExamined={m.ClustersExamined}, changedMembership={m.ClustersChangedMembership}, packsWritten={m.MembershipPacksWritten}, packsSkipped={m.MembershipPacksSkipped}, bankPartitions={m.NeuronBankPartitions}, neuronsUpserted={m.NeuronsUpserted}");
                 Console.WriteLine($"   ⏱️  Total save time {swTotal.Elapsed.TotalSeconds:F2}s");
             }
-            Console.WriteLine("✅ Brain state saved with hierarchical partitioning");
+            Console.WriteLine(" Brain state saved with hierarchical partitioning");
 
             // Optional quick integrity sampler when verbose
             if ((_configForLogging?.Verbosity ?? 0) > 0)

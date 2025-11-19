@@ -46,7 +46,7 @@ else
 fi
 
 echo
-echo "✅ Model download complete!"
+echo " Model download complete!"
 echo "📁 Location: ${MODELS_DIR}/"
 echo "🚀 Run: dotnet run -- --pretrained-demo"
 echo

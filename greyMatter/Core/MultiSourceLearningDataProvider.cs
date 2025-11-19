@@ -156,7 +156,7 @@ namespace GreyMatter.Core
                 chunks.Add(chunk);
             }
             
-            Console.WriteLine($"✅ Generated {chunks.Count} curriculum chunks for '{topic}'");
+            Console.WriteLine($" Generated {chunks.Count} curriculum chunks for '{topic}'");
             return chunks;
         }
 
@@ -877,7 +877,7 @@ namespace GreyMatter.Core
             }
             
             Console.WriteLine();
-            Console.WriteLine("💡 Quality indicators: ✅ Expected, ⚠️  High frequency, 🚨 Potential anomaly");
+            Console.WriteLine("💡 Quality indicators:  Expected, ⚠️  High frequency, 🚨 Potential anomaly");
             Console.WriteLine();
         }
 
@@ -891,7 +891,7 @@ namespace GreyMatter.Core
             
             if (expectedHighFrequency.Contains(word.ToLowerInvariant()))
             {
-                return "✅ (common word)";
+                return " (common word)";
             }
             
             // If count is significantly higher than average, flag as potential anomaly
@@ -906,7 +906,7 @@ namespace GreyMatter.Core
                 return "⚠️  (high frequency)";
             }
             
-            return "✅ (normal)";
+            return " (normal)";
         }
 
         /// <summary>

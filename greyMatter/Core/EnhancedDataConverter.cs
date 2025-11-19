@@ -54,7 +54,7 @@ namespace GreyMatter
             // Save enhanced learning data
             await SaveEnhancedLearningDataAsync();
 
-            Console.WriteLine("\n✅ **ENHANCED DATA INTEGRATION COMPLETE**");
+            Console.WriteLine("\n **ENHANCED DATA INTEGRATION COMPLETE**");
             Console.WriteLine($"Words learned: {_wordDatabase.Count}");
             Console.WriteLine($"Co-occurrence pairs: {_wordCooccurrences.Count}");
         }

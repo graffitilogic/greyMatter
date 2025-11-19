@@ -58,7 +58,7 @@ namespace greyMatter
             if (File.Exists(storageStatsPath))
             {
                 var lastTrainingDate = File.GetLastWriteTime(storageStatsPath);
-                Console.WriteLine($"   ✅ Training activity detected: {lastTrainingDate:yyyy-MM-dd HH:mm:ss}");
+                Console.WriteLine($"    Training activity detected: {lastTrainingDate:yyyy-MM-dd HH:mm:ss}");
                 Console.WriteLine($"   🎯 Hybrid sparse training detected (hierarchical storage found)");
                 return TrainingType.HybridSparse;
             }
@@ -82,7 +82,7 @@ namespace greyMatter
             
             try
             {
-                Console.WriteLine("   ✅ Hybrid sparse training detected");
+                Console.WriteLine("    Hybrid sparse training detected");
                 Console.WriteLine("   📊 Loading trained model for testing...");
                 
                 TestSparseEncodingQuality();
@@ -143,9 +143,9 @@ namespace greyMatter
             var properSparsity = patterns.Values.All(p => Math.Abs((double)p.ActiveBits.Length / 2048 - 0.02) < 0.005);
             
             Console.WriteLine($"\n   📊 PATTERN QUALITY RESULTS:");
-            Console.WriteLine($"   • Context Sensitivity: {(contextSensitive ? "✅ PASS" : "❌ FAIL")}");
-            Console.WriteLine($"   • Word Distinctiveness: {(appropriatelyDistinct ? "✅ PASS" : "❌ FAIL")}");
-            Console.WriteLine($"   • Sparsity Compliance: {(properSparsity ? "✅ PASS" : "❌ FAIL")} (target: 2%)");
+            Console.WriteLine($"   • Context Sensitivity: {(contextSensitive ? " PASS" : "❌ FAIL")}");
+            Console.WriteLine($"   • Word Distinctiveness: {(appropriatelyDistinct ? " PASS" : "❌ FAIL")}");
+            Console.WriteLine($"   • Sparsity Compliance: {(properSparsity ? " PASS" : "❌ FAIL")} (target: 2%)");
         }
         
         private void TestContextualDifferentiation()
@@ -191,7 +191,7 @@ namespace greyMatter
                 var avgSimilarity = similarities.Average();
                 var contextDiff = avgSimilarity < 0.6;
                 
-                Console.WriteLine($"   • '{word}' context similarity: {avgSimilarity:P1} {(contextDiff ? "✅" : "❌")}");
+                Console.WriteLine($"   • '{word}' context similarity: {avgSimilarity:P1} {(contextDiff ? "" : "❌")}");
             }
         }
         
@@ -219,13 +219,13 @@ namespace greyMatter
                 var passed = similarity >= minSim && similarity <= maxSim;
                 if (passed) passedTests++;
                 
-                Console.WriteLine($"   • {testName}: {similarity:P1} (target: {minSim:P1}-{maxSim:P1}) {(passed ? "✅" : "❌")}");
+                Console.WriteLine($"   • {testName}: {similarity:P1} (target: {minSim:P1}-{maxSim:P1}) {(passed ? "" : "❌")}");
             }
             
             var semanticAccuracy = (double)passedTests / semanticTests.Length;
             Console.WriteLine($"\n   📊 SEMANTIC RELATIONSHIP RESULTS:");
             Console.WriteLine($"   • Tests Passed: {passedTests}/{semanticTests.Length} ({semanticAccuracy:P1})");
-            Console.WriteLine($"   • Overall: {(semanticAccuracy >= 0.7 ? "✅ GOOD" : "❌ NEEDS IMPROVEMENT")}");
+            Console.WriteLine($"   • Overall: {(semanticAccuracy >= 0.7 ? " GOOD" : "❌ NEEDS IMPROVEMENT")}");
         }
         
         private void TestMemoryEfficiency()
@@ -284,7 +284,7 @@ namespace greyMatter
                 Console.WriteLine($"     - Lookup time: {lookupTimeMs:F1}ms");
                 
                 var scalable = encodingTimeMs < 1000 && memoryMB < 100 && lookupTimeMs < 1;
-                Console.WriteLine($"     - Scalable: {(scalable ? "✅ YES" : "❌ NO")}");
+                Console.WriteLine($"     - Scalable: {(scalable ? " YES" : "❌ NO")}");
             }
             
             Console.WriteLine($"\n   📊 SCALABILITY RESULTS:");
@@ -303,7 +303,7 @@ namespace greyMatter
                 var trainer = new TatoebaLanguageTrainer(Path.Combine(_config.TrainingDataRoot, "tatoeba"));
                 var brain = trainer.Brain;
                 
-                Console.WriteLine("   ✅ Traditional model loaded successfully");
+                Console.WriteLine("    Traditional model loaded successfully");
                 Console.WriteLine("   📊 Using LanguageEphemeralBrain architecture");
                 Console.WriteLine("   🧠 Traditional dense neuron representation");
                 Console.WriteLine();

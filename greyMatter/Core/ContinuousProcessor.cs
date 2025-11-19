@@ -100,7 +100,7 @@ namespace GreyMatter.Core
             // Initial consciousness bootstrap
             await BootstrapCognition();
             
-            Console.WriteLine("✅ Continuous processing activated - brain is now 'awake'");
+            Console.WriteLine(" Continuous processing activated - brain is now 'awake'");
         }
 
         /// <summary>
@@ -123,7 +123,7 @@ namespace GreyMatter.Core
             // Final consolidation
             await PerformNocturnalProcess();
             
-            Console.WriteLine($"✅ Cognition stopped after {CognitionIterations} iterations");
+            Console.WriteLine($" Cognition stopped after {CognitionIterations} iterations");
         }
 
         /// <summary>

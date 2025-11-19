@@ -107,11 +107,11 @@ namespace GreyMatter.Core
                 foreach (var (word, features) in wordCategory)
                 {
                     var result = await _brain.LearnConceptAsync(word, features);
-                    Console.WriteLine($"   ✅ {word}: {result.NeuronsInvolved} neurons");
+                    Console.WriteLine($"    {word}: {result.NeuronsInvolved} neurons");
                 }
             }
 
-            Console.WriteLine($"✅ Stage 1 Complete: {allWords.Sum(w => w.Count)} core words learned\n");
+            Console.WriteLine($" Stage 1 Complete: {allWords.Sum(w => w.Count)} core words learned\n");
         }
 
         /// <summary>
@@ -142,7 +142,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   📝 \"{sentence}\": confidence {result.Confidence:P0}");
             }
 
-            Console.WriteLine($"✅ Stage 2 Complete: {simpleSentences.Length} sentence patterns learned\n");
+            Console.WriteLine($" Stage 2 Complete: {simpleSentences.Length} sentence patterns learned\n");
         }
 
         /// <summary>
@@ -199,7 +199,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   📍 \"{sentence}\": {result.Confidence:P0}");
             }
 
-            Console.WriteLine("✅ Stage 3 Complete: Grammar patterns established\n");
+            Console.WriteLine(" Stage 3 Complete: Grammar patterns established\n");
         }
 
         /// <summary>
@@ -243,7 +243,7 @@ namespace GreyMatter.Core
                 }
             }
 
-            Console.WriteLine("✅ Stage 4 Complete: Story comprehension developed\n");
+            Console.WriteLine(" Stage 4 Complete: Story comprehension developed\n");
         }
 
         /// <summary>
@@ -269,7 +269,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   🎭 \"{phrase}\": {result.Confidence:P0}");
             }
 
-            Console.WriteLine("✅ Stage 5 Complete: Advanced language patterns acquired\n");
+            Console.WriteLine(" Stage 5 Complete: Advanced language patterns acquired\n");
             Console.WriteLine("🎉 **FOUNDATIONAL LANGUAGE TRAINING COMPLETE**");
             Console.WriteLine("   • Core vocabulary: 30+ essential words");
             Console.WriteLine("   • Grammar patterns: plurals, tenses, prepositions");

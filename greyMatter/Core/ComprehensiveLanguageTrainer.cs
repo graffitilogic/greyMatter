@@ -91,14 +91,14 @@ namespace GreyMatter.Core
                     var result = await _brain.LearnConceptAsync(word, features);
                     if (totalWords % 50 == 0) // Progress updates
                     {
-                        Console.WriteLine($"   ✅ {word}: {result.NeuronsInvolved} neurons | Progress: {totalWords + 1} words");
+                        Console.WriteLine($"    {word}: {result.NeuronsInvolved} neurons | Progress: {totalWords + 1} words");
                     }
                     totalWords++;
                 }
-                Console.WriteLine($"   ✅ {tierName} Complete: {wordList.Count} words\n");
+                Console.WriteLine($"    {tierName} Complete: {wordList.Count} words\n");
             }
 
-            Console.WriteLine($"✅ Stage 1 Complete: {totalWords} words with realistic frequency distribution\n");
+            Console.WriteLine($" Stage 1 Complete: {totalWords} words with realistic frequency distribution\n");
         }
 
         /// <summary>
@@ -138,7 +138,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   🔤 {pattern}: {result.NeuronsInvolved} neurons");
             }
 
-            Console.WriteLine($"✅ Stage 2 Complete: {phoneticPatterns.Length} phonetic and morphological patterns\n");
+            Console.WriteLine($" Stage 2 Complete: {phoneticPatterns.Length} phonetic and morphological patterns\n");
         }
 
         /// <summary>
@@ -177,7 +177,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   📝 {pattern}: {result.NeuronsInvolved} neurons");
             }
 
-            Console.WriteLine($"✅ Stage 3 Complete: {syntacticPatterns.Length} syntactic structures\n");
+            Console.WriteLine($" Stage 3 Complete: {syntacticPatterns.Length} syntactic structures\n");
         }
 
         /// <summary>
@@ -218,7 +218,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   🧠 {relation}: {result.NeuronsInvolved} neurons");
             }
 
-            Console.WriteLine($"✅ Stage 4 Complete: {semanticRelations.Length} semantic relationships\n");
+            Console.WriteLine($" Stage 4 Complete: {semanticRelations.Length} semantic relationships\n");
         }
 
         /// <summary>
@@ -260,7 +260,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   💬 {pattern}: {result.NeuronsInvolved} neurons");
             }
 
-            Console.WriteLine($"✅ Stage 5 Complete: {pragmaticPatterns.Length} pragmatic patterns\n");
+            Console.WriteLine($" Stage 5 Complete: {pragmaticPatterns.Length} pragmatic patterns\n");
         }
 
         /// <summary>
@@ -298,7 +298,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   📖 {pattern}: {result.NeuronsInvolved} neurons");
             }
 
-            Console.WriteLine($"✅ Stage 6 Complete: {discoursePatterns.Length} discourse patterns\n");
+            Console.WriteLine($" Stage 6 Complete: {discoursePatterns.Length} discourse patterns\n");
             
             Console.WriteLine("🎉 **COMPREHENSIVE LANGUAGE TRAINING COMPLETE**");
             Console.WriteLine("   • Core vocabulary: 1000+ words with natural frequency");

@@ -130,9 +130,9 @@ while IFS= read -r ID; do
   curl -L -f -o "$OUT" "$MIRROR_URL" || curl -L -f -o "$OUT" "$ALT_URL" || echo "⚠️  Failed to fetch $ID"
 done < gutenberg_ids.txt
 
-echo "✅ Gutenberg download complete."
+echo " Gutenberg download complete."
 EOF
   chmod +x scripts/pg_download.sh
 fi
 
-echo "✅ Learning datasets setup complete at $ROOT"
+echo " Learning datasets setup complete at $ROOT"

@@ -90,7 +90,7 @@ namespace greyMatter
                 System.Threading.Thread.Sleep(100); // Simulate time between learning
             }
             
-            Console.WriteLine($"✅ Learned {basicWords.Length} basic words");
+            Console.WriteLine($" Learned {basicWords.Length} basic words");
             TestBasicRecall();
             _brain.ShowBrainScan();
             
@@ -130,7 +130,7 @@ namespace greyMatter
                 System.Threading.Thread.Sleep(150);
             }
             
-            Console.WriteLine($"✅ Learned {associations.Length} associations");
+            Console.WriteLine($" Learned {associations.Length} associations");
             TestAssociationRecall();
             _brain.ShowBrainScan();
             
@@ -169,7 +169,7 @@ namespace greyMatter
                 System.Threading.Thread.Sleep(200);
             }
             
-            Console.WriteLine($"✅ Learned {sentences.Length} sentence patterns");
+            Console.WriteLine($" Learned {sentences.Length} sentence patterns");
             TestSentenceRecall();
             _brain.ShowBrainScan();
             
@@ -202,7 +202,7 @@ namespace greyMatter
                 System.Threading.Thread.Sleep(300); // Longer pauses for complex content
             }
             
-            Console.WriteLine("✅ Story comprehension complete");
+            Console.WriteLine(" Story comprehension complete");
             TestStoryComprehension();
             _brain.ShowBrainScan();
             
@@ -274,9 +274,9 @@ namespace greyMatter
             ShowSessionSummary();
             
             Console.WriteLine("\n🎓 Training regimen complete!");
-            Console.WriteLine("✅ Demonstrated: vocabulary, associations, sentences, stories, biology");
-            Console.WriteLine("✅ Biological behaviors: fatigue, memory limits, sequence learning");
-            Console.WriteLine("✅ Memory efficiency: O(active_concepts) scaling maintained");
+            Console.WriteLine(" Demonstrated: vocabulary, associations, sentences, stories, biology");
+            Console.WriteLine(" Biological behaviors: fatigue, memory limits, sequence learning");
+            Console.WriteLine(" Memory efficiency: O(active_concepts) scaling maintained");
         }
 
         // Helper methods

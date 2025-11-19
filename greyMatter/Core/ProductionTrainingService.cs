@@ -156,7 +156,7 @@ namespace GreyMatter.Core
             _maintenanceTask = Task.Run(() => RunMaintenanceLoopAsync(_cancellationTokenSource.Token));
             _controlTask = Task.Run(() => MonitorControlFileAsync(_cancellationTokenSource.Token));
 
-            Console.WriteLine("✅ Production training service started");
+            Console.WriteLine(" Production training service started");
             Console.WriteLine($"   Control file: {_controlFilePath}");
             Console.WriteLine($"   Start time: {_startTime:yyyy-MM-dd HH:mm:ss}");
             Console.WriteLine();
@@ -350,7 +350,7 @@ namespace GreyMatter.Core
                 {
                     _trainingSentences = sentenceList;
                     _sentenceIndex = 0;
-                    Console.WriteLine($"✅ Loaded {sentenceList.Count:N0} fresh sentences from '{datasetName}' (batch #{_batchNumber}, shuffled)");
+                    Console.WriteLine($" Loaded {sentenceList.Count:N0} fresh sentences from '{datasetName}' (batch #{_batchNumber}, shuffled)");
                 }
                 else
                 {
@@ -483,7 +483,7 @@ namespace GreyMatter.Core
                 _totalSentencesProcessed = checkpoint.SentencesProcessed;
                 
                 var stats = await _cerebro.GetStatsAsync();
-                Console.WriteLine($"✅ Restored state:");
+                Console.WriteLine($" Restored state:");
                 Console.WriteLine($"   Clusters: {stats.TotalClusters:N0}");
                 Console.WriteLine($"   Neurons: {stats.TotalNeuronsCreated:N0}");
                 Console.WriteLine($"   Synapses: {stats.TotalSynapses:N0}");
@@ -546,7 +546,7 @@ namespace GreyMatter.Core
                 var afterGC = GC.GetTotalMemory(false) / (1024.0 * 1024.0);
                 var freedMB = beforeGC - afterGC;
 
-                Console.WriteLine($"✅ Checkpoint saved: {checkpoint.Timestamp:HH:mm:ss}");
+                Console.WriteLine($" Checkpoint saved: {checkpoint.Timestamp:HH:mm:ss}");
                 Console.WriteLine($"   Total checkpoints: {_checkpointsSaved}");
                 Console.WriteLine($"   Storage size: {stats.StorageSizeFormatted}");
                 Console.WriteLine($"   Memory: {afterGC:F1} MB (freed {freedMB:F1} MB)");
@@ -595,7 +595,7 @@ namespace GreyMatter.Core
                 if (validationPassed)
                 {
                     _validationsPassed++;
-                    Console.WriteLine($"\n✅ VALIDATION PASSED ({_validationsPassed} total)");
+                    Console.WriteLine($"\n VALIDATION PASSED ({_validationsPassed} total)");
                 }
                 else
                 {
@@ -629,7 +629,7 @@ namespace GreyMatter.Core
                 if (success)
                 {
                     _lastNASArchive = DateTime.Now;
-                    Console.WriteLine("✅ NAS archive complete");
+                    Console.WriteLine(" NAS archive complete");
                 }
             }
             catch (Exception ex)
@@ -674,7 +674,7 @@ namespace GreyMatter.Core
 
             _isRunning = false;
             
-            Console.WriteLine("✅ Service stopped gracefully");
+            Console.WriteLine(" Service stopped gracefully");
         }
 
         /// <summary>

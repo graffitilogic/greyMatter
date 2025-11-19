@@ -18,7 +18,7 @@ namespace GreyMatter.Tests
             {
                 await IntegrationValidationTest.RunValidationAsync();
                 
-                Console.WriteLine("\n✅ Integration validation completed successfully!");
+                Console.WriteLine("\n Integration validation completed successfully!");
             }
             catch (Exception ex)
             {

@@ -60,10 +60,10 @@ namespace GreyMatter.PerformanceBenchmarks
             // Generate summary report
             Console.WriteLine("\n📋 **PERFORMANCE SUMMARY**");
             Console.WriteLine("========================");
-            Console.WriteLine("✅ MessagePack Performance Validation Complete");
-            Console.WriteLine("✅ Demonstrated 1.3x - 2.5x speed improvements");
-            Console.WriteLine("✅ Confirmed 40-60% storage reduction");
-            Console.WriteLine("✅ Validated for production deployment");
+            Console.WriteLine(" MessagePack Performance Validation Complete");
+            Console.WriteLine(" Demonstrated 1.3x - 2.5x speed improvements");
+            Console.WriteLine(" Confirmed 40-60% storage reduction");
+            Console.WriteLine(" Validated for production deployment");
 
             // Save results
             SaveBenchmarkResults();

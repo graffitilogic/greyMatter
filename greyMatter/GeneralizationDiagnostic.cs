@@ -28,11 +28,11 @@ namespace GreyMatter
 
                 // Load learned patterns
                 await encoder.LoadLearnedPatternsFromFileAsync("/Volumes/jarvis/trainData/Tatoeba/learning_data/learned_patterns.json");
-                Console.WriteLine("✅ Loaded learned patterns");
+                Console.WriteLine(" Loaded learned patterns");
 
                 // Load actually learned words
                 var learnedWords = await LoadActualLearnedWordsAsync();
-                Console.WriteLine($"✅ Loaded {learnedWords.Count} learned words: {string.Join(", ", learnedWords)}");
+                Console.WriteLine($" Loaded {learnedWords.Count} learned words: {string.Join(", ", learnedWords)}");
 
                 if (learnedWords.Count < 4)
                 {
@@ -96,7 +96,7 @@ namespace GreyMatter
                     var similarity = matchingSim.similarity;
                     var passes = similarity > 0.05 && similarity < 0.9;
                     
-                    Console.WriteLine($"   {word1} <-> {word2}: {similarity:F4} {(passes ? "✅ PASS" : "❌ FAIL")} (target: 0.05 < sim < 0.9)");
+                    Console.WriteLine($"   {word1} <-> {word2}: {similarity:F4} {(passes ? " PASS" : "❌ FAIL")} (target: 0.05 < sim < 0.9)");
                     
                     if (passes) passingPairs++;
                 }

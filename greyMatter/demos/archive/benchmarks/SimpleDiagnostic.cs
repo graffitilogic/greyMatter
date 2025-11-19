@@ -86,7 +86,7 @@ namespace GreyMatter
 
                 if (learnedPatternCount > 0 || vocabularyCount > 10)
                 {
-                    Console.WriteLine("✅ **LANGUAGE LEARNING DETECTED** - Found learned patterns and vocabulary");
+                    Console.WriteLine(" **LANGUAGE LEARNING DETECTED** - Found learned patterns and vocabulary");
                 }
                 else if (emotionalCount > languageCount)
                 {

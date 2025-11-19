@@ -296,7 +296,7 @@ namespace GreyMatter.Core
 
                 result.Success = true;
                 result.ProcessedWords = wordsLearned;
-                Console.WriteLine($"✅ Continuous learning complete: {wordsLearned:N0} words processed");
+                Console.WriteLine($" Continuous learning complete: {wordsLearned:N0} words processed");
             }
             catch (Exception ex)
             {
@@ -334,7 +334,7 @@ namespace GreyMatter.Core
 
                 result.Success = true;
                 result.RecordsProcessed = 50000; // Approximate - TatoebaDataConverter doesn't return count
-                Console.WriteLine($"✅ Conversion complete");
+                Console.WriteLine($" Conversion complete");
             }
             catch (Exception ex)
             {
@@ -371,7 +371,7 @@ namespace GreyMatter.Core
 
                 result.Success = true;
                 result.RecordsProcessed = 50000; // Approximate - EnhancedDataConverter doesn't return count
-                Console.WriteLine($"✅ Conversion complete");
+                Console.WriteLine($" Conversion complete");
             }
             catch (Exception ex)
             {
@@ -538,7 +538,7 @@ namespace GreyMatter.Core
                 // Trigger news headlines processing
             }
             
-            Console.WriteLine($"✅ Learning focus adjusted to: {topic}");
+            Console.WriteLine($" Learning focus adjusted to: {topic}");
             Console.WriteLine();
         }
 

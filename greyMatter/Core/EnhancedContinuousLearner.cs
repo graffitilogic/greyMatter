@@ -65,9 +65,9 @@ namespace GreyMatter.Core
             
             Console.WriteLine("🧠 **ENHANCED CONTINUOUS LEARNER INITIALIZED**");
             Console.WriteLine("=============================================");
-            Console.WriteLine("✅ Connected to multi-source data provider");
-            Console.WriteLine("✅ LLM teacher ready for dynamic curriculum");
-            Console.WriteLine("✅ Unlimited learning content available");
+            Console.WriteLine(" Connected to multi-source data provider");
+            Console.WriteLine(" LLM teacher ready for dynamic curriculum");
+            Console.WriteLine(" Unlimited learning content available");
             Console.WriteLine($"⏱️  Learning interval: {LearningInterval.TotalSeconds}s");
             Console.WriteLine($"📊 Words per session: {WordsPerSession}");
         }
@@ -102,7 +102,7 @@ namespace GreyMatter.Core
             // Begin continuous learning cycle
             _learningTimer.Change(TimeSpan.Zero, LearningInterval);
             
-            Console.WriteLine("✅ Enhanced continuous learning started!");
+            Console.WriteLine(" Enhanced continuous learning started!");
             Console.WriteLine("📚 Processing unlimited content from multiple sources...");
             Console.WriteLine("🤖 LLM teacher providing dynamic curriculum guidance...");
             Console.WriteLine("🔄 Learning will continue indefinitely without repetition");
@@ -192,7 +192,7 @@ namespace GreyMatter.Core
                 _learningLock.Release();
             }
 
-            Console.WriteLine("✅ Enhanced continuous learning stopped");
+            Console.WriteLine(" Enhanced continuous learning stopped");
         }
 
         /// <summary>
@@ -244,7 +244,7 @@ namespace GreyMatter.Core
                 await ProcessLearningChunk(chunk);
             }
             
-            Console.WriteLine($"✅ Topic focus complete for '{topic}'");
+            Console.WriteLine($" Topic focus complete for '{topic}'");
         }
 
         #region Private Methods
@@ -386,7 +386,7 @@ namespace GreyMatter.Core
                             {
                                 await _brain.SaveAsync();
                                 _lastSaveWordCount = TotalWordsLearned;
-                                Console.WriteLine($"✅ Auto-save complete");
+                                Console.WriteLine($" Auto-save complete");
                             }
                             catch (Exception ex)
                             {
@@ -400,7 +400,7 @@ namespace GreyMatter.Core
                         
                         if (wordsProcessed < 3)
                         {
-                            Console.WriteLine($"   ✅ Successfully learned '{word}'!");
+                            Console.WriteLine($"    Successfully learned '{word}'!");
                         }
                     }
                     else if (wordsProcessed < 3)
@@ -443,7 +443,7 @@ namespace GreyMatter.Core
             // Adaptive learning: adjust difficulty based on performance
             await AdaptLearningDifficulty(metrics);
             
-            Console.WriteLine($"✅ Session complete: {successfulLearning}/{wordsProcessed} words learned ({metrics.SuccessRate:P0} success rate)");
+            Console.WriteLine($" Session complete: {successfulLearning}/{wordsProcessed} words learned ({metrics.SuccessRate:P0} success rate)");
         }
 
         private Dictionary<string, double> CreateWordFeatures(string word, WordLearningData wordData, LearningChunk chunk)
@@ -556,7 +556,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   {source.Key}: {source.Value} chunks");
             }
             
-            Console.WriteLine($"\n✅ Multi-source learning system successfully processed unlimited content!");
+            Console.WriteLine($"\n Multi-source learning system successfully processed unlimited content!");
             Console.WriteLine($"🎓 LLM teacher provided dynamic curriculum throughout the session");
             Console.WriteLine($"🔄 System never ran out of learning material (eliminated 6k word limitation)");
             
@@ -568,7 +568,7 @@ namespace GreyMatter.Core
                 var saveStart = DateTime.UtcNow;
                 await _brain.SaveAsync();
                 var saveTime = DateTime.UtcNow - saveStart;
-                Console.WriteLine($"✅ Brain state saved successfully in {saveTime.TotalSeconds:F2} seconds");
+                Console.WriteLine($" Brain state saved successfully in {saveTime.TotalSeconds:F2} seconds");
                 Console.WriteLine($"📁 Learned data persisted to: {_brain.GetStoragePath()}");
             }
             else

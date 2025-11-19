@@ -219,7 +219,7 @@ namespace GreyMatter
                     foreach (var (label, path) in expected)
                     {
                         var exists = System.IO.File.Exists(path) || System.IO.Directory.Exists(path);
-                        Console.WriteLine($"{(exists ? "✅" : "❌")} {label}: {path}");
+                        Console.WriteLine($"{(exists ? "" : "❌")} {label}: {path}");
                         if (exists) found++;
                     }
 
@@ -382,11 +382,11 @@ namespace GreyMatter
                     
                     Console.WriteLine("\n📊 **LEARNING VALIDATION RESULTS**");
                     Console.WriteLine("===================================");
-                    Console.WriteLine($"   Brain Storage System: ✅ (Cerebro)");
-                    Console.WriteLine($"   Significant Learning: {(hasSignificantSynapses ? "✅" : "❌")} ({brainStats.TotalSynapses:N0} synapses)");
-                    Console.WriteLine($"   Cluster Formation: {(hasStorageClusters ? "✅" : "❌")} ({brainStats.TotalClusters:N0} storage clusters)");
-                    Console.WriteLine($"   Neural Connections: {(hasSynapses ? "✅" : "❌")} ({brainStats.TotalSynapses:N0} synapses)");
-                    Console.WriteLine($"   Active Memory: {(hasActiveMemory ? "✅" : "❌")} ({brainStats.LoadedClusters:N0} loaded clusters)");
+                    Console.WriteLine($"   Brain Storage System:  (Cerebro)");
+                    Console.WriteLine($"   Significant Learning: {(hasSignificantSynapses ? "" : "❌")} ({brainStats.TotalSynapses:N0} synapses)");
+                    Console.WriteLine($"   Cluster Formation: {(hasStorageClusters ? "" : "❌")} ({brainStats.TotalClusters:N0} storage clusters)");
+                    Console.WriteLine($"   Neural Connections: {(hasSynapses ? "" : "❌")} ({brainStats.TotalSynapses:N0} synapses)");
+                    Console.WriteLine($"   Active Memory: {(hasActiveMemory ? "" : "❌")} ({brainStats.LoadedClusters:N0} loaded clusters)");
 
                     var validationScore = 0.0;
                     if (hasSignificantSynapses) validationScore += 1.0;
@@ -785,7 +785,7 @@ namespace GreyMatter
                     };
                     
                     var result = await trainingService.RunLLMTeacherSessionAsync(parameters);
-                    Console.WriteLine($"\n✅ **LLM TEACHER SESSION COMPLETE** - Success: {result.Success}");
+                    Console.WriteLine($"\n **LLM TEACHER SESSION COMPLETE** - Success: {result.Success}");
                 }
                 catch (Exception ex)
                 {
@@ -825,7 +825,7 @@ namespace GreyMatter
             {
                 var trainingService = CreateTrainingService(args);
                 var result = trainingService.RunSimpleEphemeralDemo();
-                Console.WriteLine($"✅ Simple ephemeral demo completed - Success: {result.Success}, Concepts: {result.ConceptsLearned}");
+                Console.WriteLine($" Simple ephemeral demo completed - Success: {result.Success}, Concepts: {result.ConceptsLearned}");
                 return;
             }
             
@@ -1159,7 +1159,7 @@ namespace GreyMatter
                     await learner.ShutdownAsync();
                     
                     Console.WriteLine("\n🎉 **ENHANCED LEARNING COMPLETE WITH FAST STORAGE**");
-                    Console.WriteLine("✅ All vocabulary data saved in seconds instead of hours!");
+                    Console.WriteLine(" All vocabulary data saved in seconds instead of hours!");
                 }
                 catch (Exception ex)
                 {
@@ -1232,7 +1232,7 @@ namespace GreyMatter
 
             if (Directory.Exists(dataPath))
             {
-                Console.WriteLine("✅ Learning data found");
+                Console.WriteLine(" Learning data found");
                 var wordDbPath = Path.Combine(dataPath, "word_database.json");
                 if (File.Exists(wordDbPath))
                 {
@@ -1250,7 +1250,7 @@ namespace GreyMatter
             // Check brain storage
             if (Directory.Exists(brainPath))
             {
-                Console.WriteLine("✅ Brain storage found");
+                Console.WriteLine(" Brain storage found");
                 var files = Directory.GetFiles(brainPath, "*.json", SearchOption.AllDirectories);
                 Console.WriteLine($"   Stored patterns: {files.Length}");
             }
@@ -1353,11 +1353,11 @@ namespace GreyMatter
             await brain.SaveAsync();
 
             Console.WriteLine("\n🎉 **FOUNDATIONAL LANGUAGE TRAINING COMPLETE**");
-            Console.WriteLine("   ✅ Core vocabulary established");
-            Console.WriteLine("   ✅ Basic grammar patterns learned");
-            Console.WriteLine("   ✅ Simple sentence comprehension");
-            Console.WriteLine("   ✅ Reading foundation established");
-            Console.WriteLine("   ✅ Ready for progressive language expansion");
+            Console.WriteLine("    Core vocabulary established");
+            Console.WriteLine("    Basic grammar patterns learned");
+            Console.WriteLine("    Simple sentence comprehension");
+            Console.WriteLine("    Reading foundation established");
+            Console.WriteLine("    Ready for progressive language expansion");
             Console.WriteLine("\n💡 Next steps: Continue with graded readers and conversational practice");
         }
 
@@ -1474,7 +1474,7 @@ namespace GreyMatter
                 Console.WriteLine($"      Features: {features.Count}, Complexity Score: {features.Values.Average():F2}");
             }
 
-            Console.WriteLine("\n✅ Comprehensive language training complete!");
+            Console.WriteLine("\n Comprehensive language training complete!");
             Console.WriteLine("   🌟 Brain now exhibits sophisticated linguistic competence");
             Console.WriteLine("   🎯 Dynamic neuron allocation demonstrates realistic neural scaling");
 
@@ -1517,7 +1517,7 @@ namespace GreyMatter
             Console.WriteLine($"   Cloze accuracy: {acc:P1} on {evalSet.Count} items");
 
             await brain.SaveAsync();
-            Console.WriteLine("✅ Preschool training pipeline complete.");
+            Console.WriteLine(" Preschool training pipeline complete.");
         }
 
         private static int GetArgValue(string[] args, string argName, int defaultValue)
@@ -1659,7 +1659,7 @@ namespace GreyMatter
                 // Test 5: Real-world scenario simulation
                 await TestRealWorldScenario();
 
-                Console.WriteLine("\n✅ **PERFORMANCE VALIDATION COMPLETE**");
+                Console.WriteLine("\n **PERFORMANCE VALIDATION COMPLETE**");
             }
 
             private async Task TestBatchSize(int conceptCount, string testName)
@@ -1690,7 +1690,7 @@ namespace GreyMatter
                 Console.WriteLine($"📈 Improvement Factor: {improvementFactor:F1}x");
 
                 if (improvementFactor >= 100)
-                    Console.WriteLine("✅ **TARGET ACHIEVED**: 100x+ improvement confirmed!");
+                    Console.WriteLine(" **TARGET ACHIEVED**: 100x+ improvement confirmed!");
                 else if (improvementFactor >= 50)
                     Console.WriteLine("🟡 **GOOD PROGRESS**: 50x+ improvement achieved");
                 else
@@ -1762,7 +1762,7 @@ namespace GreyMatter
                 Console.WriteLine($"⚡ Network Throughput: {conceptsPerSecond:F2} concepts/second");
 
                 if (conceptsPerSecond >= 50)
-                    Console.WriteLine("✅ **NETWORK OPTIMIZED**: Good performance on network storage");
+                    Console.WriteLine(" **NETWORK OPTIMIZED**: Good performance on network storage");
                 else
                     Console.WriteLine("⚠️  **NETWORK CONSIDERATIONS**: May need further optimization");
             }

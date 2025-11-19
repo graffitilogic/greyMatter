@@ -119,7 +119,7 @@ Commands:
                 return;
             }
             
-            Console.WriteLine($"✅ Found {associations.Count} associations:\n");
+            Console.WriteLine($" Found {associations.Count} associations:\n");
             
             foreach (var assoc in associations.OrderByDescending(a => a.Confidence))
             {
@@ -151,7 +151,7 @@ Commands:
                 return;
             }
             
-            Console.WriteLine($"✅ Found {matches.Count} matches:\n");
+            Console.WriteLine($" Found {matches.Count} matches:\n");
             
             foreach (var match in matches)
             {
@@ -182,7 +182,7 @@ Commands:
                 return;
             }
             
-            Console.WriteLine($"✅ Found {memories.Count} relevant memories:\n");
+            Console.WriteLine($" Found {memories.Count} relevant memories:\n");
             
             foreach (var memory in memories.OrderByDescending(m => m.Relevance))
             {
@@ -245,7 +245,7 @@ Commands:
             
             if (accuracy >= 1.0)
             {
-                Console.WriteLine("✅ CORRECT! The brain has learned this.");
+                Console.WriteLine(" CORRECT! The brain has learned this.");
             }
             else
             {

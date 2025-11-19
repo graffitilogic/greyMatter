@@ -20,7 +20,7 @@ if [ "$COMMAND" == "pause" ]; then
   "Reason": "Manual pause via control script"
 }
 EOF
-    echo "✅ Pause command sent"
+    echo " Pause command sent"
     echo "   Service will pause and save checkpoint"
     echo ""
     echo "To resume: ./scripts/control_production_training.sh resume"
@@ -34,7 +34,7 @@ elif [ "$COMMAND" == "resume" ]; then
   "Reason": "Manual resume via control script"
 }
 EOF
-    echo "✅ Resume command sent"
+    echo " Resume command sent"
     echo "   Service will resume training"
 
 elif [ "$COMMAND" == "stop" ]; then
@@ -46,7 +46,7 @@ elif [ "$COMMAND" == "stop" ]; then
   "Reason": "Manual stop via control script"
 }
 EOF
-    echo "✅ Stop command sent"
+    echo " Stop command sent"
     echo "   Service will save checkpoint and stop gracefully"
     echo ""
     echo "Waiting for service to stop..."
@@ -55,7 +55,7 @@ EOF
     if pgrep -f "ProductionTrainingService" > /dev/null; then
         echo "⚠️  Service still running - may take a few seconds"
     else
-        echo "✅ Service stopped"
+        echo " Service stopped"
     fi
 
 else

@@ -76,7 +76,7 @@ namespace GreyMatter.Core
             var nextSkill = curriculum.GetNextRequiredSkill(_skillMastery);
             if (nextSkill == null)
             {
-                Console.WriteLine("✅ All guided skills mastered! Ready for scaffolded learning.");
+                Console.WriteLine(" All guided skills mastered! Ready for scaffolded learning.");
                 await AdvanceDevelopmentalStage();
                 return session;
             }
@@ -101,7 +101,7 @@ namespace GreyMatter.Core
                 session.ConceptsLearned.Add(step);
                 session.TotalConfidence += result.Confidence;
                 
-                Console.WriteLine($"      ✅ Learned with {result.Confidence:P0} confidence");
+                Console.WriteLine($"       Learned with {result.Confidence:P0} confidence");
             }
             
             // Drill and practice (repetition for mastery)
@@ -251,7 +251,7 @@ namespace GreyMatter.Core
                 session.ConceptsLearned.Add(goal);
                 session.TotalConfidence += result.Confidence;
                 
-                Console.WriteLine($"   ✅ Explored {goal} with {result.Confidence:P0} confidence");
+                Console.WriteLine($"    Explored {goal} with {result.Confidence:P0} confidence");
             }
             
             // Creative synthesis and original thinking

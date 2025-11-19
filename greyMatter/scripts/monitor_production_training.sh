@@ -20,7 +20,7 @@ if ! pgrep -f "ProductionTrainingService" > /dev/null; then
     exit 1
 fi
 
-echo "✅ Service is running"
+echo " Service is running"
 echo ""
 
 # Show latest metrics

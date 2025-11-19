@@ -16,7 +16,7 @@ if [ ! -f "google_books_1grams_sample.txt" ]; then
     curl -o "frequency_lists.zip" "https://www.wordfrequency.info/files/entries_1_2.zip" 2>/dev/null || true
     if [ -f "frequency_lists.zip" ]; then
         unzip -q frequency_lists.zip
-        echo "✅ Word frequency data downloaded"
+        echo " Word frequency data downloaded"
     else
         echo "⚠️  Could not download frequency data, creating fallback list"
         cat > "top_5000_words.txt" << 'EOF'
@@ -322,7 +322,7 @@ cat > "age_of_acquisition.json" << 'EOF'
 }
 EOF
 
-echo "✅ External language resources setup complete!"
+echo " External language resources setup complete!"
 echo "📁 Resources available in: external_resources/"
 echo "   • Word frequency lists"
 echo "   • Grammar patterns"  

@@ -23,7 +23,7 @@ case "$COMMAND" in
         TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
         echo "Sending $COMMAND command to service..."
         echo "{\"Command\":\"$COMMAND\",\"Timestamp\":\"$TIMESTAMP\"}" > "$CONTROL_FILE"
-        echo "✅ Command sent: $COMMAND"
+        echo " Command sent: $COMMAND"
         echo "📁 Control file: $CONTROL_FILE"
         ;;
     *)

@@ -46,7 +46,7 @@ check_volumes() {
         return 1
     fi
 
-    echo -e "${GREEN}✅ All external volumes accessible${NC}"
+    echo -e "${GREEN} All external volumes accessible${NC}"
     return 0
 }
 
@@ -86,7 +86,7 @@ run_current_evaluation() {
     dotnet run -- --evaluate > current_evaluation.log 2>&1
 
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Current evaluation completed${NC}"
+        echo -e "${GREEN} Current evaluation completed${NC}"
         echo "  Results saved to: current_evaluation.log"
     else
         echo -e "${RED}❌ Current evaluation failed${NC}"
@@ -112,7 +112,7 @@ create_corrected_pipeline() {
 
     for file in "${files_to_check[@]}"; do
         if [ -f "$file" ]; then
-            echo -e "${GREEN}✅ $file exists${NC}"
+            echo -e "${GREEN} $file exists${NC}"
         else
             echo -e "${RED}❌ $file missing${NC}"
             return 1
@@ -163,7 +163,7 @@ class Program
 
             if (validation.OverallLearningScore >= 3.0)
             {
-                Console.WriteLine("✅ Learning pipeline successful!");
+                Console.WriteLine(" Learning pipeline successful!");
             }
             else
             {
@@ -199,7 +199,7 @@ EOF
     dotnet run RunCorrectedLearning.cs > corrected_learning.log 2>&1
 
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ Corrected learning pipeline completed${NC}"
+        echo -e "${GREEN} Corrected learning pipeline completed${NC}"
         echo "  Results saved to: corrected_learning.log"
     else
         echo -e "${RED}❌ Corrected learning pipeline failed${NC}"
@@ -222,10 +222,10 @@ compare_results() {
     echo
 
     echo "Corrected System Features:"
-    echo "  ✅ Processes real Tatoeba sentences"
-    echo "  ✅ Learns from co-occurrence patterns"
-    echo "  ✅ Builds semantic concepts from data"
-    echo "  ✅ Validates actual learning outcomes"
+    echo "   Processes real Tatoeba sentences"
+    echo "   Learns from co-occurrence patterns"
+    echo "   Builds semantic concepts from data"
+    echo "   Validates actual learning outcomes"
     echo
 
     # Show learning scores if available
@@ -289,15 +289,15 @@ generate_report() {
 ## Validation Results
 
 ### Original System
-- Pattern Quality: ✅ PASS (algorithmic)
-- Memory Efficiency: ✅ PASS (theoretical)
+- Pattern Quality:  PASS (algorithmic)
+- Memory Efficiency:  PASS (theoretical)
 - Learning Score: 0.0/5.0 (no actual learning)
 
 ### Corrected System
-- Real Data Processing: ✅ YES
-- Learned Relationships: ✅ YES
-- Prediction Capability: ✅ YES
-- Generalization: ✅ YES
+- Real Data Processing:  YES
+- Learned Relationships:  YES
+- Prediction Capability:  YES
+- Generalization:  YES
 - Learning Score: [varies]/5.0
 
 ## Recommendations
@@ -317,7 +317,7 @@ generate_report() {
 5. Document realistic performance expectations
 EOF
 
-    echo -e "${GREEN}✅ Correction report generated: CORRECTION_REPORT.md${NC}"
+    echo -e "${GREEN} Correction report generated: CORRECTION_REPORT.md${NC}"
     echo
 }
 

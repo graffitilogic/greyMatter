@@ -67,7 +67,7 @@ namespace greyMatter.Learning
                     Console.WriteLine("📂 Loading existing brain state from FastStorage...");
                     var brain = await LoadExistingBrainAsync();
                     var stats = brain.GetLearningStats();
-                    Console.WriteLine($"   ✅ Loaded brain with {stats.VocabularySize:N0} words, {stats.TotalConcepts:N0} concepts");
+                    Console.WriteLine($"    Loaded brain with {stats.VocabularySize:N0} words, {stats.TotalConcepts:N0} concepts");
                     Console.WriteLine($"   📊 Training sessions: {stats.TrainingSessions}");
                     return brain;
                 }
@@ -163,7 +163,7 @@ namespace greyMatter.Learning
                 var vocabularySet = new HashSet<string>(coreVocabulary.Keys);
                 await _storage.SaveVocabularyAsync(vocabularySet);
                 var vocabElapsed = DateTime.UtcNow - vocabStartTime;
-                Console.WriteLine($"   ✅ Saved {vocabularySet.Count:N0} vocabulary words in {vocabElapsed.TotalSeconds:F1}s");
+                Console.WriteLine($"    Saved {vocabularySet.Count:N0} vocabulary words in {vocabElapsed.TotalSeconds:F1}s");
                 
                 // Export and save brain state (language data + neurons combined)
                 var stateStartTime = DateTime.UtcNow;
@@ -180,7 +180,7 @@ namespace greyMatter.Learning
                 
                 await _storage.SaveBrainStateAsync(brainState);
                 var stateElapsed = DateTime.UtcNow - stateStartTime;
-                Console.WriteLine($"   ✅ Saved brain state ({languageData.Count:N0} language concepts, {neurons.Count:N0} neurons) in {stateElapsed.TotalSeconds:F1}s");
+                Console.WriteLine($"    Saved brain state ({languageData.Count:N0} language concepts, {neurons.Count:N0} neurons) in {stateElapsed.TotalSeconds:F1}s");
                 
                 // Export and save neural concepts
                 var conceptStartTime = DateTime.UtcNow;
@@ -188,7 +188,7 @@ namespace greyMatter.Learning
                 Console.WriteLine($"   🧠 Saving {neuralConcepts.Count:N0} neural concepts...");
                 await _storage.SaveNeuralConceptsAsync(neuralConcepts);
                 var conceptElapsed = DateTime.UtcNow - conceptStartTime;
-                Console.WriteLine($"   ✅ Saved {neuralConcepts.Count:N0} neural concepts in {conceptElapsed.TotalSeconds:F1}s");
+                Console.WriteLine($"    Saved {neuralConcepts.Count:N0} neural concepts in {conceptElapsed.TotalSeconds:F1}s");
                 
                 var totalElapsed = DateTime.UtcNow - totalStartTime;
                 Console.WriteLine($"💾 Brain state saved successfully! Total: {totalElapsed.TotalSeconds:F1}s");
@@ -231,7 +231,7 @@ namespace greyMatter.Learning
                 .Take(maxSentences)
                 .ToList();
 
-            Console.WriteLine($"✅ Found {sentences.Count:N0} suitable learning sentences");
+            Console.WriteLine($" Found {sentences.Count:N0} suitable learning sentences");
             
             if (sentences.Count == 0)
             {
@@ -304,7 +304,7 @@ namespace greyMatter.Learning
             }
 
             var finalElapsed = DateTime.Now - startTime;
-            Console.WriteLine($"\n✅ Vocabulary foundation complete!");
+            Console.WriteLine($"\n Vocabulary foundation complete!");
             Console.WriteLine($"📊 Final vocabulary size: {_brain.VocabularySize:N0} words");
             Console.WriteLine($"📊 Processed {processedSentences:N0} sentences in {finalElapsed:mm\\:ss}");
             
@@ -466,7 +466,7 @@ namespace greyMatter.Learning
             var persistence = new ScalePersistence(savePath);
             await persistence.SaveBrain(_brain);
             
-            Console.WriteLine("✅ Brain saved successfully!");
+            Console.WriteLine(" Brain saved successfully!");
             */
             
             // Also save vocabulary statistics
@@ -530,7 +530,7 @@ namespace greyMatter.Learning
             }
 
             var finalElapsed = DateTime.Now - startTime;
-            Console.WriteLine($"\n✅ Sample vocabulary building complete!");
+            Console.WriteLine($"\n Sample vocabulary building complete!");
             Console.WriteLine($"📊 Final vocabulary size: {_brain.VocabularySize:N0} words");
             Console.WriteLine($"📊 Processed {processedSentences:N0} sentences in {finalElapsed:mm\\:ss}");
         }
@@ -578,7 +578,7 @@ namespace greyMatter.Learning
                 var conceptGrowth = finalStats.TotalConcepts - initialStats.TotalConcepts;
                 var vocabGrowth = finalStats.VocabularySize - initialStats.VocabularySize;
                 
-                Console.WriteLine($"   ✅ Block {blockNumber} complete in {blockElapsed:mm\\:ss}");
+                Console.WriteLine($"    Block {blockNumber} complete in {blockElapsed:mm\\:ss}");
                 Console.WriteLine($"   📈 Progress: {processed:N0}/{totalSentences:N0} ({processed * 100.0 / totalSentences:F1}%)");
                 Console.WriteLine($"   ⚡ Rate: {rate:F1} sentences/sec - ETA: {eta:mm\\:ss}");
                 Console.WriteLine($"   🧠 Concept growth: +{conceptGrowth:N0} (total: {finalStats.TotalConcepts:N0})");
@@ -594,7 +594,7 @@ namespace greyMatter.Learning
             }
 
             var finalElapsed = DateTime.Now - startTime;
-            Console.WriteLine($"\n✅ Random sample training complete!");
+            Console.WriteLine($"\n Random sample training complete!");
             Console.WriteLine($"📊 Processed {totalSentences:N0} sentences in {finalElapsed:mm\\:ss}");
             Console.WriteLine($"📊 Final vocabulary: {_brain.VocabularySize:N0} words");
             Console.WriteLine($"📊 Total concepts: {_brain.GetLearningStats().TotalConcepts:N0}");
@@ -662,7 +662,7 @@ namespace greyMatter.Learning
                 }
             }
 
-            Console.WriteLine($"   ✅ Collected {sentences.Count:N0} suitable sentences");
+            Console.WriteLine($"    Collected {sentences.Count:N0} suitable sentences");
             return sentences;
         }
 
@@ -780,12 +780,12 @@ namespace greyMatter.Learning
                 _attentionSystem
             );
             
-            Console.WriteLine("   ✅ Working Memory initialized (capacity: 1000, decay: 0.1)");
-            Console.WriteLine("   ✅ Message Bus initialized (max inbox: 100, history: 1000)");
-            Console.WriteLine("   ✅ Attention System initialized with 6 default profiles");
-            Console.WriteLine("   ✅ Active profile: learning");
-            Console.WriteLine("   ✅ Column Generator initialized (pattern size: 2048, sparsity: 0.02)");
-            Console.WriteLine("   ✅ Column Processor ready for training");
+            Console.WriteLine("    Working Memory initialized (capacity: 1000, decay: 0.1)");
+            Console.WriteLine("    Message Bus initialized (max inbox: 100, history: 1000)");
+            Console.WriteLine("    Attention System initialized with 6 default profiles");
+            Console.WriteLine("    Active profile: learning");
+            Console.WriteLine("    Column Generator initialized (pattern size: 2048, sparsity: 0.02)");
+            Console.WriteLine("    Column Processor ready for training");
             Console.WriteLine("🧠 === Column Architecture Ready! ===\n");
         }
 
@@ -823,7 +823,7 @@ namespace greyMatter.Learning
                 .Take(maxSentences)
                 .ToList();
 
-            Console.WriteLine($"✅ Found {sentences.Count:N0} suitable learning sentences\n");
+            Console.WriteLine($" Found {sentences.Count:N0} suitable learning sentences\n");
             
             if (sentences.Count == 0)
             {
@@ -892,7 +892,7 @@ namespace greyMatter.Learning
                 Console.WriteLine($"   • Highest activation: {finalStats.AttentionStats.HighestActivation:F3}");
             }
             
-            Console.WriteLine("\n✅ Phase 2 column-based training complete!");
+            Console.WriteLine("\n Phase 2 column-based training complete!");
             Console.WriteLine("   Compare this to the traditional LanguageEphemeralBrain approach");
             Console.WriteLine("   to see if emergence happens from column interactions.\n");
         }

@@ -92,14 +92,14 @@ dotnet run -- --cerebro-query think "technology"
 
 ## What to Look For in Tests
 
-### ✅ Good Signs:
+###  Good Signs:
 1. **Neuron Reuse**: "% new" decreases over time
    - Start: ~40-50% new
    - After 1K blocks: ~15-20% new
    - Stable: ~10-15% new
 
 2. **Checkpoint Success**: 
-   - ✅ Checkpoint saved: HH:MM:SS
+   -  Checkpoint saved: HH:MM:SS
    - No "❌ Failed to save" messages
 
 3. **Storage Growth**:
@@ -120,7 +120,7 @@ dotnet run -- --cerebro-query think "technology"
 
 ## Current Status (as of Nov 17, 2025 2:50 PM)
 
-### ✅ Working:
+###  Working:
 - **Neuron reuse during training**: 83-85% reuse after warmup
 - **Pattern matching**: Real cosine similarity with 0.85 threshold
 - **Centroid persistence**: Clusters save/restore correctly
@@ -186,10 +186,10 @@ dotnet run -- --production-training --duration 600
 
 ---
 
-**All critical bugs are now FIXED! ✅**
-- ✅ Pattern matching with real cosine similarity
-- ✅ Centroid persistence across checkpoints
-- ✅ Concurrent modification prevented
-- ✅ Checkpoint rehydration working
+**All critical bugs are now FIXED! **
+-  Pattern matching with real cosine similarity
+-  Centroid persistence across checkpoints
+-  Concurrent modification prevented
+-  Checkpoint rehydration working
 
 The system is production-ready for extended training runs!

@@ -1,6 +1,6 @@
 # Production Training Quick Start
 
-## ✅ All Systems Ready
+##  All Systems Ready
 
 All training infrastructure is now activated:
 - 571GB Wikipedia corpus
@@ -76,7 +76,7 @@ dotnet run --project greyMatter.csproj CerebroQueryCLI.cs
 📖 Curriculum Phase: Foundation (0-1K sentences)
    Short simple sentences - basic vocabulary and grammar
 📂 Loading dataset: tatoeba_small
-✅ Loaded 1,000 fresh sentences from 'tatoeba_small' (batch #1, shuffled)
+ Loaded 1,000 fresh sentences from 'tatoeba_small' (batch #1, shuffled)
 
 ...
 
@@ -87,7 +87,7 @@ dotnet run --project greyMatter.csproj CerebroQueryCLI.cs
 📖 Curriculum Phase: Expansion (1K-5K sentences)
    News headlines - current events and journalism vocabulary
 📂 Loading dataset: news
-✅ Loaded 5,000 fresh sentences from 'news' (batch #2, shuffled)
+ Loaded 5,000 fresh sentences from 'news' (batch #2, shuffled)
 
 ...
 
@@ -98,7 +98,7 @@ dotnet run --project greyMatter.csproj CerebroQueryCLI.cs
 📖 Curriculum Phase: Narrative (10K-20K sentences)
    Book corpus - narrative structures, complex storytelling
 📂 Loading dataset: books_corpus
-✅ Loaded 5,000 fresh sentences from 'books_corpus' (batch #10, shuffled)
+ Loaded 5,000 fresh sentences from 'books_corpus' (batch #10, shuffled)
 
 ...
 
@@ -109,7 +109,7 @@ dotnet run --project greyMatter.csproj CerebroQueryCLI.cs
 📖 Curriculum Phase: Encyclopedic (20K-50K sentences)
    Wikipedia chunks - encyclopedic knowledge, technical vocabulary
 📂 Loading dataset: wikipedia_chunked
-✅ Loaded 30,000 fresh sentences from 'wikipedia_chunked' (batch #20, shuffled)
+ Loaded 30,000 fresh sentences from 'wikipedia_chunked' (batch #20, shuffled)
 
 ...
 
@@ -122,7 +122,7 @@ dotnet run --project greyMatter.csproj CerebroQueryCLI.cs
 📂 Loading dataset: wikipedia_full
 📁 Scanning directory: /Volumes/jarvis/trainData/txtDump/cache/epub
 📄 Loading from 1247 .txt files...
-✅ Loaded 25,000 fresh sentences from 'wikipedia_full' (batch #40, shuffled)
+ Loaded 25,000 fresh sentences from 'wikipedia_full' (batch #40, shuffled)
 ```
 
 ### LLM Generation (Every 5th Batch)
@@ -148,7 +148,7 @@ dotnet run --project greyMatter.csproj CerebroQueryCLI.cs
 ```
 💾 Saving checkpoint to /Volumes/jarvis/brainData/checkpoints/brain_checkpoint_20241117_143022.json
    Neurons: 1,847,293 | Clusters: 12,847 | Size: 487.3 MB
-✅ Checkpoint saved successfully (took 12.3s)
+ Checkpoint saved successfully (took 12.3s)
 ```
 
 ---
@@ -251,27 +251,27 @@ touch /Volumes/jarvis/brainData/checkpoints/test.txt && rm /Volumes/jarvis/brain
 
 After 1-hour run, you should see:
 
-✅ **Curriculum Progression**:
+ **Curriculum Progression**:
 - Started: Phase 1 (tatoeba_small)
 - Advanced through: Phase 2 (news), Phase 3 (dialogue)
 - Reached: Phase 4 (books_corpus) or beyond
 
-✅ **Dataset Diversity**:
+ **Dataset Diversity**:
 - Multiple dataset loads visible in logs
 - LLM generation every 5th batch (if available)
 - No repeated dataset cycling
 
-✅ **Checkpoint Reliability**:
+ **Checkpoint Reliability**:
 - 6 checkpoints saved (every 10 min)
 - No JSON serialization errors
 - File sizes 400-600 MB each
 
-✅ **Query Functionality**:
+ **Query Functionality**:
 - Can query common words ("the", "red", "blue", "school")
 - Can query learned concepts from diverse sources
 - Case-insensitive matching works
 
-✅ **Neuron Reuse**:
+ **Neuron Reuse**:
 - 83-85% reuse rate maintained
 - New neuron rate 0.1-0.3% per batch
 - Total neurons ~30-50 per sentence
@@ -286,7 +286,7 @@ After 1-hour run, you should see:
 
 # Wait for final checkpoint save
 💾 Saving final checkpoint before shutdown...
-✅ Checkpoint saved successfully
+ Checkpoint saved successfully
 👋 Production training stopped gracefully
 ```
 

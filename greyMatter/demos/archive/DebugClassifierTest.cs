@@ -27,7 +27,7 @@ namespace GreyMatter
             };
             await classifier.TrainFromExamplesAsync(trainingData);
             
-            Console.WriteLine("✅ Training complete. Now testing 'cat'...");
+            Console.WriteLine(" Training complete. Now testing 'cat'...");
             var result = classifier.ClassifySemanticDomain("cat");
             Console.WriteLine($"🎯 Result: {result}");
             

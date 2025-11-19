@@ -45,7 +45,7 @@ dotnet run --project greyMatter.csproj -- \
 
 SERVICE_PID=$!
 
-echo "✅ Production training service started"
+echo " Production training service started"
 echo "   PID: $SERVICE_PID"
 echo "   Log: $LOG_FILE"
 echo ""

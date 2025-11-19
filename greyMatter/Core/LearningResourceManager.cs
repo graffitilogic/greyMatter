@@ -88,7 +88,7 @@ namespace GreyMatter.Core
             await SaveResourceCatalog();
             
             var totalResources = _resourceCatalog.Values.Sum(list => list.Count);
-            Console.WriteLine($"✅ Library scan complete: {totalResources} resources cataloged");
+            Console.WriteLine($" Library scan complete: {totalResources} resources cataloged");
         }
 
         private void InitializeResourceCatalog()

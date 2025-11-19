@@ -746,7 +746,7 @@ private async Task CheckpointLoop()
         var checkpoint = _brain.CreateCheckpoint();
         await _storage.SaveCheckpointAsync(checkpoint);
         
-        Console.WriteLine($"✅ Checkpoint saved: {checkpoint.TotalNeurons:N0} neurons");
+        Console.WriteLine($" Checkpoint saved: {checkpoint.TotalNeurons:N0} neurons");
     }
 }
 ```
@@ -865,13 +865,13 @@ Storage Performance:
 **Massive Dataset Infrastructure:**
 ```
 Dataset Activation (November 2025):
-├── Wikipedia Full: 571GB corpus fully activated ✅
-├── Books Collection: 500GB+ integrated ✅
-├── LLM Teacher: Ollama deepseek-r1:1.5b operational ✅
-├── Progressive Curriculum: 6-phase automatic advancement ✅
-├── Smart Sampling: 5000 sentences per batch (never exhausts) ✅
-├── LLM Integration: Every 5th batch (20% dynamic content) ✅
-└── Infinite Training: Can run indefinitely on massive datasets ✅
+├── Wikipedia Full: 571GB corpus fully activated 
+├── Books Collection: 500GB+ integrated 
+├── LLM Teacher: Ollama deepseek-r1:1.5b operational 
+├── Progressive Curriculum: 6-phase automatic advancement 
+├── Smart Sampling: 5000 sentences per batch (never exhausts) 
+├── LLM Integration: Every 5th batch (20% dynamic content) 
+└── Infinite Training: Can run indefinitely on massive datasets 
 
 Training Reliability:
 ├── Checkpoint Success Rate: 100% (NaN sanitization working)
@@ -966,7 +966,7 @@ LLM Teacher Statistics:
 
 ### Production System Status (November 2025)
 
-**✅ Fully Operational:**
+** Fully Operational:**
 - ProductionTrainingService with 571GB+ datasets
 - ADPC-Net (all 5 phases integrated and working)
 - MessagePack storage (1,350x performance improvement)
@@ -1031,10 +1031,10 @@ LLM Teacher Statistics:
    - Mitigation: Automatic fallback to static datasets if LLM unavailable
 
 **Fixed Issues (November 2025):**
-- ✅ Checkpoint crashes: NaN/Infinity sanitization implemented
-- ✅ Query failures: Direct ConceptLabel lookup with case-insensitive matching
-- ✅ Dataset underutilization: All 571GB+ activated with progressive curriculum
-- ✅ LLM integration: Dynamic generation every 5th batch operational
+-  Checkpoint crashes: NaN/Infinity sanitization implemented
+-  Query failures: Direct ConceptLabel lookup with case-insensitive matching
+-  Dataset underutilization: All 571GB+ activated with progressive curriculum
+-  LLM integration: Dynamic generation every 5th batch operational
 
 ### Scaling Targets (Aspirational)
 
@@ -1192,13 +1192,13 @@ var config = new BrainConfiguration
 This technical document provides comprehensive implementation details for the **production greyMatter system** as of **November 18, 2025**. The system features a fully operational ADPC-Net architecture with massive dataset training (571GB+ Wikipedia), LLM teacher integration, and high-performance MessagePack storage achieving 1,350x speedup over legacy systems.
 
 **Key Production Features:**
-- ✅ ProductionTrainingService with 6-phase progressive curriculum
-- ✅ All ADPC-Net phases integrated (pattern learning, dynamic neurons, sparse synapses, VQ-VAE, production)
-- ✅ 571GB Wikipedia + 500GB books fully activated
-- ✅ LLM teacher generating dynamic content every 5th batch
-- ✅ MessagePack binary storage (1,350x faster than JSON)
-- ✅ NaN/Infinity sanitization (100% checkpoint reliability)
-- ✅ Direct concept lookup with case-insensitive queries
-- ✅ Smart sampling (5000 sentences per batch, infinite training capability)
+-  ProductionTrainingService with 6-phase progressive curriculum
+-  All ADPC-Net phases integrated (pattern learning, dynamic neurons, sparse synapses, VQ-VAE, production)
+-  571GB Wikipedia + 500GB books fully activated
+-  LLM teacher generating dynamic content every 5th batch
+-  MessagePack binary storage (1,350x faster than JSON)
+-  NaN/Infinity sanitization (100% checkpoint reliability)
+-  Direct concept lookup with case-insensitive queries
+-  Smart sampling (5000 sentences per batch, infinite training capability)
 
 For usage instructions and quick start guide, see [README.md](../README.md) and [PRODUCTION_TRAINING_GUIDE.md](../PRODUCTION_TRAINING_GUIDE.md).

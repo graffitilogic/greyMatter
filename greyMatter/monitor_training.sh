@@ -8,7 +8,7 @@ echo ""
 
 # Check if process is running
 if ps aux | grep -q "[d]otnet run.*production-training"; then
-    echo "✅ Training process is RUNNING"
+    echo " Training process is RUNNING"
     ps aux | grep "[d]otnet run.*production-training" | awk '{print "   PID: " $2 "  CPU: " $3 "%  MEM: " $4 "%"}'
 else
     echo "❌ Training process NOT running"

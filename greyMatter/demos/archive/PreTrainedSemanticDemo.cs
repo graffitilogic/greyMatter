@@ -68,7 +68,7 @@ namespace GreyMatter
                 var isWellClassified = domain != "semantic_domains/general_concepts";
                 if (isWellClassified) correctlyClassified++;
                 
-                var status = isWellClassified ? "✅" : "⚠️";
+                var status = isWellClassified ? "" : "⚠️";
                 Console.WriteLine($"  {status} '{word}' → {domain}");
             }
 
@@ -79,11 +79,11 @@ namespace GreyMatter
             Console.WriteLine();
 
             Console.WriteLine("🔬 Benefits of Pre-trained Approach:");
-            Console.WriteLine("   ✅ No training data required");
-            Console.WriteLine("   ✅ Works immediately out-of-the-box");
-            Console.WriteLine("   ✅ Leverages proven semantic understanding");
-            Console.WriteLine("   ✅ Integrates with biological storage architecture");
-            Console.WriteLine("   ✅ Fallback system ensures robustness");
+            Console.WriteLine("    No training data required");
+            Console.WriteLine("    Works immediately out-of-the-box");
+            Console.WriteLine("    Leverages proven semantic understanding");
+            Console.WriteLine("    Integrates with biological storage architecture");
+            Console.WriteLine("    Fallback system ensures robustness");
             Console.WriteLine();
 
             Console.WriteLine("🚀 Next Steps:");
@@ -93,7 +93,7 @@ namespace GreyMatter
             Console.WriteLine("   • Enjoy highly accurate semantic classification!");
             Console.WriteLine();
 
-            Console.WriteLine("✅ Pre-trained semantic classification demo complete!");
+            Console.WriteLine(" Pre-trained semantic classification demo complete!");
         }
     }
 }

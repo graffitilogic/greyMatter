@@ -132,7 +132,7 @@ namespace GreyMatter.Learning
                 stats.SentencesPerSecond = sentencesFromThisSource / Math.Max(stats.ProcessingTimeSeconds, 0.001);
 
                 // Report source completion
-                Console.WriteLine($"\n✅ Completed {dataSource.SourceName}:");
+                Console.WriteLine($"\n Completed {dataSource.SourceName}:");
                 Console.WriteLine($"   Sentences learned: {stats.SentencesLearned:N0}");
                 Console.WriteLine($"   Vocabulary contributed: {stats.VocabularyContributed:N0} words");
                 Console.WriteLine($"   Processing time: {sourceStopwatch.Elapsed:mm\\:ss\\.ff}");
@@ -176,7 +176,7 @@ namespace GreyMatter.Learning
             var vocabulary = _brain.ExportVocabulary();
             var vocabSet = new HashSet<string>(vocabulary.Keys);
             await _storage.SaveVocabularyAsync(vocabSet);
-            Console.WriteLine($"   ✅ Saved vocabulary: {vocabulary.Count:N0} words");
+            Console.WriteLine($"    Saved vocabulary: {vocabulary.Count:N0} words");
 
             // Export neurons
             var neurons = _brain.ExportNeurons();
@@ -192,12 +192,12 @@ namespace GreyMatter.Learning
                 }
             };
             await _storage.SaveBrainStateAsync(brainState);
-            Console.WriteLine($"   ✅ Saved brain state: {neurons.Count:N0} neurons");
+            Console.WriteLine($"    Saved brain state: {neurons.Count:N0} neurons");
 
             // Export language data
             var languageData = _brain.ExportLanguageData();
             await _storage.SaveNeuralConceptsAsync(languageData);
-            Console.WriteLine($"   ✅ Saved language data");
+            Console.WriteLine($"    Saved language data");
 
             stopwatch.Stop();
             Console.WriteLine($"\n⏱️  Save completed in {stopwatch.Elapsed.TotalSeconds:F2}s");

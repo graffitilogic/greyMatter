@@ -128,7 +128,7 @@ Commands:
 
                     if (matches.Count > 0)
                     {
-                        Console.WriteLine($"✅ Found {matches.Count} cluster(s) for '{concept}':\n");
+                        Console.WriteLine($" Found {matches.Count} cluster(s) for '{concept}':\n");
                         foreach (var match in matches.Take(5))
                         {
                             var clusterId = match.GetType().GetProperty("ClusterId")?.GetValue(match);
@@ -167,7 +167,7 @@ Commands:
                     return;
                 }
 
-                Console.WriteLine($"✅ Neural response:");
+                Console.WriteLine($" Neural response:");
                 Console.WriteLine($"   Activated neurons:   {result.ActivatedNeurons:N0}");
                 Console.WriteLine($"   Activated clusters:  {result.ActivatedClusters.Count}");
                 Console.WriteLine($"   Confidence:          {result.Confidence:F2}");
