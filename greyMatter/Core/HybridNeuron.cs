@@ -262,18 +262,33 @@ namespace GreyMatter.Core
         /// </summary>
         public NeuronSnapshot CreateSnapshot()
         {
+            // Sanitize weights to prevent JSON serialization errors (NaN, Infinity, malformed decimals)
+            var sanitizedWeights = new Dictionary<Guid, double>();
+            foreach (var kvp in InputWeights)
+            {
+                var value = kvp.Value;
+                if (double.IsNaN(value) || double.IsInfinity(value))
+                {
+                    sanitizedWeights[kvp.Key] = 0.0; // Reset invalid weights to 0
+                }
+                else
+                {
+                    sanitizedWeights[kvp.Key] = value;
+                }
+            }
+            
             return new NeuronSnapshot
             {
                 Id = Id,
                 ConceptTag = ConceptTag,
                 AssociatedConcepts = AssociatedConcepts.ToList(),
-                ImportanceScore = ImportanceScore,
+                ImportanceScore = double.IsNaN(ImportanceScore) || double.IsInfinity(ImportanceScore) ? 0.0 : ImportanceScore,
                 ActivationCount = ActivationCount,
                 LastUsed = LastUsed,
-                InputWeights = InputWeights.ToDictionary(kvp => kvp.Key, kvp => kvp.Value),
-                Bias = Bias,
-                Threshold = Threshold,
-                LearningRate = LearningRate,
+                InputWeights = sanitizedWeights,
+                Bias = double.IsNaN(Bias) || double.IsInfinity(Bias) ? 0.0 : Bias,
+                Threshold = double.IsNaN(Threshold) || double.IsInfinity(Threshold) ? 0.5 : Threshold,
+                LearningRate = double.IsNaN(LearningRate) || double.IsInfinity(LearningRate) ? 0.01 : LearningRate,
                 IsProvisional = IsProvisional
             };
         }
