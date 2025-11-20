@@ -720,12 +720,15 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved {dirtyClusters.Count} clusters in {sw.Elapsed.TotalSeconds:F2}s (parallel={_storage.MaxParallelSaves}, gzip={_storage.CompressClusters})");
             
-            // Save cluster index (use snapshot)
+            // Save cluster index (use snapshot) - ONLY save clusters with neurons to avoid ghost clusters
             sw.Restart();
-            var clusterSnapshots = loadedClustersSnapshot.Select(c => c.CreateSnapshot()).ToList();
+            var clusterSnapshots = loadedClustersSnapshot
+                .Where(c => c.NeuronCount > 0)  // Skip empty ghost clusters
+                .Select(c => c.CreateSnapshot())
+                .ToList();
             await _storage.SaveClusterIndexAsync(clusterSnapshots);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   ⏱️  Saved cluster index in {sw.Elapsed.TotalSeconds:F2}s");
+                Console.WriteLine($"   ⏱️  Saved cluster index ({clusterSnapshots.Count} non-empty clusters) in {sw.Elapsed.TotalSeconds:F2}s");
             
             // Save synapses
             sw.Restart();

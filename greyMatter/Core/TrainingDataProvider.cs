@@ -13,6 +13,7 @@ namespace GreyMatter.Core
     {
         private readonly string _nasPath;
         private readonly Random _random = new Random();
+        private readonly Dictionary<string, string[]> _directoryFileCache = new Dictionary<string, string[]>();
         
         public TrainingDataProvider(string nasPath = "/Volumes/jarvis/trainData")
         {
@@ -93,8 +94,8 @@ namespace GreyMatter.Core
 
             AddIfExists(datasets, "epub_collection",
                 Path.Combine(_nasPath, "txtDump/cache/epub"),
-                DatasetFormat.EPUB, -1, "intermediate-advanced",
-                "EPUB collection (500GB+) - diverse literature and non-fiction");
+                DatasetFormat.DirectoryText, -1, "intermediate-advanced",
+                "EPUB collection (500GB+) - text files extracted from diverse literature and non-fiction");
 
             // === LLM-GENERATED: Infinite curriculum ===
             datasets["llm_generated"] = new DatasetInfo
@@ -370,54 +371,54 @@ namespace GreyMatter.Core
             {
                 Phase1_Foundation = new TrainingPhase
                 {
-                    Name = "Foundation (0-1K sentences)",
+                    Name = "Foundation (0-200 sentences)",
                     DatasetKey = baseDataset,  // Start with simple short sentences
-                    MaxSentences = 1000,
+                    MaxSentences = 200,  // REDUCED for smoke testing
                     MinWordCount = 3,
                     MaxWordCount = 12,
                     Description = "Short simple sentences - basic vocabulary and grammar"
                 },
                 Phase2_Expansion = new TrainingPhase
                 {
-                    Name = "Expansion (1K-5K sentences)",
+                    Name = "Expansion (200-700 sentences)",
                     DatasetKey = "news",  // News headlines - real-world events (39MB)
-                    MaxSentences = 5000,
+                    MaxSentences = 500,  // REDUCED for smoke testing
                     MinWordCount = 5,
                     MaxWordCount = 25,
                     Description = "News headlines - current events and journalism vocabulary"
                 },
                 Phase3_Dialogue = new TrainingPhase
                 {
-                    Name = "Dialogue (5K-10K sentences)",
+                    Name = "Dialogue (700-1200 sentences)",
                     DatasetKey = "dialogue",  // Conversational language from subtitles (608KB)
-                    MaxSentences = 5000,
+                    MaxSentences = 500,  // REDUCED for smoke testing
                     MinWordCount = 3,
                     MaxWordCount = 30,
                     Description = "Conversational English - questions, responses, informal language"
                 },
                 Phase4_BooksIntro = new TrainingPhase
                 {
-                    Name = "Narrative (10K-20K sentences)",
-                    DatasetKey = "books_corpus",  // 🚀 BOOKS: Narrative structures, storytelling
-                    MaxSentences = 10000,
+                    Name = "Narrative (1200-2000 sentences)",
+                    DatasetKey = "epub_collection",  // 🚀 EPUB BOOKS: Narrative structures (500GB+)
+                    MaxSentences = 800,  // REDUCED for smoke testing
                     MinWordCount = 5,
                     MaxWordCount = 40,
-                    Description = "Book corpus - narrative structures, complex storytelling"
+                    Description = "EPUB collection - narrative structures, complex storytelling"
                 },
                 Phase5_WikipediaChunked = new TrainingPhase
                 {
-                    Name = "Encyclopedic (20K-50K sentences)",
+                    Name = "Encyclopedic (2000-3000 sentences)",
                     DatasetKey = "wikipedia_chunked",  // 🚀 WIKIPEDIA CHUNKS: Pre-processed
-                    MaxSentences = 30000,
+                    MaxSentences = 1000,  // REDUCED for smoke testing
                     MinWordCount = 10,
                     MaxWordCount = 50,
                     Description = "Wikipedia chunks - encyclopedic knowledge, technical vocabulary"
                 },
                 Phase6_FullCorpus = new TrainingPhase
                 {
-                    Name = "Full Corpus (50K+ sentences)",
+                    Name = "Full Corpus (3000+ sentences)",
                     DatasetKey = "wikipedia_full",  // 🚀 571GB WIKIPEDIA: Maximum diversity
-                    MaxSentences = null,
+                    MaxSentences = 1000,  // REDUCED for smoke testing (removes null to limit batch size)
                     MinWordCount = null,
                     MaxWordCount = null,
                     Description = "Full Wikipedia (571GB+) - comprehensive world knowledge"
@@ -438,9 +439,20 @@ namespace GreyMatter.Core
                 return sentences;
             }
             
-            Console.WriteLine($"📁 Scanning directory: {dirPath}");
-            var textFiles = Directory.GetFiles(dirPath, "*.txt", SearchOption.AllDirectories);
-            Console.WriteLine($"   Found {textFiles.Length} text files");
+            // Cache file list to avoid rescanning large directories (e.g., 62K+ EPUB files)
+            string[] textFiles;
+            if (!_directoryFileCache.ContainsKey(dirPath))
+            {
+                Console.WriteLine($"📁 Scanning directory: {dirPath}");
+                textFiles = Directory.GetFiles(dirPath, "*.txt", SearchOption.AllDirectories);
+                _directoryFileCache[dirPath] = textFiles;
+                Console.WriteLine($"   Found {textFiles.Length} text files (cached for future loads)");
+            }
+            else
+            {
+                textFiles = _directoryFileCache[dirPath];
+                Console.WriteLine($"📁 Using cached file list: {textFiles.Length} text files in {dirPath}");
+            }
             
             var filesProcessed = 0;
             foreach (var file in textFiles.OrderBy(x => _random.Next()))

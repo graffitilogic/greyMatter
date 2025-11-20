@@ -314,7 +314,7 @@ namespace GreyMatter.Core
                         
                         var llmContent = await _dataProvider.LoadLLMGeneratedSentencesAsync(
                             _llmTeacher, 
-                            count: 1000,  // Generate 1000 sentences
+                            count: 100,  // REDUCED for smoke testing - faster LLM batches
                             topic: topic, 
                             difficulty: difficulty
                         );
@@ -340,7 +340,7 @@ namespace GreyMatter.Core
                     _batchNumber++;
                     var sentences = _dataProvider.LoadSentences(
                         datasetName, 
-                        maxSentences: 5000,
+                        maxSentences: 500,  // REDUCED for smoke testing - cycles faster through datasets
                         shuffle: true  // SHUFFLE each batch for variety!
                     );
                     sentenceList = sentences.ToList();

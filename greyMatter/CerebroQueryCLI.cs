@@ -108,43 +108,52 @@ Commands:
             Console.WriteLine($"🔍 Querying concept: '{concept}'");
             Console.WriteLine("════════════════════════════════════════════════════════════════════════════════\n");
 
-            // First try: Direct lookup by ConceptLabel in storage metadata
-            var storage = cerebro.GetType().GetField("_storage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(cerebro);
-            if (storage != null)
+            // Load cluster index directly from disk (don't rely on in-memory cache)
+            var clusterIndexPath = "/Volumes/jarvis/brainData/hierarchical/cluster_index.json";
+            if (File.Exists(clusterIndexPath))
             {
-                var metadataDict = storage.GetType().GetField("_partitionMetadata", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(storage) as System.Collections.IDictionary;
-                if (metadataDict != null)
+                var jsonContent = File.ReadAllText(clusterIndexPath);
+                var clusterIndex = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(jsonContent);
+                
+                var matches = new List<System.Text.Json.JsonElement>();
+                if (clusterIndex.ValueKind == System.Text.Json.JsonValueKind.Array)
                 {
-                    var matches = new List<dynamic>();
-                    foreach (System.Collections.DictionaryEntry entry in metadataDict)
+                    foreach (var cluster in clusterIndex.EnumerateArray())
                     {
-                        var metadata = entry.Value;
-                        var conceptLabel = metadata.GetType().GetProperty("ConceptLabel")?.GetValue(metadata) as string;
-                        if (!string.IsNullOrEmpty(conceptLabel) && conceptLabel.Equals(concept, StringComparison.OrdinalIgnoreCase))
+                        if (cluster.TryGetProperty("ConceptLabel", out var labelProp))
                         {
-                            matches.Add(metadata);
+                            var label = labelProp.GetString();
+                            if (!string.IsNullOrEmpty(label) && label.Equals(concept, StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Skip empty ghost clusters from old training runs
+                                var neuronCount = cluster.TryGetProperty("NeuronCount", out var nc) ? nc.GetInt32() : 0;
+                                if (neuronCount > 0)
+                                {
+                                    matches.Add(cluster);
+                                }
+                            }
                         }
                     }
+                }
 
-                    if (matches.Count > 0)
+                if (matches.Count > 0)
+                {
+                    Console.WriteLine($" Found {matches.Count} cluster(s) for '{concept}':\n");
+                    foreach (var match in matches.Take(10))
                     {
-                        Console.WriteLine($" Found {matches.Count} cluster(s) for '{concept}':\n");
-                        foreach (var match in matches.Take(5))
-                        {
-                            var clusterId = match.GetType().GetProperty("ClusterId")?.GetValue(match);
-                            var neuronCount = match.GetType().GetProperty("NeuronCount")?.GetValue(match);
-                            var importance = match.GetType().GetProperty("AverageImportance")?.GetValue(match);
-                            var domain = match.GetType().GetProperty("ConceptDomain")?.GetValue(match);
-                            
-                            Console.WriteLine($"   Cluster: {clusterId}");
-                            Console.WriteLine($"   Domain:  {domain}");
-                            Console.WriteLine($"   Neurons: {neuronCount:N0}");
-                            Console.WriteLine($"   Importance: {importance:F3}");
-                            Console.WriteLine();
-                        }
-                        Console.WriteLine("════════════════════════════════════════════════════════════════════════════════\n");
-                        return;
+                        var clusterId = match.TryGetProperty("ClusterId", out var cid) ? cid.GetGuid() : Guid.Empty;
+                        var neuronCount = match.TryGetProperty("NeuronCount", out var nc) ? nc.GetInt32() : 0;
+                        var importance = match.TryGetProperty("AverageImportance", out var imp) ? imp.GetDouble() : 0.0;
+                        var domain = match.TryGetProperty("ConceptDomain", out var dom) ? dom.GetString() : "unknown";
+                        
+                        Console.WriteLine($"   Cluster: {clusterId}");
+                        Console.WriteLine($"   Domain:  {domain}");
+                        Console.WriteLine($"   Neurons: {neuronCount:N0}");
+                        Console.WriteLine($"   Importance: {importance:F3}");
+                        Console.WriteLine();
                     }
+                    Console.WriteLine("════════════════════════════════════════════════════════════════════════════════\n");
+                    return;
                 }
             }
 

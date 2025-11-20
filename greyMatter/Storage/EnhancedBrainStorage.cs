@@ -1368,7 +1368,12 @@ namespace GreyMatter.Storage
             
             try
             {
-                var json = JsonSerializer.Serialize(regionMappings, new JsonSerializerOptions { WriteIndented = true });
+                // Convert Guid to string for JSON compatibility
+                var stringMappings = regionMappings.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value.Select(g => g.ToString()).ToList()
+                );
+                var json = JsonSerializer.Serialize(stringMappings, new JsonSerializerOptions { WriteIndented = true });
                 await File.WriteAllTextAsync(path, json);
             }
             catch (Exception ex)
@@ -1393,8 +1398,15 @@ namespace GreyMatter.Storage
             try
             {
                 var json = await File.ReadAllTextAsync(path);
-                return JsonSerializer.Deserialize<Dictionary<string, List<Guid>>>(json) 
-                       ?? new Dictionary<string, List<Guid>>();
+                // Deserialize as string first, then convert to Guid
+                var stringMappings = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(json);
+                if (stringMappings == null)
+                    return new Dictionary<string, List<Guid>>();
+                    
+                return stringMappings.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value.Select(s => Guid.Parse(s)).ToList()
+                );
             }
             catch (Exception ex)
             {
