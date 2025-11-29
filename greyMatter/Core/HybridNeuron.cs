@@ -141,6 +141,9 @@ namespace GreyMatter.Core
         {
             double error = expectedOutput - actualOutput;
             double delta = LearningRate * error * inputValue;
+            
+            // CRITICAL: Sanitize delta to prevent NaN/Infinity from propagating
+            delta = SanitizeDouble(delta, 0.0, $"Neuron {Id} LearnStm delta");
 
             if (Math.Abs(delta) > 0)
             {
@@ -161,7 +164,7 @@ namespace GreyMatter.Core
 
             if (Math.Abs(StmBiasDelta) >= epsilon)
             {
-                Bias += StmBiasDelta;
+                Bias = SanitizeDouble(Bias + StmBiasDelta, 0.0, $"Neuron {Id} bias update");
                 StmBiasDelta = 0.0;
                 changed = true;
             }
@@ -177,7 +180,10 @@ namespace GreyMatter.Core
 
                     if (!InputWeights.ContainsKey(id))
                         InputWeights[id] = 0.0;
-                    InputWeights[id] += d;
+                    
+                    // CRITICAL: Sanitize before and after addition
+                    var newWeight = SanitizeDouble(InputWeights[id] + d, 0.0, $"Neuron {Id} weight update");
+                    InputWeights[id] = newWeight;
 
                     if (Math.Abs(InputWeights[id]) < 0.001)
                         InputWeights.Remove(id);
@@ -200,7 +206,7 @@ namespace GreyMatter.Core
         {
             OutputConnections.Add(targetNeuronId);
             if (!InputWeights.ContainsKey(targetNeuronId))
-                InputWeights[targetNeuronId] = initialWeight;
+                InputWeights[targetNeuronId] = SanitizeDouble(initialWeight, 0.1, $"Neuron {Id} ConnectTo");
         }
 
         /// <summary>
@@ -260,36 +266,171 @@ namespace GreyMatter.Core
         /// <summary>
         /// Create a lightweight representation for persistence
         /// </summary>
-        public NeuronSnapshot CreateSnapshot()
+        // Aggressive sanitization: validates that a double is JSON-serializable
+        private static double SanitizeDouble(double value, double defaultValue = 0.0, string context = "")
         {
-            // Sanitize weights to prevent JSON serialization errors (NaN, Infinity, malformed decimals)
-            var sanitizedWeights = new Dictionary<Guid, double>();
-            foreach (var kvp in InputWeights)
+            // Check for NaN or Infinity
+            if (double.IsNaN(value) || double.IsInfinity(value))
             {
-                var value = kvp.Value;
-                if (double.IsNaN(value) || double.IsInfinity(value))
+                Console.WriteLine($"[SANITIZE] {context}: NaN/Infinity detected, replacing with {defaultValue}");
+                return defaultValue;
+            }
+            
+            // Check for subnormal numbers (very close to zero, can cause JSON issues)
+            if (Math.Abs(value) < double.Epsilon * 100)
+            {
+                if (value != 0.0)
+                    Console.WriteLine($"[SANITIZE] {context}: Subnormal detected ({value:E}), replacing with 0.0");
+                return 0.0;
+            }
+            
+            // Check for extreme values that might overflow JSON
+            if (Math.Abs(value) > 1e308)
+            {
+                Console.WriteLine($"[SANITIZE] {context}: Extreme value detected ({value:E}), replacing with {defaultValue}");
+                return defaultValue;
+            }
+            
+            // CRITICAL: Check for System.Text.Json edge cases
+            // Certain bit patterns cause malformed JSON (e.g., numbers ending with quotes)
+            var bits = BitConverter.DoubleToInt64Bits(value);
+            
+            // Check for signaling NaN (different bit pattern than quiet NaN)
+            if ((bits & 0x7FF8000000000000) == 0x7FF0000000000000 && (bits & 0x0007FFFFFFFFFFFF) != 0)
+            {
+                Console.WriteLine($"❌ [SANITIZE] {context}: Signaling NaN detected (0x{bits:X16}), replacing with {defaultValue}");
+                return defaultValue;
+            }
+            
+            // CRITICAL: Test round-trip through JSON using Utf8JsonWriter to catch System.Text.Json edge cases
+            // Some values pass the above checks but still fail JSON serialization
+            try
+            {
+                // Use Utf8JsonWriter to match actual serialization path
+                using var ms = new System.IO.MemoryStream();
+                using (var writer = new System.Text.Json.Utf8JsonWriter(ms))
                 {
-                    sanitizedWeights[kvp.Key] = 0.0; // Reset invalid weights to 0
+                    writer.WriteNumberValue(value);
+                }
+                
+                // Verify the JSON is valid by parsing it back
+                ms.Position = 0;
+                var jsonBytes = ms.ToArray();
+                var jsonText = System.Text.Encoding.UTF8.GetString(jsonBytes);
+                
+                // Check for malformed JSON (numbers shouldn't contain quotes)
+                if (jsonText.Contains('"'))
+                {
+                    Console.WriteLine($"❌ [SANITIZE] {context}: Value {value:E} (0x{bits:X16}) produced malformed JSON: '{jsonText}', replacing with {defaultValue}");
+                    return defaultValue;
+                }
+                
+                ms.Position = 0;
+                using var doc = System.Text.Json.JsonDocument.Parse(ms);
+                var roundTrip = doc.RootElement.GetDouble();
+                
+                // If round-trip produced NaN/Infinity, the value is invalid
+                if (double.IsNaN(roundTrip) || double.IsInfinity(roundTrip))
+                {
+                    Console.WriteLine($"[SANITIZE] {context}: Value {value:E} failed JSON round-trip (became {roundTrip}), replacing with {defaultValue}");
+                    return defaultValue;
+                }
+                
+                return value;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ [SANITIZE] {context}: Value {value:E} (raw bits: {BitConverter.DoubleToInt64Bits(value):X16}) failed JSON serialization ({ex.Message}), replacing with {defaultValue}");
+                return defaultValue;
+            }
+        }
+
+        /// <summary>
+        /// Sanitize a string for safe JSON serialization
+        /// Removes/replaces control characters and other problematic characters
+        /// </summary>
+        private static string SanitizeString(string value)
+        {
+            if (string.IsNullOrEmpty(value)) return value;
+            
+            // Fast path: if string only contains safe ASCII printable chars, return as-is
+            bool needsSanitization = false;
+            foreach (char c in value)
+            {
+                if (c < 32 || c == 127)  // Control characters including DEL
+                {
+                    needsSanitization = true;
+                    break;
+                }
+            }
+            
+            if (!needsSanitization) return value;
+            
+            // Slow path: rebuild string with safe characters
+            var sb = new System.Text.StringBuilder(value.Length);
+            foreach (char c in value)
+            {
+                if (c < 32 || c == 127)
+                {
+                    // Replace control characters with space (including newline, tab, etc.)
+                    // These cause JSON parsing errors when embedded in string values
+                    sb.Append(' ');
                 }
                 else
                 {
-                    sanitizedWeights[kvp.Key] = value;
+                    sb.Append(c);
                 }
             }
+            
+            return sb.ToString();
+        }
+
+        public NeuronSnapshot CreateSnapshot()
+        {
+            // CRITICAL: Create defensive copy of InputWeights to prevent concurrent modification
+            // Training threads can modify InputWeights during checkpoint save
+            Dictionary<Guid, double> weightsCopy;
+            lock (InputWeights)
+            {
+                weightsCopy = new Dictionary<Guid, double>(InputWeights);
+            }
+            
+            // Sanitize weights to prevent JSON serialization errors (NaN, Infinity, subnormals, etc.)
+            var sanitizedWeights = new Dictionary<Guid, double>();
+            foreach (var kvp in weightsCopy)
+            {
+                sanitizedWeights[kvp.Key] = SanitizeDouble(kvp.Value, 0.0, $"Neuron {Id} weight {kvp.Key}");
+            }
+            
+            // CRITICAL: Snapshot other fields atomically to prevent concurrent modification
+            var conceptsCopy = AssociatedConcepts.ToList();
+            var conceptTag = ConceptTag;
+            var importance = ImportanceScore;
+            var activationCount = ActivationCount;
+            var lastUsed = LastUsed;
+            var bias = Bias;
+            var threshold = Threshold;
+            var learningRate = LearningRate;
+            var isProvisional = IsProvisional;
+            
+            // CRITICAL: Sanitize strings to prevent JSON serialization errors
+            // Control characters, unescaped quotes, and invalid JSON chars cause parse failures
+            var sanitizedConceptTag = SanitizeString(conceptTag);
+            var sanitizedConcepts = conceptsCopy.Select(SanitizeString).ToList();
             
             return new NeuronSnapshot
             {
                 Id = Id,
-                ConceptTag = ConceptTag,
-                AssociatedConcepts = AssociatedConcepts.ToList(),
-                ImportanceScore = double.IsNaN(ImportanceScore) || double.IsInfinity(ImportanceScore) ? 0.0 : ImportanceScore,
-                ActivationCount = ActivationCount,
-                LastUsed = LastUsed,
+                ConceptTag = sanitizedConceptTag,
+                AssociatedConcepts = sanitizedConcepts,
+                ImportanceScore = SanitizeDouble(importance, 0.0, $"Neuron {Id} importance"),
+                ActivationCount = activationCount,
+                LastUsed = lastUsed,
                 InputWeights = sanitizedWeights,
-                Bias = double.IsNaN(Bias) || double.IsInfinity(Bias) ? 0.0 : Bias,
-                Threshold = double.IsNaN(Threshold) || double.IsInfinity(Threshold) ? 0.5 : Threshold,
-                LearningRate = double.IsNaN(LearningRate) || double.IsInfinity(LearningRate) ? 0.01 : LearningRate,
-                IsProvisional = IsProvisional
+                Bias = SanitizeDouble(bias, 0.0, $"Neuron {Id} bias"),
+                Threshold = SanitizeDouble(threshold, 0.5, $"Neuron {Id} threshold"),
+                LearningRate = SanitizeDouble(learningRate, 0.01, $"Neuron {Id} learningRate"),
+                IsProvisional = isProvisional
             };
         }
 

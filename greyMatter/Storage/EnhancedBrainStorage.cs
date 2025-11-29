@@ -997,8 +997,12 @@ namespace GreyMatter.Storage
             return new JsonSerializerOptions
             {
                 WriteIndented = false,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                // TODO: Add custom Guid converters if needed
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DictionaryKeyPolicy = null, // Don't transform dictionary keys (breaks Guid keys)
+                NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals,
+                // Handles NaN, Infinity, -Infinity as JSON strings instead of failing
+                ReferenceHandler = ReferenceHandler.IgnoreCycles, // Prevent circular reference serialization
+                MaxDepth = 64 // Limit nesting depth to catch runaway serialization
             };
         }
 
@@ -1316,7 +1320,7 @@ namespace GreyMatter.Storage
             var basePath = storage.GetBasePath();
             Directory.CreateDirectory(basePath);
             var path = Path.Combine(basePath, "feature_mappings.json");
-            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true, DictionaryKeyPolicy = null, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
             await File.WriteAllTextAsync(path, json);
         }
 
@@ -1328,7 +1332,7 @@ namespace GreyMatter.Storage
             var basePath = storage.GetBasePath();
             Directory.CreateDirectory(basePath);
             var path = Path.Combine(basePath, "synapses.json");
-            var json = JsonSerializer.Serialize(snapshots, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(snapshots, new JsonSerializerOptions { WriteIndented = true, DictionaryKeyPolicy = null, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
             await File.WriteAllTextAsync(path, json);
         }
 
@@ -1340,7 +1344,7 @@ namespace GreyMatter.Storage
             var basePath = storage.GetBasePath();
             Directory.CreateDirectory(basePath);
             var path = Path.Combine(basePath, "cluster_index.json");
-            var json = JsonSerializer.Serialize(clusterSnapshots, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(clusterSnapshots, new JsonSerializerOptions { WriteIndented = true, DictionaryKeyPolicy = null, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
             await File.WriteAllTextAsync(path, json);
         }
 
@@ -1373,7 +1377,7 @@ namespace GreyMatter.Storage
                     kvp => kvp.Key,
                     kvp => kvp.Value.Select(g => g.ToString()).ToList()
                 );
-                var json = JsonSerializer.Serialize(stringMappings, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(stringMappings, new JsonSerializerOptions { WriteIndented = true, DictionaryKeyPolicy = null, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
                 await File.WriteAllTextAsync(path, json);
             }
             catch (Exception ex)
@@ -1427,7 +1431,7 @@ namespace GreyMatter.Storage
             try
             {
                 var summary = stats.GetSummary();
-                var json = JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(summary, new JsonSerializerOptions { WriteIndented = true, DictionaryKeyPolicy = null, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
                 await File.WriteAllTextAsync(path, json);
             }
             catch (Exception ex)
@@ -1480,7 +1484,12 @@ namespace GreyMatter.Storage
             
             try
             {
-                var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
+                var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions 
+                { 
+                    WriteIndented = true, 
+                    DictionaryKeyPolicy = null,
+                    NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals 
+                });
                 await File.WriteAllTextAsync(path, json);
             }
             catch (Exception ex)

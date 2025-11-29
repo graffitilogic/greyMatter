@@ -87,7 +87,8 @@ namespace GreyMatter.Core
             }
             
             LastAccessed = DateTime.UtcNow;
-            return _neurons;
+            // Return a snapshot to avoid concurrent modification during enumeration
+            return new Dictionary<Guid, HybridNeuron>(_neurons);
         }
 
         /// <summary>

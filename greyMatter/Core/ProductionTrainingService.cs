@@ -249,6 +249,15 @@ namespace GreyMatter.Core
                     await Task.Delay(1000, cancellationToken);
                 }
             }
+            
+            // Log if we exit the training loop unexpectedly
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                Console.WriteLine($"⚠️  WARNING: Training loop exited unexpectedly!");
+                Console.WriteLine($"   Sentence index: {_sentenceIndex}");
+                Console.WriteLine($"   Total sentences in batch: {_trainingSentences.Count}");
+                Console.WriteLine($"   Total processed: {_totalSentencesProcessed}");
+            }
         }
 
         /// <summary>
@@ -279,6 +288,9 @@ namespace GreyMatter.Core
         /// </summary>
         private async Task ReloadTrainingDataAsync()
         {
+            var reloadStart = DateTime.Now;
+            Console.WriteLine($"🔄 Starting data reload... [Started: {reloadStart:HH:mm:ss.fff}]");
+            
             try
             {
                 // Determine which dataset to load
@@ -303,7 +315,8 @@ namespace GreyMatter.Core
 
                 if (useLLM && _llmTeacher != null)  // Double-check _llmTeacher is not null
                 {
-                    Console.WriteLine($"🤖 Generating diverse content via LLM (batch #{_batchNumber})...");
+                    var llmStart = DateTime.Now;
+                    Console.WriteLine($"🤖 Generating diverse content via LLM (batch #{_batchNumber})... [Started: {llmStart:HH:mm:ss.fff}]");
                     try
                     {
                         // Generate topic-diverse content based on current curriculum phase
@@ -324,7 +337,9 @@ namespace GreyMatter.Core
                             .Where(s => s.Length > 0)
                             .ToList();
                         
-                        Console.WriteLine($"✨ Generated {sentenceList.Count:N0} LLM sentences on '{topic}' ({difficulty})");
+                        var llmEnd = DateTime.Now;
+                        var llmDuration = (llmEnd - llmStart).TotalSeconds;
+                        Console.WriteLine($"✨ Generated {sentenceList.Count:N0} LLM sentences on '{topic}' ({difficulty}) [Duration: {llmDuration:F2}s]");
                     }
                     catch (Exception llmEx)
                     {
@@ -337,6 +352,8 @@ namespace GreyMatter.Core
                 if (!useLLM || sentenceList.Count == 0)
                 {
                     // Load fresh batch from static dataset (with shuffling for variety!)
+                    var staticLoadStart = DateTime.Now;
+                    Console.WriteLine($"📁 Loading static dataset '{datasetName}'... [Started: {staticLoadStart:HH:mm:ss.fff}]");
                     _batchNumber++;
                     var sentences = _dataProvider.LoadSentences(
                         datasetName, 
@@ -344,17 +361,24 @@ namespace GreyMatter.Core
                         shuffle: true  // SHUFFLE each batch for variety!
                     );
                     sentenceList = sentences.ToList();
+                    var staticLoadEnd = DateTime.Now;
+                    var staticLoadDuration = (staticLoadEnd - staticLoadStart).TotalSeconds;
+                    Console.WriteLine($"📁 Static dataset loaded: {sentenceList.Count:N0} sentences [Duration: {staticLoadDuration:F2}s]");
                 }
                 
                 if (sentenceList.Any())
                 {
                     _trainingSentences = sentenceList;
                     _sentenceIndex = 0;
-                    Console.WriteLine($" Loaded {sentenceList.Count:N0} fresh sentences from '{datasetName}' (batch #{_batchNumber}, shuffled)");
+                    var reloadEnd = DateTime.Now;
+                    var reloadDuration = (reloadEnd - reloadStart).TotalSeconds;
+                    Console.WriteLine($" Loaded {sentenceList.Count:N0} fresh sentences from '{datasetName}' (batch #{_batchNumber}, shuffled) [Total duration: {reloadDuration:F2}s]");
                 }
                 else
                 {
-                    Console.WriteLine($"⚠️  No sentences loaded from '{datasetName}', keeping current batch");
+                    var reloadEnd = DateTime.Now;
+                    var reloadDuration = (reloadEnd - reloadStart).TotalSeconds;
+                    Console.WriteLine($"⚠️  No sentences loaded from '{datasetName}', keeping current batch [Duration: {reloadDuration:F2}s]");
                 }
             }
             catch (Exception ex)
@@ -398,13 +422,23 @@ namespace GreyMatter.Core
                     // Validation if needed
                     if ((DateTime.Now - _lastValidation).TotalHours >= _validationIntervalHours)
                     {
+                        var validationStart = DateTime.Now;
+                        Console.WriteLine($"🔧 Maintenance: Starting validation [Time: {validationStart:HH:mm:ss.fff}]");
                         await RunValidationAsync();
+                        var validationEnd = DateTime.Now;
+                        var validationDuration = (validationEnd - validationStart).TotalSeconds;
+                        Console.WriteLine($"🔧 Maintenance: Validation complete [Duration: {validationDuration:F2}s]");
                     }
 
                     // NAS archival if needed
                     if ((DateTime.Now - _lastNASArchive).TotalHours >= _nasArchiveIntervalHours)
                     {
+                        var archiveStart = DateTime.Now;
+                        Console.WriteLine($"🔧 Maintenance: Starting NAS archive [Time: {archiveStart:HH:mm:ss.fff}]");
                         await ArchiveToNASAsync();
+                        var archiveEnd = DateTime.Now;
+                        var archiveDuration = (archiveEnd - archiveStart).TotalSeconds;
+                        Console.WriteLine($"🔧 Maintenance: NAS archive complete [Duration: {archiveDuration:F2}s]");
                     }
                 }
                 catch (OperationCanceledException)
@@ -505,9 +539,11 @@ namespace GreyMatter.Core
         {
             // Use semaphore to prevent concurrent saves and ensure training pauses
             await _checkpointLock.WaitAsync();
+            var checkpointStart = DateTime.Now;
+            
             try
             {
-                Console.WriteLine($"\n💾 Saving checkpoint ({reason})...");
+                Console.WriteLine($"\n💾 Saving checkpoint ({reason})... [Started: {checkpointStart:HH:mm:ss.fff}]");
 
                 // Save Cerebro state (lightweight cluster metadata)
                 await _cerebro.SaveAsync();
@@ -546,7 +582,10 @@ namespace GreyMatter.Core
                 var afterGC = GC.GetTotalMemory(false) / (1024.0 * 1024.0);
                 var freedMB = beforeGC - afterGC;
 
-                Console.WriteLine($" Checkpoint saved: {checkpoint.Timestamp:HH:mm:ss}");
+                var checkpointEnd = DateTime.Now;
+                var checkpointDuration = (checkpointEnd - checkpointStart).TotalSeconds;
+                Console.WriteLine($" Checkpoint saved: {checkpoint.Timestamp:HH:mm:ss} [Ended: {checkpointEnd:HH:mm:ss.fff}]");
+                Console.WriteLine($"   Duration: {checkpointDuration:F2} seconds");
                 Console.WriteLine($"   Total checkpoints: {_checkpointsSaved}");
                 Console.WriteLine($"   Storage size: {stats.StorageSizeFormatted}");
                 Console.WriteLine($"   Memory: {afterGC:F1} MB (freed {freedMB:F1} MB)");

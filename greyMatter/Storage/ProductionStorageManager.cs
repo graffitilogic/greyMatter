@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 
 namespace GreyMatter.Storage
@@ -17,6 +18,13 @@ namespace GreyMatter.Storage
         private readonly string _checkpointsPath;
         private readonly string _metricsPath;
         private readonly string _episodicPath;
+
+        // JSON options that safely handle NaN, Infinity, -Infinity
+        private static readonly JsonSerializerOptions _safeJsonOptions = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            NumberHandling = JsonNumberHandling.AllowNamedFloatingPointLiterals
+        };
 
         public ProductionStorageManager(string basePath)
         {
@@ -57,7 +65,7 @@ namespace GreyMatter.Storage
         public async Task SaveLiveStateAsync<T>(string filename, T data)
         {
             var path = Path.Combine(_livePath, filename);
-            var json = JsonSerializer.Serialize(data, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(data, _safeJsonOptions);
             await File.WriteAllTextAsync(path, json);
         }
 
@@ -65,7 +73,7 @@ namespace GreyMatter.Storage
         {
             var timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
             var path = Path.Combine(_checkpointsPath, $"checkpoint_{timestamp}.json");
-            var json = JsonSerializer.Serialize(checkpoint, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(checkpoint, _safeJsonOptions);
             await File.WriteAllTextAsync(path, json);
         }
 

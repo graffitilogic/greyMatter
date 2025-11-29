@@ -75,27 +75,31 @@ namespace GreyMatter.Core
                 DatasetFormat.WikiXML, -1, "intermediate",
                 "Wikipedia simplified English (1.5GB XML)");
 
-            // === MASSIVE DATASETS: 571GB+ Wikipedia ===
-            AddIfExists(datasets, "wikipedia_full",
-                Path.Combine(_nasPath, "txtDump/cache/epub"),
+            // === MASSIVE DATASETS: EPUB Collection (500GB+, 62K+ books) ===
+            // NOTE: Reorganized into batched structure (256 folders per batch) for macOS compatibility
+            // Original: txtDump/cache/epub/[0-62163] - caused macOS SMB timeouts
+            // New: txtDump/batch_XXXX_<guid>/[0-255] - Mac-friendly structure
+            AddIfExists(datasets, "epub_collection",
+                Path.Combine(_nasPath, "txtDump"),
                 DatasetFormat.DirectoryText, -1, "intermediate-advanced",
-                "Full Wikipedia dump (571GB+) - comprehensive world knowledge");
+                "EPUB collection (500GB+, 62K books) - batched for macOS compatibility");
 
+            // Structured Wikipedia from HuggingFace (actual encyclopedia content)
             AddIfExists(datasets, "wikipedia_chunked",
-                Path.Combine(_nasPath, "txtDump/cache"),
+                Path.Combine(_nasPath, "structured_wikipedia/enwiki_namespace_0"),
                 DatasetFormat.DirectoryText, -1, "intermediate-advanced",
-                "Wikipedia pre-processed chunks - optimized for streaming");
+                "Structured Wikipedia - encyclopedic knowledge for Phase 5 curriculum");
+
+            AddIfExists(datasets, "wikipedia_full",
+                Path.Combine(_nasPath, "structured_wikipedia/enwiki_namespace_0"),
+                DatasetFormat.DirectoryText, -1, "intermediate-advanced",
+                "Structured Wikipedia - full encyclopedia for Phase 6 curriculum");
 
             // === BOOKS: Deep narrative understanding ===
             AddIfExists(datasets, "books_corpus",
                 Path.Combine(_nasPath, "books"),
                 DatasetFormat.DirectoryText, -1, "intermediate-advanced",
-                "Book corpus - long-form narrative and prose");
-
-            AddIfExists(datasets, "epub_collection",
-                Path.Combine(_nasPath, "txtDump/cache/epub"),
-                DatasetFormat.DirectoryText, -1, "intermediate-advanced",
-                "EPUB collection (500GB+) - text files extracted from diverse literature and non-fiction");
+                "Book corpus - long-form narrative and prose (if separate books folder exists)");
 
             // === LLM-GENERATED: Infinite curriculum ===
             datasets["llm_generated"] = new DatasetInfo
@@ -139,9 +143,17 @@ namespace GreyMatter.Core
             bool shuffle = false)
         {
             var datasets = GetAvailableDatasets();
+            
+            // If dataset not found, retry after short delay (NAS may be mounting)
             if (!datasets.ContainsKey(datasetKey))
             {
-                throw new ArgumentException($"Dataset '{datasetKey}' not found. Available: {string.Join(", ", datasets.Keys)}");
+                System.Threading.Thread.Sleep(2000); // Wait 2 seconds for NAS mount
+                datasets = GetAvailableDatasets();
+                
+                if (!datasets.ContainsKey(datasetKey))
+                {
+                    throw new ArgumentException($"Dataset '{datasetKey}' not found. Available: {string.Join(", ", datasets.Keys)}");
+                }
             }
 
             var dataset = datasets[datasetKey];
@@ -428,6 +440,7 @@ namespace GreyMatter.Core
         
         /// <summary>
         /// Load all text files from a directory recursively (for massive Wikipedia/book corpora)
+        /// Supports both .txt and .jsonl (Wikipedia structured format)
         /// </summary>
         private List<string> LoadDirectoryText(string dirPath, int? maxSentences, int? minWords, int? maxWords)
         {
@@ -437,6 +450,14 @@ namespace GreyMatter.Core
             {
                 Console.WriteLine($"⚠️  Directory not found: {dirPath}");
                 return sentences;
+            }
+            
+            // Check if this is structured Wikipedia (contains .jsonl files)
+            var jsonlFiles = Directory.GetFiles(dirPath, "*.jsonl", SearchOption.TopDirectoryOnly);
+            if (jsonlFiles.Length > 0)
+            {
+                Console.WriteLine($"📁 Found {jsonlFiles.Length} Wikipedia JSONL files, using structured parser");
+                return LoadWikipediaJsonl(jsonlFiles, maxSentences, minWords, maxWords);
             }
             
             // Cache file list to avoid rescanning large directories (e.g., 62K+ EPUB files)
@@ -488,6 +509,100 @@ namespace GreyMatter.Core
             }
             
             Console.WriteLine($" Loaded {sentences.Count:N0} sentences from {filesProcessed} files in {dirPath}");
+            return sentences;
+        }
+        
+        /// <summary>
+        /// Load Wikipedia data from JSONL format (HuggingFace structured Wikipedia)
+        /// Each line is a JSON object with article sections containing paragraphs
+        /// </summary>
+        private List<string> LoadWikipediaJsonl(string[] jsonlFiles, int? maxSentences, int? minWords, int? maxWords)
+        {
+            var sentences = new List<string>();
+            var filesProcessed = 0;
+            
+            // Randomize file order for diversity
+            var randomizedFiles = jsonlFiles.OrderBy(x => _random.Next()).ToArray();
+            
+            foreach (var file in randomizedFiles)
+            {
+                if (maxSentences.HasValue && sentences.Count >= maxSentences.Value)
+                    break;
+                    
+                try
+                {
+                    foreach (var line in File.ReadLines(file))
+                    {
+                        if (maxSentences.HasValue && sentences.Count >= maxSentences.Value)
+                            break;
+                            
+                        if (string.IsNullOrWhiteSpace(line)) continue;
+                        
+                        try
+                        {
+                            // Parse JSON line to extract article text
+                            using var doc = System.Text.Json.JsonDocument.Parse(line);
+                            var root = doc.RootElement;
+                            
+                            // Extract paragraphs from sections
+                            if (root.TryGetProperty("sections", out var sections))
+                            {
+                                foreach (var section in sections.EnumerateArray())
+                                {
+                                    if (section.TryGetProperty("has_parts", out var parts))
+                                    {
+                                        foreach (var part in parts.EnumerateArray())
+                                        {
+                                            if (part.TryGetProperty("type", out var type) && 
+                                                type.GetString() == "paragraph" &&
+                                                part.TryGetProperty("value", out var value))
+                                            {
+                                                var text = value.GetString();
+                                                if (string.IsNullOrWhiteSpace(text)) continue;
+                                                
+                                                // Split paragraph into sentences
+                                                var paragraphSentences = SplitIntoSentences(text);
+                                                foreach (var sent in paragraphSentences)
+                                                {
+                                                    var wordCount = sent.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length;
+                                                    if (minWords.HasValue && wordCount < minWords.Value) continue;
+                                                    if (maxWords.HasValue && wordCount > maxWords.Value) continue;
+                                                    
+                                                    sentences.Add(sent);
+                                                    
+                                                    if (maxSentences.HasValue && sentences.Count >= maxSentences.Value)
+                                                        break;
+                                                }
+                                                
+                                                if (maxSentences.HasValue && sentences.Count >= maxSentences.Value)
+                                                    break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (maxSentences.HasValue && sentences.Count >= maxSentences.Value)
+                                        break;
+                                }
+                            }
+                        }
+                        catch (System.Text.Json.JsonException)
+                        {
+                            // Skip malformed JSON lines
+                            continue;
+                        }
+                    }
+                    
+                    filesProcessed++;
+                    if (filesProcessed % 5 == 0)
+                        Console.WriteLine($"   Processed {filesProcessed}/{jsonlFiles.Length} JSONL files, collected {sentences.Count:N0} sentences");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"   ⚠️  Error reading {Path.GetFileName(file)}: {ex.Message}");
+                }
+            }
+            
+            Console.WriteLine($" Loaded {sentences.Count:N0} sentences from {filesProcessed} Wikipedia JSONL files");
             return sentences;
         }
         
