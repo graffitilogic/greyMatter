@@ -462,18 +462,30 @@ namespace GreyMatter.Core
     /// <summary>
     /// Lightweight snapshot for persistence
     /// </summary>
+    [MessagePack.MessagePackObject]
     public class NeuronSnapshot
     {
+        [MessagePack.Key(0)]
         public Guid Id { get; set; }
+        [MessagePack.Key(1)]
         public string ConceptTag { get; set; } = "";
+        [MessagePack.Key(2)]
         public List<string> AssociatedConcepts { get; set; } = new();
+        [MessagePack.Key(3)]
         public double ImportanceScore { get; set; }
+        [MessagePack.Key(4)]
         public int ActivationCount { get; set; }
+        [MessagePack.Key(5)]
         public DateTime LastUsed { get; set; }
+        [MessagePack.Key(6)]
         public Dictionary<Guid, double> InputWeights { get; set; } = new();
+        [MessagePack.Key(7)]
         public double Bias { get; set; }
+        [MessagePack.Key(8)]
         public double Threshold { get; set; }
+        [MessagePack.Key(9)]
         public double LearningRate { get; set; }
+        [MessagePack.Key(10)]
         public bool IsProvisional { get; set; } = false;
     }
 }

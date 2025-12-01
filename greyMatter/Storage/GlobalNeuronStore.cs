@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using GreyMatter.Core;
 using System.Collections.Concurrent;
 using System.Threading;
+using MessagePack;
+using MessagePack;
 
 namespace GreyMatter.Storage
 {
@@ -45,7 +47,7 @@ namespace GreyMatter.Storage
 
         private string GetNeuronBankPath(PartitionPath partition)
         {
-            return Path.Combine(GetPartitionDir(partition), "neurons.bank.json.gz");
+            return Path.Combine(GetPartitionDir(partition), "neurons.bank.msgpack.gz");
         }
 
         // Canonicalize neuron IDs to lowercase Guid("N") to avoid mismatches across files
@@ -135,20 +137,93 @@ namespace GreyMatter.Storage
 
         private async Task<Dictionary<string, NeuronSnapshot>> ReadBankAsync(string bankPath)
         {
-            await using var fs = File.OpenRead(bankPath);
-            await using var gz = new GZipStream(fs, CompressionMode.Decompress);
-            var dict = await JsonSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz, _jsonOptions).ConfigureAwait(false);
-            var result = new Dictionary<string, NeuronSnapshot>();
-            if (dict != null)
+            // Support migration from JSON to MessagePack
+            // Try MessagePack first (new format), fall back to JSON (old format)
+            var msgpackPath = bankPath; // Already .msgpack.gz from GetNeuronBankPath
+            var jsonPath = bankPath.Replace(".msgpack.gz", ".json.gz");
+            
+            string? pathToRead = null;
+            bool useMsgPack = false;
+            
+            if (File.Exists(msgpackPath))
             {
-                // Re-key to normalized IDs and last-writer-wins for duplicates
-                foreach (var kvp in dict)
-                {
-                    var norm = NormalizeId(kvp.Key);
-                    result[norm] = kvp.Value;
-                }
+                pathToRead = msgpackPath;
+                useMsgPack = true;
             }
-            return result;
+            else if (File.Exists(jsonPath))
+            {
+                pathToRead = jsonPath;
+                useMsgPack = false;
+                Console.WriteLine($"   📦 Migrating {Path.GetFileName(jsonPath)} from JSON to MessagePack");
+            }
+            else
+            {
+                // No file exists yet
+                return new Dictionary<string, NeuronSnapshot>();
+            }
+            
+            try
+            {
+                await using var fs = File.OpenRead(pathToRead);
+                await using var gz = new GZipStream(fs, CompressionMode.Decompress);
+                
+                Dictionary<string, NeuronSnapshot>? dict = null;
+                
+                if (useMsgPack)
+                {
+                    try
+                    {
+                        dict = await MessagePackSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz).ConfigureAwait(false);
+                    }
+                    catch (MessagePack.MessagePackSerializationException msgEx)
+                    {
+                        Console.WriteLine($"❌ MessagePack deserialization failed for {Path.GetFileName(pathToRead)}:");
+                        Console.WriteLine($"   Message: {msgEx.Message}");
+                        Console.WriteLine($"   Inner: {msgEx.InnerException?.Message}");
+                        Console.WriteLine($"   File size: {new FileInfo(pathToRead).Length} bytes");
+                        Console.WriteLine($"   🔧 File appears corrupted, returning empty dictionary (will be rewritten)");
+                        return new Dictionary<string, NeuronSnapshot>();
+                    }
+                }
+                else
+                {
+                    // Read old JSON format
+                    try
+                    {
+                        dict = await JsonSerializer.DeserializeAsync<Dictionary<string, NeuronSnapshot>>(gz, _jsonOptions).ConfigureAwait(false);
+                    }
+                    catch (JsonException jsonEx)
+                    {
+                        Console.WriteLine($"❌ JSON deserialization failed for {Path.GetFileName(pathToRead)}:");
+                        Console.WriteLine($"   Message: {jsonEx.Message}");
+                        Console.WriteLine($"   Path: {jsonEx.Path}");
+                        Console.WriteLine($"   Line: {jsonEx.LineNumber}, Pos: {jsonEx.BytePositionInLine}");
+                        Console.WriteLine($"   🔧 File appears corrupted, returning empty dictionary (will be rewritten)");
+                        return new Dictionary<string, NeuronSnapshot>();
+                    }
+                }
+                
+                var result = new Dictionary<string, NeuronSnapshot>();
+                if (dict != null)
+                {
+                    // Re-key to normalized IDs and last-writer-wins for duplicates
+                    foreach (var kvp in dict)
+                    {
+                        if (kvp.Key == null || kvp.Value == null) continue;
+                        var norm = NormalizeId(kvp.Key);
+                        result[norm] = kvp.Value;
+                    }
+                }
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Unexpected error reading {Path.GetFileName(pathToRead ?? bankPath)}:");
+                Console.WriteLine($"   Message: {ex.Message}");
+                Console.WriteLine($"   Type: {ex.GetType().Name}");
+                Console.WriteLine($"   🔧 Returning empty dictionary (file will be rewritten)");
+                return new Dictionary<string, NeuronSnapshot>();
+            }
         }
 
         private async Task WriteBankAsync(string bankPath, Dictionary<string, NeuronSnapshot> dict)
@@ -156,62 +231,114 @@ namespace GreyMatter.Storage
             var tmp = bankPath + ".tmp";
             try
             {
+                // DEFENSIVE: Validate dictionary before serialization
+                if (dict == null)
+                {
+                    Console.WriteLine($"⚠️  Null dictionary passed to WriteBankAsync for {Path.GetFileName(bankPath)}, skipping save");
+                    return;
+                }
+                
+                // DEFENSIVE: Remove any null keys or values, sanitize snapshots
+                var sanitizedDict = new Dictionary<string, NeuronSnapshot>();
+                var nullKeyCount = 0;
+                var nullValueCount = 0;
+                var invalidSnapshotCount = 0;
+                
+                foreach (var kvp in dict)
+                {
+                    if (string.IsNullOrEmpty(kvp.Key))
+                    {
+                        nullKeyCount++;
+                        continue;
+                    }
+                    
+                    if (kvp.Value == null)
+                    {
+                        nullValueCount++;
+                        continue;
+                    }
+                    
+                    // Sanitize the snapshot to ensure all properties are valid for MessagePack
+                    var snapshot = kvp.Value;
+                    
+                    // Check for invalid ID (all zeros = default/uninitialized)
+                    if (snapshot.Id == Guid.Empty)
+                    {
+                        invalidSnapshotCount++;
+                        continue;
+                    }
+                    
+                    // Ensure collections are not null (MessagePack requires non-null collections)
+                    if (snapshot.AssociatedConcepts == null)
+                        snapshot.AssociatedConcepts = new List<string>();
+                    if (snapshot.InputWeights == null)
+                        snapshot.InputWeights = new Dictionary<Guid, double>();
+                    if (snapshot.ConceptTag == null)
+                        snapshot.ConceptTag = "";
+                    
+                    // Sanitize doubles in InputWeights
+                    var badWeights = new List<Guid>();
+                    foreach (var weight in snapshot.InputWeights)
+                    {
+                        if (double.IsNaN(weight.Value) || double.IsInfinity(weight.Value))
+                        {
+                            badWeights.Add(weight.Key);
+                        }
+                    }
+                    foreach (var badKey in badWeights)
+                    {
+                        snapshot.InputWeights.Remove(badKey);
+                    }
+                    
+                    // Sanitize other doubles
+                    if (double.IsNaN(snapshot.Bias) || double.IsInfinity(snapshot.Bias))
+                        snapshot.Bias = 0.0;
+                    if (double.IsNaN(snapshot.Threshold) || double.IsInfinity(snapshot.Threshold))
+                        snapshot.Threshold = 0.5;
+                    if (double.IsNaN(snapshot.LearningRate) || double.IsInfinity(snapshot.LearningRate))
+                        snapshot.LearningRate = 0.01;
+                    if (double.IsNaN(snapshot.ImportanceScore) || double.IsInfinity(snapshot.ImportanceScore))
+                        snapshot.ImportanceScore = 0.0;
+                    
+                    sanitizedDict[kvp.Key] = snapshot;
+                }
+                
+                if (nullKeyCount > 0 || nullValueCount > 0 || invalidSnapshotCount > 0)
+                {
+                    Console.WriteLine($"⚠️  Sanitized {Path.GetFileName(bankPath)}: removed {nullKeyCount} null keys, {nullValueCount} null values, {invalidSnapshotCount} invalid snapshots");
+                }
+                
+                if (sanitizedDict.Count == 0)
+                {
+                    Console.WriteLine($"⚠️  No valid neurons to save in {Path.GetFileName(bankPath)} after sanitization, skipping save");
+                    return;
+                }
+                
                 await using (var fs = new FileStream(tmp, FileMode.Create, FileAccess.Write, FileShare.None))
                 await using (var gz = new GZipStream(fs, CompressionLevel.Fastest, leaveOpen: false))
-                await using (var writer = new Utf8JsonWriter(gz, new JsonWriterOptions { Indented = false }))
                 {
-                    JsonSerializer.Serialize(writer, dict, _jsonOptions);
-                    await writer.FlushAsync().ConfigureAwait(false);
+                    // Use MessagePack instead of JSON to avoid System.Text.Json double serialization bugs
+                    await MessagePackSerializer.SerializeAsync(gz, sanitizedDict).ConfigureAwait(false);
                 }
 
                 if (File.Exists(bankPath)) File.Delete(bankPath);
                 File.Move(tmp, bankPath, overwrite: true);
             }
-            catch (JsonException jsonEx)
+            catch (Exception ex)
             {
-                Console.WriteLine($"❌ JSON serialization error in {Path.GetFileName(bankPath)}:");
-                Console.WriteLine($"   Message: {jsonEx.Message}");
-                Console.WriteLine($"   Path: {jsonEx.Path}");
-                Console.WriteLine($"   Line: {jsonEx.LineNumber}, Position: {jsonEx.BytePositionInLine}");
+                Console.WriteLine($"❌ Serialization error in {Path.GetFileName(bankPath)}:");
+                Console.WriteLine($"   Message: {ex.Message}");
+                Console.WriteLine($"   Type: {ex.GetType().Name}");
+                Console.WriteLine($"   Inner: {ex.InnerException?.Message}");
+                Console.WriteLine($"   Stack trace (first 500 chars): {ex.StackTrace?.Substring(0, Math.Min(500, ex.StackTrace?.Length ?? 0))}");
+                Console.WriteLine($"   Dictionary contains {dict?.Count ?? 0} neurons");
                 
-                // Parse the JSON path to extract neuron ID and weight ID
-                if (!string.IsNullOrEmpty(jsonEx.Path))
+                // Clean up temp file
+                if (File.Exists(tmp))
                 {
-                    var pathParts = jsonEx.Path.Split('.');
-                    if (pathParts.Length >= 3)
-                    {
-                        var neuronId = pathParts[1]; // $.neuronId.inputWeights.weightId
-                        Console.WriteLine($"   🔍 Problematic neuron ID: {neuronId}");
-                        
-                        if (dict.TryGetValue(neuronId, out var neuron))
-                        {
-                            Console.WriteLine($"   🔍 Neuron ConceptTag: '{neuron.ConceptTag}'");
-                            Console.WriteLine($"   🔍 Neuron has {neuron.InputWeights?.Count ?? 0} weights");
-                            
-                            // If the path mentions a specific weight, find it
-                            if (pathParts.Length >= 4 && pathParts[2] == "inputWeights")
-                            {
-                                var weightIdStr = pathParts[3];
-                                if (Guid.TryParse(weightIdStr, out var weightId) && neuron.InputWeights != null)
-                                {
-                                    if (neuron.InputWeights.TryGetValue(weightId, out var weightValue))
-                                    {
-                                        Console.WriteLine($"   🔍 Problematic weight ID: {weightId}");
-                                        Console.WriteLine($"   🔍 Weight value: {weightValue} (0x{BitConverter.DoubleToInt64Bits(weightValue):X16})");
-                                        Console.WriteLine($"   🔍 IsNaN: {double.IsNaN(weightValue)}, IsInfinity: {double.IsInfinity(weightValue)}");
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    try { File.Delete(tmp); } catch { }
                 }
                 
-                // Try to identify the problematic neuron
-                Console.WriteLine($"   Dictionary contains {dict.Count} neurons");
-                foreach (var kvp in dict.Take(5))
-                {
-                    Console.WriteLine($"   Sample ID: {kvp.Key}, ConceptTag: '{kvp.Value.ConceptTag?.Substring(0, Math.Min(50, kvp.Value.ConceptTag?.Length ?? 0)) ?? "null"}'");
-                }
                 throw;
             }
         }
