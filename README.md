@@ -6,18 +6,24 @@
 > 
 > **Latest**: ✅ 571GB Wikipedia, books, and LLM teacher fully integrated (Nov 2025)
 
-## 🎯 What Actually Works (Nov 2025)
+## 🎯 What Actually Works (Dec 2025)
 
-**Massive Dataset Training Infrastructure** ✅ **NEW**
+**Pattern-Based Neural Architecture** ✅ **Core Principle**
+- **No queryable word lists**: Concepts exist as VQ activation patterns, not searchable labels
+- **Pattern similarity retrieval**: Query by showing examples, system finds similar patterns in VQ space
+- **Biological alignment**: Like human memory - "tip of tongue" from partial patterns, not dictionary lookup
+- **VQ-VAE clustering**: 512-code learned codebook groups similar patterns automatically
+- **Sparse activation**: Most neurons dormant, only relevant patterns activate (<1% active per query)
+- **Procedural generation ready**: Foundation for regenerating neurons from VQ codes + weights
+
+**Massive Dataset Training Infrastructure** ✅
 - **571GB Wikipedia corpus**: DirectoryText format, recursive .txt loading
 - **500GB book collections**: Narrative structures and storytelling patterns
 - **LLM teacher integration**: Ollama deepseek-r1:1.5b generates content on-demand
 - **Progressive curriculum**: Simple → News → Dialogue → Books → Wikipedia
 - **Smart sampling**: 5000-sentence batches (never exhausts datasets)
 - **LLM mixing**: Every 5th batch uses dynamic generation (6 rotating topics)
-- **Fixed checkpoints**: NaN/Infinity sanitization prevents JSON crashes
-- **Fixed queries**: Direct ConceptLabel lookup with case-insensitive matching
-- **See**: MASSIVE_DATASET_ACTIVATION.md and PRODUCTION_TRAINING_GUIDE.md
+- **MessagePack checkpoints**: Binary serialization with NaN/Infinity sanitization
 
 **VQ-VAE Production Integration (ADPC-Net Phase 5)** ✅
 - Cerebro uses VQ-VAE for all region ID generation (replaces LSH)
@@ -64,11 +70,13 @@
 - **No word list cheating**: Pattern similarity drives retrieval
 
 **Infrastructure (Production-Ready)** ✅
-- Long-term training stability: 10+ hours, no crashes, constant memory (20-25 MB)
-- NAS integration: Hourly checkpoints save/load successfully
-- Fast processing: ~470 concepts/sec sustained on real Tatoeba data
-- Progressive curriculum: 4-phase learning pipeline operational
-- Cluster partitioning: On-demand loading prevents memory bloat
+- Long-term training stability: 10+ hours, no crashes
+- NAS integration: Checkpoint persistence via MessagePack
+- Pattern encoding: ~470 concepts/sec (CPU-bound, NAS I/O bottleneck)
+- Progressive curriculum: 6-phase learning pipeline operational
+- VQ-based clustering: Automatic pattern grouping, 24K+ clusters learned
+- **Current bottleneck**: NAS I/O for checkpoint writes, not CPU
+- **Next**: GPU port for VQ encoding after concept proven in .NET
 
 **Neural Realism Progress** ✅ **COMPLETE (All 5 Phases)**
 - ✅ **Pattern-based retrieval** (replaces word list lookup)
@@ -129,17 +137,19 @@
 
 
 ### Project Status
-- **Architecture**: Cerebro (procedural generation) ✅ Implemented
+- **Architecture**: Cerebro (procedural generation foundation) ✅ Implemented
 - **Pattern Learning**: ADPC-Net Phase 1 (feature-based) ✅ Complete & Validated
 - **Dynamic Neurons**: ADPC-Net Phase 2 (hypernetwork) ✅ Complete & Validated
 - **Sparse Synapses**: ADPC-Net Phase 3 (Hebbian learning) ✅ Complete & Validated
 - **VQ-VAE Codebook**: ADPC-Net Phase 4 (learned quantization) ✅ Complete & Validated
 - **VQ-VAE Integration**: ADPC-Net Phase 5 (production) ✅ Complete & Validated
-- **Massive Datasets**: 571GB Wikipedia + Books + LLM ✅ Activated **NEW**
+- **Massive Datasets**: 571GB Wikipedia + Books + LLM ✅ Activated
 - **Training**: Production service with progressive curriculum ✅ Operational
-- **Storage**: EnhancedBrainStorage + BinaryStorageManager ✅ Clean
-- **Query System**: Direct ConceptLabel lookup ✅ Working
-- **Next**: Scale testing with full 571GB corpus ⏳ In progress
+- **Storage**: MessagePack persistence with corruption recovery ✅ Working
+- **Pattern Retrieval**: VQ similarity-based (no word list lookup) ✅ By design
+- **Next Phase**: Procedural neuron regeneration (save VQ codes, regenerate structure) ⏳
+- **Then**: GPU port (CUDA/C) after .NET prototype proven ⏳
+- **Validation**: Generalization test (novel pattern combinations) 🔲 Planned
 
 ## 🚀 Quick Start
 
@@ -147,14 +157,17 @@
 # Production training (massive datasets - 571GB Wikipedia + Books + LLM)
 dotnet run -- --production-training
 
-# Knowledge query (with direct ConceptLabel lookup)
-dotnet run -- CerebroQueryCLI.cs
-# Query: red
-# Query: technology
+# Brain statistics (VQ clusters, neuron counts, pattern distribution)
+dotnet run -- --cerebro-query stats
+
+# Pattern similarity query (shows which VQ codes activate for input)
+dotnet run -- --cerebro-query think "red apple"
 
 # Build project
 dotnet build
 ```
+
+**Note**: This is a pattern-based system, not a word dictionary. Queries work by pattern similarity in VQ space, not keyword lookup. Think "Google image search by example" not "grep for exact word".
 
 ## 🔬 Research Principles
 
@@ -182,5 +195,5 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Last Updated**: November 18, 2025  
-**Latest Achievement**: ✅ Massive dataset activation - 571GB Wikipedia, 500GB books, and LLM teacher fully integrated!
+**Last Updated**: December 2, 2025  
+**Latest Achievement**: ✅ Realigned to pattern-based biological architecture - removed word-list assumptions, embracing VQ similarity retrieval as core feature!

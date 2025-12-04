@@ -70,6 +70,12 @@ namespace GreyMatter.Core
         private double _tFindMsSum = 0, _tLookupMsSum = 0, _tCapacityMsSum = 0, _tTrainMsSum = 0, _tSynMsSum = 0, _tTotalMsSum = 0;
         private long _neuronsAddedSum = 0, _neuronsUsedSum = 0;
 
+        // Phase 6A: Sparse activation tracking (biological alignment metrics)
+        private long _queryCount = 0;
+        private long _totalActivatedNeurons = 0;
+        private long _totalLoadedNeurons = 0;
+        private readonly HashSet<Guid> _accessedClusters = new(); // Track working set
+
         // Save lock to prevent concurrent save operations
         private readonly SemaphoreSlim _saveLock = new SemaphoreSlim(1, 1);
 
@@ -586,6 +592,24 @@ namespace GreyMatter.Core
                 }
                 
                 activatedClusters.Add(cluster.ClusterId);
+                _accessedClusters.Add(cluster.ClusterId); // Track for working set analysis
+            }
+            
+            // Phase 6A: Sparse activation metrics
+            _queryCount++;
+            var activatedNeurons = neuronOutputs.Count;
+            var totalLoadedNeurons = _loadedClusters.Values.Sum(c => c.NeuronCount);
+            _totalActivatedNeurons += activatedNeurons;
+            _totalLoadedNeurons += totalLoadedNeurons;
+            
+            var activationPercent = totalLoadedNeurons > 0 
+                ? (activatedNeurons * 100.0) / totalLoadedNeurons 
+                : 0.0;
+            
+            // Log sparse activation for every query (critical metric)
+            if (totalLoadedNeurons > 0)
+            {
+                Console.WriteLine($"⚡ Sparse Activation: {activatedNeurons:N0} / {totalLoadedNeurons:N0} neurons active ({activationPercent:F2}%) | clusters: {sortedClusters.Count}/{_loadedClusters.Count}");
             }
             
             // Generate response based on activated neurons
@@ -769,7 +793,26 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   📈 Save metrics: clustersExamined={m.ClustersExamined}, changedMembership={m.ClustersChangedMembership}, packsWritten={m.MembershipPacksWritten}, packsSkipped={m.MembershipPacksSkipped}, bankPartitions={m.NeuronBankPartitions}, neuronsUpserted={m.NeuronsUpserted}");
                 Console.WriteLine($"   ⏱️  Total save time {swTotal.Elapsed.TotalSeconds:F2}s");
             }
-            Console.WriteLine(" Brain state saved with hierarchical partitioning");
+            
+            // Phase 6A: Report sparse activation and working set statistics
+            if (_queryCount > 0)
+            {
+                var avgActivation = _totalLoadedNeurons > 0 
+                    ? (_totalActivatedNeurons * 100.0) / _totalLoadedNeurons 
+                    : 0.0;
+                var workingSetPercent = TotalClustersCreated > 0 
+                    ? (_accessedClusters.Count * 100.0) / TotalClustersCreated 
+                    : 0.0;
+                
+                Console.WriteLine($"\n📊 BIOLOGICAL ALIGNMENT METRICS (Phase 6A)");
+                Console.WriteLine($"   ⚡ Sparse Activation: {avgActivation:F2}% average (target: <2%)");
+                Console.WriteLine($"   🎯 Queries Processed: {_queryCount:N0}");
+                Console.WriteLine($"   🧠 Working Set: {_accessedClusters.Count}/{TotalClustersCreated} clusters ({workingSetPercent:F1}%)");
+                Console.WriteLine($"   💾 Total Neurons: {allNeurons.Count:N0}");
+                Console.WriteLine($"   🔗 Total Synapses: {_synapses.Count:N0}");
+            }
+            
+            Console.WriteLine("\n✅ Brain state saved with hierarchical partitioning");
 
             // Optional quick integrity sampler when verbose
             if ((_configForLogging?.Verbosity ?? 0) > 0)
@@ -1172,7 +1215,7 @@ namespace GreyMatter.Core
             var regionId = GetRegionId(featureVector);
             
             // Try to find existing clusters in this region with sufficient similarity
-            const double SIMILARITY_THRESHOLD = 0.85; // Reuse cluster only if >= 85% similar
+            const double SIMILARITY_THRESHOLD = 0.65; // Lowered from 0.85 to 0.65 for better pattern matching
             
             var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 5);
             var bestMatch = matches.FirstOrDefault(m => m.similarity >= SIMILARITY_THRESHOLD);

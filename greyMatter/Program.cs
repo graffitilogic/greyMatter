@@ -8,6 +8,12 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--test-sparse-activation")
+            {
+                await RunSparseActivationTest();
+                return;
+            }
+            
             if (args.Length > 0 && args[0] == "--cerebro-query")
             {
                 await CerebroQueryCLI.Run(args);
@@ -79,6 +85,62 @@ namespace GreyMatter
                 if (args[i] == key) return args[i + 1];
             }
             return defaultValue;
+        }
+        
+        static async Task RunSparseActivationTest()
+        {
+            Console.WriteLine("🧪 Phase 6A: Sparse Activation Test");
+            Console.WriteLine("====================================\n");
+            
+            var cerebro = new Cerebro("/Volumes/jarvis/brainData");
+            Console.WriteLine("✅ Cerebro initialized\n");
+            
+            Console.WriteLine("📚 Training on 20 sentences...");
+            var sentences = new[]
+            {
+                "the cat sat on the mat",
+                "dogs are loyal animals",
+                "birds can fly in the sky",
+                "fish swim in the water",
+                "the sun is bright and warm",
+                "rain falls from the clouds",
+                "trees grow tall and strong",
+                "flowers bloom in spring",
+                "winter brings cold and snow",
+                "summer is hot and sunny",
+                "apples are red or green",
+                "bananas are yellow fruit",
+                "carrots are orange vegetables",
+                "bread is made from wheat",
+                "milk comes from cows",
+                "cheese is made from milk",
+                "pizza is a popular food",
+                "coffee keeps people awake",
+                "tea is a soothing drink",
+                "water is essential for life"
+            };
+            
+            for (int i = 0; i < sentences.Length; i++)
+            {
+                var features = new System.Collections.Generic.Dictionary<string, double>();
+                await cerebro.LearnConceptAsync(sentences[i], features);
+            }
+            
+            Console.WriteLine($"✅ Training complete: {sentences.Length} sentences\n");
+            Console.WriteLine("🔍 Running queries to measure sparse activation...\n");
+            
+            var queries = new[] { "cat", "dog", "sun", "water", "tree", "food", "pizza", "milk" };
+            
+            foreach (var query in queries)
+            {
+                var features = new System.Collections.Generic.Dictionary<string, double>();
+                await cerebro.ProcessInputAsync(query, features);
+            }
+            
+            Console.WriteLine("\n💾 Saving checkpoint to show biological alignment metrics...\n");
+            await cerebro.SaveAsync();
+            
+            Console.WriteLine("\n✅ Test complete!");
         }
     }
 }
