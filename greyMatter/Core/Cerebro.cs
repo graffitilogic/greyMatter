@@ -581,10 +581,29 @@ namespace GreyMatter.Core
                 }
             }
             
-            // Activate clusters and collect neuron outputs
+            // Biological cascade activation: Encode input once and propagate through Hebbian network
+            // Combine all concepts into single feature vector for signal propagation
+            double[] inputFeatureVector = null;
+            if (inputConcepts.Length > 0)
+            {
+                var combinedConcept = string.Join(" ", inputConcepts);
+                inputFeatureVector = _featureEncoder.Encode(combinedConcept);
+            }
+            else
+            {
+                // Fallback: create zero vector
+                inputFeatureVector = new double[128]; // Match FeatureEncoder dimension
+            }
+            
+            // Activate clusters using biological cascade through Hebbian synaptic network
             foreach (var cluster in sortedClusters)
             {
-                var clusterOutputs = await cluster.ProcessInputAsync(ConvertFeaturesToNeuronInputs(features));
+                // Use new ProcessFeatureVectorAsync for biological signal propagation
+                var clusterOutputs = await cluster.ProcessFeatureVectorAsync(
+                    inputFeatureVector, 
+                    _synapticGraph,
+                    activationThreshold: 0.25,  // Lower threshold to allow activation
+                    maxActivations: 30);         // Limit for ~1-2% activation rate
                 
                 foreach (var output in clusterOutputs)
                 {
@@ -598,7 +617,7 @@ namespace GreyMatter.Core
             // Phase 6A: Sparse activation metrics
             _queryCount++;
             var activatedNeurons = neuronOutputs.Count;
-            var totalLoadedNeurons = _loadedClusters.Values.Sum(c => c.NeuronCount);
+            var totalLoadedNeurons = sortedClusters.Sum(c => c.NeuronCount);
             _totalActivatedNeurons += activatedNeurons;
             _totalLoadedNeurons += totalLoadedNeurons;
             

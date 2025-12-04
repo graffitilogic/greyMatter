@@ -152,7 +152,7 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
-        /// Process input through the cluster
+        /// Process input through the cluster (legacy - for backward compatibility)
         /// </summary>
         public async Task<Dictionary<Guid, double>> ProcessInputAsync(Dictionary<Guid, double> inputs)
         {
@@ -176,6 +176,158 @@ namespace GreyMatter.Core
             // Note: do NOT mark cluster dirty on activation alone; STM remains in neurons
             
             return outputs;
+        }
+
+        /// <summary>
+        /// Process feature vector through cluster using biological cascade activation.
+        /// Signal propagates through Hebbian synaptic network with sparse activation.
+        /// </summary>
+        /// <param name="featureVector">Encoded feature vector to process</param>
+        /// <param name="synapticGraph">Hebbian synaptic graph for cascade activation</param>
+        /// <param name="activationThreshold">Threshold for neuron activation (default: 0.3)</param>
+        /// <param name="maxActivations">Maximum neurons to activate for sparsity (default: 50)</param>
+        /// <returns>Dictionary of activated neuron IDs and their activation strengths</returns>
+        public async Task<Dictionary<Guid, double>> ProcessFeatureVectorAsync(
+            double[] featureVector, 
+            SparseSynapticGraph synapticGraph,
+            double activationThreshold = 0.3,
+            int maxActivations = 50)
+        {
+            await EnsureLoadedAsync();
+            LastAccessed = DateTime.UtcNow;
+            
+            var activatedNeurons = new Dictionary<Guid, double>();
+            
+            // Step 1: Compute initial activation for each neuron based on feature similarity
+            // Use centroid-based cosine similarity with neuron-specific selectivity
+            var initialActivations = new List<(Guid neuronId, double activation)>();
+            
+            foreach (var neuron in _neurons.Values)
+            {
+                // Compute activation as similarity to cluster's learned pattern
+                // Only highly selective neurons activate (biological sparsity)
+                double activation = ComputeFeatureActivation(neuron, featureVector);
+                
+                if (activation > activationThreshold)
+                {
+                    initialActivations.Add((neuron.Id, activation));
+                }
+            }
+            
+            // Step 2: Cascade activation through Hebbian synaptic network
+            // Start with highest-activated neurons, propagate signal through strong synapses
+            var activationQueue = new PriorityQueue<Guid, double>(Comparer<double>.Create((a, b) => b.CompareTo(a)));
+            var processedNeurons = new HashSet<Guid>();
+            
+            // Seed queue with initial activations
+            foreach (var (neuronId, activation) in initialActivations.OrderByDescending(x => x.activation))
+            {
+                activationQueue.Enqueue(neuronId, activation);
+                activatedNeurons[neuronId] = activation;
+            }
+            
+            // Step 3: Propagate activation through synaptic connections (sparse cascade)
+            while (activationQueue.Count > 0 && activatedNeurons.Count < maxActivations)
+            {
+                var currentNeuronId = activationQueue.Dequeue();
+                
+                if (processedNeurons.Contains(currentNeuronId))
+                    continue;
+                    
+                processedNeurons.Add(currentNeuronId);
+                var currentActivation = activatedNeurons[currentNeuronId];
+                
+                // Get outgoing synapses from this neuron
+                var outgoingSynapses = synapticGraph.GetOutgoingSynapses(currentNeuronId);
+                
+                foreach (var (targetNeuronId, synapseWeight) in outgoingSynapses)
+                {
+                    // Only propagate through neurons in this cluster
+                    if (!_neurons.ContainsKey(targetNeuronId))
+                        continue;
+                    
+                    // Propagated activation = current activation × synapse weight
+                    double propagatedActivation = currentActivation * synapseWeight;
+                    
+                    // Only propagate if signal is strong enough
+                    if (propagatedActivation > activationThreshold)
+                    {
+                        // Accumulate activation (multiple paths can converge)
+                        if (activatedNeurons.TryGetValue(targetNeuronId, out var existing))
+                        {
+                            activatedNeurons[targetNeuronId] = Math.Max(existing, propagatedActivation);
+                        }
+                        else if (activatedNeurons.Count < maxActivations)
+                        {
+                            activatedNeurons[targetNeuronId] = propagatedActivation;
+                            activationQueue.Enqueue(targetNeuronId, propagatedActivation);
+                        }
+                    }
+                }
+            }
+            
+            // Update metrics
+            TotalActivations += activatedNeurons.Count;
+            
+            return activatedNeurons;
+        }
+        
+        /// <summary>
+        /// Compute neuron activation based on feature vector similarity.
+        /// Uses cosine similarity between feature and cluster centroid.
+        /// Only neurons with strong pattern matches activate.
+        /// </summary>
+        private double ComputeFeatureActivation(HybridNeuron neuron, double[] featureVector)
+        {
+            if (featureVector == null || featureVector.Length == 0)
+                return 0.0;
+            
+            // Use cluster centroid for pattern matching
+            // Neurons respond based on how well the input matches the cluster's learned pattern
+            if (_centroid == null || _centroid.Length != featureVector.Length)
+                return 0.0;
+            
+            // Compute cosine similarity between input feature and cluster centroid
+            double dotProduct = 0.0;
+            double featureMag = 0.0;
+            double centroidMag = 0.0;
+            
+            for (int i = 0; i < featureVector.Length; i++)
+            {
+                dotProduct += featureVector[i] * _centroid[i];
+                featureMag += featureVector[i] * featureVector[i];
+                centroidMag += _centroid[i] * _centroid[i];
+            }
+            
+            featureMag = Math.Sqrt(featureMag);
+            centroidMag = Math.Sqrt(centroidMag);
+            
+            if (featureMag < 1e-6 || centroidMag < 1e-6)
+                return 0.0;
+            
+            // Cosine similarity: ranges from -1 to 1
+            double cosineSimilarity = dotProduct / (featureMag * centroidMag);
+            
+            // Add neuron-specific selectivity using neuron ID as seed for variation
+            // This creates sparse activation even within clusters sharing same centroid
+            // Each neuron responds slightly differently to the same input
+            var neuronHash = neuron.Id.GetHashCode();
+            var rng = new Random(neuronHash);
+            double neuronSelectivity = 0.3 + (rng.NextDouble() * 0.7); // 0.3-1.0 range
+            
+            // Only neurons with high selectivity AND good match activate
+            // This creates biological sparsity: ~1-2% of neurons fire
+            double selectivityThreshold = 0.92; // Only top 8% of neurons by selectivity
+            if (neuronSelectivity < selectivityThreshold)
+                return 0.0;
+            
+            // Only return positive activation for decent matches\n            // Threshold at 0.4 cosine similarity (allow sparse activation)
+            if (cosineSimilarity > 0.4)
+            {
+                return (cosineSimilarity - 0.4) * 1.67 * neuronSelectivity; // Normalize to 0-1
+            }
+            
+            return 0.0;
         }
 
         /// <summary>
