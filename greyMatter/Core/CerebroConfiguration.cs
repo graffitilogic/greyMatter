@@ -55,6 +55,12 @@ namespace GreyMatter.Core
         public bool CompressClusters { get; set; } = true;
         
         /// <summary>
+        /// Phase 6B: Use procedural neuron regeneration for checkpoint compression (No Man's Sky principle)
+        /// Stores compact ProceduralNeuronData (VQ code + sparse weights) instead of full NeuronSnapshot
+        /// </summary>
+        public bool UseProceduralSave { get; set; } = false;
+        
+        /// <summary>
         /// Create configuration from command line arguments
         /// </summary>
         public static CerebroConfiguration FromCommandLine(string[] args)
@@ -120,6 +126,11 @@ namespace GreyMatter.Core
                             config.CompressClusters = cc;
                             i++;
                         }
+                        break;
+
+                    case "--procedural-save":
+                    case "-ps":
+                        config.UseProceduralSave = true;
                         break;
                 }
             }

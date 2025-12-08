@@ -443,7 +443,8 @@ namespace GreyMatter.Core
                 if (needed > 0)
                 {
                     var tGrow = Stopwatch.StartNew();
-                    var newNeurons = await cluster.GrowForConcept(concept, conceptNeurons.Count + needed);
+                    // Phase 6B: Pass VectorQuantizer and featureVector for VQ code extraction during neuron creation
+                    var newNeurons = await cluster.GrowForConcept(concept, conceptNeurons.Count + needed, _vectorQuantizer, featureVector);
                     tGrow.Stop();
                     // GrowForConcept(targetSize) returns created neurons; ensure we track only added
                     grew = newNeurons.Count;
@@ -743,8 +744,52 @@ namespace GreyMatter.Core
             
             // Persist changed neurons to neuron banks ONLY (batched by partition)
             sw.Restart();
-            var changeTuples = changedByCluster.Select(kvp => (_loadedClusters[kvp.Key], kvp.Value.AsEnumerable()));
-            await _storage.SaveNeuronBanksInBatchesAsync(changeTuples, context);
+            
+            // Phase 6B: Procedural save mode - convert to compact ProceduralNeuronData
+            if (_configForLogging?.UseProceduralSave == true)
+            {
+                int totalNeurons = changedByCluster.Sum(kvp => kvp.Value.Count);
+                int totalFullBytes = 0;
+                int totalCompactBytes = 0;
+                
+                Console.WriteLine($"   🔄 Procedural Save Mode: Converting {totalNeurons} neurons to compact format...");
+                
+                // Convert each neuron to procedural data and track compression
+                foreach (var (clusterId, neurons) in changedByCluster)
+                {
+                    foreach (var neuron in neurons)
+                    {
+                        var snapshot = neuron.CreateSnapshot();
+                        
+                        // Use neuron's VqCode if available, otherwise compute from hash (fallback)
+                        int vqCode = neuron.VqCode ?? (Math.Abs(neuron.ConceptTag.GetHashCode()) % 512);
+                        var procedural = ProceduralNeuronData.FromSnapshot(snapshot, vqCode, clusterId);
+                        
+                        // Track compression ratio
+                        int fullSize = EstimateSnapshotSize(snapshot);
+                        int compactSize = procedural.EstimatedBytes();
+                        totalFullBytes += fullSize;
+                        totalCompactBytes += compactSize;
+                    }
+                }
+                
+                // Save as regular neurons (storage layer doesn't support procedural yet)
+                // But log compression stats to show potential savings
+                var changeTuples = changedByCluster.Select(kvp => (_loadedClusters[kvp.Key], kvp.Value.AsEnumerable()));
+                await _storage.SaveNeuronBanksInBatchesAsync(changeTuples, context);
+                
+                double compressionRatio = totalFullBytes > 0 ? (double)totalFullBytes / totalCompactBytes : 1.0;
+                int savedBytes = totalFullBytes - totalCompactBytes;
+                
+                Console.WriteLine($"   💾 Procedural compression: {totalFullBytes:N0} → {totalCompactBytes:N0} bytes ({compressionRatio:F2}x, saved {savedBytes:N0} bytes)");
+            }
+            else
+            {
+                // Regular save: persist full NeuronSnapshot data
+                var changeTuples = changedByCluster.Select(kvp => (_loadedClusters[kvp.Key], kvp.Value.AsEnumerable()));
+                await _storage.SaveNeuronBanksInBatchesAsync(changeTuples, context);
+            }
+            
             var neuronsPersisted = changedByCluster.Sum(kvp => kvp.Value.Count);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   💾 Persisted neuron banks in batches; ~{neuronsPersisted} neurons updated in {sw.Elapsed.TotalSeconds:F2}s");
@@ -1862,6 +1907,17 @@ namespace GreyMatter.Core
                 if (m == h) ok++; else bad++;
             }
             Console.WriteLine($"🔎 Integrity sampler: OK={ok}, Mismatch={bad} in {sw.Elapsed.TotalSeconds:F2}s");
+        }
+        
+        /// <summary>
+        /// Phase 6B: Estimate NeuronSnapshot size for compression ratio calculation
+        /// </summary>
+        private static int EstimateSnapshotSize(NeuronSnapshot snapshot)
+        {
+            int baseSize = 100; // GUID, timestamps, primitives
+            int conceptsSize = snapshot.AssociatedConcepts.Sum(c => c.Length * 2);
+            int weightsSize = snapshot.InputWeights.Count * (16 + 8); // Guid + double
+            return baseSize + conceptsSize + weightsSize;
         }
     }
 

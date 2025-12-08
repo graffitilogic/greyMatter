@@ -551,7 +551,7 @@ namespace GreyMatter.Core
         /// <summary>
         /// Grow cluster by adding new neurons for a concept
         /// </summary>
-        public async Task<List<HybridNeuron>> GrowForConcept(string concept, int targetSize = 10)
+        public async Task<List<HybridNeuron>> GrowForConcept(string concept, int targetSize = 10, VectorQuantizer? vectorQuantizer = null, double[]? featureVector = null)
         {
             await EnsureLoadedAsync();
             
@@ -564,6 +564,14 @@ namespace GreyMatter.Core
             {
                 var newNeuron = new HybridNeuron(concept);
                 newNeuron.AssociateConcept(concept);
+                
+                // Phase 6B: Extract VQ code for procedural regeneration
+                if (vectorQuantizer != null && featureVector != null)
+                {
+                    var floatVector = Array.ConvertAll(featureVector, x => (float)x);
+                    var (vqCode, _) = vectorQuantizer.QuantizeAndUpdate(floatVector);
+                    newNeuron.VqCode = vqCode;
+                }
                 
                 // Create connections to existing neurons in cluster
                 await ConnectToExistingNeurons(newNeuron, existingNeurons);

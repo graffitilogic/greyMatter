@@ -41,6 +41,9 @@ namespace GreyMatter.Core
 
         // New: Provisional flag (STM-only neuron not yet consolidated to LTM)
         public bool IsProvisional { get; set; } = false;
+        
+        // Phase 6B: VQ code for procedural regeneration (No Man's Sky principle)
+        public int? VqCode { get; set; } = null;
 
         // --- New: Short-term learning (STM) buffers and salience tracking ---
         // Accumulates transient updates which can be consolidated into LTM
@@ -412,6 +415,7 @@ namespace GreyMatter.Core
             var threshold = Threshold;
             var learningRate = LearningRate;
             var isProvisional = IsProvisional;
+            var vqCode = VqCode; // Phase 6B: Capture VQ code for procedural regeneration
             
             // CRITICAL: Sanitize strings to prevent JSON serialization errors
             // Control characters, unescaped quotes, and invalid JSON chars cause parse failures
@@ -430,7 +434,8 @@ namespace GreyMatter.Core
                 Bias = SanitizeDouble(bias, 0.0, $"Neuron {Id} bias"),
                 Threshold = SanitizeDouble(threshold, 0.5, $"Neuron {Id} threshold"),
                 LearningRate = SanitizeDouble(learningRate, 0.01, $"Neuron {Id} learningRate"),
-                IsProvisional = isProvisional
+                IsProvisional = isProvisional,
+                VqCode = vqCode // Phase 6B: Store VQ code for procedural regeneration
             };
         }
 
@@ -447,7 +452,8 @@ namespace GreyMatter.Core
                 ActivationCount = snapshot.ActivationCount,
                 LastUsed = snapshot.LastUsed,
                 ImportanceScore = snapshot.ImportanceScore,
-                IsProvisional = snapshot.IsProvisional
+                IsProvisional = snapshot.IsProvisional,
+                VqCode = snapshot.VqCode // Phase 6B: Restore VQ code for procedural regeneration
             };
             // Ensure identity is preserved across loads
             neuron.Id = snapshot.Id;
@@ -487,5 +493,7 @@ namespace GreyMatter.Core
         public double LearningRate { get; set; }
         [MessagePack.Key(10)]
         public bool IsProvisional { get; set; } = false;
+        [MessagePack.Key(11)]
+        public int? VqCode { get; set; } = null; // Phase 6B: VQ code for procedural regeneration
     }
 }
