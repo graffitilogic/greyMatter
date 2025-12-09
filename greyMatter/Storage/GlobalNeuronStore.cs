@@ -10,7 +10,6 @@ using GreyMatter.Core;
 using System.Collections.Concurrent;
 using System.Threading;
 using MessagePack;
-using MessagePack;
 
 namespace GreyMatter.Storage
 {
@@ -373,6 +372,179 @@ namespace GreyMatter.Storage
                 // If we can't serialize, treat as not equal to force a save attempt
                 return false;
             }
+        }
+
+        // ==================== PHASE 6B: PROCEDURAL NEURON STORAGE ====================
+
+        private string GetProceduralBankPath(PartitionPath partition)
+        {
+            return Path.Combine(GetPartitionDir(partition), "neurons.bank.procedural.msgpack.gz");
+        }
+
+        /// <summary>
+        /// Save neurons in compact procedural format (VQ code + sparse weights)
+        /// Phase 6B: Alternative to SaveOrUpdateNeuronsAsync for checkpoint compression
+        /// </summary>
+        public async Task SaveProceduralNeuronsAsync(
+            PartitionPath partition, 
+            IEnumerable<HybridNeuron> neurons,
+            Dictionary<Guid, Guid> clusterIdMap)
+        {
+            var dir = GetPartitionDir(partition);
+            Directory.CreateDirectory(dir);
+            var bankPath = GetProceduralBankPath(partition);
+
+            var bankLock = GetBankLock(bankPath);
+            await bankLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                // Load existing procedural data if present
+                var proceduralList = new List<ProceduralNeuronData>();
+                if (File.Exists(bankPath))
+                {
+                    proceduralList = await ReadProceduralBankAsync(bankPath).ConfigureAwait(false);
+                }
+
+                // Create lookup for existing data
+                var existingDict = proceduralList.ToDictionary(p => p.Id, p => p);
+                bool changed = false;
+
+                // Update/add neurons
+                foreach (var neuron in neurons)
+                {
+                    // Skip neurons without VQ codes
+                    if (!neuron.VqCode.HasValue)
+                    {
+                        Console.WriteLine($"⚠️  Neuron {neuron.Id} has no VQ code - skipping procedural save");
+                        continue;
+                    }
+
+                    var snapshot = neuron.CreateSnapshot();
+                    var clusterId = clusterIdMap.TryGetValue(neuron.Id, out var cid) ? cid : Guid.Empty;
+                    var procedural = ProceduralNeuronData.FromSnapshot(snapshot, neuron.VqCode.Value, clusterId);
+
+                    if (existingDict.TryGetValue(neuron.Id, out var existing))
+                    {
+                        // Simple equality check - update if different
+                        if (existing.VqCode != procedural.VqCode || 
+                            existing.ActivationCount != procedural.ActivationCount ||
+                            !existing.SynapticWeights.SequenceEqual(procedural.SynapticWeights))
+                        {
+                            existingDict[neuron.Id] = procedural;
+                            changed = true;
+                        }
+                    }
+                    else
+                    {
+                        existingDict[neuron.Id] = procedural;
+                        changed = true;
+                    }
+                }
+
+                // Write back only if changed
+                if (changed)
+                {
+                    await WriteProceduralBankAsync(bankPath, existingDict.Values.ToList()).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                bankLock.Release();
+            }
+        }
+
+        /// <summary>
+        /// Load neurons from compact procedural format and regenerate full HybridNeuron instances
+        /// Phase 6B: Alternative to LoadNeuronsAsync for checkpoint decompression
+        /// </summary>
+        public async Task<Dictionary<Guid, HybridNeuron>> LoadProceduralNeuronsAsync(
+            PartitionPath partition,
+            IEnumerable<Guid> ids,
+            VectorQuantizer vectorQuantizer,
+            FeatureEncoder featureEncoder)
+        {
+            var result = new Dictionary<Guid, HybridNeuron>();
+            var bankPath = GetProceduralBankPath(partition);
+            
+            if (!File.Exists(bankPath))
+            {
+                // Fallback to standard format
+                Console.WriteLine($"⚠️  Procedural bank not found for partition {partition.FullPath}, falling back to standard format");
+                return await LoadNeuronsAsync(partition, ids).ConfigureAwait(false);
+            }
+
+            try
+            {
+                var proceduralList = await ReadProceduralBankAsync(bankPath).ConfigureAwait(false);
+                var regenerator = new ProceduralNeuronRegenerator(vectorQuantizer, featureEncoder);
+
+                // Create lookup
+                var proceduralDict = proceduralList.ToDictionary(p => p.Id, p => p);
+
+                foreach (var id in ids)
+                {
+                    if (proceduralDict.TryGetValue(id, out var procedural))
+                    {
+                        var neuron = regenerator.RegenerateNeuron(procedural);
+                        result[id] = neuron;
+                    }
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️  Error loading procedural neurons from {partition.FullPath}: {ex.Message}");
+                // Fallback to standard format
+                return await LoadNeuronsAsync(partition, ids).ConfigureAwait(false);
+            }
+        }
+
+        private async Task<List<ProceduralNeuronData>> ReadProceduralBankAsync(string bankPath)
+        {
+            try
+            {
+                await using var fs = File.OpenRead(bankPath);
+                await using var gz = new GZipStream(fs, CompressionMode.Decompress);
+                var data = await MessagePackSerializer.DeserializeAsync<List<ProceduralNeuronData>>(gz).ConfigureAwait(false);
+                return data ?? new List<ProceduralNeuronData>();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error reading procedural bank {Path.GetFileName(bankPath)}: {ex.Message}");
+                return new List<ProceduralNeuronData>();
+            }
+        }
+
+        private async Task WriteProceduralBankAsync(string bankPath, List<ProceduralNeuronData> data)
+        {
+            var tmp = bankPath + ".tmp";
+            try
+            {
+                await using var fs = File.Create(tmp);
+                await using var gz = new GZipStream(fs, CompressionLevel.Optimal);
+                await MessagePackSerializer.SerializeAsync(gz, data).ConfigureAwait(false);
+                await gz.FlushAsync().ConfigureAwait(false);
+                await fs.FlushAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Error writing procedural bank {Path.GetFileName(bankPath)}: {ex.Message}");
+                if (File.Exists(tmp)) File.Delete(tmp);
+                throw;
+            }
+
+            // Atomic replace
+            if (File.Exists(bankPath)) File.Delete(bankPath);
+            File.Move(tmp, bankPath);
+        }
+
+        private int EstimateSnapshotSize(NeuronSnapshot snapshot)
+        {
+            int baseSize = 100; // GUID, timestamps, primitives
+            int conceptsSize = snapshot.AssociatedConcepts?.Sum(c => c?.Length ?? 0) * 2 ?? 0;
+            int weightsSize = snapshot.InputWeights?.Count * (16 + 8) ?? 0;
+            return baseSize + conceptsSize + weightsSize;
         }
     }
 }

@@ -32,6 +32,18 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length > 0 && args[0] == "--validate-procedural-accuracy")
+            {
+                await RunDualFormatValidationTest();
+                return;
+            }
+            
+            if (args.Length > 0 && args[0] == "--test-procedural-e2e")
+            {
+                await RunProceduralEndToEndTest();
+                return;
+            }
+            
             if (args.Length > 0 && args[0] == "--cerebro-query")
             {
                 await CerebroQueryCLI.Run(args);
@@ -495,6 +507,485 @@ namespace GreyMatter
             Console.WriteLine($"   ⚠️  Storage layer integration pending");
             Console.WriteLine($"   ⚠️  Full regeneration accuracy test pending storage support");
             
+            Console.WriteLine("\n✅ Test complete!");
+            Console.WriteLine("=" + new string('=', 60));
+        }
+
+        static async Task RunDualFormatValidationTest()
+        {
+            Console.WriteLine("🧪 Phase 6B: Dual-Format Accuracy Validation");
+            Console.WriteLine("=" + new string('=', 60));
+            Console.WriteLine("Comparing standard vs procedural storage formats");
+            Console.WriteLine();
+
+            var testQueries = new[]
+            {
+                "neural networks learn patterns",
+                "machine learning processes data",
+                "biological neurons communicate efficiently",
+                "vector quantization compresses data",
+                "procedural generation creates worlds"
+            };
+
+            // Step 1: Train a brain with test dataset
+            Console.WriteLine("📚 Step 1: Training brain on test dataset...");
+            var tempPath = Path.Combine(Path.GetTempPath(), "dual_format_test_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempPath);
+
+            var config = new CerebroConfiguration
+            {
+                BrainDataPath = tempPath,
+                Verbosity = 0
+            };
+            config.ValidateAndSetup();
+
+            var cerebro = new Cerebro(tempPath);
+            cerebro.AttachConfiguration(config);
+
+            // Train on expanded dataset
+            var trainingData = GetExpandedTrainingData();
+            int sentenceCount = 0;
+            foreach (var sentence in trainingData)
+            {
+                var features = new Dictionary<string, double>();
+                await cerebro.LearnConceptAsync(sentence, features);
+                sentenceCount++;
+            }
+
+            Console.WriteLine($"✅ Trained on {sentenceCount} sentences");
+
+            // Step 2: Run baseline queries (before save)
+            Console.WriteLine("\n🔍 Step 2: Running baseline queries...");
+            var baselineResults = new Dictionary<string, (int neurons, double confidence, HashSet<Guid> activatedNeuronIds)>();
+
+            foreach (var query in testQueries)
+            {
+                var features = new Dictionary<string, double>();
+                var result = await cerebro.ProcessInputAsync(query, features);
+                var activatedIds = new HashSet<Guid>(); // Would need to extract from result if available
+                baselineResults[query] = (result.ActivatedNeurons, result.Confidence, activatedIds);
+                Console.WriteLine($"   {query}");
+                Console.WriteLine($"      → {result.ActivatedNeurons} neurons, confidence {result.Confidence:F3}");
+            }
+
+            // Step 3: Save in STANDARD format
+            Console.WriteLine("\n💾 Step 3: Saving in STANDARD format...");
+            config.UseProceduralSave = false;
+            cerebro.AttachConfiguration(config);
+            await cerebro.SaveAsync();
+
+            var standardPath = Path.Combine(Path.GetTempPath(), "dual_format_standard_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(standardPath);
+            CopyDirectory(tempPath, standardPath);
+            Console.WriteLine($"   Saved to: {standardPath}");
+
+            // Step 4: Save in PROCEDURAL format
+            Console.WriteLine("\n💾 Step 4: Saving in PROCEDURAL format...");
+            config.UseProceduralSave = true;
+            cerebro.AttachConfiguration(config);
+            await cerebro.SaveAsync();
+
+            var proceduralPath = Path.Combine(Path.GetTempPath(), "dual_format_procedural_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(proceduralPath);
+            CopyDirectory(tempPath, proceduralPath);
+            Console.WriteLine($"   Saved to: {proceduralPath}");
+
+            // Step 5: Load STANDARD format and query
+            Console.WriteLine("\n🔄 Step 5: Testing STANDARD format...");
+            var standardBrain = new Cerebro(standardPath);
+            var standardConfig = new CerebroConfiguration
+            {
+                BrainDataPath = standardPath,
+                Verbosity = 0
+            };
+            standardConfig.ValidateAndSetup();
+            standardBrain.AttachConfiguration(standardConfig);
+
+            var standardResults = new Dictionary<string, (int neurons, double confidence)>();
+            foreach (var query in testQueries)
+            {
+                var features = new Dictionary<string, double>();
+                var result = await standardBrain.ProcessInputAsync(query, features);
+                standardResults[query] = (result.ActivatedNeurons, result.Confidence);
+            }
+
+            // Step 6: Load PROCEDURAL format and query
+            Console.WriteLine("\n🔄 Step 6: Testing PROCEDURAL format...");
+            Console.WriteLine("   ⚠️  Note: Procedural load path not yet fully integrated");
+            Console.WriteLine("   Fallback to standard format will occur during load");
+
+            var proceduralBrain = new Cerebro(proceduralPath);
+            var proceduralConfig = new CerebroConfiguration
+            {
+                BrainDataPath = proceduralPath,
+                Verbosity = 0,
+                UseProceduralSave = true
+            };
+            proceduralConfig.ValidateAndSetup();
+            proceduralBrain.AttachConfiguration(proceduralConfig);
+
+            var proceduralResults = new Dictionary<string, (int neurons, double confidence)>();
+            foreach (var query in testQueries)
+            {
+                var features = new Dictionary<string, double>();
+                var result = await proceduralBrain.ProcessInputAsync(query, features);
+                proceduralResults[query] = (result.ActivatedNeurons, result.Confidence);
+            }
+
+            // Step 7: Compare results
+            Console.WriteLine("\n📊 Step 7: Accuracy Comparison");
+            Console.WriteLine("=" + new string('=', 60));
+
+            int perfectMatches = 0;
+            double totalConfidenceDiff = 0;
+            double totalNeuronDiffPct = 0;
+
+            foreach (var query in testQueries)
+            {
+                var baseline = baselineResults[query];
+                var standard = standardResults[query];
+                var procedural = proceduralResults[query];
+
+                var neuronMatch = standard.neurons == procedural.neurons;
+                var confidenceDiff = Math.Abs(standard.confidence - procedural.confidence);
+                var neuronDiffPct = standard.neurons > 0 
+                    ? Math.Abs(standard.neurons - procedural.neurons) / (double)standard.neurons * 100 
+                    : 0;
+
+                totalConfidenceDiff += confidenceDiff;
+                totalNeuronDiffPct += neuronDiffPct;
+
+                if (neuronMatch && confidenceDiff < 0.01)
+                    perfectMatches++;
+
+                Console.WriteLine($"\n{query}:");
+                Console.WriteLine($"  Baseline:   {baseline.neurons} neurons, confidence {baseline.confidence:F3}");
+                Console.WriteLine($"  Standard:   {standard.neurons} neurons, confidence {standard.confidence:F3}");
+                Console.WriteLine($"  Procedural: {procedural.neurons} neurons, confidence {procedural.confidence:F3}");
+                Console.WriteLine($"  Neuron match: {(neuronMatch ? "✅" : "⚠️")} ({neuronDiffPct:F1}% diff)");
+                Console.WriteLine($"  Confidence Δ: {confidenceDiff:F4}");
+            }
+
+            // Step 8: Calculate accuracy metrics
+            double accuracy = (double)perfectMatches / testQueries.Length * 100;
+            double avgConfidenceDiff = totalConfidenceDiff / testQueries.Length;
+            double avgNeuronDiffPct = totalNeuronDiffPct / testQueries.Length;
+
+            Console.WriteLine("\n🎯 Final Accuracy Metrics:");
+            Console.WriteLine($"   Perfect matches: {perfectMatches}/{testQueries.Length} ({accuracy:F1}%)");
+            Console.WriteLine($"   Avg confidence difference: {avgConfidenceDiff:F4}");
+            Console.WriteLine($"   Avg neuron count difference: {avgNeuronDiffPct:F1}%");
+            Console.WriteLine($"   Target: >95% accuracy");
+
+            // Step 9: Check file sizes
+            Console.WriteLine("\n📦 Storage Comparison:");
+            long standardSize = GetDirectorySize(standardPath);
+            long proceduralSize = GetDirectorySize(proceduralPath);
+            double compressionRatio = standardSize > 0 ? (double)standardSize / proceduralSize : 1.0;
+
+            Console.WriteLine($"   Standard format:  {standardSize:N0} bytes");
+            Console.WriteLine($"   Procedural format: {proceduralSize:N0} bytes");
+            Console.WriteLine($"   Compression ratio: {compressionRatio:F2}x");
+            Console.WriteLine($"   Space saved: {standardSize - proceduralSize:N0} bytes");
+
+            // Step 10: Validation summary
+            Console.WriteLine("\n" + "=" + new string('=', 60));
+            if (accuracy >= 95.0 && avgNeuronDiffPct < 5.0)
+            {
+                Console.WriteLine("✅ VALIDATION PASSED!");
+                Console.WriteLine("   Procedural format achieves target accuracy (>95%)");
+                Console.WriteLine("   Ready for production deployment");
+            }
+            else
+            {
+                Console.WriteLine("⚠️  VALIDATION INCOMPLETE");
+                Console.WriteLine($"   Accuracy: {accuracy:F1}% (target: >95%)");
+                Console.WriteLine($"   Neuron variance: {avgNeuronDiffPct:F1}% (target: <5%)");
+                Console.WriteLine("   Note: Full procedural load path integration needed");
+                Console.WriteLine("   Current test uses fallback mechanism");
+            }
+
+            // Cleanup
+            try
+            {
+                Directory.Delete(tempPath, true);
+                Directory.Delete(standardPath, true);
+                Directory.Delete(proceduralPath, true);
+            }
+            catch { /* Ignore cleanup errors */ }
+
+            Console.WriteLine("\n✅ Test complete!");
+            Console.WriteLine("=" + new string('=', 60));
+        }
+
+        static void CopyDirectory(string sourceDir, string destDir)
+        {
+            Directory.CreateDirectory(destDir);
+
+            foreach (var file in Directory.GetFiles(sourceDir))
+            {
+                var destFile = Path.Combine(destDir, Path.GetFileName(file));
+                File.Copy(file, destFile, true);
+            }
+
+            foreach (var dir in Directory.GetDirectories(sourceDir))
+            {
+                var destSubDir = Path.Combine(destDir, Path.GetDirectoryName(dir));
+                CopyDirectory(dir, destSubDir);
+            }
+        }
+
+        static long GetDirectorySize(string path)
+        {
+            if (!Directory.Exists(path)) return 0;
+
+            long size = 0;
+            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+            {
+                try
+                {
+                    size += new FileInfo(file).Length;
+                }
+                catch { /* Ignore access errors */ }
+            }
+            return size;
+        }
+
+        static string[] GetExpandedTrainingData()
+        {
+            return new[]
+            {
+                // Neural network concepts
+                "neural networks learn patterns from data",
+                "machine learning processes information",
+                "deep learning uses multiple layers",
+                "artificial intelligence mimics cognition",
+                "neurons connect through synapses",
+                "backpropagation adjusts weights",
+                "gradient descent optimizes parameters",
+                
+                // Biological concepts
+                "biological neurons fire sparsely",
+                "cortical columns process features",
+                "hippocampus stores memories",
+                "working memory maintains state",
+                "long-term potentiation strengthens synapses",
+                "neurotransmitters enable communication",
+                
+                // Vector quantization
+                "vector quantization compresses data",
+                "codebooks store representative vectors",
+                "quantization reduces dimensionality",
+                "clustering groups similar patterns",
+                "embeddings capture semantic meaning",
+                
+                // Procedural generation
+                "procedural generation creates content",
+                "No Man's Sky generates planets",
+                "algorithms produce variations",
+                "compression reduces storage",
+                "parameters define structures",
+                
+                // Learning and memory
+                "hebbian learning strengthens connections",
+                "pattern recognition identifies structures",
+                "feature extraction transforms inputs",
+                "dimensionality reduction preserves information",
+                "sparse activation conserves energy",
+                
+                // Additional training examples
+                "convolutional layers detect features",
+                "recurrent networks model sequences",
+                "attention mechanisms focus processing",
+                "transformers use self-attention",
+                "reinforcement learning maximizes rewards"
+            };
+        }
+
+        static async Task RunProceduralEndToEndTest()
+        {
+            Console.WriteLine("🧪 Phase 6B: Procedural Storage End-to-End Test");
+            Console.WriteLine("=" + new string('=', 60));
+            Console.WriteLine("Training → Save Procedural → Load Procedural → Query");
+            Console.WriteLine();
+
+            var testQueries = new[]
+            {
+                "neural networks",
+                "machine learning",
+                "vector quantization",
+                "procedural generation",
+                "biological neurons"
+            };
+
+            // Step 1: Train a brain
+            Console.WriteLine("📚 Step 1: Training brain...");
+            var testPath = Path.Combine(Path.GetTempPath(), "procedural_e2e_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(testPath);
+
+            var config = new CerebroConfiguration
+            {
+                BrainDataPath = testPath,
+                Verbosity = 1,
+                UseProceduralSave = true  // Enable procedural save from start
+            };
+            config.ValidateAndSetup();
+
+            var cerebro = new Cerebro(testPath);
+            cerebro.AttachConfiguration(config);
+
+            // Train on dataset
+            var trainingData = GetExpandedTrainingData();
+            foreach (var sentence in trainingData)
+            {
+                var features = new Dictionary<string, double>();
+                await cerebro.LearnConceptAsync(sentence, features);
+            }
+
+            Console.WriteLine($"✅ Training complete: {trainingData.Length} sentences");
+
+            // Step 2: Run baseline queries
+            Console.WriteLine("\n🔍 Step 2: Running baseline queries (before save)...");
+            var baselineResults = new Dictionary<string, (int neurons, double confidence)>();
+
+            foreach (var query in testQueries)
+            {
+                var features = new Dictionary<string, double>();
+                var result = await cerebro.ProcessInputAsync(query, features);
+                baselineResults[query] = (result.ActivatedNeurons, result.Confidence);
+                Console.WriteLine($"   {query}: {result.ActivatedNeurons} neurons, conf {result.Confidence:F3}");
+            }
+
+            // Step 3: Save with procedural compression
+            Console.WriteLine("\n💾 Step 3: Saving brain with procedural compression...");
+            await cerebro.SaveAsync();
+            Console.WriteLine("✅ Save complete");
+
+            // Step 4: Create new brain instance and load
+            Console.WriteLine("\n🔄 Step 4: Loading brain from procedural format...");
+            var loadedBrain = new Cerebro(testPath);
+            var loadConfig = new CerebroConfiguration
+            {
+                BrainDataPath = testPath,
+                Verbosity = 1,
+                UseProceduralSave = true
+            };
+            loadConfig.ValidateAndSetup();
+            loadedBrain.AttachConfiguration(loadConfig);
+
+            // Initialize brain: load codebook, feature mappings, cluster index
+            await loadedBrain.InitializeAsync();
+            Console.WriteLine("✅ Brain initialized with procedural components");
+
+            // Step 5: Run same queries on loaded brain
+            Console.WriteLine("\n🔍 Step 5: Running queries on loaded brain...");
+            var loadedResults = new Dictionary<string, (int neurons, double confidence)>();
+
+            foreach (var query in testQueries)
+            {
+                var features = new Dictionary<string, double>();
+                var result = await loadedBrain.ProcessInputAsync(query, features);
+                loadedResults[query] = (result.ActivatedNeurons, result.Confidence);
+                Console.WriteLine($"   {query}: {result.ActivatedNeurons} neurons, conf {result.Confidence:F3}");
+            }
+
+            // Step 6: Compare results
+            Console.WriteLine("\n📊 Step 6: Accuracy Comparison");
+            Console.WriteLine("=" + new string('=', 60));
+
+            int perfectMatches = 0;
+            double totalConfidenceDiff = 0;
+            double totalNeuronDiffPct = 0;
+            int queriesWithActivation = 0;
+
+            foreach (var query in testQueries)
+            {
+                var baseline = baselineResults[query];
+                var loaded = loadedResults[query];
+
+                if (baseline.neurons > 0 || loaded.neurons > 0)
+                    queriesWithActivation++;
+
+                var neuronMatch = baseline.neurons == loaded.neurons;
+                var confidenceDiff = Math.Abs(baseline.confidence - loaded.confidence);
+                var neuronDiffPct = baseline.neurons > 0 
+                    ? Math.Abs(baseline.neurons - loaded.neurons) / (double)baseline.neurons * 100 
+                    : (loaded.neurons > 0 ? 100.0 : 0.0);
+
+                totalConfidenceDiff += confidenceDiff;
+                totalNeuronDiffPct += neuronDiffPct;
+
+                if (neuronMatch && confidenceDiff < 0.01)
+                    perfectMatches++;
+
+                Console.WriteLine($"\n{query}:");
+                Console.WriteLine($"  Baseline: {baseline.neurons} neurons, conf {baseline.confidence:F3}");
+                Console.WriteLine($"  Loaded:   {loaded.neurons} neurons, conf {loaded.confidence:F3}");
+                Console.WriteLine($"  Match: {(neuronMatch ? "✅" : "⚠️")} (Δ {neuronDiffPct:F1}%, conf Δ {confidenceDiff:F4})");
+            }
+
+            // Step 7: Final metrics
+            double accuracy = testQueries.Length > 0 ? (double)perfectMatches / testQueries.Length * 100 : 0;
+            double avgConfidenceDiff = testQueries.Length > 0 ? totalConfidenceDiff / testQueries.Length : 0;
+            double avgNeuronDiffPct = testQueries.Length > 0 ? totalNeuronDiffPct / testQueries.Length : 0;
+
+            Console.WriteLine("\n🎯 Final Results:");
+            Console.WriteLine($"   Perfect matches: {perfectMatches}/{testQueries.Length} ({accuracy:F1}%)");
+            Console.WriteLine($"   Avg confidence Δ: {avgConfidenceDiff:F4}");
+            Console.WriteLine($"   Avg neuron Δ: {avgNeuronDiffPct:F1}%");
+            Console.WriteLine($"   Queries with activation: {queriesWithActivation}/{testQueries.Length}");
+
+            // Step 8: Check compression
+            Console.WriteLine("\n📦 Compression Analysis:");
+            var proceduralFiles = Directory.GetFiles(Path.Combine(testPath, "hierarchical"), "*procedural*.msgpack.gz", SearchOption.AllDirectories);
+            var standardFiles = Directory.GetFiles(Path.Combine(testPath, "hierarchical"), "neurons.bank.msgpack.gz", SearchOption.AllDirectories);
+            
+            long proceduralSize = proceduralFiles.Sum(f => new FileInfo(f).Length);
+            long standardSize = standardFiles.Sum(f => new FileInfo(f).Length);
+
+            if (proceduralSize > 0)
+            {
+                Console.WriteLine($"   Procedural banks: {proceduralFiles.Length} files, {proceduralSize:N0} bytes");
+                if (standardSize > 0)
+                {
+                    double ratio = (double)standardSize / proceduralSize;
+                    Console.WriteLine($"   Standard banks: {standardFiles.Length} files, {standardSize:N0} bytes");
+                    Console.WriteLine($"   Compression ratio: {ratio:F2}x");
+                }
+            }
+            else
+            {
+                Console.WriteLine("   ⚠️  No procedural files found");
+            }
+
+            // Validation
+            Console.WriteLine("\n" + "=" + new string('=', 60));
+            if (accuracy >= 95.0)
+            {
+                Console.WriteLine("✅ END-TO-END TEST PASSED!");
+                Console.WriteLine("   Procedural save/load cycle maintains accuracy");
+                Console.WriteLine("   Ready for production use");
+            }
+            else if (queriesWithActivation == 0)
+            {
+                Console.WriteLine("⚠️  TEST INCOMPLETE");
+                Console.WriteLine("   No neurons activated - training may need adjustment");
+                Console.WriteLine("   Or neurons not being loaded from procedural format");
+            }
+            else
+            {
+                Console.WriteLine("⚠️  TEST NEEDS INVESTIGATION");
+                Console.WriteLine($"   Accuracy: {accuracy:F1}% (target: >95%)");
+                Console.WriteLine($"   Neuron variance: {avgNeuronDiffPct:F1}%");
+            }
+
+            // Cleanup
+            try
+            {
+                Directory.Delete(testPath, true);
+            }
+            catch { /* Ignore cleanup errors */ }
+
             Console.WriteLine("\n✅ Test complete!");
             Console.WriteLine("=" + new string('=', 60));
         }

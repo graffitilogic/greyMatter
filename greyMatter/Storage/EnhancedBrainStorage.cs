@@ -32,6 +32,10 @@ namespace GreyMatter.Storage
 
         // New: Global neuron store per partition (Phase B)
         private readonly GlobalNeuronStore _globalNeuronStore;
+        
+        // Phase 6B: References for procedural neuron regeneration
+        private VectorQuantizer? _vectorQuantizer;
+        private FeatureEncoder? _featureEncoder;
 
         // Per-partition membership pack (clusterId -> neuronIds) to avoid many small writes
         private class MembershipPack
@@ -138,6 +142,15 @@ namespace GreyMatter.Storage
             // Load cached stats and kick a background refresh
             TryLoadStatsCache();
             StartBackgroundStatsRefreshIfNeeded();
+        }
+
+        /// <summary>
+        /// Phase 6B: Attach VectorQuantizer and FeatureEncoder for procedural neuron regeneration
+        /// </summary>
+        public void AttachProceduralComponents(VectorQuantizer vectorQuantizer, FeatureEncoder featureEncoder)
+        {
+            _vectorQuantizer = vectorQuantizer;
+            _featureEncoder = featureEncoder;
         }
 
         private void BuildConceptIndexFromMetadata()
@@ -590,6 +603,138 @@ namespace GreyMatter.Storage
             _lastSaveMetrics.NeuronsUpserted = neuronsUpserted;
         }
 
+        // ==================== PHASE 6B: PROCEDURAL NEURON STORAGE ====================
+
+        /// <summary>
+        /// Save neurons in compact procedural format (VQ code + sparse weights)
+        /// Phase 6B: Alternative to SaveNeuronBanksInBatchesAsync for checkpoint compression
+        /// </summary>
+        public async Task SaveProceduralNeuronBanksAsync(
+            IEnumerable<(NeuronCluster Cluster, IEnumerable<HybridNeuron> Neurons)> clusterBatches,
+            BrainContext context)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            
+            // Group neurons by partition and build cluster ID map
+            var byPartition = new Dictionary<string, (PartitionPath Path, List<HybridNeuron> Neurons, Dictionary<Guid, Guid> ClusterIdMap)>();
+            
+            foreach (var (cluster, neurons) in clusterBatches)
+            {
+                var partition = GetStablePartitionForCluster(cluster, context);
+                var key = partition.FullPath;
+                
+                if (!byPartition.TryGetValue(key, out var entry))
+                {
+                    entry = (partition, new List<HybridNeuron>(), new Dictionary<Guid, Guid>());
+                    byPartition[key] = entry;
+                }
+                
+                // Deduplicate neurons and track cluster membership
+                var existing = entry.Neurons.ToDictionary(n => n.Id, n => n);
+                foreach (var n in neurons)
+                {
+                    existing[n.Id] = n;
+                    entry.ClusterIdMap[n.Id] = cluster.ClusterId;
+                }
+                
+                byPartition[key] = (entry.Path, existing.Values.ToList(), entry.ClusterIdMap);
+            }
+            
+            // Track compression statistics
+            int totalFullBytes = 0;
+            int totalCompactBytes = 0;
+            int neuronCount = 0;
+            int skippedCount = 0;
+            
+            // Calculate compression (before saving)
+            foreach (var (partition, neurons, clusterIdMap) in byPartition.Values)
+            {
+                foreach (var neuron in neurons)
+                {
+                    if (!neuron.VqCode.HasValue)
+                    {
+                        skippedCount++;
+                        continue;
+                    }
+                    
+                    var snapshot = neuron.CreateSnapshot();
+                    totalFullBytes += EstimateSnapshotSize(snapshot);
+                    
+                    var clusterId = clusterIdMap.TryGetValue(neuron.Id, out var cid) ? cid : Guid.Empty;
+                    var procedural = ProceduralNeuronData.FromSnapshot(snapshot, neuron.VqCode.Value, clusterId);
+                    totalCompactBytes += procedural.EstimatedBytes();
+                    neuronCount++;
+                }
+            }
+            
+            // Save in parallel
+            var sem = new SemaphoreSlim(MaxParallelSaves);
+            var tasks = new List<Task>();
+            
+            foreach (var (partition, neurons, clusterIdMap) in byPartition.Values)
+            {
+                await sem.WaitAsync();
+                tasks.Add(Task.Run(async () =>
+                {
+                    try 
+                    { 
+                        await _globalNeuronStore.SaveProceduralNeuronsAsync(partition, neurons, clusterIdMap); 
+                    }
+                    finally { sem.Release(); }
+                }));
+            }
+            
+            await Task.WhenAll(tasks);
+            
+            // Log compression statistics
+            var compressionRatio = totalFullBytes > 0 ? (double)totalFullBytes / totalCompactBytes : 1.0;
+            var savedBytes = totalFullBytes - totalCompactBytes;
+            
+            Console.WriteLine($"   💾 Procedural save: {neuronCount} neurons in {byPartition.Count} partitions");
+            Console.WriteLine($"      Full: {totalFullBytes:N0} bytes");
+            Console.WriteLine($"      Compact: {totalCompactBytes:N0} bytes");
+            Console.WriteLine($"      Ratio: {compressionRatio:F2}x (saved {savedBytes:N0} bytes)");
+            if (skippedCount > 0)
+                Console.WriteLine($"      ⚠️  Skipped {skippedCount} neurons without VQ codes");
+            Console.WriteLine($"      Time: {sw.Elapsed.TotalSeconds:F2}s");
+            
+            // Update metrics
+            _lastSaveMetrics.NeuronBankPartitions = byPartition.Count;
+            _lastSaveMetrics.NeuronsUpserted = neuronCount;
+        }
+
+        /// <summary>
+        /// Load neurons from procedural format for a specific partition
+        /// Phase 6B: Requires VectorQuantizer and FeatureEncoder for regeneration
+        /// </summary>
+        public async Task<Dictionary<Guid, HybridNeuron>> LoadProceduralNeuronBankAsync(
+            PartitionPath partition,
+            IEnumerable<Guid> ids)
+        {
+            // Check if procedural components are available
+            if (_vectorQuantizer == null || _featureEncoder == null)
+            {
+                // Fallback to standard format if components not attached
+                return await _globalNeuronStore.LoadNeuronsAsync(partition, ids);
+            }
+            
+            return await _globalNeuronStore.LoadProceduralNeuronsAsync(
+                partition, 
+                ids, 
+                _vectorQuantizer, 
+                _featureEncoder);
+        }
+
+        private int EstimateSnapshotSize(NeuronSnapshot snapshot)
+        {
+            int baseSize = 100; // GUID, timestamps, primitives
+            int conceptsSize = snapshot.AssociatedConcepts?.Sum(c => c?.Length ?? 0) * 2 ?? 0;
+            int weightsSize = snapshot.InputWeights?.Count * (16 + 8) ?? 0;
+            return baseSize + conceptsSize + weightsSize;
+        }
+
+        // ==================== END PHASE 6B ====================
+
         private async Task WriteJsonFastAsync<T>(string fullPath, T obj, bool compress)
         {
             var options = GetJsonOptions();
@@ -760,7 +905,18 @@ namespace GreyMatter.Storage
                     var pack = await LoadMembershipPackAsync(meta.PartitionPath);
                     if (pack.Membership.TryGetValue(key, out var ids))
                     {
-                        var loaded = await _globalNeuronStore.LoadNeuronsAsync(meta.PartitionPath, ids);
+                        // Phase 6B: Try procedural load first if components available
+                        Dictionary<Guid, HybridNeuron> loaded;
+                        if (_vectorQuantizer != null && _featureEncoder != null)
+                        {
+                            loaded = await _globalNeuronStore.LoadProceduralNeuronsAsync(
+                                meta.PartitionPath, ids, _vectorQuantizer, _featureEncoder);
+                        }
+                        else
+                        {
+                            loaded = await _globalNeuronStore.LoadNeuronsAsync(meta.PartitionPath, ids);
+                        }
+                        
                         return new PartitionedClusterData
                         {
                             NeuronIds = ids,
@@ -797,7 +953,18 @@ namespace GreyMatter.Storage
                 if (data == null) continue;
                 if ((data.Neurons == null || data.Neurons.Count == 0) && data.NeuronIds != null && data.NeuronIds.Count > 0)
                 {
-                    var loaded = await _globalNeuronStore.LoadNeuronsAsync(data.PartitionPath, data.NeuronIds);
+                    // Phase 6B: Try procedural load first if components available
+                    Dictionary<Guid, HybridNeuron> loaded;
+                    if (_vectorQuantizer != null && _featureEncoder != null)
+                    {
+                        loaded = await _globalNeuronStore.LoadProceduralNeuronsAsync(
+                            data.PartitionPath, data.NeuronIds, _vectorQuantizer, _featureEncoder);
+                    }
+                    else
+                    {
+                        loaded = await _globalNeuronStore.LoadNeuronsAsync(data.PartitionPath, data.NeuronIds);
+                    }
+                    
                     data.Neurons = loaded.Values.Select(n => n.CreateSnapshot()).ToList();
                 }
                 return data;
@@ -1044,7 +1211,19 @@ namespace GreyMatter.Storage
             // Read membership from membership.pack (authoritative)
             var pack = await LoadMembershipPackAsync(meta.PartitionPath);
             var ids = pack.Membership.TryGetValue(key, out var list) ? list : new List<Guid>();
-            var hydrated = await _globalNeuronStore.LoadNeuronsAsync(meta.PartitionPath, ids);
+            
+            // Phase 6B: Try procedural load first if components available
+            Dictionary<Guid, HybridNeuron> hydrated;
+            if (_vectorQuantizer != null && _featureEncoder != null)
+            {
+                hydrated = await _globalNeuronStore.LoadProceduralNeuronsAsync(
+                    meta.PartitionPath, ids, _vectorQuantizer, _featureEncoder);
+            }
+            else
+            {
+                hydrated = await _globalNeuronStore.LoadNeuronsAsync(meta.PartitionPath, ids);
+            }
+            
             return (ids.Count, hydrated.Count);
         }
 

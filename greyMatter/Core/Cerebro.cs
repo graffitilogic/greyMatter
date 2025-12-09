@@ -256,6 +256,9 @@ namespace GreyMatter.Core
                 emaDecay: 0.99f          // Codebook EMA decay
             );
             
+            // Phase 6B: Attach procedural regeneration components to storage layer
+            _storage.AttachProceduralComponents(_vectorQuantizer, _featureEncoder);
+            
             if ((_configForLogging?.Verbosity ?? 0) > 0)
             {
                 Console.WriteLine("🧬 ADPC-Net initialized:");
@@ -745,47 +748,29 @@ namespace GreyMatter.Core
             // Persist changed neurons to neuron banks ONLY (batched by partition)
             sw.Restart();
             
-            // Phase 6B: Procedural save mode - convert to compact ProceduralNeuronData
+            // Phase 6B: Procedural save mode - save ALL neurons in compact format
             if (_configForLogging?.UseProceduralSave == true)
             {
-                int totalNeurons = changedByCluster.Sum(kvp => kvp.Value.Count);
-                int totalFullBytes = 0;
-                int totalCompactBytes = 0;
-                
-                Console.WriteLine($"   🔄 Procedural Save Mode: Converting {totalNeurons} neurons to compact format...");
-                
-                // Convert each neuron to procedural data and track compression
-                foreach (var (clusterId, neurons) in changedByCluster)
+                // In procedural mode, save all neurons from all loaded clusters
+                // (not just consolidated ones, since we want full checkpoints)
+                var allClusterNeurons = new List<(NeuronCluster, IEnumerable<HybridNeuron>)>();
+                foreach (var cluster in loadedClustersSnapshot)
                 {
-                    foreach (var neuron in neurons)
+                    var neurons = await cluster.GetNeuronsAsync();
+                    if (neurons.Count > 0)
                     {
-                        var snapshot = neuron.CreateSnapshot();
-                        
-                        // Use neuron's VqCode if available, otherwise compute from hash (fallback)
-                        int vqCode = neuron.VqCode ?? (Math.Abs(neuron.ConceptTag.GetHashCode()) % 512);
-                        var procedural = ProceduralNeuronData.FromSnapshot(snapshot, vqCode, clusterId);
-                        
-                        // Track compression ratio
-                        int fullSize = EstimateSnapshotSize(snapshot);
-                        int compactSize = procedural.EstimatedBytes();
-                        totalFullBytes += fullSize;
-                        totalCompactBytes += compactSize;
+                        allClusterNeurons.Add((cluster, neurons.Values));
                     }
                 }
                 
-                // Save as regular neurons (storage layer doesn't support procedural yet)
-                // But log compression stats to show potential savings
-                var changeTuples = changedByCluster.Select(kvp => (_loadedClusters[kvp.Key], kvp.Value.AsEnumerable()));
-                await _storage.SaveNeuronBanksInBatchesAsync(changeTuples, context);
+                int totalNeurons = allClusterNeurons.Sum(t => t.Item2.Count());
+                Console.WriteLine($"   🔄 Procedural Save Mode: Saving {totalNeurons} neurons in compact format...");
                 
-                double compressionRatio = totalFullBytes > 0 ? (double)totalFullBytes / totalCompactBytes : 1.0;
-                int savedBytes = totalFullBytes - totalCompactBytes;
-                
-                Console.WriteLine($"   💾 Procedural compression: {totalFullBytes:N0} → {totalCompactBytes:N0} bytes ({compressionRatio:F2}x, saved {savedBytes:N0} bytes)");
+                await _storage.SaveProceduralNeuronBanksAsync(allClusterNeurons, context);
             }
             else
             {
-                // Regular save: persist full NeuronSnapshot data
+                // Regular save: persist only consolidated neurons (incremental)
                 var changeTuples = changedByCluster.Select(kvp => (_loadedClusters[kvp.Key], kvp.Value.AsEnumerable()));
                 await _storage.SaveNeuronBanksInBatchesAsync(changeTuples, context);
             }
@@ -1910,15 +1895,6 @@ namespace GreyMatter.Core
         }
         
         /// <summary>
-        /// Phase 6B: Estimate NeuronSnapshot size for compression ratio calculation
-        /// </summary>
-        private static int EstimateSnapshotSize(NeuronSnapshot snapshot)
-        {
-            int baseSize = 100; // GUID, timestamps, primitives
-            int conceptsSize = snapshot.AssociatedConcepts.Sum(c => c.Length * 2);
-            int weightsSize = snapshot.InputWeights.Count * (16 + 8); // Guid + double
-            return baseSize + conceptsSize + weightsSize;
-        }
     }
 
     // Result classes
