@@ -44,6 +44,19 @@ namespace GreyMatter
                 return;
             }
             
+            if (args.Length > 0 && args[0] == "--production-scale-test")
+            {
+                var brainPath = args.Length > 1 && args[1].StartsWith("--brain-path=") 
+                    ? args[1].Substring("--brain-path=".Length)
+                    : Path.Combine(Path.GetTempPath(), "production_test_" + Guid.NewGuid().ToString("N"));
+                var sentenceCount = args.Any(a => a.StartsWith("--sentences="))
+                    ? int.Parse(args.First(a => a.StartsWith("--sentences=")).Substring("--sentences=".Length))
+                    : 1000;
+                
+                await ProductionScaleValidator.RunProductionScaleTest(brainPath, sentenceCount);
+                return;
+            }
+            
             if (args.Length > 0 && args[0] == "--cerebro-query")
             {
                 await CerebroQueryCLI.Run(args);
