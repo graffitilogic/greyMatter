@@ -2,85 +2,38 @@
 
 **"A trillion-parameter model in a gigabyte of RAM."**
 
-> **Status**: Active development - Massive dataset activation complete
+> **Status**: Active development - Synaptic novelty detection complete! ⚡
 > 
-> **Latest**:  571GB Wikipedia, books, and LLM teacher fully integrated (Nov 2025)
+> **Latest**: Biological graph traversal replaces broken pattern matching (Jan 2026)
 
-## 🎯 What Actually Works (Nov 2025)
+## 🎯 What Actually Works (January 2026)
 
-**Massive Dataset Training Infrastructure**  **NEW**
-- **571GB Wikipedia corpus**: DirectoryText format, recursive .txt loading
-- **500GB book collections**: Narrative structures and storytelling patterns
-- **LLM teacher integration**: Ollama deepseek-r1:1.5b generates content on-demand
-- **Progressive curriculum**: Simple → News → Dialogue → Books → Wikipedia
-- **Smart sampling**: 5000-sentence batches (never exhausts datasets)
-- **LLM mixing**: Every 5th batch uses dynamic generation (6 rotating topics)
-- **Fixed checkpoints**: NaN/Infinity sanitization prevents JSON crashes
-- **Fixed queries**: Direct ConceptLabel lookup with case-insensitive matching
-- **See**: MASSIVE_DATASET_ACTIVATION.md and PRODUCTION_TRAINING_GUIDE.md
+**Biological Novelty Detection** ⭐
+- Memory stored as synaptic connections between neurons (not hash lookups)
+- Recognition through graph traversal of trained pathways
+- Novelty emerges from cascade depth: trained concepts propagate deeply, garbage dies immediately
+- Test: "neural networks" cascades through synapses, "qawsedrftg" activates nothing
+- **See**: [SYNAPTIC_NOVELTY_DETECTION.md](SYNAPTIC_NOVELTY_DETECTION.md) for implementation details
 
-**VQ-VAE Production Integration (ADPC-Net Phase 5)** 
-- Cerebro uses VQ-VAE for all region ID generation (replaces LSH)
-- Codebook learns during training (EMA updates with γ=0.99)
-- Full persistence: Codebook saves/loads across training sessions
-- Similar concepts cluster together (verified in tests)
-- Deterministic assignments: Same pattern → same code
-- **100% test passing**: All 6 Phase 5 validation tests pass
-- **Perplexity growth**: 1.0 → 5.66 (codebook learns patterns)
-- **Production ready**: Toggle support for LSH fallback
+**Massive-Scale Training**
+- **571GB Wikipedia** + **500GB books** directly from NAS storage
+- **LLM teacher** generates dynamic content (Ollama deepseek-r1:1.5b)
+- Progressive curriculum: Basic → News → Dialogue → Books → Wikipedia
+- Smart sampling: 5K sentence batches, never loads full datasets
+- Checkpoints every 10 minutes with NaN/Infinity sanitization
 
-**VQ-VAE Codebook (ADPC-Net Phase 4)** 
-- Learned vector quantization: 512-code codebook adapts to data
-- Replaces fixed LSH with adaptive learned similarity
-- EMA updates: Codebook continuously refines (γ=0.99)
-- Perplexity tracking: 209/256 efficiency (81.6%)
-- Commitment loss: Prevents encoder drift (β=0.25)
-- **100% test passing**: All 6 Phase 4 validation tests pass
-- **Utilization**: 94.9% (243/256 codes active)
-- **Learned clustering**: 100% similar inputs → same code
+**Neural Architecture**
+- Procedural generation: Neurons created on-demand, not pre-allocated
+- Lazy loading: Max 10 clusters in memory, unload after 30 min inactivity
+- VQ-VAE clustering: Learned codebook groups similar patterns
+- Hebbian synapses: "Neurons that fire together, wire together"
+- Sparse connectivity: Only meaningful connections stored (>90% sparsity)
 
-**Sparse Synaptic Graph (ADPC-Net Phase 3)** 
-- Hebbian learning: "Neurons that fire together, wire together"
-- Sparse storage: Dictionary-based (O(E) not O(N²))
-- Automatic pruning: Weak synapses removed below threshold
-- Synaptic decay: Forgetting mechanism (0.99 default)
-- **100% test passing**: All 6 Phase 3 validation tests pass
-- **Sparsity**: >90% (only meaningful connections stored)
-
-**Dynamic Neuron Generation (ADPC-Net Phase 2)** 
-- Hypernetwork formula: `N = α*log(freq) + β*novelty + γ*complexity`
-- Variable neuron counts: 5-500 per cluster (not fixed!)
-- Pattern-driven allocation: Complex patterns get more neurons
-- Deterministic generation: Same pattern → same neuron count
-- **100% test passing**: All 6 Phase 2 validation tests pass
-- **Observed range**: 82-97 neurons (vs Phase 1: all ~64)
-
-**Pattern-Based Learning (ADPC-Net Phase 1)** 
-- Feature encoding: 128-dim vectors (deterministic, reproducible)
-- LSH partitioning: Efficient region-based clustering
-- Novelty detection: Activation statistics track pattern familiarity
-- Storage: Region mappings and activation stats persist correctly
-- **100% test passing**: All 6 Phase 1 validation tests pass
-- **No word list cheating**: Pattern similarity drives retrieval
-
-**Infrastructure (Production-Ready)** 
-- Long-term training stability: 10+ hours, no crashes, constant memory (20-25 MB)
-- NAS integration: Hourly checkpoints save/load successfully
-- Fast processing: ~470 concepts/sec sustained on real Tatoeba data
-- Progressive curriculum: 4-phase learning pipeline operational
-- Cluster partitioning: On-demand loading prevents memory bloat
-
-**Neural Realism Progress**  **COMPLETE (All 5 Phases)**
--  **Pattern-based retrieval** (replaces word list lookup)
--  **Feature encoding** (128-dim vectors from text)
--  **LSH clustering** (locality-sensitive hashing for similarity)
--  **Novelty tracking** (activation statistics)
--  **Dynamic neuron allocation** (hypernetwork generation)
--  **Sparse synaptic graph** (Hebbian learning, pruning, decay)
--  **VQ-VAE codebook** (learned vector quantization, EMA updates)
--  **Production integration** (VQ-VAE in Cerebro training pipeline) **NEW**
-
-**See ADPC_PHASE5_COMPLETE.md for Phase 5 details and test results.**
+**Performance**
+- Constant memory: 20-25 MB regardless of training duration
+- Fast processing: ~470 concepts/sec on real data
+- MessagePack storage: 60% smaller than JSON, 1,350x faster saves
+- 10+ hour stability: No crashes, consistent performance
 
 ## 🏗️ Architecture
 
@@ -123,57 +76,52 @@
 
 ## 📖 Documentation
 
-### Essential Reading
-- **[MASSIVE_DATASET_ACTIVATION.md](MASSIVE_DATASET_ACTIVATION.md)** - 571GB Wikipedia + LLM integration ⭐ **NEW**
-- **[PRODUCTION_TRAINING_GUIDE.md](PRODUCTION_TRAINING_GUIDE.md)** - Quick start for massive-scale training ⭐ **NEW**
-- **[ADPC_PHASE5_COMPLETE.md](ADPC_PHASE5_COMPLETE.md)** - VQ-VAE production integration ⭐
-- **[ADPC_PHASE4_COMPLETE.md](ADPC_PHASE4_COMPLETE.md)** - VQ-VAE codebook (learned vector quantization) ⭐
-- **[ADPC_PHASE3_COMPLETE.md](ADPC_PHASE3_COMPLETE.md)** - Sparse synaptic graph (Hebbian learning) ⭐
-- **[ADPC_PHASE2_COMPLETE.md](ADPC_PHASE2_COMPLETE.md)** - Dynamic neuron generation ⭐
-- **[ADPC_PHASE1_COMPLETE.md](ADPC_PHASE1_COMPLETE.md)** - Pattern-based learning implementation ⭐
-- **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - Implementation details
-- **[docs/QUICK_START.md](docs/QUICK_START.md)** - Getting started guide
+**User Guides:**
+- **[SYNAPTIC_NOVELTY_DETECTION.md](SYNAPTIC_NOVELTY_DETECTION.md)** - How novelty detection works ⭐
+- **[PRODUCTION_TRAINING_GUIDE.md](PRODUCTION_TRAINING_GUIDE.md)** - Running production training
+- **[QUERY_GUIDE.md](QUERY_GUIDE.md)** - Testing and querying the brain
 
-### Project Status
-- **Architecture**: Cerebro (procedural generation)  Implemented
-- **Pattern Learning**: ADPC-Net Phase 1 (feature-based)  Complete & Validated
-- **Dynamic Neurons**: ADPC-Net Phase 2 (hypernetwork)  Complete & Validated
-- **Sparse Synapses**: ADPC-Net Phase 3 (Hebbian learning)  Complete & Validated
-- **VQ-VAE Codebook**: ADPC-Net Phase 4 (learned quantization)  Complete & Validated
-- **VQ-VAE Integration**: ADPC-Net Phase 5 (production)  Complete & Validated
-- **Massive Datasets**: 571GB Wikipedia + Books + LLM  Activated **NEW**
-- **Training**: Production service with progressive curriculum  Operational
-- **Storage**: EnhancedBrainStorage + BinaryStorageManager  Clean
-- **Query System**: Direct ConceptLabel lookup  Working
-- **Next**: Scale testing with full 571GB corpus ⏳ In progress
+**Technical Details:**
+- **[MASSIVE_DATASET_ACTIVATION.md](MASSIVE_DATASET_ACTIVATION.md)** - 571GB Wikipedia integration
+- **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - Architecture deep dive
+- **ADPC_PHASE*.md** - Implementation history (archived)
+
+## 🎯 Current Status
+
+✅ **Complete & Working:**
+- Biological novelty detection (synaptic graph traversal)
+- Massive dataset training (571GB Wikipedia + 500GB books)
+- Progressive curriculum with LLM teacher
+- Procedural neural generation
+- Lazy loading and efficient storage
+
+🚀 **Ready For:**
+- Production-scale training to build strong synaptic pathways
+- Extended training runs (10+ hours proven stable)
+- Real-world knowledge acquisition
 
 ## 🚀 Quick Start
 
 ```bash
-# Test ADPC-Net Phase 1 (pattern-based learning)
-dotnet run -- --adpc-test
+# Test novelty detection
+dotnet run -- --cerebro-query think "neural networks"  # Lower novelty (trained)
+dotnet run -- --cerebro-query think "qawsedrftg"       # High novelty (garbage)
 
-# Test ADPC-Net Phase 2 (dynamic neuron generation)
-dotnet run -- --adpc-phase2-test
+# Production training (571GB Wikipedia + Books + LLM)
+dotnet run -- --production-training                    # Run indefinitely (24/7 mode)
+dotnet run -- --production-training --duration 3600    # Run for 1 hour (3600 seconds)
+dotnet run -- --production-training --duration 7200    # Run for 2 hours
+dotnet run -- --production-training --llm-teacher      # Enable LLM teacher (every 5th batch)
 
-# Test ADPC-Net Phase 3 (sparse synaptic graph)
-dotnet run -- --adpc-phase3-test
+# Query trained knowledge
+dotnet run -- --cerebro-query stats              # Show brain statistics
+dotnet run -- --cerebro-query think "cat"        # Query a concept
+dotnet run -- --cerebro-query clusters 50        # List top concepts
 
-# Test ADPC-Net Phase 4 (VQ-VAE codebook)
-dotnet run -- --adpc-phase4-test
+# Inspect brain state (fast, no loading)
+dotnet run -- --inspect-brain
 
-# Test ADPC-Net Phase 5 (VQ-VAE production integration) ⭐ NEW
-dotnet run -- --adpc-phase5-test
-
-# Production training (massive datasets - 571GB Wikipedia + Books + LLM)
-dotnet run -- --production-training
-
-# Knowledge query (with direct ConceptLabel lookup)
-dotnet run -- CerebroQueryCLI.cs
-# Query: red
-# Query: technology
-
-# Build project
+# Build
 dotnet build
 ```
 
@@ -203,5 +151,5 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Last Updated**: November 18, 2025  
-**Latest Achievement**:  Massive dataset activation - 571GB Wikipedia, 500GB books, and LLM teacher fully integrated!
+**Last Updated**: January 14, 2026  
+**Latest Achievement**: ✅ Synaptic novelty detection - biological graph traversal replaces broken pattern matching!

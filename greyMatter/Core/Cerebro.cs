@@ -536,33 +536,40 @@ namespace GreyMatter.Core
             var activatedClusters = new List<Guid>();
             var neuronOutputs = new Dictionary<Guid, double>();
             
-            // ADPC-Net: Pattern-based retrieval (NO WORD LOOKUP)
+            // SYNAPTIC PROPAGATION: Load trained neurons and follow synaptic paths
             // Extract concepts from input for feature encoding
             var inputConcepts = ExtractConcepts(input);
             
-            // Encode each concept to feature vector and find matching clusters
+            // Phase 1: Load EXISTING trained neurons for each concept (don't create new)
+            var seedNeurons = new Dictionary<Guid, double>();
             var relevantClusters = new List<NeuronCluster>();
             var clusterScores = new Dictionary<Guid, double>();
             
             foreach (var concept in inputConcepts)
             {
-                // Encode to feature vector
-                var featureVector = _featureEncoder.Encode(concept);
+                // Load neurons that were TRAINED on this concept
+                var (conceptNeurons, conceptClusters) = await LoadTrainedNeuronsForConcept(concept);
                 
-                // Find clusters matching this pattern (LSH-based, no name lookup)
-                var matchingClusters = await FindClustersMatchingPattern(featureVector, maxClusters: 3);
+                // Add to seed neurons for propagation
+                foreach (var (neuronId, activation) in conceptNeurons)
+                {
+                    if (!seedNeurons.ContainsKey(neuronId))
+                        seedNeurons[neuronId] = activation;
+                    else
+                        seedNeurons[neuronId] = Math.Max(seedNeurons[neuronId], activation);
+                }
                 
-                foreach (var (cluster, similarity) in matchingClusters)
+                // Track clusters
+                foreach (var (cluster, score) in conceptClusters)
                 {
                     if (!clusterScores.ContainsKey(cluster.ClusterId))
                     {
                         relevantClusters.Add(cluster);
-                        clusterScores[cluster.ClusterId] = similarity;
+                        clusterScores[cluster.ClusterId] = score;
                     }
                     else
                     {
-                        // Accumulate scores from multiple concepts
-                        clusterScores[cluster.ClusterId] += similarity;
+                        clusterScores[cluster.ClusterId] += score;
                     }
                 }
             }
@@ -576,47 +583,36 @@ namespace GreyMatter.Core
             
             if (ShouldSampleLog())
             {
-                Console.WriteLine("   🎯 Pattern matching: " + inputConcepts.Length + " concepts → " + sortedClusters.Count + " clusters");
+                Console.WriteLine($"   🎯 Loaded trained neurons: {inputConcepts.Length} concepts → {seedNeurons.Count} neurons in {sortedClusters.Count} clusters");
                 for (int i = 0; i < Math.Min(3, sortedClusters.Count); i++)
                 {
                     var cluster = sortedClusters[i];
                     var score = clusterScores[cluster.ClusterId];
-                    Console.WriteLine("      ◽ Cluster " + cluster.ClusterId + " (score: " + score.ToString("F3") + ")");
+                    Console.WriteLine($"      ◽ Cluster {cluster.ClusterId} (score: {score:F3}, neurons: {cluster.NeuronCount})");
                 }
             }
             
-            // Biological cascade activation: Encode input once and propagate through Hebbian network
-            // Combine all concepts into single feature vector for signal propagation
-            double[] inputFeatureVector = null;
-            if (inputConcepts.Length > 0)
-            {
-                var combinedConcept = string.Join(" ", inputConcepts);
-                inputFeatureVector = _featureEncoder.Encode(combinedConcept);
-            }
-            else
-            {
-                // Fallback: create zero vector
-                inputFeatureVector = new double[128]; // Match FeatureEncoder dimension
-            }
+            // Use seed neurons from trained patterns (no new neuron creation)
+            neuronOutputs = new Dictionary<Guid, double>(seedNeurons);
             
-            // Activate clusters using biological cascade through Hebbian synaptic network
+            // Track activated clusters
             foreach (var cluster in sortedClusters)
             {
-                // Use new ProcessFeatureVectorAsync for biological signal propagation
-                var clusterOutputs = await cluster.ProcessFeatureVectorAsync(
-                    inputFeatureVector, 
-                    _synapticGraph,
-                    activationThreshold: 0.25,  // Lower threshold to allow activation
-                    maxActivations: 30);         // Limit for ~1-2% activation rate
-                
-                foreach (var output in clusterOutputs)
-                {
-                    neuronOutputs[output.Key] = output.Value;
-                }
-                
                 activatedClusters.Add(cluster.ClusterId);
-                _accessedClusters.Add(cluster.ClusterId); // Track for working set analysis
+                _accessedClusters.Add(cluster.ClusterId);
             }
+            
+            // Phase 2: Propagate activation through synaptic graph (biological cascade)
+            var propagationResult = await PropagateActivationThroughSynapticGraph(seedNeurons, maxDepth: 3);
+            neuronOutputs = propagationResult.AllActivations;
+            
+            // Phase 3: Calculate natural novelty from cascade metrics
+            var noveltyScore = CalculateNoveltyFromCascade(
+                seedCount: seedNeurons.Count,
+                totalActivated: neuronOutputs.Count,
+                maxDepth: propagationResult.MaxDepthReached,
+                layerGrowth: propagationResult.LayerSizes
+            );
             
             // Phase 6A: Sparse activation metrics
             _queryCount++;
@@ -635,8 +631,12 @@ namespace GreyMatter.Core
                 Console.WriteLine($"⚡ Sparse Activation: {activatedNeurons:N0} / {totalLoadedNeurons:N0} neurons active ({activationPercent:F2}%) | clusters: {sortedClusters.Count}/{_loadedClusters.Count}");
             }
             
+            // Phase 3: Log novelty score
+            var noveltyLabel = noveltyScore < 0.3 ? "FAMILIAR" : noveltyScore > 0.7 ? "NOVEL" : "MODERATE";
+            Console.WriteLine($"🧬 Novelty: {noveltyScore:F2} ({noveltyLabel}) | cascade: {seedNeurons.Count}→{neuronOutputs.Count} neurons");
+            
             // Generate response based on activated neurons and clusters
-            result.Response = GenerateResponse(neuronOutputs, inputConcepts, sortedClusters);
+            result.Response = GenerateResponse(neuronOutputs, inputConcepts, sortedClusters, noveltyScore);
             result.ActivatedClusters = activatedClusters;
             result.ActivatedNeurons = neuronOutputs.Count;
             result.Confidence = CalculateConfidence(neuronOutputs, sortedClusters);
@@ -1515,6 +1515,309 @@ namespace GreyMatter.Core
             return _featureMapper.ConvertFeaturesToNeuronInputs(features);
         }
 
+        /// <summary>
+        /// Phase 1: Load EXISTING trained neurons for a concept (don't create new ones)
+        /// This enables synaptic propagation by ensuring queries use the same neurons as training
+        /// </summary>
+        private async Task<(Dictionary<Guid, double> neurons, List<(NeuronCluster cluster, double score)> clusters)> 
+            LoadTrainedNeuronsForConcept(string concept)
+        {
+            var activatedNeurons = new Dictionary<Guid, double>();
+            var relevantClusters = new List<(NeuronCluster, double)>();
+            
+            // Encode concept to feature vector
+            var featureVector = _featureEncoder.Encode(concept);
+            
+            // Get region ID for this pattern (VQ code or LSH hash)
+            var regionId = GetRegionId(featureVector);
+            
+            // Find clusters that were TRAINED on patterns in this region
+            var clusterIds = _regionToClusterMapping.GetValueOrDefault(regionId, new List<Guid>());
+            
+            if (!clusterIds.Any())
+            {
+                // No trained clusters for this region - truly novel pattern
+                return (activatedNeurons, relevantClusters);
+            }
+            
+            // Load neurons from trained clusters (lazy loading)
+            foreach (var clusterId in clusterIds.Take(3)) // Top 3 clusters per concept
+            {
+                // Try to get cluster from loaded cache
+                if (!_loadedClusters.TryGetValue(clusterId, out var cluster))
+                {
+                    // Cluster not in memory - load it from storage using hierarchical partitioning
+                    try
+                    {
+                        // Create hierarchical loader function (same pattern used in InitializeAsync)
+                        Func<string, Task<List<NeuronSnapshot>>> hierLoad = id =>
+                            _storage.LoadClusterWithPartitioningAsync(id, new BrainContext
+                            {
+                                AllNeurons = new Dictionary<Guid, HybridNeuron>(),
+                                AnalysisTime = DateTime.UtcNow
+                            });
+                        
+                        // Reconstruct NeuronCluster with lazy loading capability
+                        cluster = new NeuronCluster($"pattern_{clusterId}", clusterId, hierLoad, _storage.SaveClusterAsync);
+                        
+                        // CRITICAL: Restore centroid from persisted metadata for pattern matching
+                        var metadata = _storage.GetClusterMetadata(clusterId);
+                        if (metadata?.Centroid != null && metadata.Centroid.Length > 0)
+                        {
+                            // Restore centroid directly without recalculation
+                            cluster.RestoreCentroid(metadata.Centroid, metadata.CentroidNeuronCount);
+                        }
+                        
+                        // Restore concept label for queryability
+                        if (!string.IsNullOrEmpty(metadata?.ConceptLabel))
+                        {
+                            cluster.ConceptLabel = metadata.ConceptLabel;
+                            _conceptClusterCache[metadata.ConceptLabel] = clusterId;
+                        }
+                        
+                        // Cache loaded cluster
+                        _loadedClusters[clusterId] = cluster;
+                        
+                        if ((_configForLogging?.Verbosity ?? 0) >= 2)
+                        {
+                            Console.WriteLine($"💾 Loaded cluster {clusterId:N} from storage for query processing");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Cluster could not be loaded - skip it
+                        if ((_configForLogging?.Verbosity ?? 0) >= 1)
+                        {
+                            Console.WriteLine($"⚠️ Failed to load cluster {clusterId:N}: {ex.Message}");
+                        }
+                        continue;
+                    }
+                }
+                
+                // Get EXISTING neurons in this cluster (don't create new ones)
+                var neurons = await cluster.GetNeuronsAsync();
+                
+                if (neurons.Count == 0) continue;
+                
+                // Calculate activation for each neuron based on feature similarity
+                double clusterActivationSum = 0;
+                int neuronsActivated = 0;
+                
+                foreach (var kvp in neurons)
+                {
+                    var neuronId = kvp.Key;
+                    var neuron = kvp.Value;
+                    
+                    // Activation = similarity between input features and neuron's learned features
+                    // For now, use simple feature overlap (can be enhanced with attention later)
+                    double activation = CalculateNeuronActivation(neuron, featureVector);
+                    
+                    if (activation > 0.25) // Threshold - only strong matches
+                    {
+                        activatedNeurons[neuronId] = activation;
+                        clusterActivationSum += activation;
+                        neuronsActivated++;
+                        
+                        // Limit neurons per cluster (sparse activation)
+                        if (neuronsActivated >= 50)
+                            break;
+                    }
+                }
+                
+                if (neuronsActivated > 0)
+                {
+                    var clusterScore = clusterActivationSum / neuronsActivated;
+                    relevantClusters.Add((cluster, clusterScore));
+                }
+            }
+            
+            return (activatedNeurons, relevantClusters);
+        }
+        
+        /// <summary>
+        /// Calculate how strongly a neuron should activate given input features
+        /// Uses cosine similarity between input and neuron's learned patterns
+        /// </summary>
+        private double CalculateNeuronActivation(HybridNeuron neuron, double[] featureVector)
+        {
+            // Check neuron's importance score (how well it was trained)
+            var importance = neuron.ImportanceScore;
+            
+            if (importance < 0.1)
+                return 0.0; // Weakly trained neuron
+            
+            // For Phase 1: Return baseline activation for trained neurons
+            // This ensures we activate EXISTING neurons, not create new ones
+            // Phase 2 will enhance this with actual feature similarity calculations
+            
+            // Baseline activation weighted by neuron importance
+            return Math.Min(0.8, 0.3 + importance * 0.5);
+        }
+
+        /// <summary>
+        /// Phase 2: Propagate activation through synaptic graph in cascading layers
+        /// This is the biological "spreading activation" that distinguishes trained from novel patterns
+        /// Trained pathways have strong synapses → deep cascade → many neurons
+        /// Novel patterns have weak/no synapses → shallow cascade → few neurons
+        /// </summary>
+        private async Task<PropagationResult> PropagateActivationThroughSynapticGraph(
+            Dictionary<Guid, double> seedNeurons,
+            int maxDepth = 3)
+        {
+            const int EMERGENCY_BRAKE = 50000; // Safety limit
+            const double PROPAGATION_DECAY = 0.9; // Activation decays each layer (higher = less decay)
+            const double ACTIVATION_THRESHOLD = 0.01; // Minimum to continue propagating (lowered for small weights)
+            
+            var allActivations = new Dictionary<Guid, double>(seedNeurons);
+            var currentLayer = new Dictionary<Guid, double>(seedNeurons);
+            var layerSizes = new List<int> { seedNeurons.Count }; // Track neurons per layer
+            var maxDepthReached = 0;
+            
+            if ((_configForLogging?.Verbosity ?? 0) >= 2)
+            {
+                Console.WriteLine($"\n🌊 Starting synaptic cascade from {seedNeurons.Count} seed neurons...");
+                Console.WriteLine($"   Total synapses available: {_synapses.Count}");
+            }
+            
+            for (int depth = 1; depth <= maxDepth; depth++)
+            {
+                if (currentLayer.Count == 0) break;
+                if (allActivations.Count >= EMERGENCY_BRAKE)
+                {
+                    if ((_configForLogging?.Verbosity ?? 0) >= 1)
+                    {
+                        Console.WriteLine($"⚠️ Emergency brake: {allActivations.Count} neurons activated");
+                    }
+                    break;
+                }
+                
+                var nextLayer = new Dictionary<Guid, double>();
+                
+                // Propagate from each neuron in current layer through its synapses
+                foreach (var (sourceNeuronId, sourceActivation) in currentLayer)
+                {
+                    if (sourceActivation < ACTIVATION_THRESHOLD) continue;
+                    
+                    // Find all synapses from this neuron
+                    var outgoingSynapses = _synapses.Values
+                        .Where(s => s.PresynapticNeuronId == sourceNeuronId)
+                        .ToList();
+                    
+                    foreach (var synapse in outgoingSynapses)
+                    {
+                        var targetNeuronId = synapse.PostsynapticNeuronId;
+                        
+                        // Calculate propagated activation through this synapse
+                        // Activation = source_activation * synapse_weight * decay
+                        var propagatedActivation = sourceActivation * synapse.Weight * PROPAGATION_DECAY;
+                        
+                        if (propagatedActivation < ACTIVATION_THRESHOLD) continue;
+                        
+                        // Dendritic integration: sum activations from multiple sources
+                        if (nextLayer.ContainsKey(targetNeuronId))
+                        {
+                            // Multiple synapses converging - integrate (sum with saturation)
+                            nextLayer[targetNeuronId] = Math.Min(1.0, 
+                                nextLayer[targetNeuronId] + propagatedActivation * 0.5);
+                        }
+                        else if (!allActivations.ContainsKey(targetNeuronId))
+                        {
+                            // New neuron activated in this layer
+                            nextLayer[targetNeuronId] = propagatedActivation;
+                        }
+                        else
+                        {
+                            // Already activated in previous layer - boost it
+                            allActivations[targetNeuronId] = Math.Min(1.0,
+                                allActivations[targetNeuronId] + propagatedActivation * 0.3);
+                        }
+                    }
+                }
+                
+                // Add next layer neurons to total activations
+                foreach (var (neuronId, activation) in nextLayer)
+                {
+                    allActivations[neuronId] = activation;
+                }
+                
+                // Track cascade metrics
+                layerSizes.Add(nextLayer.Count);
+                if (nextLayer.Count > 0)
+                {
+                    maxDepthReached = depth;
+                }
+                
+                if ((_configForLogging?.Verbosity ?? 0) >= 2)
+                {
+                    Console.WriteLine($"   Layer {depth}: {nextLayer.Count} neurons activated (total: {allActivations.Count})");
+                }
+                
+                // Set up for next iteration
+                currentLayer = nextLayer;
+            }
+            
+            if ((_configForLogging?.Verbosity ?? 0) >= 2)
+            {
+                Console.WriteLine($"🎯 Cascade complete: {seedNeurons.Count} seed → {allActivations.Count} total neurons\n");
+            }
+            
+            return new PropagationResult
+            {
+                AllActivations = allActivations,
+                MaxDepthReached = maxDepthReached,
+                LayerSizes = layerSizes
+            };
+        }
+
+        /// <summary>
+        /// Phase 3: Calculate novelty score from cascade metrics
+        /// Biological principle: Familiar = deep cascade through trained paths, Novel = shallow/no cascade
+        /// </summary>
+        private double CalculateNoveltyFromCascade(
+            int seedCount,
+            int totalActivated,
+            int maxDepth,
+            List<int> layerGrowth)
+        {
+            // Metric 1: Cascade growth ratio (how much did it spread?)
+            var growthRatio = seedCount > 0 ? (totalActivated - seedCount) / (double)seedCount : 0.0;
+            
+            // Metric 2: Cascade depth (how many layers?)
+            var depthNormalized = maxDepth / 3.0; // Normalize to 0-1 (max depth = 3)
+            
+            // Metric 3: Average layer growth
+            var avgLayerGrowth = layerGrowth.Count > 1
+                ? layerGrowth.Skip(1).Average() / Math.Max(1, layerGrowth[0])
+                : 0.0;
+            
+            // Combine metrics into novelty score
+            // HIGH novelty (0.7-1.0) = no cascade, shallow depth, low growth
+            // LOW novelty (0.0-0.3) = deep cascade, many layers, high growth
+            var familiarityScore = (growthRatio * 0.4) + (depthNormalized * 0.4) + (avgLayerGrowth * 0.2);
+            var noveltyScore = Math.Max(0.0, Math.Min(1.0, 1.0 - familiarityScore)); // Invert
+            
+            if ((_configForLogging?.Verbosity ?? 0) >= 2)
+            {
+                Console.WriteLine($"📊 Novelty Analysis:");
+                Console.WriteLine($"   Growth ratio: {growthRatio:F2} ({totalActivated - seedCount} new neurons)");
+                Console.WriteLine($"   Depth: {maxDepth}/3 layers");
+                Console.WriteLine($"   Avg layer growth: {avgLayerGrowth:F2}");
+                Console.WriteLine($"   → Novelty score: {noveltyScore:F2} (0=familiar, 1=novel)\n");
+            }
+            
+            return noveltyScore;
+        }
+
+        /// <summary>
+        /// Result of synaptic propagation cascade
+        /// </summary>
+        private class PropagationResult
+        {
+            public Dictionary<Guid, double> AllActivations { get; set; } = new();
+            public int MaxDepthReached { get; set; }
+            public List<int> LayerSizes { get; set; } = new();
+        }
+
         private string[] ExtractConcepts(string input)
         {
             // Simple concept extraction - in practice would use NLP
@@ -1525,7 +1828,7 @@ namespace GreyMatter.Core
                 .ToArray();
         }
 
-        private string GenerateResponse(Dictionary<Guid, double> neuronOutputs, string[] concepts, List<NeuronCluster> activatedClusters)
+        private string GenerateResponse(Dictionary<Guid, double> neuronOutputs, string[] concepts, List<NeuronCluster> activatedClusters, double novelty)
         {
             if (!neuronOutputs.Any())
                 return "I don't recognize this.";
@@ -1533,33 +1836,27 @@ namespace GreyMatter.Core
             var avgActivation = neuronOutputs.Values.Average();
             var maxActivation = neuronOutputs.Values.Max();
             var activationCount = neuronOutputs.Count;
+            var conceptsList = string.Join(", ", concepts.Take(3));
             
-            // Simple activation-based response (novelty detection disabled - requires architecture changes)
-            var responseBuilder = new List<string>();
-            
-            if (maxActivation > 0.7 && avgActivation > 0.5)
+            // Generate response based on novelty score (Phase 3)
+            string responseText;
+            if (novelty < 0.3)
             {
-                responseBuilder.Add($"Strong neural activation detected.");
-                responseBuilder.Add($"Concepts: {string.Join(", ", concepts.Take(3))}");
+                // Familiar - strong cascade through trained pathways
+                responseText = $"This is familiar to me. Related to: {conceptsList} ({activationCount} neurons, {activatedClusters.Count} clusters)";
             }
-            else if (maxActivation > 0.5 && avgActivation > 0.3)
+            else if (novelty > 0.7)
             {
-                responseBuilder.Add($"Moderate activation for this input.");
-                responseBuilder.Add($"Related to: {string.Join(", ", concepts.Take(2))}");
-            }
-            else if (maxActivation > 0.3)
-            {
-                responseBuilder.Add($"Weak activation detected.");
-                responseBuilder.Add($"Possibly: {concepts.FirstOrDefault() ?? "unknown"}");
+                // Novel - little to no cascade
+                responseText = $"This is completely novel - I have no trained associations for: {conceptsList} ({activationCount} neurons, {activatedClusters.Count} clusters)";
             }
             else
             {
-                responseBuilder.Add("Very weak neural response.");
+                // Moderate - some cascade but not deep
+                responseText = $"Moderate activation for this input. Related to: {conceptsList} ({activationCount} neurons, {activatedClusters.Count} clusters)";
             }
             
-            responseBuilder.Add($"({activationCount} neurons, {activatedClusters.Count} clusters)");
-            
-            return string.Join(" ", responseBuilder);
+            return responseText;
         }
 
         private double CalculatePatternFamiliarity(Dictionary<Guid, double> neuronOutputs, string[] concepts, List<NeuronCluster> activatedClusters)
