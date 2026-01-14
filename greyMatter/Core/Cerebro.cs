@@ -635,11 +635,11 @@ namespace GreyMatter.Core
                 Console.WriteLine($"⚡ Sparse Activation: {activatedNeurons:N0} / {totalLoadedNeurons:N0} neurons active ({activationPercent:F2}%) | clusters: {sortedClusters.Count}/{_loadedClusters.Count}");
             }
             
-            // Generate response based on activated neurons
-            result.Response = GenerateResponse(neuronOutputs, inputConcepts);
+            // Generate response based on activated neurons and clusters
+            result.Response = GenerateResponse(neuronOutputs, inputConcepts, sortedClusters);
             result.ActivatedClusters = activatedClusters;
             result.ActivatedNeurons = neuronOutputs.Count;
-            result.Confidence = CalculateConfidence(neuronOutputs);
+            result.Confidence = CalculateConfidence(neuronOutputs, sortedClusters);
             
             // Enhanced: Integrate emotional processing if consciousness is active
             // BUT avoid recursive loops for internal consciousness processing
@@ -1525,55 +1525,126 @@ namespace GreyMatter.Core
                 .ToArray();
         }
 
-        private string GenerateResponse(Dictionary<Guid, double> neuronOutputs, string[] concepts)
+        private string GenerateResponse(Dictionary<Guid, double> neuronOutputs, string[] concepts, List<NeuronCluster> activatedClusters)
         {
             if (!neuronOutputs.Any())
-                return "I need to learn more about this.";
+                return "I don't recognize this.";
             
             var avgActivation = neuronOutputs.Values.Average();
             var maxActivation = neuronOutputs.Values.Max();
             var activationCount = neuronOutputs.Count;
             
-            // Build response based on activation patterns
+            // Simple activation-based response (novelty detection disabled - requires architecture changes)
             var responseBuilder = new List<string>();
             
-            if (maxActivation > 0.7)
+            if (maxActivation > 0.7 && avgActivation > 0.5)
             {
-                responseBuilder.Add($"I recognize this strongly!");
-                responseBuilder.Add($"It relates to: {string.Join(", ", concepts.Take(3))}");
+                responseBuilder.Add($"Strong neural activation detected.");
+                responseBuilder.Add($"Concepts: {string.Join(", ", concepts.Take(3))}");
             }
-            else if (maxActivation > 0.4)
+            else if (maxActivation > 0.5 && avgActivation > 0.3)
             {
-                responseBuilder.Add($"This seems familiar to me.");
-                responseBuilder.Add($"I associate it with: {string.Join(", ", concepts.Take(2))}");
+                responseBuilder.Add($"Moderate activation for this input.");
+                responseBuilder.Add($"Related to: {string.Join(", ", concepts.Take(2))}");
             }
-            else if (avgActivation > 0.2)
+            else if (maxActivation > 0.3)
             {
-                responseBuilder.Add($"I have some knowledge about this.");
-                responseBuilder.Add($"Possibly related to: {concepts.FirstOrDefault() ?? "unknown"}");
+                responseBuilder.Add($"Weak activation detected.");
+                responseBuilder.Add($"Possibly: {concepts.FirstOrDefault() ?? "unknown"}");
             }
             else
             {
-                responseBuilder.Add("This is quite new to me.");
-                responseBuilder.Add("I'm learning from this input...");
+                responseBuilder.Add("Very weak neural response.");
             }
             
-            // Add activation details
-            if (activationCount > 0)
-            {
-                responseBuilder.Add($"({activationCount} neurons activated)");
-            }
+            responseBuilder.Add($"({activationCount} neurons, {activatedClusters.Count} clusters)");
             
             return string.Join(" ", responseBuilder);
         }
 
-        private double CalculateConfidence(Dictionary<Guid, double> neuronOutputs)
+        private double CalculatePatternFamiliarity(Dictionary<Guid, double> neuronOutputs, string[] concepts, List<NeuronCluster> activatedClusters)
+        {
+            // Check HEBBIAN CO-ACTIVATION: trained neurons have synapses TO EACH OTHER
+            // Trained patterns: neurons densely interconnected (learned together through STDP)
+            // Garbage: neurons isolated/weakly connected (random feature overlap, never trained together)
+            
+            if (!activatedClusters.Any() || !neuronOutputs.Any())
+                return 0.0;
+            
+            // Sample activated neurons and check their interconnectivity
+            var sampledNeurons = neuronOutputs.Keys.Take(50).ToList(); // Sample 50 neurons
+            int interconnections = 0;
+            int totalChecked = 0;
+            
+            for (int i = 0; i < Math.Min(20, sampledNeurons.Count); i++)
+            {
+                var neuronA = sampledNeurons[i];
+                var outgoing = _synapticGraph.GetOutgoingSynapses(neuronA);
+                
+                // Check if this neuron connects to OTHER activated neurons
+                foreach (var (targetId, weight) in outgoing)
+                {
+                    if (sampledNeurons.Contains(targetId) && weight > 0.3)
+                    {
+                        interconnections++;
+                    }
+                }
+                totalChecked++;
+            }
+            
+            // Interconnection ratio: trained concepts have ~20-50% of neurons connected to each other
+            // Garbage: <5% interconnection (isolated neurons)
+            var interconnectionRatio = totalChecked > 0 ? (double)interconnections / totalChecked : 0.0;
+            
+            // Also check activation statistics
+            var avgActivation = neuronOutputs.Values.Average();
+            var maxActivation = neuronOutputs.Values.Max();
+            var strongActivations = neuronOutputs.Values.Count(v => v > 0.5);
+            var activationRatio = neuronOutputs.Count / (double)activatedClusters.Sum(c => c.NeuronCount);
+            
+            double familiarity = 0.0;
+            
+            // INTERCONNECTION (most important - proves neurons trained together)
+            if (interconnectionRatio > 0.3) // >30% interconnected = trained
+                familiarity += 0.6;
+            else if (interconnectionRatio > 0.15) // >15% = moderate training
+                familiarity += 0.4;
+            else if (interconnectionRatio > 0.05) // >5% = weak training
+                familiarity += 0.2;
+            else
+                familiarity -= 0.3; // <5% = garbage (isolated neurons)
+            
+            // MAX ACTIVATION (confident match)
+            if (maxActivation > 0.7)
+                familiarity += 0.2;
+            else if (maxActivation < 0.4)
+                familiarity -= 0.2;
+            
+            // ACTIVATION RATIO (focused vs diffuse)
+            if (activationRatio < 0.08) // <8% = focused
+                familiarity += 0.1;
+            else if (activationRatio > 0.15) // >15% = too diffuse
+                familiarity -= 0.1;
+            
+            Console.WriteLine($"   🔗 Co-activation analysis ({sampledNeurons.Count} neurons sampled):");
+            Console.WriteLine($"      • Hebbian interconnections: {interconnections} ({interconnectionRatio*100:F1}%)");
+            Console.WriteLine($"      • Avg activation: {avgActivation:F3} | Max: {maxActivation:F3}");
+            Console.WriteLine($"      • Strong activations (>0.5): {strongActivations} ({100.0*strongActivations/neuronOutputs.Count:F1}%)");
+            Console.WriteLine($"      • Activation focus: {activationRatio*100:F1}% of cluster neurons");
+            Console.WriteLine($"      • Familiarity score: {Math.Clamp(familiarity, 0.0, 1.0):F3}");
+            
+            return Math.Clamp(familiarity, 0.0, 1.0);
+        }
+
+        private double CalculateConfidence(Dictionary<Guid, double> neuronOutputs, List<NeuronCluster> activatedClusters)
         {
             if (!neuronOutputs.Any()) return 0.0;
             
             var avgActivation = neuronOutputs.Values.Average();
             var maxActivation = neuronOutputs.Values.Max();
             
+            // Simple confidence based on activation strength
+            // (Novelty detection disabled - requires architecture changes to properly track trained patterns)
             return (avgActivation + maxActivation) / 2.0;
         }
 
