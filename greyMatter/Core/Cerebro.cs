@@ -699,25 +699,16 @@ namespace GreyMatter.Core
                 // Take snapshot of loaded clusters to avoid concurrent modification
                 var loadedClustersSnapshot = _loadedClusters.Values.ToList();
 
-            // Gather all neurons from loaded clusters for partitioning context
+            // Use lightweight context for routine checkpoints (no full neuron loading)
+            // BrainContext.AllNeurons is optional - partitioner works with empty dict for incremental saves
             var sw = Stopwatch.StartNew();
-            var allNeurons = new Dictionary<Guid, HybridNeuron>();
-            foreach (var cluster in loadedClustersSnapshot)
-            {
-                var neurons = await cluster.GetNeuronsAsync();
-                foreach (var neuron in neurons.Values)
-                {
-                    allNeurons[neuron.Id] = neuron;
-                }
-            }
-            
             var context = new BrainContext
             {
-                AllNeurons = allNeurons,
+                AllNeurons = new Dictionary<Guid, HybridNeuron>(), // Empty - avoid loading 140K+ neurons
                 AnalysisTime = DateTime.UtcNow
             };
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   ⏱️  Gathered {allNeurons.Count} neurons in {sw.Elapsed.TotalMilliseconds:F1}ms");
+                Console.WriteLine($"   ⏱️  Created lightweight checkpoint context in {sw.Elapsed.TotalMilliseconds:F1}ms");
 
             // STM->LTM consolidation with collection
             sw.Restart();
@@ -857,7 +848,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   ⚡ Sparse Activation: {avgActivation:F2}% average (target: <2%)");
                 Console.WriteLine($"   🎯 Queries Processed: {_queryCount:N0}");
                 Console.WriteLine($"   🧠 Working Set: {_accessedClusters.Count}/{TotalClustersCreated} clusters ({workingSetPercent:F1}%)");
-                Console.WriteLine($"   💾 Total Neurons: {allNeurons.Count:N0}");
+                Console.WriteLine($"   💾 Total Clusters Loaded: {loadedClustersSnapshot.Count:N0}");
                 Console.WriteLine($"   🔗 Total Synapses: {_synapses.Count:N0}");
             }
             
@@ -1269,8 +1260,8 @@ namespace GreyMatter.Core
             var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 5);
             var bestMatch = matches.FirstOrDefault(m => m.similarity >= SIMILARITY_THRESHOLD);
             
-            // DEBUG: Only log first 20 cluster attempts (DISABLED after that to prevent performance bottleneck)
-            if (TotalClustersCreated < 20)
+            // DEBUG: Sample logging (first 20 clusters, then every 1000th) to maintain visibility without spam
+            if (TotalClustersCreated < 20 || TotalClustersCreated % 1000 == 0)
             {
                 Console.WriteLine($"   🔍 DEBUG cluster={TotalClustersCreated}: candidates={matches.Count()}, best={matches.FirstOrDefault().similarity:F3}, threshold={SIMILARITY_THRESHOLD:F2} [debug: {debugLabel}]");
             }

@@ -457,6 +457,10 @@ namespace GreyMatter.Storage
         /// Load neurons from compact procedural format and regenerate full HybridNeuron instances
         /// Phase 6B: Alternative to LoadNeuronsAsync for checkpoint decompression
         /// </summary>
+        // Cache of partitions known to NOT have procedural banks (to suppress repeated warnings)
+        private readonly HashSet<string> _missingProceduralBanks = new HashSet<string>();
+        private readonly object _missingBanksLock = new object();
+
         public async Task<Dictionary<Guid, HybridNeuron>> LoadProceduralNeuronsAsync(
             PartitionPath partition,
             IEnumerable<Guid> ids,
@@ -468,8 +472,23 @@ namespace GreyMatter.Storage
             
             if (!File.Exists(bankPath))
             {
+                // Only warn once per partition (suppress spam)
+                bool shouldWarn = false;
+                lock (_missingBanksLock)
+                {
+                    if (!_missingProceduralBanks.Contains(partition.FullPath))
+                    {
+                        _missingProceduralBanks.Add(partition.FullPath);
+                        shouldWarn = true;
+                    }
+                }
+                
+                if (shouldWarn)
+                {
+                    Console.WriteLine($"⚠️  Procedural bank not found for partition {partition.FullPath} (suppressing further warnings)");
+                }
+                
                 // Fallback to standard format
-                Console.WriteLine($"⚠️  Procedural bank not found for partition {partition.FullPath}, falling back to standard format");
                 return await LoadNeuronsAsync(partition, ids).ConfigureAwait(false);
             }
 
