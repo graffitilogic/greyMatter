@@ -82,9 +82,13 @@
 - **[QUERY_GUIDE.md](QUERY_GUIDE.md)** - Testing and querying the brain
 
 **Technical Details:**
-- **[MASSIVE_DATASET_ACTIVATION.md](MASSIVE_DATASET_ACTIVATION.md)** - 571GB Wikipedia integration
-- **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - Architecture deep dive
-- **ADPC_PHASE*.md** - Implementation history (archived)
+- **[TECHNICAL_DETAILS.md](TECHNICAL_DETAILS.md)** - Complete architecture documentation
+- **[SYNAPTIC_PROPAGATION_IMPLEMENTATION.md](SYNAPTIC_PROPAGATION_IMPLEMENTATION.md)** - Wave traversal implementation
+- **[BIOLOGICAL_ALIGNMENT.md](BIOLOGICAL_ALIGNMENT.md)** - Biological fidelity principles
+
+**Implementation History:**
+- **[PHASE_6B_COMPLETION_SUMMARY.md](PHASE_6B_COMPLETION_SUMMARY.md)** - Procedural storage completion
+- **[PRODUCTION_TRAINING_FIXES.md](PRODUCTION_TRAINING_FIXES.md)** - Production improvements
 
 ## 🎯 Current Status
 

@@ -351,9 +351,14 @@ namespace GreyMatter.Storage
         public async Task SaveClustersEfficientlyAsync(IEnumerable<NeuronCluster> clusters, BrainContext context)
         {
             _batchMode = true;
+            
+            // DEBUG: Log entry
+            var clustersList = clusters.ToList();
+            Console.WriteLine($"   📦 SaveClustersEfficientlyAsync: received {clustersList.Count} clusters");
+            
             // Group clusters by stable partition (metadata if present)
             var groups = new Dictionary<string, (PartitionPath Path, List<NeuronCluster> Clusters)>();
-            foreach (var cluster in clusters)
+            foreach (var cluster in clustersList)
             {
                 var partition = GetStablePartitionForCluster(cluster, context);
                 var key = partition.FullPath;
@@ -365,6 +370,8 @@ namespace GreyMatter.Storage
                 entry.Clusters.Add(cluster);
                 groups[key] = entry;
             }
+
+            Console.WriteLine($"   📦 Grouped into {groups.Count} partitions");
 
             // Instrumentation counters
             int clustersExamined = groups.Values.Sum(g => g.Clusters.Count);
@@ -383,52 +390,53 @@ namespace GreyMatter.Storage
                     {
                         var pack = await LoadMembershipPackAsync(entry.Path);
                         bool packChanged = false;
+                        
+                        // If membership pack doesn't exist, we need to rebuild it from all clusters
+                        bool packMissing = pack.Membership.Count == 0;
+                        
+                        Console.WriteLine($"   📦 Processing partition {entry.Path.FullPath}: {entry.Clusters.Count} clusters, packMissing={packMissing}, existingMembership={pack.Membership.Count}");
 
                         foreach (var c in entry.Clusters)
                         {
                             var cid = c.ClusterId.ToString("N");
-                            // Try incremental update using newly added neuron ids
-                            var newlyAdded = c.GetNewNeuronIdsSincePersist();
-                            if (newlyAdded != null && newlyAdded.Count > 0)
+                            
+                            // Always use full set comparison with LTM filter
+                            // (Incremental path was causing STM neurons to be added to membership packs)
+                            var neurons = await c.GetNeuronsAsync();
+                            
+                            // CRITICAL FIX: Only include neurons that are persisted (LTM), not STM
+                            // STM neurons haven't been consolidated/saved to bank yet!
+                            var newIds = neurons.Values
+                                .Where(n => !n.HasPendingStm)  // Exclude STM neurons not yet in bank
+                                .Select(n => n.Id)
+                                .ToList();
+                            
+                            Console.WriteLine($"   📦 Cluster {cid.Substring(0,8)}: {neurons.Count} total neurons, {newIds.Count} LTM neurons");
+                            
+                            // If pack was missing, force save all clusters
+                            if (packMissing && newIds.Count > 0)
                             {
-                                if (!pack.Membership.TryGetValue(cid, out var existingIds) || existingIds == null)
-                                {
-                                    existingIds = new List<Guid>();
-                                    pack.Membership[cid] = existingIds;
-                                }
-                                int before = existingIds.Count;
-                                // Merge unique new ids
-                                var set = new HashSet<Guid>(existingIds);
-                                foreach (var id in newlyAdded)
-                                {
-                                    if (set.Add(id)) existingIds.Add(id);
-                                }
-                                if (existingIds.Count != before)
-                                {
-                                    packChanged = true;
-                                    Interlocked.Increment(ref clustersChanged);
-                                }
+                                pack.Membership[cid] = newIds;
+                                packChanged = true;
+                                Interlocked.Increment(ref clustersChanged);
+                                Console.WriteLine($"   📦 Pack missing: added {newIds.Count} neurons for cluster {cid.Substring(0,8)}");
                             }
-                            else
+                            else if (pack.Membership.TryGetValue(cid, out var existingIds))
                             {
-                                // Fallback: full set comparison
-                                var neurons = await c.GetNeuronsAsync();
-                                var newIds = neurons.Keys.ToList();
-                                if (pack.Membership.TryGetValue(cid, out var existingIds2))
-                                {
-                                    if (!SetEquals(existingIds2, newIds))
-                                    {
-                                        pack.Membership[cid] = newIds;
-                                        packChanged = true;
-                                        Interlocked.Increment(ref clustersChanged);
-                                    }
-                                }
-                                else
+                                if (!SetEquals(existingIds, newIds))
                                 {
                                     pack.Membership[cid] = newIds;
                                     packChanged = true;
                                     Interlocked.Increment(ref clustersChanged);
+                                    Console.WriteLine($"   📦 Membership changed: {existingIds.Count}→{newIds.Count} for cluster {cid.Substring(0,8)}");
                                 }
+                            }
+                            else
+                            {
+                                pack.Membership[cid] = newIds;
+                                packChanged = true;
+                                Interlocked.Increment(ref clustersChanged);
+                                Console.WriteLine($"   📦 New cluster entry: {newIds.Count} neurons for cluster {cid.Substring(0,8)}");
                             }
 
                             // Update partition metadata for this cluster
@@ -441,9 +449,14 @@ namespace GreyMatter.Storage
                         if (packChanged)
                         {
                             pack.SavedAt = DateTime.UtcNow;
+                            Console.WriteLine($"   📦 SAVING membership pack to {entry.Path.FullPath}: {pack.Membership.Count} clusters");
                             await SaveMembershipPackAsync(entry.Path, pack);
                             _membershipPackCache2[entry.Path.FullPath] = (DateTime.UtcNow, pack);
                             Interlocked.Increment(ref packsWritten);
+                        }
+                        else
+                        {
+                            Console.WriteLine($"   📦 No changes, skipping save for {entry.Path.FullPath}");
                         }
                     }
                     finally { sem.Release(); }
@@ -454,6 +467,8 @@ namespace GreyMatter.Storage
             // Persist partition metadata once at the end
             await this.PersistPartitionMetadataAsync();
             _batchMode = false;
+
+            Console.WriteLine($"   📦 SaveClustersEfficientlyAsync: examined={clustersExamined}, changed={clustersChanged}, packsWritten={packsWritten}");
 
             // Publish metrics (merge with any neuron bank metrics gathered earlier)
             var prior = _lastSaveMetrics;

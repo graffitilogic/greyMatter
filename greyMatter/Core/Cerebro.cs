@@ -698,6 +698,7 @@ namespace GreyMatter.Core
 
                 // Take snapshot of loaded clusters to avoid concurrent modification
                 var loadedClustersSnapshot = _loadedClusters.Values.ToList();
+                Console.WriteLine($"   🧮 Checkpoint: _loadedClusters has {_loadedClusters.Count} entries, snapshot has {loadedClustersSnapshot.Count} clusters");
 
             // Use lightweight context for routine checkpoints (no full neuron loading)
             // BrainContext.AllNeurons is optional - partitioner works with empty dict for incremental saves
@@ -771,18 +772,23 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   💾 Persisted neuron banks in batches; ~{neuronsPersisted} neurons updated in {sw.Elapsed.TotalSeconds:F2}s");
 
             // Determine clusters requiring membership/metadata save (use snapshot to avoid concurrent modification)
-            var dirtyClusters = loadedClustersSnapshot
-                .Where(c => c.HasUnsavedChanges)
+            // IMPORTANT: Even non-dirty clusters need membership pack updates when packs are missing/corrupt
+            // So we pass ALL loaded clusters, not just dirty ones. SaveClustersEfficientlyAsync will detect
+            // which ones actually need updates (missing packs, changed membership, etc.)
+            var clustersToSave = loadedClustersSnapshot
+                .Where(c => c.NeuronCount > 0)  // Skip empty clusters
                 .Distinct()
                 .ToList();
+            
+            var dirtyCount = clustersToSave.Count(c => c.HasUnsavedChanges);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   🧮 Clusters: total={loadedClustersSnapshot.Count}, dirty={dirtyClusters.Count}, skipped={loadedClustersSnapshot.Count - dirtyClusters.Count}");
+                Console.WriteLine($"   🧮 Clusters: total={loadedClustersSnapshot.Count}, dirty={dirtyCount}, checking={clustersToSave.Count}");
 
             // Save clusters (membership + metadata) with throttling
             sw.Restart();
-            await _storage.SaveClustersEfficientlyAsync(dirtyClusters, context);
+            await _storage.SaveClustersEfficientlyAsync(clustersToSave, context);
             if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   ⏱️  Saved {dirtyClusters.Count} clusters in {sw.Elapsed.TotalSeconds:F2}s (parallel={_storage.MaxParallelSaves}, gzip={_storage.CompressClusters})");
+                Console.WriteLine($"   ⏱️  Saved {clustersToSave.Count} clusters in {sw.Elapsed.TotalSeconds:F2}s (parallel={_storage.MaxParallelSaves}, gzip={_storage.CompressClusters})");
             
             // Save cluster index (use snapshot) - ONLY save clusters with neurons to avoid ghost clusters
             sw.Restart();
