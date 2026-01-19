@@ -690,7 +690,7 @@ namespace GreyMatter.Core
             // Signal cancellation
             _cancellationTokenSource?.Cancel();
             
-            // Wait for all tasks to complete
+            // Wait for all tasks to complete (but don't propagate cancellation exceptions)
             try
             {
                 var tasksToWait = new List<Task>();
@@ -700,16 +700,28 @@ namespace GreyMatter.Core
                 
                 if (tasksToWait.Count > 0)
                 {
-                    await Task.WhenAll(tasksToWait);
+                    // Wait for tasks but swallow cancellation exceptions
+                    await Task.WhenAll(tasksToWait.Select(async t => {
+                        try { await t; }
+                        catch (OperationCanceledException) { /* Expected - includes TaskCanceledException */ }
+                    }));
                 }
             }
-            catch (OperationCanceledException)
+            catch (Exception ex)
             {
-                // Expected when tasks are cancelled
+                Console.WriteLine($"⚠️  Warning during task cleanup: {ex.Message}");
             }
 
-            // Save final checkpoint
-            await SaveCheckpointAsync("shutdown");
+            // Save final checkpoint (critical - must complete)
+            try
+            {
+                await SaveCheckpointAsync("shutdown");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ CRITICAL: Failed to save final checkpoint: {ex.Message}");
+                Console.WriteLine($"   Stack trace: {ex.StackTrace}");
+            }
 
             _isRunning = false;
             

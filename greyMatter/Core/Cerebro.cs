@@ -204,20 +204,46 @@ namespace GreyMatter.Core
         /// </summary>
         private void RecordHebbianCoactivation(List<HybridNeuron> activeNeurons)
         {
+            // ALWAYS log first few calls to diagnose synapse creation issue
+            var synapseCountBefore = _synapticGraph.GetSynapseCount();
+            var isFirstCall = synapseCountBefore < 100; // Log first 100 synapses
+            
             if (activeNeurons.Count < 2)
+            {
+                if (isFirstCall || synapseCountBefore % 10000 == 0)
+                    Console.WriteLine($"   🧬 Hebbian: <2 neurons ({activeNeurons.Count}), skipping");
                 return; // Need at least 2 neurons for connections
+            }
             
             // Build activation list with neuron IDs and activations
+            // Note: CurrentPotential is typically negative (resting ~-70), so measure activation above resting
             var activations = activeNeurons
-                .Select(n => (n.Id, activation: (float)n.CurrentPotential))
-                .Where(pair => pair.activation > 0.1f) // Only consider significantly active neurons
+                .Select(n => (n.Id, activation: (float)Math.Max(0, n.CurrentPotential - n.RestingPotential)))
+                .Where(pair => pair.activation > 0.1f) // Only consider significantly active neurons (>0.1 above resting)
                 .ToList();
             
+            if (isFirstCall || synapseCountBefore % 1000 == 0)
+            {
+                var maxActivation = activeNeurons.Count > 0 ? activeNeurons.Max(n => n.CurrentPotential) : 0.0;
+                var avgActivation = activeNeurons.Count > 0 ? activeNeurons.Average(n => n.CurrentPotential) : 0.0;
+                Console.WriteLine($"   🧬 Hebbian: {activeNeurons.Count} neurons, max={maxActivation:F3}, avg={avgActivation:F3}, above_threshold={activations.Count}");
+            }
+            
             if (activations.Count < 2)
+            {
+                if (isFirstCall || synapseCountBefore % 10000 == 0)
+                    Console.WriteLine($"   🧬 Hebbian: <2 above threshold ({activations.Count}), skipping synapse creation");
                 return;
+            }
             
             // Record co-activation pattern in sparse graph
             _synapticGraph.RecordCoactivationPattern(activations);
+            
+            var synapseCountAfter = _synapticGraph.GetSynapseCount();
+            if (isFirstCall || synapseCountAfter % 1000 == 0)
+            {
+                Console.WriteLine($"   🧬 Hebbian: Recorded {activations.Count} co-active neurons, total synapses: {synapseCountBefore:N0} → {synapseCountAfter:N0} (+{synapseCountAfter-synapseCountBefore})");
+            }
         }
 
         public Cerebro(string storagePath)
@@ -335,6 +361,11 @@ namespace GreyMatter.Core
             }
             
             Console.WriteLine($"Loaded {_synapses.Count} synapses");
+            
+            // CRITICAL FIX: Import synapses into SparseSynapticGraph for cascade propagation
+            // The _synapticGraph is used during queries, but _synapses is what's saved/loaded
+            _synapticGraph.ImportSynapses(synapseSnapshots);
+            Console.WriteLine($"🔗 Imported {_synapses.Count} synapses into synaptic graph");
             
             // ADPC-Net: Load region→cluster mappings
             _regionToClusterMapping.Clear();
@@ -800,12 +831,43 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved cluster index ({clusterSnapshots.Count} non-empty clusters) in {sw.Elapsed.TotalSeconds:F2}s");
             
-            // Save synapses
+            // Export and save synapses in chunks to avoid memory issues with 100M+ synapses
             sw.Restart();
-            var synapseSnapshots = _synapses.Values.Select(s => s.CreateSnapshot()).ToList();
-            await _storage.SaveSynapsesAsync(synapseSnapshots);
-            if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   ⏱️  Saved {synapseSnapshots.Count} synapses in {sw.Elapsed.TotalSeconds:F2}s");
+            var synapseCount = _synapticGraph.GetSynapseCount();
+            Console.WriteLine($"   🔗 Starting chunked synapse export ({synapseCount:N0} total synapses)...");
+            
+            const int CHUNK_SIZE = 1_000_000; // Export 1M synapses at a time
+            int chunksExported = 0;
+            int totalExported = 0;
+            
+            try
+            {
+                // Export synapses in chunks from the graph
+                var allSynapseSnapshots = new List<SynapseSnapshot>();
+                foreach (var chunk in _synapticGraph.ExportSynapsesChunked(CHUNK_SIZE))
+                {
+                    allSynapseSnapshots.AddRange(chunk);
+                    totalExported += chunk.Count;
+                    chunksExported++;
+                    
+                    if (chunksExported % 10 == 0) // Log every 10 chunks (10M synapses)
+                    {
+                        Console.WriteLine($"   🔗 Exported {totalExported:N0} synapses so far ({chunksExported} chunks)...");
+                    }
+                }
+                
+                Console.WriteLine($"   🔗 Completed synapse export: {totalExported:N0} synapses in {chunksExported} chunks ({sw.Elapsed.TotalSeconds:F2}s)");
+                
+                // Save to disk
+                sw.Restart();
+                await _storage.SaveSynapsesAsync(allSynapseSnapshots);
+                Console.WriteLine($"   💾 Saved {allSynapseSnapshots.Count:N0} synapses to storage in {sw.Elapsed.TotalSeconds:F2}s");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"   ❌ ERROR during synapse export: {ex.GetType().Name}: {ex.Message}");
+                Console.WriteLine($"   ⚠️  Exported {totalExported:N0} of {synapseCount:N0} synapses before error");
+            }
             
             // ADPC-Net: Save region→cluster mappings
             sw.Restart();
@@ -1154,11 +1216,16 @@ namespace GreyMatter.Core
             // Get region ID from feature vector (Phase 5: VQ-VAE or legacy LSH)
             var regionId = GetRegionId(featureVector);
             
+            // DEBUG: Log region lookup
+            Console.WriteLine($"   🔍 FindClustersMatchingPattern: regionId={regionId}, total mappings={_regionToClusterMapping.Count}");
+            
             // Record activation for statistics
             _activationStats.RecordActivation(regionId, featureVector);
             
             // Get candidate regions (primary + nearby)
             var nearbyRegions = GetNearbyRegions(featureVector, neighbors: 5);
+            
+            Console.WriteLine($"   🔍 Searching {nearbyRegions.Count} regions: {string.Join(", ", nearbyRegions.Take(3))}...");
             
             // CRITICAL: Ensure the primary region is ALWAYS included in search!
             if (!nearbyRegions.Contains(regionId))
@@ -1174,6 +1241,8 @@ namespace GreyMatter.Core
                 // Get clusters mapped to this region
                 if (_regionToClusterMapping.TryGetValue(region, out var clusterIds))
                 {
+                    Console.WriteLine($"   🔍 Region {region}: found {clusterIds.Count} clusters");
+                    
                     foreach (var clusterId in clusterIds)
                     {
                         // Load cluster if not already loaded
@@ -1528,8 +1597,12 @@ namespace GreyMatter.Core
             // Get region ID for this pattern (VQ code or LSH hash)
             var regionId = GetRegionId(featureVector);
             
+            Console.WriteLine($"   🔍 LoadTrainedNeuronsForConcept('{concept}'): regionId={regionId}, total mappings={_regionToClusterMapping.Count}");
+            
             // Find clusters that were TRAINED on patterns in this region
             var clusterIds = _regionToClusterMapping.GetValueOrDefault(regionId, new List<Guid>());
+            
+            Console.WriteLine($"   🔍 Region {regionId}: found {clusterIds.Count} trained clusters");
             
             if (!clusterIds.Any())
             {
@@ -1670,11 +1743,20 @@ namespace GreyMatter.Core
             var layerSizes = new List<int> { seedNeurons.Count }; // Track neurons per layer
             var maxDepthReached = 0;
             
-            if ((_configForLogging?.Verbosity ?? 0) >= 2)
+            Console.WriteLine($"🌊 Starting synaptic cascade from {seedNeurons.Count} seed neurons...");
+            Console.WriteLine($"   Total synapses available: {_synapses.Count}");
+            
+            // DEBUG: Check if seed neurons have any outgoing synapses
+            var seedWithSynapses = 0;
+            var totalOutgoing = 0;
+            foreach (var seedId in seedNeurons.Keys.Take(5)) // Sample first 5 seeds
             {
-                Console.WriteLine($"\n🌊 Starting synaptic cascade from {seedNeurons.Count} seed neurons...");
-                Console.WriteLine($"   Total synapses available: {_synapses.Count}");
+                var outgoing = _synapses.Values.Count(s => s.PresynapticNeuronId == seedId);
+                if (outgoing > 0) seedWithSynapses++;
+                totalOutgoing += outgoing;
+                Console.WriteLine($"   🔍 Seed neuron {seedId.ToString().Substring(0,8)}: {outgoing} outgoing synapses");
             }
+            Console.WriteLine($"   📊 Sampled {Math.Min(5, seedNeurons.Count)} seeds: {seedWithSynapses} have synapses, {totalOutgoing} total outgoing");
             
             for (int depth = 1; depth <= maxDepth; depth++)
             {
@@ -1690,23 +1772,32 @@ namespace GreyMatter.Core
                 
                 var nextLayer = new Dictionary<Guid, double>();
                 
+                int synapsesChecked = 0;
+                int synapsesFound = 0;
+                int neuronsWithSynapses = 0;
+                
                 // Propagate from each neuron in current layer through its synapses
                 foreach (var (sourceNeuronId, sourceActivation) in currentLayer)
                 {
                     if (sourceActivation < ACTIVATION_THRESHOLD) continue;
                     
-                    // Find all synapses from this neuron
-                    var outgoingSynapses = _synapses.Values
-                        .Where(s => s.PresynapticNeuronId == sourceNeuronId)
-                        .ToList();
+                    synapsesChecked++;
                     
-                    foreach (var synapse in outgoingSynapses)
+                    // CRITICAL FIX: Use _synapticGraph instead of _synapses
+                    // The SparseSynapticGraph records Hebbian learning during training
+                    var outgoingSynapses = _synapticGraph.GetOutgoingSynapses(sourceNeuronId);
+                    
+                    if (outgoingSynapses.Count > 0)
                     {
-                        var targetNeuronId = synapse.PostsynapticNeuronId;
-                        
+                        neuronsWithSynapses++;
+                        synapsesFound += outgoingSynapses.Count;
+                    }
+                    
+                    foreach (var (targetNeuronId, weight) in outgoingSynapses)
+                    {
                         // Calculate propagated activation through this synapse
                         // Activation = source_activation * synapse_weight * decay
-                        var propagatedActivation = sourceActivation * synapse.Weight * PROPAGATION_DECAY;
+                        var propagatedActivation = sourceActivation * weight * PROPAGATION_DECAY;
                         
                         if (propagatedActivation < ACTIVATION_THRESHOLD) continue;
                         
@@ -1744,19 +1835,13 @@ namespace GreyMatter.Core
                     maxDepthReached = depth;
                 }
                 
-                if ((_configForLogging?.Verbosity ?? 0) >= 2)
-                {
-                    Console.WriteLine($"   Layer {depth}: {nextLayer.Count} neurons activated (total: {allActivations.Count})");
-                }
+                Console.WriteLine($"   Layer {depth}: checked {synapsesChecked} neurons, {neuronsWithSynapses} had synapses ({synapsesFound} total), activated {nextLayer.Count} new neurons");
                 
                 // Set up for next iteration
                 currentLayer = nextLayer;
             }
             
-            if ((_configForLogging?.Verbosity ?? 0) >= 2)
-            {
-                Console.WriteLine($"🎯 Cascade complete: {seedNeurons.Count} seed → {allActivations.Count} total neurons\n");
-            }
+            Console.WriteLine($"🎯 Cascade complete: {seedNeurons.Count} seed → {allActivations.Count} total neurons (max depth: {maxDepthReached})\n");
             
             return new PropagationResult
             {
@@ -1793,14 +1878,13 @@ namespace GreyMatter.Core
             var familiarityScore = (growthRatio * 0.4) + (depthNormalized * 0.4) + (avgLayerGrowth * 0.2);
             var noveltyScore = Math.Max(0.0, Math.Min(1.0, 1.0 - familiarityScore)); // Invert
             
-            if ((_configForLogging?.Verbosity ?? 0) >= 2)
-            {
-                Console.WriteLine($"📊 Novelty Analysis:");
-                Console.WriteLine($"   Growth ratio: {growthRatio:F2} ({totalActivated - seedCount} new neurons)");
-                Console.WriteLine($"   Depth: {maxDepth}/3 layers");
-                Console.WriteLine($"   Avg layer growth: {avgLayerGrowth:F2}");
-                Console.WriteLine($"   → Novelty score: {noveltyScore:F2} (0=familiar, 1=novel)\n");
-            }
+            Console.WriteLine($"📊 Novelty Analysis:");
+            Console.WriteLine($"   Seeds: {seedCount}, Total activated: {totalActivated}, New neurons: {totalActivated - seedCount}");
+            Console.WriteLine($"   Growth ratio: {growthRatio:F2} (weight 0.4)");
+            Console.WriteLine($"   Depth: {maxDepth}/3 layers = {depthNormalized:F2} normalized (weight 0.4)");
+            Console.WriteLine($"   Avg layer growth: {avgLayerGrowth:F2} (weight 0.2)");
+            Console.WriteLine($"   → Familiarity score: {familiarityScore:F2}");
+            Console.WriteLine($"   → Novelty score: {noveltyScore:F2} (0=familiar, 1=novel)\n");
             
             return noveltyScore;
         }

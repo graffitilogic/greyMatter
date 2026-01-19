@@ -276,6 +276,44 @@ namespace GreyMatter.Core
         }
         
         /// <summary>
+        /// Export synapses in chunks to avoid memory issues with large graphs
+        /// </summary>
+        public IEnumerable<List<SynapseSnapshot>> ExportSynapsesChunked(int chunkSize)
+        {
+            var chunk = new List<SynapseSnapshot>(chunkSize);
+            
+            foreach (var kvp in _synapses)
+            {
+                chunk.Add(new SynapseSnapshot
+                {
+                    Id = Guid.NewGuid(),
+                    PresynapticNeuronId = kvp.Key.source,
+                    PostsynapticNeuronId = kvp.Key.target,
+                    Weight = kvp.Value,
+                    Strength = kvp.Value,
+                    Type = SynapseType.Excitatory,
+                    LastActive = DateTime.UtcNow,
+                    TransmissionCount = 0,
+                    AverageSignalStrength = kvp.Value,
+                    PlasticityRate = _learningRate,
+                    IsPlastic = true
+                });
+                
+                if (chunk.Count >= chunkSize)
+                {
+                    yield return chunk;
+                    chunk = new List<SynapseSnapshot>(chunkSize);
+                }
+            }
+            
+            // Return any remaining synapses
+            if (chunk.Count > 0)
+            {
+                yield return chunk;
+            }
+        }
+        
+        /// <summary>
         /// Import synapses from persistence
         /// </summary>
         public void ImportSynapses(List<SynapseSnapshot> snapshots)

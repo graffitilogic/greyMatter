@@ -366,17 +366,25 @@ namespace GreyMatter.Core
         {
             await EnsureLoadedAsync();
 
+            // CRITICAL FIX: Prioritize neurons with synaptic connections
+            // Synaptic connectivity is essential for cascade propagation during queries
+            // Combined score: 60% synaptic connectivity + 40% salience
             var candidates = _neurons.Values
                 .Where(n => n.HasPendingStm)
-                .OrderByDescending(n => n.StmSalience)
+                .Select(n => new {
+                    Neuron = n,
+                    SynapticDegree = n.InputWeights.Count + n.OutputConnections.Count,
+                    Score = (n.InputWeights.Count + n.OutputConnections.Count) * 0.6 + n.StmSalience * 0.4
+                })
+                .OrderByDescending(c => c.Score)
                 .Take(Math.Max(0, maxNeurons))
                 .ToList();
 
             var changed = new List<HybridNeuron>();
-            foreach (var n in candidates)
+            foreach (var candidate in candidates)
             {
-                if (n.ConsolidateToLtm(epsilon))
-                    changed.Add(n);
+                if (candidate.Neuron.ConsolidateToLtm(epsilon))
+                    changed.Add(candidate.Neuron);
             }
 
             return changed;

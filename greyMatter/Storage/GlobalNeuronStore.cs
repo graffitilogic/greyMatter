@@ -120,10 +120,17 @@ namespace GreyMatter.Storage
         {
             var result = new Dictionary<Guid, HybridNeuron>();
             var bankPath = GetNeuronBankPath(partition);
+            
+            var idsList = ids.ToList();
+            Console.WriteLine($"   📦 LoadNeuronsAsync: partition={partition.FullPath}, requesting {idsList.Count} neurons, bankPath exists={File.Exists(bankPath)}");
+            
             if (!File.Exists(bankPath)) return result;
 
             var dict = await ReadBankAsync(bankPath).ConfigureAwait(false);
-            foreach (var id in ids)
+            
+            Console.WriteLine($"   📦 Bank contains {dict.Count} neurons total");
+            
+            foreach (var id in idsList)
             {
                 var key = NormalizeId(id);
                 if (dict.TryGetValue(key, out var snap))
@@ -131,6 +138,9 @@ namespace GreyMatter.Storage
                     result[id] = HybridNeuron.FromSnapshot(snap);
                 }
             }
+            
+            Console.WriteLine($"   📦 Loaded {result.Count}/{idsList.Count} neurons from bank");
+            
             return result;
         }
 

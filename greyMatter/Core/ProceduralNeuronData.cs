@@ -146,6 +146,7 @@ namespace GreyMatter.Core
                 Threshold = GenerateThreshold(vqVectorDouble),
                 Bias = GenerateBias(vqVectorDouble),
                 LearningRate = BASE_LEARNING_RATE,
+                RestingPotential = -70.0, // Biologically realistic resting potential
                 
                 // LastUsed set to now (freshly regenerated)
                 LastUsed = DateTime.UtcNow
