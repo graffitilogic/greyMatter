@@ -581,6 +581,12 @@ namespace GreyMatter.Core
                     newNeuron.VqCode = vqCode;
                 }
                 
+                // PHASE 1 DIAGNOSTIC: Log neuron ID at creation
+                if (i < 3) // Log first 3 neurons created
+                {
+                    Console.WriteLine($"      [PHASE1] Created neuron {newNeuron.Id.ToString().Substring(0,8)} for concept '{concept}'");
+                }
+                
                 // Create connections to existing neurons in cluster
                 await ConnectToExistingNeurons(newNeuron, existingNeurons);
                 

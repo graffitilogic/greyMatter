@@ -1458,22 +1458,56 @@ namespace GreyMatter.Storage
 
         /// <summary>
         /// Load synapses from storage
+        /// PHASE 3: Supports both old monolithic format and new partitioned format
+        /// NOTE: For production, use LoadSynapsesForNeuronsAsync for lazy loading
         /// </summary>
         public static async Task<List<GreyMatter.Core.SynapseSnapshot>> LoadSynapsesAsync(this EnhancedBrainStorage storage)
         {
             var basePath = storage.GetBasePath();
-            var path = Path.Combine(basePath, "synapses.json");
             
-            if (!File.Exists(path))
+            // Try new partitioned format first
+            var partitionedDir = Path.Combine(basePath, "synapses_partitioned");
+            if (Directory.Exists(partitionedDir))
+            {
+                Console.WriteLine("   🔗 Loading synapses from partitioned storage...");
+                var allSynapses = new List<GreyMatter.Core.SynapseSnapshot>();
+                var partitionFiles = Directory.GetFiles(partitionedDir, "partition_*.json.gz");
+                
+                foreach (var partitionFile in partitionFiles)
+                {
+                    await using var fileStream = File.OpenRead(partitionFile);
+                    await using var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
+                    var partitionSynapses = await JsonSerializer.DeserializeAsync<List<GreyMatter.Core.SynapseSnapshot>>(gzipStream);
+                    if (partitionSynapses != null)
+                    {
+                        allSynapses.AddRange(partitionSynapses);
+                    }
+                    
+                    if (allSynapses.Count % 1_000_000 == 0)
+                    {
+                        Console.WriteLine($"   🔗 Loaded {allSynapses.Count:N0} synapses so far...");
+                    }
+                }
+                
+                Console.WriteLine($"   ✅ Loaded {allSynapses.Count:N0} synapses from {partitionFiles.Length} partitions");
+                return allSynapses;
+            }
+            
+            // Fall back to old monolithic format
+            var oldPath = Path.Combine(basePath, "synapses.json");
+            if (!File.Exists(oldPath))
             {
                 return new List<GreyMatter.Core.SynapseSnapshot>();
             }
             
             try
             {
-                var json = await File.ReadAllTextAsync(path);
-                return JsonSerializer.Deserialize<List<GreyMatter.Core.SynapseSnapshot>>(json) 
+                Console.WriteLine("   🔗 Loading synapses from legacy monolithic file...");
+                var json = await File.ReadAllTextAsync(oldPath);
+                var synapses = JsonSerializer.Deserialize<List<GreyMatter.Core.SynapseSnapshot>>(json) 
                        ?? new List<GreyMatter.Core.SynapseSnapshot>();
+                Console.WriteLine($"   ✅ Loaded {synapses.Count:N0} synapses");
+                return synapses;
             }
             catch
             {
@@ -1519,15 +1553,163 @@ namespace GreyMatter.Storage
         }
 
         /// <summary>
-        /// Save synapses to storage
+        /// Save synapses to storage using partitioned streaming approach
+        /// PHASE 3: Prevents OOM by saving synapses incrementally to partitions
         /// </summary>
         public static async Task SaveSynapsesAsync(this EnhancedBrainStorage storage, List<GreyMatter.Core.SynapseSnapshot> snapshots)
         {
+            const int NUM_PARTITIONS = 256;
             var basePath = storage.GetBasePath();
-            Directory.CreateDirectory(basePath);
-            var path = Path.Combine(basePath, "synapses.json");
-            var json = JsonSerializer.Serialize(snapshots, new JsonSerializerOptions { WriteIndented = true, DictionaryKeyPolicy = null, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals });
-            await File.WriteAllTextAsync(path, json);
+            var synapsesDir = Path.Combine(basePath, "synapses_partitioned");
+            Directory.CreateDirectory(synapsesDir);
+            
+            Console.WriteLine($"   🔗 Saving {snapshots.Count:N0} synapses to {NUM_PARTITIONS} partitions...");
+            
+            // Group synapses by source neuron hash (partition by source for efficient cascade queries)
+            var partitions = new Dictionary<int, List<GreyMatter.Core.SynapseSnapshot>>();
+            for (int i = 0; i < NUM_PARTITIONS; i++)
+            {
+                partitions[i] = new List<GreyMatter.Core.SynapseSnapshot>();
+            }
+            
+            foreach (var synapse in snapshots)
+            {
+                var partition = Math.Abs(synapse.PresynapticNeuronId.GetHashCode()) % NUM_PARTITIONS;
+                partitions[partition].Add(synapse);
+            }
+            
+            // Save each partition incrementally (prevents massive memory allocation)
+            int saved = 0;
+            foreach (var (partitionId, synapseList) in partitions)
+            {
+                if (synapseList.Count == 0) continue;
+                
+                var partitionPath = Path.Combine(synapsesDir, $"partition_{partitionId:D3}.json.gz");
+                
+                // Compress and save
+                await using var fileStream = File.Create(partitionPath);
+                await using var gzipStream = new GZipStream(fileStream, CompressionLevel.Fastest);
+                await JsonSerializer.SerializeAsync(gzipStream, synapseList);
+                
+                saved += synapseList.Count;
+                if (saved % 10_000_000 == 0)
+                {
+                    Console.WriteLine($"   🔗 Saved {saved:N0} synapses...");
+                }
+            }
+            
+            // Save partition metadata
+            var metadataPath = Path.Combine(synapsesDir, "metadata.json");
+            var metadata = new
+            {
+                TotalSynapses = snapshots.Count,
+                NumPartitions = NUM_PARTITIONS,
+                SavedAt = DateTime.UtcNow,
+                PartitionCounts = partitions.ToDictionary(p => p.Key, p => p.Value.Count)
+            };
+            await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
+            
+            Console.WriteLine($"   ✅ Saved {snapshots.Count:N0} synapses to {NUM_PARTITIONS} partitions");
+        }
+
+        /// <summary>
+        /// Save synapses directly from SparseSynapticGraph (streaming, no memory spike)
+        /// PHASE 3: Prevents OOM by streaming from graph to disk without intermediate buffer
+        /// </summary>
+        public static async Task SaveSynapsesPartitionedAsync(this EnhancedBrainStorage storage, GreyMatter.Core.SparseSynapticGraph graph)
+        {
+            const int NUM_PARTITIONS = 256;
+            const int CHUNK_SIZE = 1_000_000;
+            
+            var basePath = storage.GetBasePath();
+            var synapsesDir = Path.Combine(basePath, "synapses_partitioned");
+            Directory.CreateDirectory(synapsesDir);
+            
+            var totalSynapses = graph.GetSynapseCount();
+            Console.WriteLine($"   🔗 Streaming {totalSynapses:N0} synapses to {NUM_PARTITIONS} partitions...");
+            
+            // Create partition files
+            var partitionCounts = new int[NUM_PARTITIONS];
+            var partitionWriters = new Dictionary<int, StreamWriter>();
+            
+            try
+            {
+                // Open all partition files for streaming write
+                for (int i = 0; i < NUM_PARTITIONS; i++)
+                {
+                    var partitionPath = Path.Combine(synapsesDir, $"partition_{i:D3}.json.gz");
+                    var fileStream = File.Create(partitionPath);
+                    var gzipStream = new GZipStream(fileStream, CompressionLevel.Fastest);
+                    var writer = new StreamWriter(gzipStream);
+                    
+                    // Write JSON array start
+                    await writer.WriteAsync("[");
+                    partitionWriters[i] = writer;
+                }
+                
+                // Stream synapses in chunks directly to partitions
+                int processed = 0;
+                var partitionFirsts = Enumerable.Repeat(true, NUM_PARTITIONS).ToArray();
+                
+                foreach (var chunk in graph.ExportSynapsesChunked(CHUNK_SIZE))
+                {
+                    foreach (var synapse in chunk)
+                    {
+                        var partition = Math.Abs(synapse.PresynapticNeuronId.GetHashCode()) % NUM_PARTITIONS;
+                        var writer = partitionWriters[partition];
+                        
+                        // Add comma separator (except for first item)
+                        if (!partitionFirsts[partition])
+                        {
+                            await writer.WriteAsync(",");
+                        }
+                        partitionFirsts[partition] = false;
+                        
+                        // Write synapse JSON
+                        var json = JsonSerializer.Serialize(synapse);
+                        await writer.WriteAsync(json);
+                        
+                        partitionCounts[partition]++;
+                    }
+                    
+                    processed += chunk.Count;
+                    if (processed % 10_000_000 == 0)
+                    {
+                        Console.WriteLine($"   🔗 Streamed {processed:N0} synapses...");
+                    }
+                }
+                
+                // Close JSON arrays and files
+                foreach (var writer in partitionWriters.Values)
+                {
+                    await writer.WriteAsync("]");
+                    await writer.FlushAsync();
+                    writer.Close();
+                }
+                
+                // Save metadata
+                var metadataPath = Path.Combine(synapsesDir, "metadata.json");
+                var metadata = new
+                {
+                    TotalSynapses = totalSynapses,
+                    NumPartitions = NUM_PARTITIONS,
+                    SavedAt = DateTime.UtcNow,
+                    PartitionCounts = partitionCounts.Select((count, idx) => new { Partition = idx, Count = count })
+                        .Where(p => p.Count > 0)
+                        .ToDictionary(p => p.Partition, p => p.Count)
+                };
+                await File.WriteAllTextAsync(metadataPath, JsonSerializer.Serialize(metadata, new JsonSerializerOptions { WriteIndented = true }));
+                
+                Console.WriteLine($"   ✅ Streamed {totalSynapses:N0} synapses to {NUM_PARTITIONS} partitions");
+            }
+            finally
+            {
+                // Ensure all writers are closed
+                foreach (var writer in partitionWriters.Values)
+                {
+                    writer.Dispose();
+                }
+            }
         }
 
         /// <summary>

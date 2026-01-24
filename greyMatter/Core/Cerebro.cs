@@ -227,6 +227,16 @@ namespace GreyMatter.Core
                 var maxActivation = activeNeurons.Count > 0 ? activeNeurons.Max(n => n.CurrentPotential) : 0.0;
                 var avgActivation = activeNeurons.Count > 0 ? activeNeurons.Average(n => n.CurrentPotential) : 0.0;
                 Console.WriteLine($"   🧬 Hebbian: {activeNeurons.Count} neurons, max={maxActivation:F3}, avg={avgActivation:F3}, above_threshold={activations.Count}");
+                
+                // PHASE 1 DIAGNOSTIC: Sample neuron IDs being passed to synapse creation
+                if (activations.Count >= 2)
+                {
+                    Console.WriteLine($"      [PHASE1] Sample neuron IDs for synapses:");
+                    foreach (var (id, act) in activations.Take(3))
+                    {
+                        Console.WriteLine($"         {id.ToString().Substring(0,8)}: activation={act:F3}");
+                    }
+                }
             }
             
             if (activations.Count < 2)
@@ -831,42 +841,19 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   ⏱️  Saved cluster index ({clusterSnapshots.Count} non-empty clusters) in {sw.Elapsed.TotalSeconds:F2}s");
             
-            // Export and save synapses in chunks to avoid memory issues with 100M+ synapses
+            // Save synapses directly to partitioned storage (Phase 3: prevents OOM)
             sw.Restart();
             var synapseCount = _synapticGraph.GetSynapseCount();
-            Console.WriteLine($"   🔗 Starting chunked synapse export ({synapseCount:N0} total synapses)...");
-            
-            const int CHUNK_SIZE = 1_000_000; // Export 1M synapses at a time
-            int chunksExported = 0;
-            int totalExported = 0;
+            Console.WriteLine($"   🔗 Saving {synapseCount:N0} synapses to partitioned storage...");
             
             try
             {
-                // Export synapses in chunks from the graph
-                var allSynapseSnapshots = new List<SynapseSnapshot>();
-                foreach (var chunk in _synapticGraph.ExportSynapsesChunked(CHUNK_SIZE))
-                {
-                    allSynapseSnapshots.AddRange(chunk);
-                    totalExported += chunk.Count;
-                    chunksExported++;
-                    
-                    if (chunksExported % 10 == 0) // Log every 10 chunks (10M synapses)
-                    {
-                        Console.WriteLine($"   🔗 Exported {totalExported:N0} synapses so far ({chunksExported} chunks)...");
-                    }
-                }
-                
-                Console.WriteLine($"   🔗 Completed synapse export: {totalExported:N0} synapses in {chunksExported} chunks ({sw.Elapsed.TotalSeconds:F2}s)");
-                
-                // Save to disk
-                sw.Restart();
-                await _storage.SaveSynapsesAsync(allSynapseSnapshots);
-                Console.WriteLine($"   💾 Saved {allSynapseSnapshots.Count:N0} synapses to storage in {sw.Elapsed.TotalSeconds:F2}s");
+                await _storage.SaveSynapsesPartitionedAsync(_synapticGraph);
+                Console.WriteLine($"   💾 Saved {synapseCount:N0} synapses in {sw.Elapsed.TotalSeconds:F2}s");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"   ❌ ERROR during synapse export: {ex.GetType().Name}: {ex.Message}");
-                Console.WriteLine($"   ⚠️  Exported {totalExported:N0} of {synapseCount:N0} synapses before error");
+                Console.WriteLine($"   ❌ ERROR during synapse save: {ex.GetType().Name}: {ex.Message}");
             }
             
             // ADPC-Net: Save region→cluster mappings
@@ -1744,19 +1731,6 @@ namespace GreyMatter.Core
             var maxDepthReached = 0;
             
             Console.WriteLine($"🌊 Starting synaptic cascade from {seedNeurons.Count} seed neurons...");
-            Console.WriteLine($"   Total synapses available: {_synapses.Count}");
-            
-            // DEBUG: Check if seed neurons have any outgoing synapses
-            var seedWithSynapses = 0;
-            var totalOutgoing = 0;
-            foreach (var seedId in seedNeurons.Keys.Take(5)) // Sample first 5 seeds
-            {
-                var outgoing = _synapses.Values.Count(s => s.PresynapticNeuronId == seedId);
-                if (outgoing > 0) seedWithSynapses++;
-                totalOutgoing += outgoing;
-                Console.WriteLine($"   🔍 Seed neuron {seedId.ToString().Substring(0,8)}: {outgoing} outgoing synapses");
-            }
-            Console.WriteLine($"   📊 Sampled {Math.Min(5, seedNeurons.Count)} seeds: {seedWithSynapses} have synapses, {totalOutgoing} total outgoing");
             
             for (int depth = 1; depth <= maxDepth; depth++)
             {
