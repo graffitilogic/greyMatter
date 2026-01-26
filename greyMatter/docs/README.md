@@ -2,9 +2,9 @@
 
 **"A trillion-parameter model in a gigabyte of RAM."**
 
-> **Status**: Active development - Synaptic novelty detection complete! ⚡
+> **Status**: Production-ready architecture - All memory management phases complete! 🚀
 > 
-> **Latest**: Biological graph traversal replaces broken pattern matching (Jan 2026)
+> **Latest**: Phase 4 complete - LRU cluster eviction ensures bounded memory (Jan 25, 2026)
 
 ## 🎯 What Actually Works (January 2026)
 
@@ -24,28 +24,31 @@
 
 **Neural Architecture**
 - Procedural generation: Neurons created on-demand, not pre-allocated
-- Lazy loading: Max 10 clusters in memory, unload after 30 min inactivity
+- LRU cluster cache: Max 800 clusters, automatic eviction when full
+- Background eviction: Removes idle clusters every 5 minutes (30 min idle threshold)
 - VQ-VAE clustering: Learned codebook groups similar patterns
 - Hebbian synapses: "Neurons that fire together, wire together"
 - Sparse connectivity: Only meaningful connections stored (>90% sparsity)
-- **NEW**: Partitioned synaptic storage - 256 partitions, handles 133M+ synapses without OOM
+- Partitioned synaptic storage: 256 partitions, handles 133M+ synapses without OOM
 
 **Performance**
-- Constant memory: 20-25 MB regardless of training duration
+- Bounded memory: O(active_set) not O(total_data) - max 800 clusters in RAM
 - Fast processing: ~470 concepts/sec on real data
 - MessagePack storage: 60% smaller than JSON, 1,350x faster saves
 - 10+ hour stability: No crashes, consistent performance
-- **NEW**: Streaming synapse saves - 133M synapses in ~10 minutes (52% faster, no OOM)
+- Streaming synapse saves: 133M synapses in ~10 minutes (52% faster, no OOM)
+- Automatic eviction: LRU cache prevents unbounded growth, ready for 24/7 training
 
 ## 🏗️ Architecture
 
 ### Core Components
 
-**Cerebro** (`Core/Cerebro.cs` - 1,398 lines)
+**Cerebro** (`Core/Cerebro.cs` - 2,474 lines)
 - Procedural SBIJ orchestrator
-- Lazy loading: Max 10 clusters loaded at once
+- LRU cluster cache: Max 800 clusters with automatic eviction
+- Background eviction loop: Checks every 5 min, evicts after 30 min idle
 - Procedurally generates neurons on-demand
-- Unloads clusters after 30 minutes of inactivity
+- Graceful persistence before eviction
 - STM → LTM consolidation
 
 **EnhancedBrainStorage** (`Storage/EnhancedBrainStorage.cs`)
@@ -94,17 +97,18 @@
 
 ## 🎯 Current Status
 
-✅ **Complete & Working:**
+✅ **Architecture Complete (Phases 1, 3, 4):**
+- Phase 1: Fixed neuron-synapse ID mismatch (Jan 19)
+- Phase 3: Partitioned synaptic storage - 256 partitions, 133M synapses, no OOM (Jan 23)
+- Phase 4: LRU cluster eviction - bounded memory, automatic eviction (Jan 25)
 - Biological novelty detection (synaptic graph traversal)
 - Massive dataset training (571GB Wikipedia + 500GB books)
 - Progressive curriculum with LLM teacher
-- Procedural neural generation
-- Lazy loading and efficient storage
 
 🚀 **Ready For:**
-- Production-scale training to build strong synaptic pathways
-- Extended training runs (10+ hours proven stable)
-- Real-world knowledge acquisition
+- Extended validation: 8+ hour training runs
+- Production-scale 24/7 training (memory bounded, automatic eviction)
+- Real-world knowledge acquisition at scale
 
 ## 🚀 Quick Start
 
@@ -157,5 +161,10 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Last Updated**: January 14, 2026  
-**Latest Achievement**: ✅ Synaptic novelty detection - biological graph traversal replaces broken pattern matching!
+**Last Updated**: January 25, 2026  
+**Latest Achievement**: ✅ Phase 4 complete - LRU cluster eviction ensures bounded memory for 24/7 training!
+
+**Architecture Milestones:**
+- Jan 19: Phase 1 - Fixed ID mismatch
+- Jan 23: Phase 3 - Partitioned storage (133M synapses, 52% faster, no OOM)
+- Jan 25: Phase 4 - LRU eviction (max 800 clusters, automatic eviction)
