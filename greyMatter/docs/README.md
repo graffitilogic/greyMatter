@@ -28,12 +28,14 @@
 - VQ-VAE clustering: Learned codebook groups similar patterns
 - Hebbian synapses: "Neurons that fire together, wire together"
 - Sparse connectivity: Only meaningful connections stored (>90% sparsity)
+- **NEW**: Partitioned synaptic storage - 256 partitions, handles 133M+ synapses without OOM
 
 **Performance**
 - Constant memory: 20-25 MB regardless of training duration
 - Fast processing: ~470 concepts/sec on real data
 - MessagePack storage: 60% smaller than JSON, 1,350x faster saves
 - 10+ hour stability: No crashes, consistent performance
+- **NEW**: Streaming synapse saves - 133M synapses in ~10 minutes (52% faster, no OOM)
 
 ## 🏗️ Architecture
 

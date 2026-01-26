@@ -15,7 +15,10 @@ namespace GreyMatter.Core
     public class Cerebro : IBrainInterface
     {
         private readonly EnhancedBrainStorage _storage; // Use only enhanced storage
-        private readonly Dictionary<Guid, NeuronCluster> _loadedClusters = new();
+        private readonly LRUCache<Guid, NeuronCluster> _loadedClusters = new(maxSize: 800); // Phase 4: LRU eviction
+        private readonly Dictionary<Guid, DateTime> _clusterAccessTimes = new(); // Track last access for eviction
+        private CancellationTokenSource? _evictionCancellation;
+        private Task? _evictionTask;
         private readonly Dictionary<Guid, Synapse> _synapses = new();
         private readonly FeatureMapper _featureMapper = new();
         private readonly Random _random = new();
@@ -436,6 +439,11 @@ namespace GreyMatter.Core
 
             // Reset per-run cache
             _conceptClusterCache.Clear();
+            
+            // Phase 4: Start background cluster eviction loop
+            _evictionCancellation = new CancellationTokenSource();
+            _evictionTask = Task.Run(() => ClusterEvictionLoopAsync(_evictionCancellation.Token));
+            Console.WriteLine("✓ Background cluster eviction started (check every 5 min, evict after 30 min idle)");
         }
 
         /// <summary>
@@ -738,7 +746,7 @@ namespace GreyMatter.Core
                 var swTotal = Stopwatch.StartNew();
 
                 // Take snapshot of loaded clusters to avoid concurrent modification
-                var loadedClustersSnapshot = _loadedClusters.Values.ToList();
+                var loadedClustersSnapshot = _loadedClusters.GetValues();
                 Console.WriteLine($"   🧮 Checkpoint: _loadedClusters has {_loadedClusters.Count} entries, snapshot has {loadedClustersSnapshot.Count} clusters");
 
             // Use lightweight context for routine checkpoints (no full neuron loading)
@@ -804,7 +812,12 @@ namespace GreyMatter.Core
             else
             {
                 // Regular save: persist only consolidated neurons (incremental)
-                var changeTuples = changedByCluster.Select(kvp => (_loadedClusters[kvp.Key], kvp.Value.AsEnumerable()));
+                var changeTuples = changedByCluster
+                    .Where(kvp => _loadedClusters.TryGetValue(kvp.Key, out _))
+                    .Select(kvp => {
+                        _loadedClusters.TryGetValue(kvp.Key, out var cluster);
+                        return (cluster!, kvp.Value.AsEnumerable());
+                    });
                 await _storage.SaveNeuronBanksInBatchesAsync(changeTuples, context);
             }
             
@@ -935,7 +948,7 @@ namespace GreyMatter.Core
             await _storage.ConsolidateMemoryPartitions();
             
             // Unload old clusters
-            var clustersToUnload = _loadedClusters.Values
+            var clustersToUnload = _loadedClusters.GetValues()
                 .Where(c => !c.ShouldStayLoaded())
                 .ToList();
             
@@ -965,6 +978,73 @@ namespace GreyMatter.Core
             }
             
             Console.WriteLine($"🧹 Maintenance complete: consolidated memory, unloaded {unloadedClusters} clusters, pruned {prunedSynapses} synapses");
+        }
+
+        /// <summary>
+        /// Phase 4: Handle cluster eviction from LRU cache
+        /// Persists cluster to disk before evicting from memory
+        /// </summary>
+        private async Task HandleClusterEvictionAsync(Guid clusterId, NeuronCluster cluster)
+        {
+            try
+            {
+                // Persist cluster before eviction
+                await cluster.PersistAndUnloadAsync(forceUnload: true);
+                
+                // Clean up access time tracking
+                _clusterAccessTimes.Remove(clusterId);
+                
+                Console.WriteLine($"   🗑️ LRU evicted cluster: {clusterId}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"   ⚠️ Error evicting cluster {clusterId}: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Phase 4: Background loop for cluster eviction
+        /// Runs every 5 minutes, evicts clusters idle for >30 minutes
+        /// </summary>
+        private async Task ClusterEvictionLoopAsync(CancellationToken cancellationToken)
+        {
+            const int CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+            const int MAX_IDLE_MINUTES = 30;
+            
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await Task.Delay(CHECK_INTERVAL_MS, cancellationToken);
+                    
+                    // Find stale clusters (not accessed in last 30 minutes)
+                    var staleItems = _loadedClusters.GetStaleItems(
+                        _clusterAccessTimes, 
+                        TimeSpan.FromMinutes(MAX_IDLE_MINUTES));
+                    
+                    if (staleItems.Count > 0)
+                    {
+                        Console.WriteLine($"🧹 Evicting {staleItems.Count} idle clusters (>{MAX_IDLE_MINUTES} min inactive)...");
+                        
+                        foreach (var (clusterId, cluster) in staleItems)
+                        {
+                            await HandleClusterEvictionAsync(clusterId, cluster);
+                            _loadedClusters.Remove(clusterId);
+                        }
+                        
+                        Console.WriteLine($"   ✅ Evicted {staleItems.Count} idle clusters, {_loadedClusters.Count} remain in cache");
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // Normal shutdown
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"⚠️ Error in eviction loop: {ex.Message}");
+                }
+            }
         }
 
         /// <summary>
@@ -1235,6 +1315,7 @@ namespace GreyMatter.Core
                         // Load cluster if not already loaded
                         if (!_loadedClusters.TryGetValue(clusterId, out var cluster))
                         {
+                            // LRU cache returns null if not found
                             // Load from storage
                             try
                             {
@@ -1261,7 +1342,15 @@ namespace GreyMatter.Core
                                     _conceptClusterCache[metadata.ConceptLabel] = clusterId;
                                 }
                                 
-                                _loadedClusters[clusterId] = cluster;
+                                // Phase 4: Add to LRU cache with automatic eviction
+                                var evictionResult = _loadedClusters.Add(clusterId, cluster);
+                                _clusterAccessTimes[clusterId] = DateTime.UtcNow;
+                                
+                                // Handle eviction if cache was full
+                                if (evictionResult.evicted && evictionResult.key != default)
+                                {
+                                    await HandleClusterEvictionAsync(evictionResult.key, evictionResult.value!);
+                                }
                             }
                             catch
                             {
@@ -1348,7 +1437,12 @@ namespace GreyMatter.Core
             // Initialize centroid with the first pattern - CRITICAL for pattern matching!
             newCluster.UpdateCentroid(featureVector);
             
-            _loadedClusters[newCluster.ClusterId] = newCluster;
+            var evictionResult = _loadedClusters.Add(newCluster.ClusterId, newCluster);
+            _clusterAccessTimes[newCluster.ClusterId] = DateTime.UtcNow;
+            if (evictionResult.evicted && evictionResult.key != default)
+            {
+                await HandleClusterEvictionAsync(evictionResult.key, evictionResult.value!);
+            }
             
             // Map region → cluster
             if (!_regionToClusterMapping.ContainsKey(regionId))
@@ -1387,7 +1481,12 @@ namespace GreyMatter.Core
                         AnalysisTime = DateTime.UtcNow
                     });
                 var clusterFromCache = new NeuronCluster(concept, cachedId, hierLoad, _storage.SaveClusterAsync);
-                _loadedClusters[cachedId] = clusterFromCache;
+                var evictionResult5 = _loadedClusters.Add(cachedId, clusterFromCache);
+                _clusterAccessTimes[cachedId] = DateTime.UtcNow;
+                if (evictionResult5.evicted && evictionResult5.key != default)
+                {
+                    await HandleClusterEvictionAsync(evictionResult5.key, evictionResult5.value!);
+                }
                 return clusterFromCache;
             }
 
@@ -1413,7 +1512,12 @@ namespace GreyMatter.Core
                         AnalysisTime = DateTime.UtcNow
                     });
                 var existing = new NeuronCluster(chosen.ConceptDomain, chosen.ClusterId, hierLoad, _storage.SaveClusterAsync);
-                _loadedClusters[existing.ClusterId] = existing;
+                var evictionResult6 = _loadedClusters.Add(existing.ClusterId, existing);
+                _clusterAccessTimes[existing.ClusterId] = DateTime.UtcNow;
+                if (evictionResult6.evicted && evictionResult6.key != default)
+                {
+                    await HandleClusterEvictionAsync(evictionResult6.key, evictionResult6.value!);
+                }
                 _conceptClusterCache[concept] = existing.ClusterId;
                 return existing;
             }
@@ -1421,7 +1525,12 @@ namespace GreyMatter.Core
             // Create new cluster
             var newCluster = new NeuronCluster(concept, _storage.LoadClusterAsync, _storage.SaveClusterAsync);
             newCluster.ConceptLabel = concept; // Set the primary concept label for queryability
-            _loadedClusters[newCluster.ClusterId] = newCluster;
+            var evictionResult = _loadedClusters.Add(newCluster.ClusterId, newCluster);
+            _clusterAccessTimes[newCluster.ClusterId] = DateTime.UtcNow;
+            if (evictionResult.evicted && evictionResult.key != default)
+            {
+                await HandleClusterEvictionAsync(evictionResult.key, evictionResult.value!);
+            }
             _conceptClusterCache[concept] = newCluster.ClusterId;
             TotalClustersCreated++;
             return newCluster;
@@ -1429,7 +1538,7 @@ namespace GreyMatter.Core
 
         private async Task<List<NeuronCluster>> FindRelevantClusters(IEnumerable<string> concepts)
         {
-            var allClusters = new List<NeuronCluster>(_loadedClusters.Values);
+            var allClusters = _loadedClusters.GetValues();
 
             // Seed with cached clusters for provided concepts
             foreach (var c in concepts)
@@ -1446,9 +1555,17 @@ namespace GreyMatter.Core
                                 AnalysisTime = DateTime.UtcNow
                             });
                         cached = new NeuronCluster(c, cid, hierLoad, _storage.SaveClusterAsync);
-                        _loadedClusters[cid] = cached;
+                        var evictionResult3 = _loadedClusters.Add(cid, cached);
+                        _clusterAccessTimes[cid] = DateTime.UtcNow;
+                        if (evictionResult3.evicted && evictionResult3.key != default)
+                        {
+                            await HandleClusterEvictionAsync(evictionResult3.key, evictionResult3.value!);
+                        }
                     }
-                    allClusters.Add(cached);
+                    if (cached != null)
+                    {
+                        allClusters.Add(cached);
+                    }
                 }
             }
 
@@ -1472,7 +1589,12 @@ namespace GreyMatter.Core
                             clusterRef.ClusterId,
                             hierLoad,
                             _storage.SaveClusterAsync);
-                        _loadedClusters[cluster.ClusterId] = cluster;
+                        var evictionResult = _loadedClusters.Add(cluster.ClusterId, cluster);
+                        _clusterAccessTimes[cluster.ClusterId] = DateTime.UtcNow;
+                        if (evictionResult.evicted && evictionResult.key != default)
+                        {
+                            await HandleClusterEvictionAsync(evictionResult.key, evictionResult.value!);
+                        }
                         allClusters.Add(cluster);
                     }
                 }
@@ -1633,7 +1755,12 @@ namespace GreyMatter.Core
                         }
                         
                         // Cache loaded cluster
-                        _loadedClusters[clusterId] = cluster;
+                        var evictionResult = _loadedClusters.Add(clusterId, cluster);
+                        _clusterAccessTimes[clusterId] = DateTime.UtcNow;
+                        if (evictionResult.evicted && evictionResult.key != default)
+                        {
+                            await HandleClusterEvictionAsync(evictionResult.key, evictionResult.value!);
+                        }
                         
                         if ((_configForLogging?.Verbosity ?? 0) >= 2)
                         {
@@ -1652,6 +1779,7 @@ namespace GreyMatter.Core
                 }
                 
                 // Get EXISTING neurons in this cluster (don't create new ones)
+                if (cluster == null) continue;
                 var neurons = await cluster.GetNeuronsAsync();
                 
                 if (neurons.Count == 0) continue;
@@ -2038,7 +2166,7 @@ namespace GreyMatter.Core
             
             // === DYNAMIC NEURAL COMPETITION ===
             // Concepts compete for finite neural resources (biological reality)
-            var totalNeuronsInUse = _loadedClusters.Values.Sum(c => c.NeuronCount);
+            var totalNeuronsInUse = _loadedClusters.GetValues().Sum(c => c.NeuronCount);
             var resourcePressure = Math.Max(0.5, Math.Min(3.0, totalNeuronsInUse / 10000.0)); // Pressure increases with usage
             
             // === STOCHASTIC COMPLEXITY FACTORS ===
@@ -2305,10 +2433,11 @@ namespace GreyMatter.Core
         public async Task RunIntegritySamplerAsync(int sampleClusters = 5)
         {
             var sw = Stopwatch.StartNew();
-            var clusters = _loadedClusters.Values.OrderBy(_ => _reportRand.Next()).Take(Math.Max(1, sampleClusters)).ToList();
+            var clusters = _loadedClusters.GetValues().OrderBy(_ => _reportRand.Next()).Take(Math.Max(1, sampleClusters)).ToList();
             int ok = 0, bad = 0;
             foreach (var c in clusters)
             {
+                if (c == null) continue;
                 var neurons = await c.GetNeuronsAsync();
                 var ctx = new BrainContext { AllNeurons = neurons, AnalysisTime = DateTime.UtcNow };
                 var (m, h) = await _storage.InspectClusterMembershipAsync(c, ctx);
