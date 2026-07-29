@@ -27,10 +27,11 @@ The project has never run this experiment. That is the drift, and this is the fi
    serialization, NAS I/O, LRU eviction. Competent plumbing — but the actual thesis
    ("Phase 2: procedural loading") was marked *DEFERRED* in the old PROJECT_STATUS.
    The scaffolding became the building.
-3. **Known-broken state at last commit:** debug logs (Jan 19) show Hebbian
-   activations averaging ~−59 with zero neurons above threshold → *no new synapses
-   form*. The learning loop is silently dead. The "133M synapses" milestone predates
-   this regression.
+3. **Learning-loop scare (corrected):** Jan 19 debug logs showed zero neurons
+   passing the Hebbian gate (raw negative potentials tested against a 0.1
+   threshold). The Jan 23 commit fixed the gate to measure activation *above
+   resting potential*; the 133M-synapse run came after the fix. Verified by code
+   review during the 2026 reboot — but never re-verified empirically, hence P1.
 4. **Doc inflation:** claims like "trillion-parameter model in a gigabyte" and
    "production ready" have no eval behind them. New rule below.
 
@@ -55,14 +56,30 @@ brains, orphaned trainers/evaluators — 26 files, all already excluded from the
 build). Training logs, stale phase docs, and generated artifacts purged or archived.
 csproj exclude-list collapsed to wildcards. `.gitignore` hardened.
 
-### P1 — Resurrect the learning loop (prerequisite bug fix)
-The Hebbian threshold gate never passes: activations are deeply negative
-(avg ≈ −59, `above_threshold=0` on every batch).
-- Instrument: activation histogram per batch (min/mean/max, % above threshold).
-- Locate why membrane potentials go negative (bias accumulation, decay sign,
-  or unnormalized weighted sums in `HybridNeuron`/cluster processing).
-- **Exit criterion:** a unit test proving two co-activated neurons form a synapse,
-  and a 10-minute `tatoeba_small` run that *creates* synapses (count grows, logged).
+### P1 — Verify the learning loop (instrumented, not assumed)
+Code review (Jul 2026 reboot) found the Jan 19 "dead gate" was fixed on Jan 23;
+current code should create synapses. Per ground rules, that claim needs a command:
+- ✅ Instrumentation added: per-interval Hebbian histogram
+  (`calls / neurons / passed% / delta min-avg-max / skip reasons / synapses_created`)
+  printed with every training progress update.
+- ✅ Self-check added: `dotnet run -- --test-hebbian` (temp brain, 3 sentences,
+  asserts graph synapse count grows; exit code 0/1).
+- **Exit criterion:** `--test-hebbian` passes, and a short `tatoeba_small` run on
+  the fresh brainData shows `synapses_created > 0` with a sane histogram
+  (deltas ≈ +5..+30, passed% high).
+
+**P1 findings feeding later phases:**
+- Regeneration recomputes Threshold/Bias from VQ code, discarding learned Bias →
+  fidelity loss to be measured in P2.
+- `Learn()` writes STM deltas; consolidation to real weights happens only at
+  checkpoint, budget-capped (5–50 neurons/cluster), and `NeuronSnapshot` doesn't
+  persist STM → LRU eviction silently drops unconsolidated learning (P3 must fix
+  or consolidate-before-evict).
+- Hebbian gate is non-selective: trained neurons sit ~10–27 above resting, so all
+  batch neurons pass the 0.1 gate — "co-activation" currently means "same batch".
+  Revisit selectivity in P4.
+- `BrainStats.TotalSynapses` reports a legacy `_synapses` list, not the synaptic
+  graph; use `GetSynapticGraphSynapseCount()` for the real number.
 
 ### P2 — The fidelity experiment (the experiment this project exists to run)
 Build `--fidelity-test`:

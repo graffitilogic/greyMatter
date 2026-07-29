@@ -201,6 +201,57 @@ namespace GreyMatter.Core
             // Else: keep capacity unchanged to avoid churn when on target
         }
         
+        // ─── P1 instrumentation (REFOCUS.md): Hebbian activation histogram ───
+        // Accumulated across calls; read/reset via GetHebbianActivationSummary().
+        private long _hebbCalls;
+        private long _hebbNeuronsSeen;
+        private long _hebbNeuronsPassed;
+        private long _hebbSkippedFewNeurons;
+        private long _hebbSkippedNonePassed;
+        private long _hebbSynapsesCreated;
+        private double _hebbDeltaMin = double.PositiveInfinity;
+        private double _hebbDeltaMax = double.NegativeInfinity;
+        private double _hebbDeltaSum;
+
+        /// <summary>
+        /// P1 instrumentation: summary of Hebbian gate behavior since last reset.
+        /// delta = CurrentPotential - RestingPotential (what the 0.1 gate tests).
+        /// </summary>
+        public string GetHebbianActivationSummary(bool reset = true)
+        {
+            string summary;
+            if (_hebbCalls == 0)
+            {
+                summary = "   📊 Hebbian histogram: no calls recorded";
+            }
+            else
+            {
+                var deltaPart = _hebbNeuronsSeen > 0
+                    ? $"delta[min={_hebbDeltaMin:F2} avg={_hebbDeltaSum / _hebbNeuronsSeen:F2} max={_hebbDeltaMax:F2}] "
+                    : "delta[n/a] ";
+                var passedPct = _hebbNeuronsSeen > 0 ? 100.0 * _hebbNeuronsPassed / _hebbNeuronsSeen : 0.0;
+                summary = $"   📊 Hebbian histogram: calls={_hebbCalls:N0} neurons={_hebbNeuronsSeen:N0} " +
+                          $"passed={_hebbNeuronsPassed:N0} ({passedPct:F1}%) " + deltaPart +
+                          $"skipped[few={_hebbSkippedFewNeurons:N0} none_passed={_hebbSkippedNonePassed:N0}] " +
+                          $"synapses_created={_hebbSynapsesCreated:N0}";
+            }
+            if (reset)
+            {
+                _hebbCalls = _hebbNeuronsSeen = _hebbNeuronsPassed = 0;
+                _hebbSkippedFewNeurons = _hebbSkippedNonePassed = _hebbSynapsesCreated = 0;
+                _hebbDeltaMin = double.PositiveInfinity;
+                _hebbDeltaMax = double.NegativeInfinity;
+                _hebbDeltaSum = 0;
+            }
+            return summary;
+        }
+
+        /// <summary>
+        /// Synapse count in the Hebbian sparse graph (the real learned connectivity).
+        /// Note: BrainStats.TotalSynapses reports the legacy _synapses list, not this.
+        /// </summary>
+        public int GetSynapticGraphSynapseCount() => _synapticGraph.GetSynapseCount();
+
         /// <summary>
         /// ADPC-Net Phase 3: Record Hebbian co-activation between neurons
         /// Neurons that fire together, wire together
@@ -210,20 +261,32 @@ namespace GreyMatter.Core
             // ALWAYS log first few calls to diagnose synapse creation issue
             var synapseCountBefore = _synapticGraph.GetSynapseCount();
             var isFirstCall = synapseCountBefore < 100; // Log first 100 synapses
-            
+
+            _hebbCalls++;
+            foreach (var n in activeNeurons)
+            {
+                var delta = n.CurrentPotential - n.RestingPotential;
+                _hebbNeuronsSeen++;
+                _hebbDeltaSum += delta;
+                if (delta < _hebbDeltaMin) _hebbDeltaMin = delta;
+                if (delta > _hebbDeltaMax) _hebbDeltaMax = delta;
+            }
+
             if (activeNeurons.Count < 2)
             {
+                _hebbSkippedFewNeurons++;
                 if (isFirstCall || synapseCountBefore % 10000 == 0)
                     Console.WriteLine($"   🧬 Hebbian: <2 neurons ({activeNeurons.Count}), skipping");
                 return; // Need at least 2 neurons for connections
             }
-            
+
             // Build activation list with neuron IDs and activations
             // Note: CurrentPotential is typically negative (resting ~-70), so measure activation above resting
             var activations = activeNeurons
                 .Select(n => (n.Id, activation: (float)Math.Max(0, n.CurrentPotential - n.RestingPotential)))
                 .Where(pair => pair.activation > 0.1f) // Only consider significantly active neurons (>0.1 above resting)
                 .ToList();
+            _hebbNeuronsPassed += activations.Count;
             
             if (isFirstCall || synapseCountBefore % 1000 == 0)
             {
@@ -244,15 +307,17 @@ namespace GreyMatter.Core
             
             if (activations.Count < 2)
             {
+                _hebbSkippedNonePassed++;
                 if (isFirstCall || synapseCountBefore % 10000 == 0)
                     Console.WriteLine($"   🧬 Hebbian: <2 above threshold ({activations.Count}), skipping synapse creation");
                 return;
             }
-            
+
             // Record co-activation pattern in sparse graph
             _synapticGraph.RecordCoactivationPattern(activations);
-            
+
             var synapseCountAfter = _synapticGraph.GetSynapseCount();
+            _hebbSynapsesCreated += Math.Max(0, synapseCountAfter - synapseCountBefore);
             if (isFirstCall || synapseCountAfter % 1000 == 0)
             {
                 Console.WriteLine($"   🧬 Hebbian: Recorded {activations.Count} co-active neurons, total synapses: {synapseCountBefore:N0} → {synapseCountAfter:N0} (+{synapseCountAfter-synapseCountBefore})");

@@ -8,6 +8,12 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--test-hebbian")
+            {
+                await RunHebbianSynapseTest();
+                return;
+            }
+
             if (args.Length > 0 && args[0] == "--test-sparse-activation")
             {
                 await RunSparseActivationTest();
@@ -117,6 +123,9 @@ namespace GreyMatter
                 Console.WriteLine("║    dotnet run -- --cerebro-query think <word>             ║");
                 Console.WriteLine("║    dotnet run -- --inspect-brain                          ║");
                 Console.WriteLine("║                                                           ║");
+                Console.WriteLine("║  Health Checks:                                           ║");
+                Console.WriteLine("║    dotnet run -- --test-hebbian   (P1 synapse creation)   ║");
+                Console.WriteLine("║                                                           ║");
                 Console.WriteLine("╚═══════════════════════════════════════════════════════════╝");
             }
         }
@@ -130,6 +139,76 @@ namespace GreyMatter
             return defaultValue;
         }
         
+        /// <summary>
+        /// P1 (REFOCUS.md): prove that co-activated neurons form synapses.
+        /// Self-contained: uses a temp brain directory, cleans up after itself.
+        /// Exit code 0 = pass, 1 = fail (usable from scripts/CI).
+        /// </summary>
+        static async Task RunHebbianSynapseTest()
+        {
+            Console.WriteLine("🧪 P1: Hebbian Synapse Creation Test");
+            Console.WriteLine("=====================================\n");
+
+            var path = Path.Combine(Path.GetTempPath(), "hebbian_test_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+
+            try
+            {
+                var brain = new Cerebro(path);
+                await brain.InitializeAsync();
+
+                var before = brain.GetSynapticGraphSynapseCount();
+                Console.WriteLine($"Graph synapses before: {before}");
+
+                // Mimic ProductionTrainingService: per-sentence features, per-word concepts
+                var sentences = new[]
+                {
+                    "the cat sat on the mat",
+                    "the dog ran in the park",
+                    "a cat and a dog can be friends"
+                };
+
+                foreach (var sentence in sentences)
+                {
+                    var features = new Dictionary<string, double>
+                    {
+                        ["length"] = sentence.Length / 100.0,
+                        ["words"] = sentence.Split(' ').Length / 20.0,
+                        ["hasUpper"] = sentence.Any(char.IsUpper) ? 1.0 : 0.0,
+                        ["hasDigit"] = sentence.Any(char.IsDigit) ? 1.0 : 0.0,
+                        ["hasPunctuation"] = sentence.Any(char.IsPunctuation) ? 1.0 : 0.0
+                    };
+
+                    foreach (var word in sentence.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                    {
+                        if (word.Length > 1)
+                            await brain.LearnConceptAsync(word, features);
+                    }
+                }
+
+                var after = brain.GetSynapticGraphSynapseCount();
+                Console.WriteLine();
+                Console.WriteLine(brain.GetHebbianActivationSummary());
+                Console.WriteLine($"\nGraph synapses: {before} → {after} (+{after - before})");
+
+                if (after > before)
+                {
+                    Console.WriteLine("\n✅ PASS: co-activated neurons formed synapses");
+                }
+                else
+                {
+                    Console.WriteLine("\n❌ FAIL: no synapses created — Hebbian loop is dead");
+                    Console.WriteLine("   Check the histogram above: if passed=0 with negative deltas,");
+                    Console.WriteLine("   the activation gate is broken again (see REFOCUS.md P1).");
+                    Environment.ExitCode = 1; // don't Exit(): finally must clean the temp dir
+                }
+            }
+            finally
+            {
+                try { Directory.Delete(path, recursive: true); } catch { /* best effort */ }
+            }
+        }
+
         static async Task RunSparseActivationTest()
         {
             Console.WriteLine("🧪 Phase 6A: Sparse Activation Test");

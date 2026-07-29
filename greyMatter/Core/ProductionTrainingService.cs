@@ -240,7 +240,10 @@ namespace GreyMatter.Core
                                         $"{_sessionSentencesProcessed:N0} session | " +
                                         $"{rate:F1} sent/sec | " +
                                         $"Clusters: {stats.TotalClusters:N0} | " +
-                                        $"Neurons: {stats.TotalNeuronsCreated:N0}");
+                                        $"Neurons: {stats.TotalNeuronsCreated:N0} | " +
+                                        $"Graph synapses: {_cerebro.GetSynapticGraphSynapseCount():N0}");
+                        // P1 instrumentation (REFOCUS.md): activation histogram since last update
+                        Console.WriteLine(_cerebro.GetHebbianActivationSummary());
                         lastProgressUpdate = DateTime.Now;
                     }
                 }
