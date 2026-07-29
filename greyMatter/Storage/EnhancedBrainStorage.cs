@@ -1457,6 +1457,53 @@ namespace GreyMatter.Storage
         }
 
         /// <summary>
+        /// Get synapse count without loading them all (Phase 3b: lazy loading)
+        /// </summary>
+        public static async Task<int> GetSynapseCountAsync(this EnhancedBrainStorage storage)
+        {
+            var basePath = storage.GetBasePath();
+            
+            // Try new partitioned format first
+            var partitionedDir = Path.Combine(basePath, "synapses_partitioned");
+            if (Directory.Exists(partitionedDir))
+            {
+                var partitionFiles = Directory.GetFiles(partitionedDir, "partition_*.json.gz");
+                int totalCount = 0;
+                
+                foreach (var partitionFile in partitionFiles)
+                {
+                    await using var fileStream = File.OpenRead(partitionFile);
+                    await using var gzipStream = new GZipStream(fileStream, CompressionMode.Decompress);
+                    var partitionSynapses = await JsonSerializer.DeserializeAsync<List<GreyMatter.Core.SynapseSnapshot>>(gzipStream);
+                    if (partitionSynapses != null)
+                    {
+                        totalCount += partitionSynapses.Count;
+                    }
+                }
+                
+                return totalCount;
+            }
+            
+            // Fall back to old monolithic format
+            var oldPath = Path.Combine(basePath, "synapses.json");
+            if (!File.Exists(oldPath))
+            {
+                return 0;
+            }
+            
+            try
+            {
+                var json = await File.ReadAllTextAsync(oldPath);
+                var synapses = JsonSerializer.Deserialize<List<GreyMatter.Core.SynapseSnapshot>>(json);
+                return synapses?.Count ?? 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        /// <summary>
         /// Load synapses from storage
         /// PHASE 3: Supports both old monolithic format and new partitioned format
         /// NOTE: For production, use LoadSynapsesForNeuronsAsync for lazy loading

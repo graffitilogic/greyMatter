@@ -366,7 +366,7 @@ namespace GreyMatter.Core
             _featureMapper.RestoreFromSnapshot(featureMappings);
             Console.WriteLine($"Loaded {featureMappings.FeatureMappings.Count} feature mappings");
             
-            // Load synapses
+            // Load synapses (Phase 3b TODO: implement lazy partition loading)
             var synapseSnapshots = await _storage.LoadSynapsesAsync();
             foreach (var snapshot in synapseSnapshots)
             {

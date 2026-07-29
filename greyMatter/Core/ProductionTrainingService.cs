@@ -60,6 +60,7 @@ namespace GreyMatter.Core
         private bool _isPaused = false;
         private CancellationTokenSource? _cancellationTokenSource;
         private DateTime _startTime;
+        private DateTime _stopTime;
         private DateTime _lastCheckpoint;
         private DateTime _lastValidation;
         private DateTime _lastNASArchive;
@@ -723,6 +724,7 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   Stack trace: {ex.StackTrace}");
             }
 
+            _stopTime = DateTime.Now;
             _isRunning = false;
             
             Console.WriteLine(" Service stopped gracefully");
@@ -788,7 +790,7 @@ namespace GreyMatter.Core
             {
                 IsRunning = _isRunning,
                 IsPaused = _isPaused,
-                Uptime = _isRunning ? DateTime.Now - _startTime : TimeSpan.Zero,
+                Uptime = _isRunning ? DateTime.Now - _startTime : _stopTime - _startTime,
                 TotalSentencesProcessed = _totalSentencesProcessed,
                 SessionSentencesProcessed = _sessionSentencesProcessed,
                 VocabularySize = cerebroStats.TotalNeuronsCreated, // Use neurons as proxy for vocabulary

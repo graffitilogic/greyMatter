@@ -17,7 +17,7 @@ All training infrastructure is now activated:
 ### Option 1: Default Progressive Curriculum (Recommended)
 ```bash
 cd /Users/billdodd/Library/CloudStorage/Dropbox/dev/gl/greyMatter/greyMatter
-dotnet run --project greyMatter.csproj -- --production-training
+dotnet run -- --production-training
 ```
 
 **What happens**:
