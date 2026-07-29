@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -14,57 +14,12 @@
     <PackageReference Include="System.Numerics.Tensors" Version="8.0.0" />
   </ItemGroup>
 
-  <!-- Exclude broken demo/test files that reference deleted types -->
   <ItemGroup>
-    <!-- Exclude all root-level test files -->
+    <!-- Root-level scratch tests/diagnostics are not part of the build -->
     <Compile Remove="*Test*.cs" />
     <Compile Remove="*Diagnostic*.cs" />
-    <Compile Remove="Learning/TatoebaLanguageTrainer.cs" />
-    <Compile Remove="Learning/MultiSourceTrainer.cs" />
-    <Compile Remove="Validation/BaselineValidationTest.cs" />
-    <Compile Remove="Core/TrainingService.cs" />
-    <Compile Remove="demos/archive/**" />
+    <!-- Standalone stress-test project -->
     <Compile Remove="tests/**" />
-    <Compile Remove="Evaluations/test_debug.cs" />
-    <Compile Remove="KnowledgeQueryCLI.cs" />
-    <Compile Remove="demos/ContinuousLearningDemo.cs" />
-    <Compile Remove="RunBaselineTest.cs" />
-    <Compile Remove="BaselineColumnComparisonTest.cs" />
-    <Compile Remove="ColumnArchitectureTestRunner.cs" />
-    <Compile Remove="Evaluations/UnifiedTrainingEvaluator.cs" />
-    <Compile Remove="tests/RunIntegrationValidation.cs" />
-    <!-- Keep other dependent files excluded until properly integrated -->
-    <Compile Remove="Core/DevelopmentalLearningSystem.cs" />
-    <Compile Remove="Core/ComprehensiveLanguageTrainer.cs" />
-    <Compile Remove="Core/EnvironmentalLearner.cs" />
-    <Compile Remove="Core/ContinuousProcessor.cs" />
-    <Compile Remove="Core/EthicalDriveSystem.cs" />
-    <Compile Remove="Core/EnhancedContinuousLearner.cs" />
-    <Compile Remove="Core/InstinctualProcessor.cs" />
-    <Compile Remove="Core/LearningResourceManager.cs" />
-    <Compile Remove="Core/LanguageFoundationsTrainer.cs" />
-    <Compile Remove="Core/LongTermGoalSystem.cs" />
-    <Compile Remove="Evaluations/EvalHarness.cs" />
-    <Compile Remove="demos/EnhancedContinuousLearningDemo.cs" />
-    
-    <!-- Archived redundant storage managers (superseded by EnhancedBrainStorage) -->
-    <Compile Remove="Storage/BiologicalStorageManager.cs" />
-    <Compile Remove="Storage/BrainStorage.cs" />
-    <Compile Remove="Storage/FastStorageAdapter.cs" />
-    <Compile Remove="Storage/HybridPersistenceManager.cs" />
-    <Compile Remove="Storage/HybridTieredStorage.cs" />
-    <Compile Remove="Storage/SemanticStorageManager.cs" />
-    <Compile Remove="Storage/archived/**" />
-    
-    <!-- Archived redundant brain implementations (superseded by Cerebro) -->
-    <Compile Remove="Core/SimpleEphemeralBrain.cs" />
-    <Compile Remove="Core/BiologicalEphemeralBrain.cs" />
-    <Compile Remove="Core/LanguageEphemeralBrain.cs" />
-    <Compile Remove="Core/archived/**" />
-    
-    <!-- Files that depend on archived brain implementations -->
-    <Compile Remove="Learning/RealisticTrainingRegimen.cs" />
-    <Compile Remove="Visualization/BrainScanVisualizer.cs" />
   </ItemGroup>
 
 </Project>
