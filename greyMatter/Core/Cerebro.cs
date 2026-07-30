@@ -1919,12 +1919,26 @@ namespace GreyMatter.Core
             // Convert features to consistent neuron inputs
             var inputs = _featureMapper.ConvertFeaturesToNeuronInputs(features);
             
-            // Initialize connections if neuron has no weights
-            if (!neuron.InputWeights.Any())
+            // Wire up any feature input this neuron is missing.
+            //
+            // P1.6m — this used to be `if (!neuron.InputWeights.Any())`, which was
+            // the bug behind the immovable ~22% Hebbian pass rate.
+            // `InputWeights` holds TWO kinds of key: feature-input IDs (the
+            // receptive field) and other neurons' IDs (synapses, written by
+            // HybridNeuron.ConnectTo and restored by ProceduralNeuronRegenerator).
+            // NeuronCluster.GrowForConcept connects each new neuron to 3 random
+            // peers, so the dictionary was almost always non-empty — and the
+            // neuron then NEVER received feature weights at all.
+            // Measured consequence (LogReceptiveFieldOverlap, every sample):
+            //   coverage[none=62 partial=0 full=16] — binary, and exactly one
+            //   16-neuron cohort per concept had a receptive field. Everything
+            //   else was dead weight that could never fire, which is why the pass
+            //   rate ignored clustering, concept features, and rectification alike.
+            foreach (var feature in features)
             {
-                foreach (var feature in features)
+                var featureNeuronId = _featureMapper.GetNeuronIdForFeature(feature.Key);
+                if (!neuron.InputWeights.ContainsKey(featureNeuronId))
                 {
-                    var featureNeuronId = _featureMapper.GetNeuronIdForFeature(feature.Key);
                     // Initialize with much larger weights for guaranteed activation
                     neuron.InputWeights[featureNeuronId] = (_random.NextDouble() + 0.5) * 3.0; // Range: 1.5 to 4.5
                 }

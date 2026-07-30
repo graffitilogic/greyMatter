@@ -489,6 +489,54 @@ the two candidate explanations directly:
 **Still costing:** 29.2 sent/sec (vs 48.7), compression 1.68x (vs 2.38x) —
 both from the larger feature set; revisit once the 16 is explained.
 
+### P1.6m — FOUND IT: the 22% was a wiring bug (2026-07-30 11:29)
+
+The receptive-field diagnostic answered on the first run, identically in every
+single sample:
+
+```
+RF[same]:       neurons=78 inputs=42 coverage[none=62 partial=0 full=16] firing=16
+RF[very]:       neurons=78 inputs=42 coverage[none=62 partial=0 full=16] firing=16
+RF[within]:     neurons=71 inputs=42 coverage[none=55 partial=0 full=16] firing=16
+RF[married]:    neurons=69 inputs=42 coverage[none=53 partial=0 full=16] firing=16
+RF[everything]: neurons=76 inputs=42 coverage[none=60 partial=0 full=16] firing=16
+RF[never]:      neurons=79 inputs=42 coverage[none=63 partial=0 full=16] firing=16
+RF[sleep]:      neurons=78 inputs=42 coverage[none=62 partial=0 full=16] firing=16
+RF[in]:         neurons=75 inputs=42 coverage[none=59 partial=0 full=16] firing=16
+```
+
+**`partial=0` everywhere, `full=16` exactly, regardless of concept or neuron
+count (69–79).** Coverage is binary and capped at one allocation cohort. Median
+delta is 0.00 — the median neuron of every concept is incapable of firing.
+
+**Root cause.** `HybridNeuron.InputWeights` is a single dictionary holding two
+different kinds of key:
+1. **feature-input IDs** (from `FeatureMapper`) — the receptive field;
+2. **other neurons' IDs** — synapses, written by `HybridNeuron.ConnectTo` and
+   restored by `ProceduralNeuronRegenerator`.
+
+`TrainNeuronWithFeatures` gated initialisation on
+`if (!neuron.InputWeights.Any())`. `NeuronCluster.GrowForConcept` connects every
+new neuron to 3 random peers (`ConnectTo`, line 530), so the dictionary is
+almost always non-empty by the time training runs — and the neuron then
+**never receives feature weights at all, ever**. Only neurons that happened to
+be trained before acquiring a synapse got a receptive field: one cohort, 16.
+
+This is why the pass rate was immovable at ~22% across every intervention —
+clustering granularity, concept-vs-sentence features, signed vs rectified inputs.
+None of them could matter: 80% of each concept's neurons had no input wiring to
+evaluate. It also explains the ballooning neuron counts (dead neurons never fire,
+so the system keeps recruiting) and, retroactively, the original
+`FirstAllocationNeurons`-multiple lockstep.
+
+**Fix:** initialise any *missing* feature weight per neuron rather than gating on
+the whole dictionary being empty. Three lines.
+
+**Lesson recorded:** four consecutive wrong theories (coarse clusters, substring
+matching, concept-blind features, signed inputs) were all reasoned from aggregate
+metrics. One targeted measurement of the actual data structure settled it
+immediately. Instrument the mechanism, don't infer it from summary statistics.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).
