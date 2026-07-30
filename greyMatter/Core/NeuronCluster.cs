@@ -151,9 +151,17 @@ namespace GreyMatter.Core
             await EnsureLoadedAsync();
             
             concept = concept.ToLowerInvariant();
+            // NOTE (REFOCUS P1.6i): this used to be ConceptTag.Contains(concept),
+            // a SUBSTRING match — "the" matched "there", "them", "other",
+            // "together". Consequence: a concept's neuron set was padded with
+            // unrelated neurons that don't respond to its features, pinning the
+            // Hebbian pass rate at ~22% (16 of 78, 32 of 146, 208 of 947 — always
+            // the concept's own 16-neuron allocation passing, the rest noise).
+            // It also inflated reuse%, since a new word "found" neurons belonging
+            // to words that merely contain it.
             return _neurons.Values
-                .Where(n => n.AssociatedConcepts.Contains(concept) || 
-                           n.ConceptTag.Contains(concept))
+                .Where(n => n.AssociatedConcepts.Contains(concept) ||
+                            string.Equals(n.ConceptTag, concept, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 

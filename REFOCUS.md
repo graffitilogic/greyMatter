@@ -319,6 +319,54 @@ Measured reality from this run's procedural save: **2.19x** (18,589,460 →
 ceiling is set by persisted synaptic weights, not the VQ code — raising it is a
 synapse-budget question (P3), not a VQ question.
 
+### P1.6i — Codebook fix validated; substring bug found (2026-07-30 10:14)
+
+Post-fix run. **The collapse fix worked, and it confirmed the earlier caveat
+was correct: the previous run's 100% reuse was partly bucket-collapse.**
+
+| metric | collapsed codebook | seeded codebook |
+|---|---|---|
+| clusters | ~60 | **226-250** (4x discrimination) |
+| sentences / 5 min | 11,532 | **15,378** |
+| throughput | 38.4 sent/sec | **51.0 sent/sec** (377 cps) |
+| reuse% | 100% (artifact) | **96%** (real) |
+| grew_events | 0% | 6-7% |
+| neurons | 75,273 (plateau) | 278,355 (still climbing) |
+
+Honest reading: with real discrimination the system no longer reaches perfect
+saturation — reuse settles ~96% and neurons keep growing slowly, because more
+clusters means more places for a concept to land. The remaining 4-6% is the
+genuine assembly-reuse miss rate (home cluster absent from the top-5
+candidates). That is a real, bounded problem to solve, unlike the previous
+run's flattering artifact.
+
+**The fix did NOT move Hebbian `passed%`: still 22.2%, mean delta 4.1** —
+identical to the collapsed run. My "coarse buckets cause low pass rate"
+hypothesis was **wrong**, and the invariance across a 4x change in cluster
+count is what exposed the real cause.
+
+**Root cause — substring matching in `FindNeuronsByConcept`:**
+```csharp
+n.AssociatedConcepts.Contains(concept) || n.ConceptTag.Contains(concept)
+```
+`ConceptTag.Contains` is a **substring** test. Concept "the" matched neurons
+tagged "there", "them", "other", "together". So every learn event trained a set
+padded with neurons belonging to unrelated words, which of course don't respond
+to this concept's features. The log's arithmetic is exact: 16 of 78, 32 of 146,
+208 of 947 — always the concept's own 16-neuron allocation passing, everything
+else noise. Hence 22% forever, regardless of clustering.
+
+Second consequence: **reuse% was inflated**. A first-time word "found" neurons
+belonging to any word containing it, so it reported reuse instead of growing.
+The true reuse rate is therefore *below* the 96% measured here.
+
+Fixed: exact (case-insensitive) match on `ConceptTag`.
+
+**Expected effects:** `passed%` should jump from 22% toward 90-100%; group
+sizes drop from ~78 to the concept's actual allocation; the train step gets
+~4x cheaper; `reuse%` may *fall* — that would be a more honest number, not a
+regression.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).
