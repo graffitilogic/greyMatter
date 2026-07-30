@@ -122,13 +122,13 @@ namespace GreyMatter.Storage
             var bankPath = GetNeuronBankPath(partition);
             
             var idsList = ids.ToList();
-            Console.WriteLine($"   📦 LoadNeuronsAsync: partition={partition.FullPath}, requesting {idsList.Count} neurons, bankPath exists={File.Exists(bankPath)}");
+            DebugLog.Debug($"   📦 LoadNeuronsAsync: partition={partition.FullPath}, requesting {idsList.Count} neurons, bankPath exists={File.Exists(bankPath)}");
             
             if (!File.Exists(bankPath)) return result;
 
             var dict = await ReadBankAsync(bankPath).ConfigureAwait(false);
             
-            Console.WriteLine($"   📦 Bank contains {dict.Count} neurons total");
+            DebugLog.Debug($"   📦 Bank contains {dict.Count} neurons total");
             
             foreach (var id in idsList)
             {
@@ -139,7 +139,7 @@ namespace GreyMatter.Storage
                 }
             }
             
-            Console.WriteLine($"   📦 Loaded {result.Count}/{idsList.Count} neurons from bank");
+            DebugLog.Debug($"   📦 Loaded {result.Count}/{idsList.Count} neurons from bank");
             
             return result;
         }

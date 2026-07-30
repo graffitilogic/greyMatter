@@ -56,7 +56,44 @@ brains, orphaned trainers/evaluators — 26 files, all already excluded from the
 build). Training logs, stale phase docs, and generated artifacts purged or archived.
 csproj exclude-list collapsed to wildcards. `.gitignore` hardened.
 
-### P1 — Verify the learning loop (instrumented, not assumed)
+### P1 — Verify the learning loop ✅ VERIFIED (2026-07-29)
+Command: `dotnet run -- --test-hebbian` → PASS (synapses form).
+Command: `--production-training --dataset tatoeba_small --duration 300` →
+1,496 sentences, synapses created — **65,498,012 of them (3.54 GB)**.
+The loop is alive; the new problem is the opposite failure: synaptic
+incontinence. See P1.5.
+
+### P1.5 — Synaptic budget (added 2026-07-29 after the 5-min run) ✅ implemented, pending re-run
+Root causes found:
+- `RecordCoactivationPattern` wired **all pairs bidirectionally**: a 340-neuron
+  group = ~115K synapses in one call, per word occurrence.
+- Activations fed to Hebbian Δw were raw deltas (~10–27), not 0..1 →
+  Δw = 0.01·15·15 ≈ 2.25 → **every synapse born saturated at max weight**,
+  making decay/pruning meaningless.
+- `ApplyDecay`/`PruneWeakSynapses` existed but were **never called**.
+
+Fixes (SparseSynapticGraph + Cerebro):
+- Top-K co-activation group (K=16, winner-take-all analog) → ≤240 pairs/event.
+- Per-neuron out-degree budget (64); strengthening always allowed, creation
+  beyond budget blocked (counted + reported).
+- Creation requires activation product ≥ 0.15; activations normalized
+  tanh(delta/20); birth weight = prune threshold + Δw → persistence must be
+  earned through reinforcement.
+- Decay (×0.995) + prune wired into every checkpoint; log line reports
+  pruned + blocked_by_budget.
+- Log spam gated: `DebugLog` levels (0/1/2, env `GREYMATTER_VERBOSITY`);
+  per-cluster/per-region traces now level 2, evictions/partition saves level 1.
+
+**Exit criterion:** re-run the 5-minute benchmark; expect ~1–3M synapses
+(not 65M), visible histogram lines, and checkpoint well under 60s (was 402s).
+
+**Open questions surfaced (diagnose before P2):**
+- Clusters reach 13K neurons; same word re-grows ~66 neurons in whatever
+  cluster its sentence-level features land in → concept scattering.
+- "Vocabulary learned: 562,539 words" from 1,496 sentences is not a real
+  vocabulary count — find what that stat actually counts.
+
+#### P1 original notes
 Code review (Jul 2026 reboot) found the Jan 19 "dead gate" was fixed on Jan 23;
 current code should create synapses. Per ground rules, that claim needs a command:
 - ✅ Instrumentation added: per-interval Hebbian histogram

@@ -394,7 +394,7 @@ namespace GreyMatter.Storage
                         // If membership pack doesn't exist, we need to rebuild it from all clusters
                         bool packMissing = pack.Membership.Count == 0;
                         
-                        Console.WriteLine($"   📦 Processing partition {entry.Path.FullPath}: {entry.Clusters.Count} clusters, packMissing={packMissing}, existingMembership={pack.Membership.Count}");
+                        DebugLog.Verbose($"   📦 Processing partition {entry.Path.FullPath}: {entry.Clusters.Count} clusters, packMissing={packMissing}, existingMembership={pack.Membership.Count}");
 
                         foreach (var c in entry.Clusters)
                         {
@@ -411,7 +411,7 @@ namespace GreyMatter.Storage
                                 .Select(n => n.Id)
                                 .ToList();
                             
-                            Console.WriteLine($"   📦 Cluster {cid.Substring(0,8)}: {neurons.Count} total neurons, {newIds.Count} LTM neurons");
+                            DebugLog.Debug($"   📦 Cluster {cid.Substring(0,8)}: {neurons.Count} total neurons, {newIds.Count} LTM neurons");
                             
                             // If pack was missing, force save all clusters
                             if (packMissing && newIds.Count > 0)
@@ -419,7 +419,7 @@ namespace GreyMatter.Storage
                                 pack.Membership[cid] = newIds;
                                 packChanged = true;
                                 Interlocked.Increment(ref clustersChanged);
-                                Console.WriteLine($"   📦 Pack missing: added {newIds.Count} neurons for cluster {cid.Substring(0,8)}");
+                                DebugLog.Debug($"   📦 Pack missing: added {newIds.Count} neurons for cluster {cid.Substring(0,8)}");
                             }
                             else if (pack.Membership.TryGetValue(cid, out var existingIds))
                             {
@@ -449,7 +449,7 @@ namespace GreyMatter.Storage
                         if (packChanged)
                         {
                             pack.SavedAt = DateTime.UtcNow;
-                            Console.WriteLine($"   📦 SAVING membership pack to {entry.Path.FullPath}: {pack.Membership.Count} clusters");
+                            DebugLog.Verbose($"   📦 SAVING membership pack to {entry.Path.FullPath}: {pack.Membership.Count} clusters");
                             await SaveMembershipPackAsync(entry.Path, pack);
                             _membershipPackCache2[entry.Path.FullPath] = (DateTime.UtcNow, pack);
                             Interlocked.Increment(ref packsWritten);

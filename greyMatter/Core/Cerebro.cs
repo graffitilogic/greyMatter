@@ -280,11 +280,17 @@ namespace GreyMatter.Core
                 return; // Need at least 2 neurons for connections
             }
 
-            // Build activation list with neuron IDs and activations
-            // Note: CurrentPotential is typically negative (resting ~-70), so measure activation above resting
+            // Build activation list with neuron IDs and activations.
+            // delta = potential above resting (typically 0..30 for driven neurons).
+            // Normalized to 0..1 via tanh(delta/20) so Hebbian Δw = η·aᵢ·aⱼ stays small
+            // and new synapses don't saturate to max weight at birth.
             var activations = activeNeurons
-                .Select(n => (n.Id, activation: (float)Math.Max(0, n.CurrentPotential - n.RestingPotential)))
-                .Where(pair => pair.activation > 0.1f) // Only consider significantly active neurons (>0.1 above resting)
+                .Select(n =>
+                {
+                    var delta = Math.Max(0, n.CurrentPotential - n.RestingPotential);
+                    return (n.Id, activation: (float)Math.Tanh(delta / 20.0));
+                })
+                .Where(pair => pair.activation > 0.1f) // ≈ delta > 2.0 above resting
                 .ToList();
             _hebbNeuronsPassed += activations.Count;
             
@@ -844,6 +850,18 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   🧠 Consolidation: promoted {totalPromoted} neurons across {clustersTouched} clusters in {sw.Elapsed.TotalSeconds:F2}s (budget/cluster={budgetPerCluster})");
 
+            // Synaptic forgetting (REFOCUS.md: persistence must be earned).
+            // Decay all weights slightly, then prune anything that fell below the
+            // prune threshold. Synapses born at ~0.1 die after one un-reinforced
+            // cycle; repeatedly co-activated pathways keep climbing.
+            sw.Restart();
+            var synBefore = _synapticGraph.GetSynapseCount();
+            _synapticGraph.ApplyDecay(0.995f);
+            var synPruned = synBefore - _synapticGraph.GetSynapseCount();
+            Console.WriteLine($"   ✂️  Synaptic decay: {synBefore:N0} → {_synapticGraph.GetSynapseCount():N0} " +
+                              $"(pruned {synPruned:N0}, blocked_by_budget {_synapticGraph.CreationsBlockedByBudget:N0}) " +
+                              $"in {sw.Elapsed.TotalSeconds:F2}s");
+
             // Save feature mappings
             sw.Restart();
             var featureMappingSnapshot = _featureMapper.CreateSnapshot();
@@ -1059,7 +1077,7 @@ namespace GreyMatter.Core
                 // Clean up access time tracking
                 _clusterAccessTimes.Remove(clusterId);
                 
-                Console.WriteLine($"   🗑️ LRU evicted cluster: {clusterId}");
+                DebugLog.Verbose($"   🗑️ LRU evicted cluster: {clusterId}");
             }
             catch (Exception ex)
             {
@@ -1349,7 +1367,7 @@ namespace GreyMatter.Core
             var regionId = GetRegionId(featureVector);
             
             // DEBUG: Log region lookup
-            Console.WriteLine($"   🔍 FindClustersMatchingPattern: regionId={regionId}, total mappings={_regionToClusterMapping.Count}");
+            DebugLog.Debug($"   🔍 FindClustersMatchingPattern: regionId={regionId}, total mappings={_regionToClusterMapping.Count}");
             
             // Record activation for statistics
             _activationStats.RecordActivation(regionId, featureVector);
@@ -1357,7 +1375,7 @@ namespace GreyMatter.Core
             // Get candidate regions (primary + nearby)
             var nearbyRegions = GetNearbyRegions(featureVector, neighbors: 5);
             
-            Console.WriteLine($"   🔍 Searching {nearbyRegions.Count} regions: {string.Join(", ", nearbyRegions.Take(3))}...");
+            DebugLog.Debug($"   🔍 Searching {nearbyRegions.Count} regions: {string.Join(", ", nearbyRegions.Take(3))}...");
             
             // CRITICAL: Ensure the primary region is ALWAYS included in search!
             if (!nearbyRegions.Contains(regionId))
@@ -1373,7 +1391,7 @@ namespace GreyMatter.Core
                 // Get clusters mapped to this region
                 if (_regionToClusterMapping.TryGetValue(region, out var clusterIds))
                 {
-                    Console.WriteLine($"   🔍 Region {region}: found {clusterIds.Count} clusters");
+                    DebugLog.Debug($"   🔍 Region {region}: found {clusterIds.Count} clusters");
                     
                     foreach (var clusterId in clusterIds)
                     {
@@ -1479,7 +1497,7 @@ namespace GreyMatter.Core
             // DEBUG: Sample logging (first 20 clusters, then every 1000th) to maintain visibility without spam
             if (TotalClustersCreated < 20 || TotalClustersCreated % 1000 == 0)
             {
-                Console.WriteLine($"   🔍 DEBUG cluster={TotalClustersCreated}: candidates={matches.Count()}, best={matches.FirstOrDefault().similarity:F3}, threshold={SIMILARITY_THRESHOLD:F2} [debug: {debugLabel}]");
+                DebugLog.Debug($"   🔍 DEBUG cluster={TotalClustersCreated}: candidates={matches.Count()}, best={matches.FirstOrDefault().similarity:F3}, threshold={SIMILARITY_THRESHOLD:F2} [debug: {debugLabel}]");
             }
             
             if (bestMatch != default)
@@ -1776,7 +1794,7 @@ namespace GreyMatter.Core
             // Find clusters that were TRAINED on patterns in this region
             var clusterIds = _regionToClusterMapping.GetValueOrDefault(regionId, new List<Guid>());
             
-            Console.WriteLine($"   🔍 Region {regionId}: found {clusterIds.Count} trained clusters");
+            DebugLog.Debug($"   🔍 Region {regionId}: found {clusterIds.Count} trained clusters");
             
             if (!clusterIds.Any())
             {
@@ -2489,7 +2507,7 @@ namespace GreyMatter.Core
             _configForLogging = config;
             _storage.MaxParallelSaves = config.MaxParallelSaves;
             _storage.CompressClusters = config.CompressClusters;
-            // Optionally allow overrides via config env vars later
+            DebugLog.Level = config.Verbosity; // gate high-volume diagnostics globally
         }
 
         /// <summary>

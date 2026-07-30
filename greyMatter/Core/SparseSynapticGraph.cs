@@ -20,13 +20,28 @@ namespace GreyMatter.Core
     {
         // Sparse synapse storage: (sourceId, targetId) → weight
         private readonly Dictionary<(Guid source, Guid target), float> _synapses;
-        
+
         // Hebbian learning parameters
         private readonly float _learningRate;
         private readonly float _minWeight;
         private readonly float _maxWeight;
         private readonly float _pruneThreshold;
-        
+
+        // ─── Synaptic budget (REFOCUS.md: limited persistence is the thesis) ───
+        // Only the top-K most active neurons in a co-activation event wire together
+        // (biological analog: lateral inhibition / winner-take-all).
+        public const int MaxCoactivationGroup = 16;
+        // Hard cap on outgoing synapses per neuron. Strengthening existing synapses
+        // is always allowed; creating beyond the budget is not.
+        public const int MaxOutDegree = 64;
+        // Both neurons must be meaningfully active (product of normalized 0..1
+        // activations) before a NEW synapse is worth creating.
+        public const float CreationProductThreshold = 0.15f;
+
+        // Out-degree index (maintained by create/remove/import paths)
+        private readonly Dictionary<Guid, int> _outDegree = new();
+        public long CreationsBlockedByBudget { get; private set; }
+
         // Statistics
         public int SynapseCount => _synapses.Count;
         public int TotalNeurons { get; private set; }
@@ -65,26 +80,35 @@ namespace GreyMatter.Core
             // Skip self-connections
             if (sourceId == targetId)
                 return;
-            
-            // Hebbian update: Δw = η * a_i * a_j
+
+            // Hebbian update: Δw = η * a_i * a_j  (activations expected normalized 0..1)
             var key = (sourceId, targetId);
             var deltaWeight = _learningRate * sourceActivation * targetActivation;
-            
+
             if (_synapses.TryGetValue(key, out var currentWeight))
             {
-                // Strengthen existing synapse
+                // Strengthen existing synapse (always allowed — reinforcement is free)
                 var newWeight = Math.Clamp(currentWeight + deltaWeight, _minWeight, _maxWeight);
                 _synapses[key] = newWeight;
             }
             else
             {
-                // Create new synapse only if activation is strong enough
-                // Use pruning threshold to determine if connection is worth creating
-                var creationThreshold = Math.Max(_pruneThreshold * 0.5f, _learningRate * 0.5f);
-                if (deltaWeight > creationThreshold)
+                // NEW synapse: both parties must be meaningfully active
+                if (sourceActivation * targetActivation < CreationProductThreshold)
+                    return;
+
+                // Enforce per-neuron synaptic budget
+                if (_outDegree.TryGetValue(sourceId, out var degree) && degree >= MaxOutDegree)
                 {
-                    _synapses[key] = Math.Clamp(deltaWeight, _minWeight, _maxWeight);
+                    CreationsBlockedByBudget++;
+                    return;
                 }
+
+                // Born just above the prune line: one decay pass kills it unless
+                // reinforced. Persistence must be earned through repetition.
+                var birthWeight = Math.Clamp(_pruneThreshold + deltaWeight, _minWeight, _maxWeight);
+                _synapses[key] = birthWeight;
+                _outDegree[sourceId] = degree + 1;
             }
         }
         
@@ -94,6 +118,17 @@ namespace GreyMatter.Core
         /// <param name="activeNeurons">List of (neuronId, activation) pairs</param>
         public void RecordCoactivationPattern(List<(Guid neuronId, float activation)> activeNeurons)
         {
+            // Synaptic budget: only the strongest K participants wire together.
+            // Without this, a 340-neuron group creates 115K synapses per event
+            // (observed: 65M synapses from 1,500 sentences on 2026-07-29).
+            if (activeNeurons.Count > MaxCoactivationGroup)
+            {
+                activeNeurons = activeNeurons
+                    .OrderByDescending(a => a.activation)
+                    .Take(MaxCoactivationGroup)
+                    .ToList();
+            }
+
             // For each pair of active neurons, strengthen connection
             for (int i = 0; i < activeNeurons.Count; i++)
             {
@@ -101,7 +136,7 @@ namespace GreyMatter.Core
                 {
                     var (sourceId, sourceAct) = activeNeurons[i];
                     var (targetId, targetAct) = activeNeurons[j];
-                    
+
                     // Bidirectional strengthening
                     RecordCoactivation(sourceId, targetId, sourceAct, targetAct);
                     RecordCoactivation(targetId, sourceId, targetAct, sourceAct);
@@ -165,13 +200,22 @@ namespace GreyMatter.Core
                 .Where(kvp => kvp.Value < _pruneThreshold)
                 .Select(kvp => kvp.Key)
                 .ToList();
-            
+
             foreach (var key in toRemove)
             {
-                _synapses.Remove(key);
+                RemoveSynapseInternal(key);
             }
-            
+
             return beforeCount - _synapses.Count;
+        }
+
+        private void RemoveSynapseInternal((Guid source, Guid target) key)
+        {
+            if (_synapses.Remove(key) && _outDegree.TryGetValue(key.source, out var d))
+            {
+                if (d <= 1) _outDegree.Remove(key.source);
+                else _outDegree[key.source] = d - 1;
+            }
         }
         
         /// <summary>
@@ -203,9 +247,9 @@ namespace GreyMatter.Core
             // Remove decayed synapses
             foreach (var key in toRemove)
             {
-                _synapses.Remove(key);
+                RemoveSynapseInternal(key);
             }
-            
+
             return beforeCount - _synapses.Count;
         }
         
@@ -319,11 +363,15 @@ namespace GreyMatter.Core
         public void ImportSynapses(List<SynapseSnapshot> snapshots)
         {
             _synapses.Clear();
-            
+            _outDegree.Clear();
+
             foreach (var snapshot in snapshots)
             {
                 var key = (snapshot.PresynapticNeuronId, snapshot.PostsynapticNeuronId);
-                _synapses[key] = (float)snapshot.Weight;
+                if (_synapses.TryAdd(key, (float)snapshot.Weight))
+                {
+                    _outDegree[key.Item1] = _outDegree.GetValueOrDefault(key.Item1) + 1;
+                }
             }
         }
         
@@ -333,6 +381,8 @@ namespace GreyMatter.Core
         public void Clear()
         {
             _synapses.Clear();
+            _outDegree.Clear();
+            CreationsBlockedByBudget = 0;
             TotalNeurons = 0;
         }
     }
