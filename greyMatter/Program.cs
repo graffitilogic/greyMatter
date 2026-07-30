@@ -200,7 +200,7 @@ namespace GreyMatter
 
             // ── A: baseline, everything warm ───────────────────────────────
             Console.WriteLine("── A: baseline (clusters resident) ──");
-            var baseline = new Dictionary<string, List<(Guid id, double act)>>();
+            var baseline = new Dictionary<string, List<(Guid neuronId, double activation)>>();
             foreach (var cue in cues)
             {
                 var probe = await brain.ProbeConceptAsync(cue, topK);
@@ -215,8 +215,8 @@ namespace GreyMatter
             for (int i = 0; i < trained.Count; i++)
             for (int j = i + 1; j < trained.Count; j++)
             {
-                var a = baseline[trained[i]].Select(p => p.id).ToHashSet();
-                var b = baseline[trained[j]].Select(p => p.id).ToHashSet();
+                var a = baseline[trained[i]].Select(p => p.neuronId).ToHashSet();
+                var b = baseline[trained[j]].Select(p => p.neuronId).ToHashSet();
                 if (a.Count == 0 || b.Count == 0) continue;
                 var overlap = (double)a.Intersect(b).Count() / Math.Min(a.Count, b.Count);
                 pairSum += overlap; pairs++;
@@ -253,8 +253,8 @@ namespace GreyMatter
                     continue;
                 }
 
-                var beforeSet = before.Select(p => p.id).ToHashSet();
-                var afterSet = after.Select(p => p.id).ToHashSet();
+                var beforeSet = before.Select(p => p.neuronId).ToHashSet();
+                var afterSet = after.Select(p => p.neuronId).ToHashSet();
                 var kept = beforeSet.Intersect(afterSet).Count();
                 var fidelity = (double)kept / beforeSet.Count;
                 fidSum += fidelity; fidCount++;
