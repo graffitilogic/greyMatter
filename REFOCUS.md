@@ -794,6 +794,49 @@ visible directly rather than inferred.
 That is the correct trade for now — measure it, then decide the persistence
 budget deliberately rather than inheriting a number chosen for save speed.
 
+### P2 run #3 — consolidation fixed, and it was not the blocker (2026-07-30)
+
+Consolidation now lands: **65,613 neurons promoted** across 316 clusters in 2.27s
+(was ~3,360). Compression **2.53x** — the best figure this project has produced,
+and a real one. Checkpoint 56s.
+
+**But `qwertyuiop` scored 0.993** — higher than every trained cue except the
+saturated 1.000s, and higher than `water` (0.728). My prediction that starved
+learning caused the poor discrimination was **wrong**. Learning now lands fully
+and the controls got *worse*.
+
+**This is no longer a bug — it is a design gap, and it is structural.** Two facts
+in the code make selectivity impossible in principle:
+
+1. **The learning target is a constant.** `Cerebro.cs:2022`:
+   ```csharp
+   neuron.Learn(featureNeuronId, feature.Value, 0.8, output);
+   ```
+   Every neuron, for every concept, is trained toward output **0.8**. There is no
+   negative example and no competition — no neuron is ever told *not* to respond
+   to anything. The rule's fixed point is "respond 0.8 to whatever you see."
+   A constant supervised target cannot produce discrimination; it is a
+   fire-for-everything rule.
+
+2. **Activation is an unnormalised dot product.** `HybridNeuron.ProcessInputs`:
+   ```csharp
+   weightedSum = Bias + Σ(input × weight)     // no normalisation
+   ```
+   With weights scaled 7.5–22.5 (P1.7 density compensation), a cue that drives
+   only 3 of a neuron's 8 inputs still sums to ~18 → tanh(18/20) ≈ 0.72.
+   **Magnitude dominates match quality.** Partial overlap between any two words'
+   top-32 encoding dims is therefore enough to saturate the neuron, which is
+   exactly why gibberish scores like language.
+
+Both are load-bearing: fixing either alone leaves the other able to wash out
+selectivity. This is the first blocker in the whole arc that is a genuine
+architectural absence rather than a constant tuned for the wrong purpose.
+
+Everything downstream — P2 fidelity, P4 scoped activation, P4.5 composition —
+requires a network that can tell one pattern from another. That capability does
+not currently exist, and no amount of instrumentation will reveal it, because
+there is nothing there to reveal.
+
 ### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
 - Procedural loading becomes the *default* path, not the fallback.
 - Add a **persistence budget**: top-k synapses per neuron, dirty-region-only writes.
