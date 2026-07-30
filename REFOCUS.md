@@ -603,6 +603,60 @@ instead of 42.
 sparsity isn't producing selectivity and the next lever is competition (k-WTA)
 rather than wiring.
 
+### P1.7 result — sparsity worked; the pass-rate metric is now the broken thing (2026-07-30 12:52)
+
+Scored against predictions made in advance: **2 of 4 hit, and both misses are
+the same miss.**
+
+✅ `coverage[none=0 partial=N full=0 avg=18–20%]` — exactly as designed.
+✅ **Graded activation achieved.** `delta[p10≈8–11 med≈13–17 max≈27–36]` — a 3–4×
+   spread across an assembly, where before the median sat within 2 of the max.
+   Neurons in an assembly are now genuinely different from one another.
+✅ **Storage improved beyond any previous run**: procedural save Full
+   79.9MB → **29.2MB**, compression 1.34x → **1.80x** (previous best 1.68x).
+   Each neuron stores ~8 weights instead of 42.
+❌ `firing < N` — still N/N in 6 of 7 samples.
+❌ `passed%` between the failure modes — still 99.9%.
+
+**Why the misses, and why they matter less than they look.** The Hebbian gate is
+`tanh(delta/20) > 0.1`, i.e. delta > ~2.0. The **p10** of the new distribution is
+8–11. Even the least-active decile clears the gate by 4–5×. A fixed absolute
+threshold is not a selectivity mechanism against this distribution — it admits
+everything regardless of how well differentiated the population is.
+
+**But selection is already happening downstream.** `RecordCoactivationPattern`
+trims to `MaxCoactivationGroup = 16` by activation before wiring. So synapse
+formation has always been winner-take-all — the difference is that it now picks
+**the strongest 16 of a differentiated population** instead of 16 arbitrary
+clones. That is precisely what P1.7 set out to achieve, and `passed%` cannot see
+it because it measures the pre-trim gate.
+
+**Conclusion: `passed%` has outlived its usefulness.** It was the right
+instrument for finding the wiring bug and is now saturated and uninformative.
+The question worth measuring is *selectivity*: does the active set differ
+between concepts, and is it stable for the same concept across contexts? That is
+a mini version of the P2 fidelity measurement, so it should be built there
+rather than as more activation tuning.
+
+**Cost noted:** throughput 29 → 25.4 sent/sec, train step 2.6 → 3.1 ms
+(~3,300 hash evaluations per learn event: 78 neurons × 42 features). Cacheable
+in memory without giving up regenerability — recompute on load. Deferred.
+
+**Still open:** neurons continue to grow (165,411, `grew_events` ~6%, reuse ~96%)
+with no plateau on a 500-sentence cycling corpus.
+
+---
+
+## P1 COMPLETE — moving to P2
+
+The structural prerequisites for the fidelity experiment are now in place:
+- assemblies are stable and reused (~96–98%)
+- receptive fields are sparse, deterministic, and **regenerable from neuron
+  identity** rather than stored
+- activation within an assembly is graded, so co-activation selects meaningfully
+- persistence works end-to-end (procedural save, 1.80x, ~66K neurons/checkpoint)
+- synapse count is bounded by decay; storage and throughput are stable
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).
