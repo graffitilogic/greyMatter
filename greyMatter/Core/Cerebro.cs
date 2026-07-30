@@ -1836,13 +1836,25 @@ namespace GreyMatter.Core
 
             // Concept identity: deterministic top-K dims by magnitude, so the same
             // word always drives the same input lines regardless of sentence.
+            //
+            // Rectified into ON/OFF channels (P1.6k). FeatureEncoder emits a
+            // unit-norm vector with SIGNED components, but TrainNeuronWithFeatures
+            // initializes weights positive (1.5-4.5) — an assumption inherited from
+            // the old all-non-negative sentence features. Feeding signed values
+            // through positive weights cancels: mean delta fell 4.1 -> 2.04 and
+            // delta_min went negative (-6.84) for the first time.
+            // Splitting each dim into a positive and a negative channel keeps all
+            // inputs non-negative while preserving sign information. Only one
+            // channel per dim is ever emitted, so sparsity is unchanged.
             var topDims = Enumerable.Range(0, conceptVector.Length)
                 .OrderByDescending(i => Math.Abs(conceptVector[i]))
                 .ThenBy(i => i)                       // stable tie-break
                 .Take(ConceptFeatureDims);
             foreach (var dim in topDims)
             {
-                result[$"cf_{dim}"] = conceptVector[dim];
+                var v = conceptVector[dim];
+                if (v >= 0) result[$"cf_{dim}_p"] = v;
+                else        result[$"cf_{dim}_n"] = -v;
             }
 
             // Context, down-weighted: modulates but does not define the field.

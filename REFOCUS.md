@@ -414,6 +414,40 @@ recruiting a context cohort. Less certain: `reuse%` and cluster count. If
 from somewhere other than the feature path and I should instrument
 `TrainNeuronWithFeatures` directly rather than theorise again.
 
+### P1.6k — Cohort lockstep broken; signed-input regression (2026-07-30 11:02)
+
+**Prediction was half right.** I said `passed%` would rise above 22% and stop
+being a multiple of 16. The *second* half happened, the first did not:
+
+- **Lockstep broke** — `above_threshold` now takes values 0, 1, 4, 5, 7, 8, 9,
+  10, 13, 15, 16. Every prior run produced only multiples of 16. Neurons no
+  longer respond in whole allocation-cohorts, which was the actual claim under
+  test, and it confirms the concept-blind training diagnosis.
+- **But `passed%` fell to 18.5%** (from 22.2%), and mean delta fell 4.1 → 2.04.
+
+**Cause of the regression — my own change.** `TrainNeuronWithFeatures`
+initializes weights **positive** (1.5–4.5), an assumption inherited from the old
+sentence features, which were all non-negative (char/128, booleans, lengths).
+`FeatureEncoder` emits a **unit-norm vector with signed components**, so
+Σ(signed value × positive weight) cancels. The log shows it directly:
+`delta[min=-6.84 ...]` — the first negative minimum in any run; previously 0.00.
+Also new: `none_passed=257–318` per window (~13% of events now produce no
+co-activation at all).
+
+**Fix (P1.6k):** rectify concept features into ON/OFF channels — each top-K dim
+emits `cf_{d}_p` or `cf_{d}_n` carrying |v|. All inputs non-negative, sign
+information preserved, sparsity unchanged (one channel per dim). This is also
+the biologically standard arrangement (rectified ON/OFF pathways).
+
+**Genuine gains this run, worth keeping:** neurons 280,583 → **169,089** (−40%)
+and synapses 464,184 → **220,258** (−53%) — concept-based receptive fields mean
+repeat encounters reinforce rather than recruit. `reuse%` 96.7–97.4%.
+
+**Costs to watch:** throughput 48.7 → 29.7 sent/sec and the train step
+0.5 → 2.4 ms (features went from 10 keys to ~42); compression 2.38x → 1.67x
+(more InputWeights per neuron). If ON/OFF restores activation, consider
+lowering `ConceptFeatureDims` from 32 to trade discriminability for speed.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).
