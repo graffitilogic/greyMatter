@@ -107,13 +107,28 @@ Fixes:
   (~0.102–0.108) × 0.995 stays above the 0.1 prune line for 4-5 cycles.
   At 0.98 newborns die within 1-2 un-reinforced checkpoints.
 
-**Exit criterion:** 5-min benchmark shows "% new" neurons falling toward
-single digits as vocabulary saturates; neuron total plateaus instead of
-growing linearly; checkpoint prune count > 0.
+**Result (2026-07-29 second re-run):** partial win, two lessons:
+- Assembly reuse works on repeated vocabulary: % new fell 49 → 20.5% while
+  tatoeba cycled — then curriculum advanced to news (308K unique headlines)
+  and legitimately-new words pushed it back to 33-45%. Benchmarks must pin
+  the dataset → added `--no-curriculum`.
+- "pruned 0" again: real birth weights ~0.105-0.108 need ~3 decay passes,
+  and decay only ran at checkpoints — which fire once per 10 min, i.e.
+  never during a 5-min run. Decay moved to the maintenance loop
+  (0.97 every 2 min); newborns now die in ~6 unreinforced minutes.
+- 20% new during pure repetition is still too high (should → 0 after the
+  corpus cycles twice). Added allocation instrumentation (reuse%,
+  assembly_pref hits, grew_events, avg_grow) to distinguish: home cluster
+  missing from top-5 candidates (VQ drift) vs capacity-target ratcheting.
+
+**Exit criterion (revised):** `--no-curriculum` 5-min run shows reuse% → ~100
+and grew_events% → ~0 as tatoeba saturates; maintenance log shows pruned > 0.
 
 **Still open:**
 - "Vocabulary learned: 793,175 words" from 1,741 sentences is not a real
   vocabulary count — find what that stat actually counts.
+- `Clusters: 0` and `Storage size: 103 B` in progress/final stats are bogus
+  (read storage before first save).
 
 #### P1 original notes
 Code review (Jul 2026 reboot) found the Jan 19 "dead gate" was fixed on Jan 23;

@@ -80,12 +80,15 @@ namespace GreyMatter
                 var datasetKey = GetArgValue(args, "--dataset", "tatoeba_small");
                 var durationSec = int.Parse(GetArgValue(args, "--duration", "86400"));
                 var useLLMTeacher = args.Contains("--llm-teacher");
-                
+                // Benchmark mode: pin the dataset so curriculum advancement doesn't
+                // confound A/B comparisons (news influx masks assembly-reuse gains)
+                var noCurriculum = args.Contains("--no-curriculum");
+
                 var service = new ProductionTrainingService(
                     datasetKey: datasetKey,
                     llmTeacher: useLLMTeacher ? new LLMTeacher() : null,
                     useLLMTeacher: useLLMTeacher,
-                    useProgressiveCurriculum: true,
+                    useProgressiveCurriculum: !noCurriculum,
                     checkpointIntervalMinutes: 10, // Frequent checkpoints for data safety
                     validationIntervalHours: 6,
                     nasArchiveIntervalHours: 24,
@@ -117,6 +120,7 @@ namespace GreyMatter
                 Console.WriteLine("║  Production Training:                                     ║");
                 Console.WriteLine("║    dotnet run -- --production-training                    ║");
                 Console.WriteLine("║    dotnet run -- --production-training --duration 3600    ║");
+                Console.WriteLine("║    add --no-curriculum to pin dataset (benchmarking)      ║");
                 Console.WriteLine("║                                                           ║");
                 Console.WriteLine("║  Query & Inspection:                                      ║");
                 Console.WriteLine("║    dotnet run -- --cerebro-query stats                    ║");

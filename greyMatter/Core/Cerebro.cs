@@ -253,6 +253,43 @@ namespace GreyMatter.Core
         public int GetSynapticGraphSynapseCount() => _synapticGraph.GetSynapseCount();
 
         /// <summary>
+        /// Continuous forgetting (called from the maintenance loop, not checkpoints).
+        /// At 0.97/pass with ~2-min passes: newborn synapses (~0.106) die within
+        /// ~3 un-reinforced passes (≈6 min); established pathways (≈1.0) halve in
+        /// ~45 min without any reinforcement.
+        /// </summary>
+        public (int before, int after, long blockedByBudget) DecayAndPruneSynapses(float decayFactor = 0.97f)
+        {
+            var before = _synapticGraph.GetSynapseCount();
+            _synapticGraph.ApplyDecay(decayFactor);
+            return (before, _synapticGraph.GetSynapseCount(), _synapticGraph.CreationsBlockedByBudget);
+        }
+
+        // ─── P1.6 instrumentation: allocation / assembly-reuse counters ───
+        private long _allocEvents, _allocReuseHits, _allocAssemblyPrefHits, _allocGrowEvents, _allocNeuronsGrown;
+
+        /// <summary>
+        /// P1.6 instrumentation: where do neurons come from? reuse% should rise
+        /// toward ~100 as vocabulary saturates; grew_events/avg_grow expose
+        /// capacity-target ratcheting (growth on concepts that were found).
+        /// </summary>
+        public string GetAllocationSummary(bool reset = true)
+        {
+            var ev = Math.Max(1, _allocEvents);
+            var summary = _allocEvents == 0
+                ? "   📊 Allocation: no events recorded"
+                : $"   📊 Allocation: events={_allocEvents:N0} reuse={100.0 * _allocReuseHits / ev:F1}% " +
+                  $"(assembly_pref={_allocAssemblyPrefHits:N0}) grew_events={_allocGrowEvents:N0} " +
+                  $"({100.0 * _allocGrowEvents / ev:F1}%) avg_grow={(_allocGrowEvents > 0 ? (double)_allocNeuronsGrown / _allocGrowEvents : 0):F1}";
+            if (reset)
+            {
+                _allocEvents = _allocReuseHits = _allocAssemblyPrefHits = 0;
+                _allocGrowEvents = _allocNeuronsGrown = 0;
+            }
+            return summary;
+        }
+
+        /// <summary>
         /// ADPC-Net Phase 3: Record Hebbian co-activation between neurons
         /// Neurons that fire together, wire together
         /// </summary>
@@ -551,6 +588,10 @@ namespace GreyMatter.Core
             var target = GetTargetNeuronsForConcept(concept, features);
             int grew = 0;
 
+            // P1.6 instrumentation: reuse vs growth accounting
+            _allocEvents++;
+            if (conceptNeurons.Count > 0) _allocReuseHits++;
+
             // Dynamic creation balanced by reuse (removed arbitrary hit gating)
             if (conceptNeurons.Count < target)
             {
@@ -573,6 +614,7 @@ namespace GreyMatter.Core
                     grew = newNeurons.Count;
                     conceptNeurons.AddRange(newNeurons);
                     TotalNeuronsCreated += grew;
+                    if (grew > 0) { _allocGrowEvents++; _allocNeuronsGrown += grew; }
                     
                     // Update cluster centroid with new pattern
                     cluster.UpdateCentroid(featureVector);
@@ -850,18 +892,9 @@ namespace GreyMatter.Core
             if ((_configForLogging?.Verbosity ?? 0) > 0)
                 Console.WriteLine($"   🧠 Consolidation: promoted {totalPromoted} neurons across {clustersTouched} clusters in {sw.Elapsed.TotalSeconds:F2}s (budget/cluster={budgetPerCluster})");
 
-            // Synaptic forgetting (REFOCUS.md: persistence must be earned).
-            // Decay all weights, then prune below threshold. At 0.98, synapses
-            // born at ~0.102-0.108 die within 1-2 un-reinforced checkpoints;
-            // established pathways (≈1.0) survive ~30+ cycles. (0.995 was too
-            // gentle: first 5-min run pruned exactly 0.)
-            sw.Restart();
-            var synBefore = _synapticGraph.GetSynapseCount();
-            _synapticGraph.ApplyDecay(0.98f);
-            var synPruned = synBefore - _synapticGraph.GetSynapseCount();
-            Console.WriteLine($"   ✂️  Synaptic decay: {synBefore:N0} → {_synapticGraph.GetSynapseCount():N0} " +
-                              $"(pruned {synPruned:N0}, blocked_by_budget {_synapticGraph.CreationsBlockedByBudget:N0}) " +
-                              $"in {sw.Elapsed.TotalSeconds:F2}s");
+            // Note: synaptic decay/pruning moved to the maintenance loop
+            // (DecayAndPruneSynapses) — checkpoint-only decay never fired in
+            // short runs, so 5-min benchmarks always reported "pruned 0".
 
             // Save feature mappings
             sw.Restart();
@@ -1509,6 +1542,7 @@ namespace GreyMatter.Core
                     var existing = await m.cluster.FindNeuronsByConcept(debugLabel);
                     if (existing.Count > 0)
                     {
+                        _allocAssemblyPrefHits++;
                         if (ShouldSampleLog())
                             Console.WriteLine($"   ♻️ Assembly reuse: {debugLabel} → cluster {m.cluster.ClusterId.ToString().Substring(0, 8)} ({existing.Count} existing neurons, sim {m.similarity:F3})");
                         return m.cluster;
