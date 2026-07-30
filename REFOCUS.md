@@ -367,6 +367,53 @@ sizes drop from ~78 to the concept's actual allocation; the train step gets
 ~4x cheaper; `reuse%` may *fall* — that would be a more honest number, not a
 regression.
 
+### P1.6j — Neuron training was concept-blind (2026-07-30 10:35)
+
+**Prediction failed:** I expected the substring fix to move Hebbian `passed%`
+from 22% toward 90%. It did not move *at all* — still 22.2%, mean delta 4.1,
+identical to two runs prior. (The substring fix was still correct; it just
+wasn't the cause. Reuse and throughput held: 96%, 48.7 sent/sec, 14,655
+sentences.)
+
+**What the failure revealed.** `passed` is *always a multiple of 16*: 16 of 78,
+32 of 146, 208 of 947. Sixteen is `FirstAllocationNeurons`. Neurons therefore
+respond in whole allocation-cohorts — an entire cohort fires or none of it does.
+
+Cause, verified in `ProductionTrainingService`:
+```csharp
+var features = ExtractFeatures(sentence);          // 10 features: length, word
+                                                   // count, 3 bools, first 5 chars
+foreach (var word in words)
+    await _cerebro.LearnConceptAsync(word, features);   // SAME dict every word
+```
+The training features are a **sentence fingerprint**, and every word in a
+sentence receives an identical copy. So "cat" and "the" were trained on the same
+input pattern; a neuron's receptive field encoded *which sentence it saw*, never
+*which concept it belongs to*. Concept identity influenced only which cluster
+and neurons were selected — never what they learned.
+
+Consequences, all of which we had been measuring without understanding:
+- A concept accrues one 16-neuron cohort per distinct sentence-context; only the
+  cohort matching the current sentence fires → the immovable ~22%.
+- Neuron count grows with *contexts*, not vocabulary — why it never plateaus.
+- "Recognition" was closer to sentence-matching than concept recall.
+- **P2 would have been meaningless**: regeneration fidelity measured against
+  sentence fingerprints, not concept representations.
+
+**Fix:** `Cerebro.BuildTrainingFeatures` composes the receptive field from the
+concept's own encoding (top-32 magnitude dims of `FeatureEncoder.Encode(word)`,
+deterministic and stable across sentences) plus the sentence context retained at
+0.25 weight as modulation. Cluster selection already used the concept encoding;
+now training does too.
+
+**Predictions (recorded before running, given the last one missed):** `passed%`
+should rise well above 22% and stop being a multiple of 16; neuron growth should
+slow because repeat encounters reinforce an existing assembly instead of
+recruiting a context cohort. Less certain: `reuse%` and cluster count. If
+`passed%` stays pinned at 22.2% a third time, the cohort behaviour is coming
+from somewhere other than the feature path and I should instrument
+`TrainNeuronWithFeatures` directly rather than theorise again.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).

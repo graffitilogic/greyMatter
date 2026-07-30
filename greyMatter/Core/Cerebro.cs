@@ -664,9 +664,10 @@ namespace GreyMatter.Core
 
             // Training pass
             var tTrain = Stopwatch.StartNew();
+            var trainingFeatures = BuildTrainingFeatures(featureVector, features);
             foreach (var neuron in conceptNeurons)
             {
-                await TrainNeuronWithFeatures(neuron, features);
+                await TrainNeuronWithFeatures(neuron, trainingFeatures);
             }
             tTrain.Stop();
 
@@ -1814,6 +1815,43 @@ namespace GreyMatter.Core
                 .Where(c => c != null)
                 .OrderByDescending(c => c.CalculateRelevance(concepts))
                 .ToList();
+        }
+
+        // Concept-identity features (REFOCUS P1.6j). The caller's `features` are a
+        // SENTENCE fingerprint (length, word count, 3 booleans, first 5 chars) and
+        // ProductionTrainingService passes the SAME dict for every word in the
+        // sentence — so "cat" and "the" were trained on identical input and a
+        // neuron's receptive field encoded the sentence, never the concept.
+        // Symptom: a concept accumulated one 16-neuron cohort per sentence-context
+        // and only the matching cohort fired, pinning the Hebbian pass rate at
+        // ~22% with `passed` always a multiple of 16 (16, 32, 208 = 13x16).
+        // Fix: the neuron's receptive field is built from the concept's own
+        // encoding; sentence context is retained but down-weighted to modulation.
+        private const int ConceptFeatureDims = 32;   // top-magnitude dims, keeps input sparse
+        private const double ContextFeatureWeight = 0.25;
+
+        private Dictionary<string, double> BuildTrainingFeatures(double[] conceptVector, Dictionary<string, double> contextFeatures)
+        {
+            var result = new Dictionary<string, double>(ConceptFeatureDims + contextFeatures.Count);
+
+            // Concept identity: deterministic top-K dims by magnitude, so the same
+            // word always drives the same input lines regardless of sentence.
+            var topDims = Enumerable.Range(0, conceptVector.Length)
+                .OrderByDescending(i => Math.Abs(conceptVector[i]))
+                .ThenBy(i => i)                       // stable tie-break
+                .Take(ConceptFeatureDims);
+            foreach (var dim in topDims)
+            {
+                result[$"cf_{dim}"] = conceptVector[dim];
+            }
+
+            // Context, down-weighted: modulates but does not define the field.
+            foreach (var kv in contextFeatures)
+            {
+                result[$"ctx_{kv.Key}"] = kv.Value * ContextFeatureWeight;
+            }
+
+            return result;
         }
 
         private async Task TrainNeuronWithFeatures(HybridNeuron neuron, Dictionary<string, double> features)
