@@ -1018,6 +1018,38 @@ The provisional tier is a deliberate judgement call and worth flagging as such:
 it lets a strong-but-imperfect result be *seen* rather than hidden, at the cost
 of a weaker guarantee. The hard abort remains for genuine overlap.
 
+### P2.3 — the fidelity number has been vacuous the whole time (2026-07-30)
+
+With 8 controls the statistics finally became readable: **AUC 0.902, d′ 2.23**,
+trained mean 0.587 vs control mean 0.424. Discrimination is real and the effect
+is large. Tier-2 pseudo-words behaved exactly as predicted — `grastic` 0.526,
+`thrumble` 0.453 outscored the keyboard mash (0.359–0.445), so part of the
+discrimination is orthographic plausibility rather than learned identity. Weakest
+trained cues are `so` (0.403) and `water` (0.415): both short, and short words
+have few distinctive n-grams for `FeatureEncoder` to work with.
+
+**But the fidelity measurement itself was vacuous, and had been from the start.**
+`--fidelity-test` began with `InitializeAsync`, i.e. by loading a brain from
+disk. The first probe therefore materialised clusters **through**
+`ProceduralNeuronRegenerator` — so baseline **A was already a regeneration**, B
+was a second regeneration of the same files, and the two were identical by
+construction. 100% for every cue including `qwertyuiop` was not a result; it was
+the experiment measuring whether reading a file twice is deterministic.
+
+Every 100% reported in P2 runs #1–#4 is void for this reason, independently of
+the control problem.
+
+*Fixed:* the harness now **trains in-process first** (`--train N`, default 500),
+so assemblies are live in memory and never persisted when A is taken. Only then
+save + evict + re-probe for B. A is the original; B is the regeneration.
+
+**Also fixed — a metric that punished a better experiment.** The gate used
+`trainedMean − controlMax`, mixing a mean against a max, so it *shrank* purely
+from adding controls: 0.178 with 2 controls → 0.062 with 8, while d′ showed
+discrimination was strong. Criteria are now AUC ≥ 0.90 **and** d′ ≥ 1.5 for the
+provisional tier; strict min/max separation still required for a clean pass.
+Mean gap and strict margin are still printed, but no longer gate anything.
+
 **Next mechanism (biology): intrinsic homeostatic plasticity.** Cortical neurons
 regulate their own excitability toward a target firing rate — a cell that
 responds to everything becomes harder to excite. That is precisely the remaining

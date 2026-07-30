@@ -188,6 +188,41 @@ namespace GreyMatter
             brain.AttachConfiguration(config);
             await brain.InitializeAsync();
 
+            // ── Train in-process so baseline A is the ORIGINAL ─────────────
+            //
+            // CRITICAL (P2.3): without this the experiment is vacuous. Loading a
+            // brain from disk means the first probe already materialises clusters
+            // THROUGH ProceduralNeuronRegenerator — so A was itself a regeneration,
+            // B was a second regeneration of the same files, and fidelity was
+            // trivially 100% for every cue including gibberish. It was measuring
+            // whether reading a file twice is deterministic.
+            //
+            // Training here leaves the assemblies live in memory, never yet
+            // persisted, so A is genuinely pre-regeneration.
+            var trainSentences = int.Parse(GetArgValue(args, "--train", "500"));
+            if (trainSentences > 0)
+            {
+                Console.WriteLine($"── Training {trainSentences} sentences in-process (baseline must be pre-persistence) ──");
+                var provider = new TrainingDataProvider();
+                var sentences = provider.LoadSentences("tatoeba_small", maxSentences: trainSentences, shuffle: false).ToList();
+                int presented = 0;
+                foreach (var sentence in sentences)
+                {
+                    var feats = new Dictionary<string, double>
+                    {
+                        ["length"] = sentence.Length / 100.0,
+                        ["words"] = sentence.Split(' ').Length / 20.0,
+                        ["hasUpper"] = sentence.Any(char.IsUpper) ? 1.0 : 0.0,
+                        ["hasDigit"] = sentence.Any(char.IsDigit) ? 1.0 : 0.0,
+                        ["hasPunctuation"] = sentence.Any(char.IsPunctuation) ? 1.0 : 0.0
+                    };
+                    foreach (var w in sentence.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                        if (w.Length > 1) await brain.LearnConceptAsync(w, feats);
+                    if (++presented % 100 == 0) Console.Write($"\r   {presented}/{sentences.Count}");
+                }
+                Console.WriteLine($"\r   trained {presented} sentences — assemblies are live in memory\n");
+            }
+
             // Cue set: common words the brain has almost certainly seen, plus
             // controls it has not. Novel cues should activate ~nothing; if they
             // light up, the "recall" being measured is not concept-specific.
@@ -318,10 +353,17 @@ namespace GreyMatter
             var weakest = trained.OrderBy(TopAct).FirstOrDefault();
             Console.WriteLine($"   trained: mean={trainedMean:F3}  weakest={trainedMin:F3} ('{weakest}')");
             Console.WriteLine($"   controls: mean={controlMean:F3}  strongest={controlMax:F3}");
-            Console.WriteLine($"   MARGIN={margin:F3}   AUC={auc:F3}   d′={dPrime:F2}");
+            Console.WriteLine($"   separation: AUC={auc:F3}  d′={dPrime:F2}  (mean gap={trainedMean - controlMean:F3}, " +
+                              $"strict margin={margin:F3})");
 
+            // Criteria are now the two proper statistics. The old gate used
+            // `trainedMean − controlMax`, which mixes a mean against a max and so
+            // shrinks automatically as controls are ADDED: going from 2 to 8
+            // controls dropped it 0.178 → 0.062 while d′ showed discrimination was
+            // strong (2.23). A metric that degrades when you improve the experiment
+            // is the wrong metric.
             var separable = controlMax < trainedMin;              // strict: a perfect threshold exists
-            var ranksWell = auc >= 0.90 && margin > 0.10;         // strong but imperfect separation
+            var ranksWell = auc >= 0.90 && dPrime >= 1.5;         // strong but imperfect separation
             var controlsClean = controlMax == 0 || separable;
 
             Console.WriteLine(controlsClean
