@@ -1130,6 +1130,70 @@ Lesson, and it belongs with the others: a measurement harness must be inert with
 respect to its subject. This one wrote to the same store it read from, and every
 number produced before this fix carries that caveat.
 
+### P2.6 — first clean-room run (2026-07-30 17:48). Isolation confirmed by Bill.
+
+Scratch brain, trained from nothing, brainData verified unchanged. These are the
+first numbers not contaminated by the harness writing into its own subject, and
+they are materially better than the contaminated ones — the contamination was
+*hiding* the improvement.
+
+| | contaminated brain | clean room |
+|---|---|---|
+| VQ utilisation | 2.5% (perplexity 7) | **67.0%, 343 codes claimed, perplexity 212** |
+| control mean | 0.428 | **0.240** |
+| trained mean | 0.587 | 0.557 |
+| mean gap | 0.159 | **0.316** |
+| AUC | 0.902 | **0.971** |
+| fidelity | 100.0% (all cues) | **99.7%** |
+
+**Four of eight controls now activate nothing at all** — `xkcdvbnm`, `thrumble`,
+`grastic` at zero, `flendish` a single neuron at 0.205. Three of those are
+tier-2 pseudo-words, which was the hard test. The P1.6h codebook-seeding fix
+also only shows its true effect on a fresh brain: 67% utilisation versus the
+2.5% collapse.
+
+**`water` activating nothing is correct, not a failure.** The scratch brain saw
+only 500 sentences; "water" plausibly never appeared. An unseen English word
+behaving exactly like unseen gibberish is the *right* result and is evidence the
+gate is about exposure rather than orthography.
+
+**First non-100% fidelity ever recorded: `to` at 93.8%** (15 of 16 neurons kept).
+Small, but it means the measurement is finally sensitive to something.
+
+**Caveat on how the silence is achieved.** Controls that score zero do so because
+their VQ code maps to *no trained cluster* — `LoadTrainedNeuronsForConcept`
+returns empty before any matching happens. That is a coarse region gate, not
+fine pattern discrimination. `zxcvbnmasd` (0.451), `qqzzxxjj` (0.513) and
+`blorp` (0.448) land on codes that *do* have clusters and then match moderately.
+So the AUC of 0.971 is part real selectivity, part lookup miss.
+
+**Procedural content measured: 1.9%** — 4B of VQ code against 208B explicit
+(7.4 weights × 20B + 60B identity/metadata). Matches the analytic estimate.
+
+**Conclusion, agreed with Bill: the plumbing is sound; the thesis is untested.**
+P2 is closed as a negative result — not "the thesis failed" but "this experiment
+cannot address it", with the reason precisely located and quantified.
+
+### P3 (proposed) — make procedural generation load-bearing
+
+The single change that converts P2 from vacuous to meaningful: **generate the
+receptive field's weights, don't store them.**
+
+Today a neuron's receptive-field *shape* is already generated from its identity
+(`NeuronSamplesFeature`, P1.7) while its *weights* are persisted verbatim.
+Instead:
+1. Generate baseline weights from `codebook[VqCode]` projected onto the neuron's
+   generated sparse subset — deterministic, reproducible, zero bytes stored.
+2. Persist only the **deviation** from that baseline, and only where learning
+   moved a weight materially.
+3. Regeneration = generate baseline, apply stored deviations.
+
+This makes recall depend on the VQ code, so fidelity acquires a real failure
+mode. It also turns P3's persistence budget into the actual thesis curve:
+**fidelity as a function of bytes retained per neuron** — how much can be thrown
+away and still recall? At 1.9% procedural content there is nothing to trade; at
+a generated baseline plus sparse deviations there is a curve to plot.
+
 **Next mechanism (biology): intrinsic homeostatic plasticity.** Cortical neurons
 regulate their own excitability toward a target firing rate — a cell that
 responds to everything becomes harder to excite. That is precisely the remaining
