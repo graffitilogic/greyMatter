@@ -537,6 +537,42 @@ matching, concept-blind features, signed inputs) were all reasoned from aggregat
 metrics. One targeted measurement of the actual data structure settled it
 immediately. Instrument the mechanism, don't infer it from summary statistics.
 
+### P1.6n — Wiring fix confirmed; new problem is the opposite one (2026-07-30 12:31)
+
+```
+RF[but]:    neurons=67  coverage[none=0 partial=0 full=67 100%]  delta[med=17.76]  firing=67
+RF[the]:    neurons=78  coverage[none=0 partial=0 full=78 100%]  delta[med=17.35]  firing=78
+RF[we]:     neurons=77  coverage[none=0 partial=0 full=77 100%]  delta[med=19.71]  firing=77
+RF[to]:     neurons=80  coverage[none=0 partial=0 full=80 100%]  delta[med=18.26]  firing=80
+```
+`none=0` everywhere, median delta 0.00 → **15–19**, and **`passed%` 22% → 100.0%**
+(`delta[min=12.43 avg=17.31 max=24.86]`). The ceiling that survived five
+interventions is gone. Wiring bug confirmed and fixed.
+
+**But 100% is not success — it is the opposite failure.** Every neuron in an
+assembly now fires on every presentation, with near-identical activation
+(`RF[but]`: median 17.76, max 19.54 across 67 neurons). They share one input set
+and differ only by random weight jitter, so a 78-neuron assembly is functionally
+**one neuron replicated 78 times**. There is no selectivity *within* an assembly
+and therefore no distributed code — which would make a P2 fidelity result
+meaningless in the other direction: regenerating 78 identical clones is trivial
+and proves nothing.
+
+Second cost, directly caused: every neuron now carries all 42 feature weights.
+Procedural save **Full 29.1MB → 79.9MB**, compression **1.68x → 1.34x**. We are
+now storing 78 copies of the same receptive field per concept.
+
+Unchanged: throughput 29.1 sent/sec, reuse 96–98%, neurons still growing
+(172,635), synapses bounded 370–450K under decay (60–80K pruned per pass).
+
+**The real question this exposes (design call, P1.7):** what should distinguish
+two neurons in the same assembly? Candidate: give each neuron a deterministic
+*sparse subset* of the concept's input dims, derived from (VQ code, neuron
+index). Different neurons then respond to different feature combinations —
+graded activation, genuine sparsity, and each receptive field becomes
+**procedurally regenerable rather than stored**, which is the thesis in its
+purest form and would cut storage rather than inflate it.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).
