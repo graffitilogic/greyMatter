@@ -2936,12 +2936,13 @@ namespace GreyMatter.Core
             double compactPerNeuron = (double)_storage.LastSaveCompactBytes / neurons;
             double fullPerNeuron = (double)_storage.LastSaveFullBytes / neurons;
 
+            // Single greppable line, stable "PROCEDURAL:" tag — the previous version
+            // spanned two lines and changed wording, so existing sweep scripts
+            // silently stopped matching it and the metric vanished from results.
             return
-                $"   🧬 Receptive field: {memoryPerNeuron:F1} weights per neuron, " +
-                $"{storedPerNeuron:F2} persisted → {regenerated:P1} REGENERATED from (VqCode, identity)\n" +
-                $"   🧬 Bytes per neuron: {compactPerNeuron:F0} compact vs {fullPerNeuron:F0} full " +
-                $"({(compactPerNeuron > 0 ? fullPerNeuron / compactPerNeuron : 0):F2}x), of which " +
-                $"~60B is irreducible identity/metadata";
+                $"PROCEDURAL:            regenerated={regenerated:P1}  " +
+                $"stored={storedPerNeuron:F2}/{memoryPerNeuron:F1} weights per neuron  " +
+                $"bytes={compactPerNeuron:F0} (of {fullPerNeuron:F0}, ~60B is identity/meta)";
         }
 
         public void AttachConfiguration(CerebroConfiguration config)

@@ -418,13 +418,13 @@ namespace GreyMatter
             // survive a round trip; it says nothing about procedural generation.
             Console.WriteLine();
             Console.WriteLine("── What this fidelity number covers ──");
-            Console.WriteLine(brain.GetProceduralContentReport());
-            Console.WriteLine("   ✅ P3: the receptive field is now REGENERATED from (VqCode, identity) and");
-            Console.WriteLine("      only learned deviations are stored, so recall depends on the");
-            Console.WriteLine("      procedural path. Fidelity below 100% is the cost of that regeneration —");
-            Console.WriteLine("      the failure mode the experiment previously could not have.");
+            Console.WriteLine("   ✅ P3: the receptive field is REGENERATED from (VqCode, identity) and only");
+            Console.WriteLine("      learned deviations are stored, so recall depends on the procedural");
+            Console.WriteLine("      path. Fidelity below 100% is the cost of that regeneration.");
 
             Console.WriteLine();
+            Console.WriteLine(brain.GetProceduralContentReport());
+            Console.WriteLine($"BUDGET:                deviation threshold={devThreshold}");
             Console.WriteLine($"DISCRIMINATION:        margin={margin:F3}  AUC={auc:F3}  d′={dPrime:F2}");
             Console.WriteLine($"CONTROLS:              {(controlsClean ? "separable" : ranksWell ? "strong but imperfect" : "OVERLAPPING — RESULT INVALID")}");
             Console.WriteLine("════════════════════════════════════════");

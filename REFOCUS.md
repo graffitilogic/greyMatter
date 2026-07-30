@@ -1277,6 +1277,34 @@ count per neuron will now say which.
 in two sweep runs while AUC stayed 0.91–0.99 — more evidence that the strict
 min/max margin is the noisy statistic and AUC/d′ are the ones to trust.
 
+#### P3.2 — the metric vanished from the sweep, and the sweep range was wrong
+
+Second sweep: fidelity 83.0 / 83.3 / 80.1 / 81.2, and **no procedural line at
+all**. Cause: renaming the report to "Receptive field:" / "Bytes per neuron:"
+broke the existing grep, so the metric silently disappeared from results. A
+diagnostic that changes shape breaks every script reading it — now emitted as a
+single line with a stable `PROCEDURAL:` tag, alongside `BUDGET:` so each run
+records the threshold it used.
+
+**The sweep range was also wrong, and that explains the flatness.** Weights are
+born at O(10–45) (`BaselineGain`), competitive learning steps by ~0.05 × (input −
+weight), and synaptic scaling then conserves total strength — so a neuron drifts
+only a little from its prototype. With ~0.75 weights stored per neuron at 4.68×
+compression, nearly every deviation already sits **below 0.25**. Sweeping
+0.25 → 16 therefore sampled the same point four times; the 2-point decline was
+the tail, not the curve.
+
+`scripts/sweep_fidelity.sh` added (versioned, not a local file) sweeping
+**0.02 → 8.0**, weighted toward the low end where the deviations actually live,
+and emitting CSV so the curve can be plotted directly.
+
+**Substantive reading so far, pending the finer sweep:** ~98% of the receptive
+field is regenerated and that alone yields **~83% fidelity**. The last ~17%
+lives in deviations that are mostly *not* being stored at current thresholds.
+That is already a thesis-relevant statement — prototype alone recovers most of
+an assembly — but the shape of the trade only becomes visible once the sweep
+straddles the deviation distribution.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
