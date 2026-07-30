@@ -763,6 +763,37 @@ neurons. Perfect scores on both axes should have read as alarming, not good.
 **aborts before printing a verdict** if they activate. A fidelity number is no
 longer reportable when the probe can't tell language from noise.
 
+### P2 run #2 — harness correctly refuses; the blocker is that learning never lands (2026-07-30)
+
+The abort worked: `❌ CONTROLS ACTIVATE`, no verdict printed. The probe is now
+genuinely pattern-based (activations spread 0.52–1.00 instead of a flat ~0.62,
+so it *is* responding to the input), but `qwertyuiop` scored **0.839** —
+above `water` (0.788) and `so` (0.786). Ranking is close to noise.
+
+**Why: 95% of neurons have never had their learned weights applied.**
+Checkpoint consolidation ran with
+`budgetPerCluster = max(5, min(50, MaxParallelSaves*5))` = **10 neurons per
+cluster**. With ~336 clusters and one checkpoint in a 5-minute run that promotes
+~3,360 of ~70,000 neurons. The rest still hold their **random initialisation**
+(`(rand+0.5)*3.0/density`, i.e. 7.5–22.5). `ProcessInputs` over random weights is
+a random projection — it varies with the cue, which is why activations now
+spread, but it carries no learned selectivity, which is why gibberish can
+outrank a trained word.
+
+So the probe fix in run #1 was necessary and correct; it simply exposed the next
+layer. `Learn()` has been writing STM deltas the whole time and a budget tuned
+for checkpoint speed was discarding ~95% of them.
+
+*Fixed:* consolidation is now unbudgeted — every neuron with pending STM has its
+deltas applied. Consolidation itself is cheap (dictionary adds); the cost is in
+the resulting saves, and a neuron whose weights actually changed has earned its
+write. The RF diagnostic now also reports `pendingStm` so starved learning is
+visible directly rather than inferred.
+
+**Note for P3:** unbudgeted consolidation will increase checkpoint size and time.
+That is the correct trade for now — measure it, then decide the persistence
+budget deliberately rather than inheriting a number chosen for save speed.
+
 ### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
 - Procedural loading becomes the *default* path, not the fallback.
 - Add a **persistence budget**: top-k synapses per neuron, dirty-region-only writes.

@@ -925,7 +925,17 @@ namespace GreyMatter.Core
             sw.Restart();
             int totalPromoted = 0;
             int clustersTouched = 0;
-            int budgetPerCluster = Math.Max(5, Math.Min(50, (_configForLogging?.MaxParallelSaves ?? 1) * 5));
+            // P2 FIX: this was `max(5, min(50, MaxParallelSaves*5))` = 10 neurons
+            // per cluster per checkpoint. With ~336 clusters and one checkpoint in
+            // a 5-minute run that promoted ~3,360 of ~70,000 neurons — under 5%.
+            // The other 95% never had their learned STM deltas applied and kept
+            // their random initial weights forever, so ProcessInputs was a random
+            // projection and the probe could not tell "water" (0.788) from
+            // "qwertyuiop" (0.839). A budget tuned for checkpoint speed was
+            // silently discarding almost all learning.
+            // Consolidation is cheap (dictionary adds); it is the SAVE that costs,
+            // and a neuron whose weights actually changed has earned its write.
+            int budgetPerCluster = int.MaxValue;
             var changedByCluster = new Dictionary<Guid, List<HybridNeuron>>();
             foreach (var cluster in loadedClustersSnapshot)
             {
@@ -937,8 +947,7 @@ namespace GreyMatter.Core
                     changedByCluster[cluster.ClusterId] = changed;
                 }
             }
-            if ((_configForLogging?.Verbosity ?? 0) > 0)
-                Console.WriteLine($"   🧠 Consolidation: promoted {totalPromoted} neurons across {clustersTouched} clusters in {sw.Elapsed.TotalSeconds:F2}s (budget/cluster={budgetPerCluster})");
+            Console.WriteLine($"   🧠 Consolidation: promoted {totalPromoted:N0} neurons across {clustersTouched} clusters in {sw.Elapsed.TotalSeconds:F2}s (unbudgeted)");
 
             // Note: synaptic decay/pruning moved to the maintenance loop
             // (DecayAndPruneSynapses) — checkpoint-only decay never fired in
@@ -1893,6 +1902,7 @@ namespace GreyMatter.Core
 
             int noOverlap = 0, partial = 0, full = 0;
             int firing = 0;
+            int pendingStm = 0;      // P2: neurons still carrying unconsolidated learning
             double sumCoverage = 0;
             var deltas = new List<double>(neurons.Count);
 
@@ -1911,6 +1921,7 @@ namespace GreyMatter.Core
                 var delta = n.CurrentPotential - n.RestingPotential;
                 deltas.Add(delta);
                 if (delta > 2.0) firing++;
+                if (n.HasPendingStm) pendingStm++;
             }
 
             deltas.Sort();
@@ -1918,7 +1929,8 @@ namespace GreyMatter.Core
             var p10 = deltas.Count > 0 ? deltas[deltas.Count / 10] : 0;
             Console.WriteLine($"   🔬 RF[{concept}]: neurons={neurons.Count} inputs={inputIds.Count} " +
                               $"coverage[none={noOverlap} partial={partial} full={full} avg={sumCoverage / Math.Max(1, neurons.Count):P0}] " +
-                              $"delta[p10={p10:F2} med={median:F2} max={(deltas.Count > 0 ? deltas[^1] : 0):F2}] firing={firing}/{neurons.Count}");
+                              $"delta[p10={p10:F2} med={median:F2} max={(deltas.Count > 0 ? deltas[^1] : 0):F2}] " +
+                              $"firing={firing}/{neurons.Count} pendingStm={pendingStm}");
         }
 
         private Dictionary<string, double> BuildTrainingFeatures(double[] conceptVector, Dictionary<string, double> contextFeatures)
