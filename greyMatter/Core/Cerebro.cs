@@ -2888,6 +2888,33 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// P3.3 — every neuron the probe CONSIDERED, not just the winners.
+        ///
+        /// The sweep showed fidelity pinned at ~83% whether 1.6 weights per neuron
+        /// were stored or none at all, so the lost 17% is not weight error. The two
+        /// remaining explanations are distinguishable only with the full candidate
+        /// set: a neuron missing from A's top-k after reload either
+        ///   (a) is ABSENT from the cluster entirely — a persistence/membership loss,
+        ///       nothing to do with regeneration fidelity, or
+        ///   (b) is PRESENT but ranked lower — a genuine activation difference.
+        /// </summary>
+        public async Task<Dictionary<Guid, double>> ProbeConceptCandidatesAsync(string concept)
+        {
+            var (activated, clusters) = await LoadTrainedNeuronsForConcept(concept);
+
+            // Include sub-threshold neurons too: a neuron that survived but now
+            // activates weakly must be distinguishable from one that vanished.
+            var all = new Dictionary<Guid, double>(activated);
+            foreach (var (cluster, _) in clusters)
+            {
+                var ns = await cluster.GetNeuronsAsync();
+                foreach (var id in ns.Keys)
+                    if (!all.ContainsKey(id)) all[id] = 0.0;
+            }
+            return all;
+        }
+
+        /// <summary>
         /// Force every loaded cluster out of memory, persisting first. After this
         /// the next probe must rebuild from disk — which is exactly the path P2
         /// is testing. Returns the number of clusters evicted.

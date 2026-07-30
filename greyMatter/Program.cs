@@ -320,10 +320,25 @@ namespace GreyMatter
             Console.WriteLine();
             Console.WriteLine("── B: after eviction + procedural regeneration ──");
             double fidSum = 0; int fidCount = 0;
+            int lostAbsent = 0, lostDemoted = 0;   // P3.3: where does the loss go?
             foreach (var cue in cues)
             {
                 var after = await brain.ProbeConceptAsync(cue, topK);
                 var before = baseline[cue];
+
+                // Attribute each lost neuron: gone from the cluster, or merely
+                // out-ranked? Weight error can only explain the second.
+                if (before.Count > 0)
+                {
+                    var afterIds = after.Select(p => p.neuronId).ToHashSet();
+                    var candidates = await brain.ProbeConceptCandidatesAsync(cue);
+                    foreach (var (id, _) in before)
+                    {
+                        if (afterIds.Contains(id)) continue;
+                        if (candidates.ContainsKey(id)) lostDemoted++;
+                        else lostAbsent++;
+                    }
+                }
 
                 if (before.Count == 0)
                 {
@@ -424,6 +439,12 @@ namespace GreyMatter
 
             Console.WriteLine();
             Console.WriteLine(brain.GetProceduralContentReport());
+            var lostTotal = lostAbsent + lostDemoted;
+            Console.WriteLine($"LOSS:                  absent={lostAbsent} demoted={lostDemoted}" +
+                              (lostTotal > 0
+                                  ? $"  ({(double)lostAbsent / lostTotal:P0} of loss is neurons that vanished, " +
+                                    $"not weight error)"
+                                  : "  (nothing lost)"));
             Console.WriteLine($"BUDGET:                deviation threshold={devThreshold}");
             Console.WriteLine($"DISCRIMINATION:        margin={margin:F3}  AUC={auc:F3}  d′={dPrime:F2}");
             Console.WriteLine($"CONTROLS:              {(controlsClean ? "separable" : ranksWell ? "strong but imperfect" : "OVERLAPPING — RESULT INVALID")}");

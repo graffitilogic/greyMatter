@@ -1305,6 +1305,50 @@ That is already a thesis-relevant statement — prototype alone recovers most of
 an assembly — but the shape of the trade only becomes visible once the sweep
 straddles the deviation distribution.
 
+#### P3.3 — THE CURVE, and it is flat (2026-07-30)
+
+```
+threshold  fidelity  regenerated  stored/neuron  bytes/neuron  AUC
+0.02         83.0       78.5%         1.60           96       0.885
+0.05         83.3       81.4%         1.38           92       0.952
+0.10         85.1       83.3%         1.24           89       0.942
+0.25         80.6       86.9%         0.97           83       0.981
+0.50         85.4       90.1%         0.74           79       0.952
+1.00         83.3       92.4%         0.56           75       0.981
+2.00         81.2       94.6%         0.40           72       0.962
+8.00         84.2      100.0%         0.00           64       0.923
+```
+
+**At the bottom row: zero weights stored, 100% regenerated, 64 bytes per neuron
+— and fidelity is 84.2%, the best in the table.** Storing nothing performs as
+well as storing 1.6 weights per neuron. Fidelity is flat at 83% ± 2 across a
+400× budget range and does not correlate with the budget at all.
+
+Two conclusions, and the second is more interesting than the first:
+
+1. **The receptive field is fully procedural, and it works.** Weights need not be
+   persisted at all. What remains is 64 B/neuron of pure identity/metadata —
+   Guid, cluster Guid, importance, activation count, concept tag — none of which
+   is learned state. Against the pre-P3 ~212 B that is a **3.3× reduction with no
+   measurable loss**, and the residual is bookkeeping, not knowledge.
+
+2. **The stored deviations contribute nothing to recall**, so the missing 17% is
+   not weight error. Buying more weights does not buy it back. Learning is
+   evidently not shaping the receptive field in any way the readout can see —
+   which, combined with P2.6's observation that silent controls are silent
+   because their VQ code maps to *no cluster*, suggests recall is currently close
+   to **nearest-prototype lookup** rather than learned memory.
+
+**Where does the 17% go, then?** Two candidates, and they are distinguishable:
+a neuron in A's top-k that is missing from B's either **vanished** from the
+cluster (a membership/persistence issue, unrelated to regeneration) or is
+**present but out-ranked** (a genuine activation difference). Added
+`ProbeConceptCandidatesAsync` and a `LOSS: absent=… demoted=…` line to attribute
+every lost neuron to one or the other, with both columns now in the sweep CSV.
+
+Per the rule that has actually worked this session: measure it, do not reason
+about it.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

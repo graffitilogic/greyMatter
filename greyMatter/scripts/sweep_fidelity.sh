@@ -14,7 +14,7 @@ set -u
 REPEATS="${1:-1}"
 THRESHOLDS="0.02 0.05 0.1 0.25 0.5 1.0 2.0 8.0"
 
-echo "threshold,repeat,fidelity,regenerated,stored_per_neuron,bytes_per_neuron,auc,dprime"
+echo "threshold,repeat,fidelity,regenerated,stored_per_neuron,bytes_per_neuron,auc,dprime,lost_absent,lost_demoted"
 for t in $THRESHOLDS; do
   for r in $(seq 1 "$REPEATS"); do
     out=$(dotnet run -c Release -- --fidelity-test --deviation-threshold "$t" 2>/dev/null)
@@ -26,6 +26,9 @@ for t in $THRESHOLDS; do
     auc=$(echo "$out"   | grep '^DISCRIMINATION:' | grep -oE 'AUC=[0-9.]+' | grep -oE '[0-9.]+')
     dp=$(echo "$out"    | grep '^DISCRIMINATION:' | grep -oE "d.=[-0-9.]+" | grep -oE '[-0-9.]+$')
 
-    echo "$t,$r,${fid:-NA},${regen:-NA},${stored:-NA},${bytes:-NA},${auc:-NA},${dp:-NA}"
+    absent=$(echo "$out"  | grep '^LOSS:' | grep -oE 'absent=[0-9]+' | grep -oE '[0-9]+')
+    demoted=$(echo "$out" | grep '^LOSS:' | grep -oE 'demoted=[0-9]+' | grep -oE '[0-9]+')
+
+    echo "$t,$r,${fid:-NA},${regen:-NA},${stored:-NA},${bytes:-NA},${auc:-NA},${dp:-NA},${absent:-NA},${demoted:-NA}"
   done
 done
