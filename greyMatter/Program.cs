@@ -378,6 +378,20 @@ namespace GreyMatter
             Console.WriteLine("════════════════════════════════════════");
             Console.WriteLine($"REGENERATION FIDELITY: {meanFidelity:P1}  (mean over {fidCount} cues, top-{topK})");
             Console.WriteLine($"CROSS-CONCEPT OVERLAP: {meanCross:P1}");
+            // What did this actually test? MatchQuality — the quantity fidelity is
+            // measured on — reads InputWeights only. It never touches Threshold or
+            // Bias, which are the ONLY properties ProceduralNeuronRegenerator
+            // regenerates from the VQ code. So a 100% here says persisted weights
+            // survive a round trip; it says nothing about procedural generation.
+            Console.WriteLine();
+            Console.WriteLine("── What this fidelity number covers ──");
+            Console.WriteLine(brain.GetProceduralContentReport());
+            Console.WriteLine("   ⚠️  MatchQuality (the recall measure) reads InputWeights only — never");
+            Console.WriteLine("      Threshold/Bias, which are the only VQ-regenerated properties.");
+            Console.WriteLine("      So this measures EXPLICIT PERSISTENCE round-tripping, not procedural");
+            Console.WriteLine("      regeneration. 100% is expected and does not test the thesis.");
+
+            Console.WriteLine();
             Console.WriteLine($"DISCRIMINATION:        margin={margin:F3}  AUC={auc:F3}  d′={dPrime:F2}");
             Console.WriteLine($"CONTROLS:              {(controlsClean ? "separable" : ranksWell ? "strong but imperfect" : "OVERLAPPING — RESULT INVALID")}");
             Console.WriteLine("════════════════════════════════════════");
@@ -390,7 +404,7 @@ namespace GreyMatter
                 Console.WriteLine("🟡 PROVISIONAL — discrimination is strong but not perfect; treat fidelity as indicative, not established.");
             Console.WriteLine(meanFidelity switch
             {
-                >= 0.95 => "✅ Thesis supported at this scale: procedural regeneration preserves the assembly.",
+                >= 0.95 => "✅ Persisted assemblies round-trip losslessly. NOT a test of the thesis — see above.",
                 >= 0.70 => "🟡 Partial: most of the assembly survives regeneration. Find what the lost fraction has in common.",
                 >  0.10 => "🔴 Substantial loss. Regeneration is NOT reproducing the trained assembly.",
                 _       => "🔴 Regeneration reproduces essentially nothing — check that neurons persisted at all."

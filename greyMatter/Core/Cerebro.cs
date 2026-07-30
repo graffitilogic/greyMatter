@@ -2897,6 +2897,46 @@ namespace GreyMatter.Core
             return evicted;
         }
 
+        /// <summary>
+        /// P2.4 — how much of a persisted neuron is actually PROCEDURAL?
+        ///
+        /// The thesis is that structure is regenerated from a compact code and only
+        /// learned changes are stored. This measures the real split in
+        /// ProceduralNeuronData: the VQ code (4 bytes, from which Threshold and Bias
+        /// are regenerated) versus identity, metadata and explicitly-persisted
+        /// synaptic weights (20 bytes each).
+        /// </summary>
+        public string GetProceduralContentReport()
+        {
+            long neurons = 0, weights = 0;
+            foreach (var clusterId in _loadedClusters.GetKeys())
+            {
+                if (!_loadedClusters.TryGetValue(clusterId, out var cluster) || cluster == null) continue;
+                if (!cluster.IsLoaded) continue;
+                var ns = cluster.GetNeuronsAsync().GetAwaiter().GetResult();
+                foreach (var n in ns.Values)
+                {
+                    neurons++;
+                    foreach (var w in n.InputWeights)
+                        if (Math.Abs(w.Value) > 0.1) weights++;
+                }
+                if (neurons > 20000) break;   // sample is enough
+            }
+            if (neurons == 0) return "   🧬 Procedural content: no resident neurons to sample";
+
+            const int vqCodeBytes = 4;      // the only regenerated-from part
+            const int identityMetaBytes = 60;  // Id, ClusterId, importance, count, tag
+            const int bytesPerWeight = 20;     // Guid + float, persisted verbatim
+
+            double avgWeights = (double)weights / neurons;
+            double explicitBytes = identityMetaBytes + avgWeights * bytesPerWeight;
+            double proceduralFraction = vqCodeBytes / (vqCodeBytes + explicitBytes);
+
+            return $"   🧬 Procedural content: {proceduralFraction:P1} of each persisted neuron " +
+                   $"({vqCodeBytes}B VQ code vs {explicitBytes:F0}B explicit: " +
+                   $"{avgWeights:F1} weights × {bytesPerWeight}B + {identityMetaBytes}B identity/meta)";
+        }
+
         public void AttachConfiguration(CerebroConfiguration config)
         {
             _configForLogging = config;

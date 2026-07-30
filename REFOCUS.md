@@ -1050,6 +1050,61 @@ discrimination was strong. Criteria are now AUC ≥ 0.90 **and** d′ ≥ 1.5 fo
 provisional tier; strict min/max separation still required for a clean pass.
 Mean gap and strict margin are still printed, but no longer gate anything.
 
+### P2.4 — THE ANSWER: the fidelity test cannot test the thesis (2026-07-30)
+
+The in-process training fix worked — eviction genuinely persisted this time
+(`changed=258, packsWritten=6`, 83,172 neurons, 800 clusters evicted), so B is a
+real regeneration from disk. Fidelity: **100.0%** across all 22 cues.
+
+**And it still doesn't test the thesis.** The reason is structural:
+
+- Fidelity is measured on the top-k active set, ranked by **`MatchQuality`**.
+- `MatchQuality` reads **`InputWeights` only** — grep confirms zero references to
+  `Threshold` or `Bias`.
+- `Threshold` and `Bias` are **the only two properties**
+  `ProceduralNeuronRegenerator` regenerates from the VQ code
+  (`ProceduralNeuronData.cs:146-147`).
+- Synaptic weights are persisted **verbatim** and restored verbatim.
+
+So 100% means "explicitly persisted weights survive a round trip". Of course they
+do. The recall measure is structurally blind to the procedurally-generated part,
+so no value it returns can bear on procedural regeneration. The controls scoring
+100% too was the tell, and it was visible from run #1.
+
+**Quantified — how procedural is a "procedurally generated" neuron?**
+Per persisted neuron: **4 bytes** of VQ code (from which Threshold and Bias are
+regenerated) against ~60 bytes of identity/metadata plus 20 bytes per explicitly
+stored synaptic weight. At ~8 weights that is roughly **2% procedural, 98%
+explicitly persisted**. The 1.6–2.5× compression comes from *dropping weak
+synapses* — pruning — not from regenerating structure.
+
+This confirms, with measurement, the concern recorded at the very start of this
+reboot: *"The 90% compression claim is soft… the compression mostly comes from
+dropping weak synapses — that's pruning, not procedural generation. The core
+hypothesis remains untested."* It is now untested **and demonstrated
+untestable by this harness**.
+
+Harness updated to say so in its own output rather than printing a green tick:
+the report now prints the procedural/explicit byte split and states plainly that
+a high number measures persistence round-tripping.
+
+**What testing the thesis would actually require** — the readout must depend on
+regenerated structure:
+1. **Make recall depend on the VQ code.** If a neuron's receptive field were
+   *generated* from `codebook[VqCode]` + neuron identity (the P1.7 sparse-subset
+   trick already proves shapes can be derived rather than stored), then weights
+   would not need persisting at all and regeneration fidelity would become a real
+   question with a real failure mode.
+2. **Then measure fidelity against storage.** Fidelity at 4 bytes/neuron versus
+   fidelity at 220 bytes/neuron is the actual thesis curve — "how much can we
+   throw away and still recall?" That is P3's persistence budget, and it only
+   becomes meaningful once (1) exists.
+
+**Status: P2 answered, negatively but cleanly.** The plumbing works — assemblies
+persist, evict, and reload losslessly, discrimination is real (AUC 0.902,
+d′ 2.22). What does not yet exist is any dependence of recall on procedurally
+generated structure, so there is nothing yet for a fidelity experiment to lose.
+
 **Next mechanism (biology): intrinsic homeostatic plasticity.** Cortical neurons
 regulate their own excitability toward a target firing rate — a cell that
 responds to everything becomes harder to excite. That is precisely the remaining
