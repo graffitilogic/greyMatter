@@ -627,8 +627,8 @@ namespace GreyMatter.Core
                 _vectorQuantizer.FreezeCodebook();
                 var vqStatsFreeze = _vectorQuantizer.GetStats();
                 Console.WriteLine($"   🧊 VQ codebook frozen after {VqWarmupUpdates:N0} updates " +
-                                  $"(perplexity {vqStatsFreeze.Perplexity:F2}, utilization {vqStatsFreeze.CodebookUtilization:P1}) " +
-                                  $"— pattern→code assignment is now stable");
+                                  $"(codes claimed {_vectorQuantizer.SeededCount}, perplexity {vqStatsFreeze.Perplexity:F2}, " +
+                                  $"utilization {vqStatsFreeze.CodebookUtilization:P1}) — pattern→code assignment is now stable");
             }
 
             // Dynamic creation balanced by reuse (removed arbitrary hit gating)

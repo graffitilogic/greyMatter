@@ -6,13 +6,13 @@
 
 ### Neural Persistence & Reuse Architecture
 
-The system implements a hybrid storage strategy combining **procedural generation** (for neuron properties) with **explicit persistence** (for learned connections), achieving 90% storage compression while maintaining 100% neural connectivity fidelity.
+The system implements a hybrid storage strategy combining **procedural generation** (for neuron properties) with **explicit persistence** (for learned connections), achieving **2.19x storage compression** (measured 2026-07-30: 18,589,460 -> 8,478,848 bytes for 74,682 neurons) while maintaining 100% neural connectivity fidelity. NOTE: this doc previously claimed 90% compression; that was never measured. Synaptic weights are persisted explicitly and dominate the compact record, so the realistic ceiling is set by the synapse budget, not the VQ code.
 
 #### 1. Two-Format Storage System
 
 **Compact Procedural Format**:
 - Stores only **VQ code** (int index 0-511) + **sparse synaptic weights** (connections >0.1)
-- ~90% compression: 50-100 bytes vs 500-1000 bytes per neuron
+- Measured 2.19x compression: ~113 bytes/neuron compact vs ~249 bytes/neuron full (2026-07-30 run)
 - Saved to `neurons.bank.procedural.msgpack.gz` files per partition
 - Implementation: [ProceduralNeuronData.cs](Core/ProceduralNeuronData.cs)
 
@@ -129,7 +129,7 @@ Neurons are **procedurally generated** but synaptic connections are **explicitly
 - **Cluster Membership**: Enables efficient lookup (membership packs)
 - **Reuse Strategy**: Pattern similarity → cluster reuse → neuron activation → connection strengthening
 
-The system achieves **90% storage compression** while maintaining **100% neural connectivity fidelity** - the "No Man's Sky principle" applied to neural networks.
+The system achieves **2.19x storage compression** (measured) while maintaining **100% neural connectivity fidelity** - the "No Man's Sky principle" applied to neural networks. Raising this ratio means persisting fewer/smaller synapses per neuron, not shrinking the VQ code.
 
 ---
 
@@ -182,7 +182,7 @@ public class Cerebro
 - **Phase 3**: Sparse synaptic graph for memory-efficient connectivity
 - **Phase 4**: VQ-VAE codebook for compressed concept representation
 - **Phase 5**: Production integration unified in ProductionTrainingService
-- **Phase 6B**: Procedural neuron storage for 90% compression
+- **Phase 6B**: Procedural neuron storage (2.19x measured compression)
 
 **Cerebro Architecture Benefits:**
 - **Memory Efficient**: Sparse synaptic graph reduces memory footprint by 60%
@@ -375,7 +375,7 @@ Storage Performance:
 │   ├── Bottleneck: Loading 140K+ neurons into BrainContext
 │   └── Fix: Use lightweight empty context for routine saves
 ├── Format: Binary MessagePack with gzip compression
-├── Size Reduction: ~90% via procedural format
+├── Size Reduction: 2.19x measured via procedural format
 └── Checkpoint Frequency: Every 10 minutes (auto-save)
 ```
 
@@ -419,7 +419,7 @@ Dataset Activation (January 2026):
 - LLM teacher integration (every 5th batch)
 - NaN/Infinity sanitization (100% checkpoint success)
 - Direct concept lookup with case-insensitive query
-- Procedural neuron storage (90% compression)
+- Procedural neuron storage (2.19x measured compression)
 
 **🏗️ Architecture Complete:**
 - HybridNeuron with VQ-VAE codebook integration

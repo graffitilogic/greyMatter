@@ -268,6 +268,57 @@ inert in production runs): `MaxParallelSaves`, `CompressClusters`, and
 `Verbosity` now apply. `GREYMATTER_VERBOSITY` accepted as an alias for
 `VERBOSITY`.
 
+### P1.6h — SATURATION ACHIEVED, and the caveat that matters (2026-07-30 09:06)
+
+First clean run with everything wired: fresh brainData, pinned cycling corpus,
+procedural save on. **The system converged.**
+
+| metric | before (07-29) | this run | change |
+|---|---|---|---|
+| sentences / 5 min | 3,282 | **11,532** | 3.5x |
+| neurons | 729,956 | **75,273** | 9.7x fewer |
+| synapses | 1,421,928 | **249,747** | 5.7x fewer |
+| throughput | 11 sent/sec | **38.4 sent/sec** (rising) | 3.5x |
+| neurons persisted | ~5/cluster | **74,682 (99.2%)** | — |
+
+Trajectory over the run — this is the thesis behaving as designed:
+- `reuse%`: 58.7 → 78.4 → 97.4 → 99.6 → **100.0** (and holds)
+- `grew_events`: 55.2% → 19.3% → 4.8% → **0.0%**
+- neurons: climb to ~75,000 then **plateau flat** for the last 3 minutes
+- synapses: peak ~294K then settle to ~250K under decay
+- throughput *increases* as it saturates (132 → 283 cps)
+
+The brain learned a 500-sentence corpus, saturated, and stopped allocating.
+Every subsequent pass recognized everything with zero new neurons. Bounded
+memory, bounded storage, rising speed. All P1.6d exit criteria met.
+
+**CAVEAT — the win is partly an artifact. VQ utilization is 2.5%.**
+`🧊 VQ codebook frozen ... perplexity 7.03, utilization 2.5%` — roughly **13 of
+512 codes** are in use, and ~60 clusters hold the entire vocabulary. With that
+few regions, *any* concept finds its home cluster in the top-5 candidates, so
+100% reuse is partly real assembly reuse and partly "everything is in the same
+few buckets". Supporting evidence: Hebbian `passed%` settled at 22.5% with mean
+delta 4.1 — most neurons in a cluster don't respond to the pattern being
+trained, exactly what coarse buckets predict.
+
+**Root cause (verified):** `VectorQuantizer` initialized all 512 codes to
+±0.01 random noise — effectively 512 near-identical vectors at the origin —
+while `FeatureEncoder` emits **unit-norm** vectors. Every code was ~equidistant
+from all data; the first winner got EMA-pulled onto the unit sphere and then
+beat the origin-bound codes forever. Textbook VQ codebook collapse from
+non-data-driven initialization.
+
+**Fix (P1.6h):** codes are now claimed by real observations, and only when an
+observation is farther than `SeedDistanceThreshold` (squared-L2 0.35 ≈ cosine
+0.825) from every code already claimed. Nearest-code search and neighbour
+lookup consider claimed codes only. `SeededCount` reported at freeze time.
+
+**Also corrected:** `TECHNICAL_DETAILS.md` claimed "90% compression" throughout.
+Measured reality from this run's procedural save: **2.19x** (18,589,460 →
+8,478,848 bytes for 74,682 neurons, ~113 bytes/neuron). Docs updated. The
+ceiling is set by persisted synaptic weights, not the VQ code — raising it is a
+synapse-budget question (P3), not a VQ question.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).

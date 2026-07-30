@@ -78,12 +78,60 @@ namespace GreyMatter.Core
         {
             if (embedding.Length != _embeddingDim)
                 throw new ArgumentException($"Expected {_embeddingDim}-dim vector, got {embedding.Length}");
-            
-            // Find nearest codebook entry (argmin ||z_e - e_k||²)
+
+            // Data-driven seeding (REFOCUS P1.6h). The codebook used to start as
+            // 512 near-identical vectors at the origin (±0.01) while FeatureEncoder
+            // emits UNIT-NORM vectors. Every code sat ~equidistant from all data;
+            // whichever won first got EMA-pulled onto the unit sphere and then beat
+            // the origin-bound codes forever. Result: 2.5% utilization, perplexity
+            // 7 of a possible 512 — representational collapse.
+            // Fix: codes are claimed by real observations, and only when the
+            // observation is far from every code already claimed.
+            if (IsLearning && _seededCount < _codebookSize)
+            {
+                if (_seededCount == 0)
+                {
+                    SeedCode(0, embedding);
+                    _usageCounts[0]++;
+                    _totalEncodings++;
+                    return 0;
+                }
+
+                var (nearestSoFar, nearestDist) = FindNearestSeeded(embedding);
+                if (nearestDist > SeedDistanceThreshold)
+                {
+                    int fresh = _seededCount;
+                    SeedCode(fresh, embedding);
+                    _usageCounts[fresh]++;
+                    _totalEncodings++;
+                    return fresh;
+                }
+
+                _usageCounts[nearestSoFar]++;
+                _totalEncodings++;
+                return nearestSoFar;
+            }
+
+            var (bestCode, _) = FindNearestSeeded(embedding);
+
+            // Track usage
+            _usageCounts[bestCode]++;
+            _totalEncodings++;
+
+            return bestCode;
+        }
+
+        /// <summary>
+        /// Nearest among CLAIMED codes only. Unclaimed codes still sit at the
+        /// origin and would otherwise act as a magnet for outlier vectors.
+        /// </summary>
+        private (int code, float distance) FindNearestSeeded(float[] embedding)
+        {
             int bestCode = 0;
             float bestDistance = float.MaxValue;
-            
-            for (int k = 0; k < _codebookSize; k++)
+            int limit = Math.Max(1, Math.Min(_seededCount, _codebookSize));
+
+            for (int k = 0; k < limit; k++)
             {
                 float distance = ComputeL2Distance(embedding, _codebook[k]);
                 if (distance < bestDistance)
@@ -92,12 +140,17 @@ namespace GreyMatter.Core
                     bestCode = k;
                 }
             }
-            
-            // Track usage
-            _usageCounts[bestCode]++;
-            _totalEncodings++;
-            
-            return bestCode;
+
+            return (bestCode, bestDistance);
+        }
+
+        private void SeedCode(int index, float[] embedding)
+        {
+            Array.Copy(embedding, _codebook[index], _embeddingDim);
+            // Prime EMA so the fresh code isn't instantly treated as dead
+            _emaClusterSize[index] = 1.0f;
+            Array.Copy(embedding, _emaCodebookSum[index], _embeddingDim);
+            if (index >= _seededCount) _seededCount = index + 1;
         }
         
         /// <summary>
@@ -115,6 +168,16 @@ namespace GreyMatter.Core
         // Fix: warm up, then freeze. Lookups stay read-only after freezing.
         public bool IsLearning { get; private set; } = true;
         public long UpdateCount { get; private set; }
+
+        // Data-driven seeding: how many codes have been claimed by real data.
+        private int _seededCount;
+        public int SeededCount => _seededCount;
+
+        // Squared-L2 threshold for claiming a NEW code. FeatureEncoder emits
+        // unit-norm vectors, so squared distance between two of them is in [0,4]
+        // (0.35 ≈ cosine similarity 0.825). Below this, an observation joins the
+        // nearest existing code instead of claiming its own.
+        private const float SeedDistanceThreshold = 0.35f;
 
         /// <summary>
         /// Stop adapting the codebook. Quantization continues (read-only), so
@@ -308,6 +371,17 @@ namespace GreyMatter.Core
             Array.Copy(snapshot.UsageCounts, _usageCounts, _codebookSize);
             _totalEncodings = snapshot.TotalEncodings;
 
+            // Recover how many codes were claimed. Unclaimed codes are still at
+            // the origin (norm ≈ 0), so norm is a reliable discriminator and this
+            // needs no snapshot schema change.
+            _seededCount = 0;
+            for (int i = 0; i < _codebookSize; i++)
+            {
+                float norm = 0f;
+                for (int j = 0; j < _embeddingDim; j++) norm += _codebook[i][j] * _codebook[i][j];
+                if (norm > 1e-4f) _seededCount = i + 1;
+            }
+
             // Already-trained codebook: keep it stable (see IsLearning notes)
             IsLearning = false;
         }
@@ -319,13 +393,16 @@ namespace GreyMatter.Core
         public List<(int code, float distance)> GetNearestCodes(float[] embedding, int k = 5)
         {
             var distances = new List<(int code, float distance)>();
-            
-            for (int i = 0; i < _codebookSize; i++)
+
+            // Claimed codes only — unclaimed ones sit at the origin and would
+            // otherwise crowd the neighbour list for every query.
+            int limit = Math.Max(1, Math.Min(_seededCount, _codebookSize));
+            for (int i = 0; i < limit; i++)
             {
                 float distance = ComputeL2Distance(embedding, _codebook[i]);
                 distances.Add((i, distance));
             }
-            
+
             return distances.OrderBy(x => x.distance).Take(k).ToList();
         }
     }
