@@ -202,7 +202,20 @@ namespace GreyMatter
 
             try
             {
-            var config = new CerebroConfiguration { BrainDataPath = brainPath, UseProceduralSave = true };
+            // P3: the persistence budget. Sweeping this plots fidelity vs storage —
+            // the actual thesis curve.
+            var devThreshold = double.Parse(GetArgValue(args, "--deviation-threshold",
+                ProceduralReceptiveField.DefaultDeviationThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                System.Globalization.CultureInfo.InvariantCulture);
+            Console.WriteLine($"Budget: deviation threshold = {devThreshold} " +
+                              "(weights within this of the generated prototype are NOT stored)\n");
+
+            var config = new CerebroConfiguration
+            {
+                BrainDataPath = brainPath,
+                UseProceduralSave = true,
+                ProceduralDeviationThreshold = devThreshold
+            };
             config.ValidateAndSetup();
             var brain = new Cerebro(brainPath);
             brain.AttachConfiguration(config);

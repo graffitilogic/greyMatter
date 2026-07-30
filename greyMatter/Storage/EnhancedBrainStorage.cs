@@ -32,6 +32,22 @@ namespace GreyMatter.Storage
 
         // New: Global neuron store per partition (Phase B)
         private readonly GlobalNeuronStore _globalNeuronStore;
+
+        /// <summary>
+        /// P3: hand the store what it needs to generate receptive fields rather than
+        /// store them — feature naming, the sparse-subset rule, and the codebook.
+        /// </summary>
+        public void ConfigureProceduralReceptiveFields(
+            GreyMatter.Core.FeatureMapper mapper,
+            Func<Guid, string, bool> samplesFeature,
+            GreyMatter.Core.VectorQuantizer quantizer,
+            double deviationThreshold)
+        {
+            _globalNeuronStore.ProceduralFeatureMapper = mapper;
+            _globalNeuronStore.ProceduralSamplesFeature = samplesFeature;
+            _globalNeuronStore.ProceduralQuantizer = quantizer;
+            _globalNeuronStore.ProceduralDeviationThreshold = deviationThreshold;
+        }
         
         // Phase 6B: References for procedural neuron regeneration
         private VectorQuantizer? _vectorQuantizer;
@@ -676,7 +692,14 @@ namespace GreyMatter.Storage
                     totalFullBytes += EstimateSnapshotSize(snapshot);
                     
                     var clusterId = clusterIdMap.TryGetValue(neuron.Id, out var cid) ? cid : Guid.Empty;
-                    var procedural = ProceduralNeuronData.FromSnapshot(snapshot, neuron.VqCode.Value, clusterId);
+                    // P3: size estimate must reflect deviation-only storage, or the
+                    // reported compression ratio would describe a format we no
+                    // longer write.
+                    var procedural = ProceduralNeuronData.FromSnapshot(
+                        snapshot, neuron.VqCode.Value, clusterId,
+                        _globalNeuronStore.ProceduralFeatureMapper,
+                        _globalNeuronStore.CodebookFor(neuron.VqCode),
+                        _globalNeuronStore.ProceduralDeviationThreshold);
                     totalCompactBytes += procedural.EstimatedBytes();
                     neuronCount++;
                 }

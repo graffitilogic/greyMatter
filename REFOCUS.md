@@ -1202,12 +1202,49 @@ responsive. Per-neuron gain/threshold adjusted from a running average of its own
 match would sharpen the margin without any supervision, and it is the natural
 partner to the lateral inhibition and synaptic scaling already in place.
 
-### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
-- Procedural loading becomes the *default* path, not the fallback.
-- Add a **persistence budget**: top-k synapses per neuron, dirty-region-only writes.
-  (Current "90% compression" is mostly weak-synapse pruning; make the budget explicit
-  and measurable.)
-- **Exit criterion:** fidelity from P2 holds at ≤10% of full-persistence storage.
+### P3 — Make procedural generation load-bearing ✅ IMPLEMENTED (2026-07-30)
+
+The change that converts P2 from vacuous to meaningful. Previously a neuron's
+receptive-field *shape* was generated (P1.7) but its *weights* were persisted
+verbatim — measured at **1.9% procedural content**, and recall never touched the
+VQ code, so regeneration had no failure mode and returned 100% regardless.
+
+**Neurons are now born as their VQ prototype.**
+`ProceduralReceptiveField.GenerateBaselineWeight(neuronId, featureKey, codebook)`
+derives a weight from `codebook[VqCode]` at the dimension a `cf_{dim}_p/n` line
+encodes, weighting the matching polarity strongly and the opposite weakly, with
+identity-derived jitter so neurons sharing a code aren't clones (the P1.6n
+failure mode). Deterministic, so it never needs storing.
+
+Pipeline:
+1. **Birth** — `EnsureFeatureWiring` initialises weights to the prototype instead
+   of random values.
+2. **Learning** moves the neuron away from its prototype (competitive Hebbian +
+   synaptic scaling, unchanged).
+3. **Save** — `FromSnapshot` stores a feature weight *only* if it has drifted
+   further than `ProceduralDeviationThreshold` from the baseline.
+4. **Load** — `RegenerateNeuron` rebuilds the entire receptive field from
+   `(VqCode, identity)`, then layers stored deviations on top.
+
+Wiring: `GlobalNeuronStore` receives the mapper, the sparse-subset rule and the
+quantizer via `EnhancedBrainStorage.ConfigureProceduralReceptiveFields`, injected
+from `Cerebro.AttachConfiguration`. Unset, it falls back to verbatim weights, so
+nothing breaks if a caller skips configuration.
+
+**Why this makes the experiment real:** recall now depends on regenerated
+structure. If the generated baseline is wrong, fidelity drops — the failure mode
+that could not previously exist. Storage per neuron becomes a function of *how
+much a neuron learned*, not of how many inputs it has.
+
+**The thesis curve is now plottable.** `--deviation-threshold` is the persistence
+budget: raise it and fewer deviations persist (smaller, lossier); lower it and
+more do. Sweeping it against fidelity answers the actual question — **how much
+can be thrown away and still recall?**
+
+- **Exit criterion:** a fidelity-vs-bytes curve. Procedural content well above
+  1.9%, and a visible knee where fidelity falls as the budget tightens. A flat
+  100% across all thresholds would mean the baseline is still not load-bearing
+  and I have missed something again.
 
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.

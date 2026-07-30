@@ -2007,6 +2007,19 @@ namespace GreyMatter.Core
         /// </summary>
         private void EnsureFeatureWiring(HybridNeuron neuron, Dictionary<string, double> features)
         {
+            // P3: a neuron is BORN as its VQ prototype. Baseline weights are derived
+            // from codebook[VqCode] restricted to the dims this neuron samples, so
+            // they are reproducible from (VqCode, identity) and never need storing.
+            // Learning moves the neuron away from the prototype, and only that
+            // deviation gets persisted — which is what makes procedural generation
+            // load-bearing rather than decorative (it was 1.9% of stored bytes).
+            float[]? prototype = null;
+            if (neuron.VqCode.HasValue && _useVQVAE)
+            {
+                try { prototype = _vectorQuantizer.GetCodebookVector(neuron.VqCode.Value); }
+                catch { prototype = null; }
+            }
+
             foreach (var feature in features)
             {
                 if (!NeuronSamplesFeature(neuron.Id, feature.Key)) continue;
@@ -2015,7 +2028,7 @@ namespace GreyMatter.Core
                 if (!neuron.InputWeights.ContainsKey(featureNeuronId))
                 {
                     neuron.InputWeights[featureNeuronId] =
-                        (_random.NextDouble() + 0.5) * 3.0 / ReceptiveFieldDensity;
+                        ProceduralReceptiveField.GenerateBaselineWeight(neuron.Id, feature.Key, prototype);
                 }
             }
         }
@@ -2943,6 +2956,15 @@ namespace GreyMatter.Core
             _storage.MaxParallelSaves = config.MaxParallelSaves;
             _storage.CompressClusters = config.CompressClusters;
             DebugLog.Level = config.Verbosity; // gate high-volume diagnostics globally
+
+            // P3: make procedural generation load-bearing. The store can now
+            // regenerate a neuron's receptive field from (VqCode, identity) and
+            // persist only what learning moved away from that prototype.
+            _storage.ConfigureProceduralReceptiveFields(
+                _featureMapper,
+                NeuronSamplesFeature,
+                _vectorQuantizer,
+                config.ProceduralDeviationThreshold);
         }
 
         /// <summary>

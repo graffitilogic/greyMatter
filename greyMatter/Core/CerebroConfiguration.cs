@@ -59,6 +59,16 @@ namespace GreyMatter.Core
         /// Stores compact ProceduralNeuronData (VQ code + sparse weights) instead of full NeuronSnapshot
         /// </summary>
         public bool UseProceduralSave { get; set; } = false;
+
+        /// <summary>
+        /// P3 persistence budget. A feature weight is stored only when it has drifted
+        /// further than this from the baseline regeneration will reconstruct for free.
+        /// Raise it → fewer bytes, more loss. Lower it → more bytes, less loss.
+        /// Sweeping this is how the fidelity-vs-storage curve gets plotted, which is
+        /// the actual thesis question: how much can be thrown away and still recall?
+        /// </summary>
+        public double ProceduralDeviationThreshold { get; set; }
+            = ProceduralReceptiveField.DefaultDeviationThreshold;
         
         /// <summary>
         /// Create configuration from command line arguments

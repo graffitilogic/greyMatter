@@ -19,6 +19,25 @@ namespace GreyMatter.Storage
     /// </summary>
     public class GlobalNeuronStore
     {
+        /// <summary>
+        /// P3 procedural-receptive-field context, injected by Cerebro.
+        /// With these set, saving stores only DEVIATIONS from the generated
+        /// prototype and loading regenerates the baseline first. Without them the
+        /// store falls back to verbatim weights, so nothing breaks if unset.
+        /// </summary>
+        public FeatureMapper? ProceduralFeatureMapper { get; set; }
+        public Func<Guid, string, bool>? ProceduralSamplesFeature { get; set; }
+        public VectorQuantizer? ProceduralQuantizer { get; set; }
+        public double ProceduralDeviationThreshold { get; set; }
+            = ProceduralReceptiveField.DefaultDeviationThreshold;
+
+        internal float[]? CodebookFor(int? vqCode)
+        {
+            if (ProceduralQuantizer == null || !vqCode.HasValue) return null;
+            try { return ProceduralQuantizer.GetCodebookVector(vqCode.Value); }
+            catch { return null; }
+        }
+
         private readonly string _hierarchicalBasePath;
         private readonly JsonSerializerOptions _jsonOptions = new JsonSerializerOptions
         {
@@ -431,7 +450,11 @@ namespace GreyMatter.Storage
 
                     var snapshot = neuron.CreateSnapshot();
                     var clusterId = clusterIdMap.TryGetValue(neuron.Id, out var cid) ? cid : Guid.Empty;
-                    var procedural = ProceduralNeuronData.FromSnapshot(snapshot, neuron.VqCode.Value, clusterId);
+                    // P3: store deviations from the generated prototype, not raw weights
+                    var procedural = ProceduralNeuronData.FromSnapshot(
+                        snapshot, neuron.VqCode.Value, clusterId,
+                        ProceduralFeatureMapper, CodebookFor(neuron.VqCode),
+                        ProceduralDeviationThreshold);
 
                     if (existingDict.TryGetValue(neuron.Id, out var existing))
                     {
@@ -505,7 +528,9 @@ namespace GreyMatter.Storage
             try
             {
                 var proceduralList = await ReadProceduralBankAsync(bankPath).ConfigureAwait(false);
-                var regenerator = new ProceduralNeuronRegenerator(vectorQuantizer, featureEncoder);
+                var regenerator = new ProceduralNeuronRegenerator(
+                    vectorQuantizer, featureEncoder,
+                    ProceduralFeatureMapper, ProceduralSamplesFeature);
 
                 // Create lookup
                 var proceduralDict = proceduralList.ToDictionary(p => p.Id, p => p);

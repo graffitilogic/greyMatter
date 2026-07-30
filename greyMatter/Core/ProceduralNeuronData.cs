@@ -70,16 +70,40 @@ namespace GreyMatter.Core
         /// Convert full NeuronSnapshot to compact procedural representation.
         /// Extracts VQ code from pattern, keeps only strong synaptic weights.
         /// </summary>
-        public static ProceduralNeuronData FromSnapshot(NeuronSnapshot snapshot, int vqCode, Guid clusterId)
+        /// <summary>
+        /// P3: store DEVIATIONS from the generated prototype, not raw weights.
+        ///
+        /// When `featureMapper` and `codebookVector` are supplied, any weight still
+        /// sitting within `deviationThreshold` of its generated baseline is dropped —
+        /// regeneration will reproduce it exactly. Only what learning actually moved
+        /// gets bytes. Passing null for either falls back to the old verbatim
+        /// behaviour so existing call sites keep working.
+        /// </summary>
+        public static ProceduralNeuronData FromSnapshot(
+            NeuronSnapshot snapshot, int vqCode, Guid clusterId,
+            FeatureMapper? featureMapper = null, float[]? codebookVector = null,
+            double deviationThreshold = ProceduralReceptiveField.DefaultDeviationThreshold)
         {
-            // Extract only strong connections (Hebbian network sparsity)
             var strongConnections = new Dictionary<Guid, float>();
             foreach (var weight in snapshot.InputWeights)
             {
-                if (Math.Abs(weight.Value) > 0.1) // Threshold for significant connection
+                if (Math.Abs(weight.Value) <= 0.1) continue; // insignificant either way
+
+                if (featureMapper != null)
                 {
-                    strongConnections[weight.Key] = (float)weight.Value;
+                    var featureName = featureMapper.GetFeatureForNeuronId(weight.Key);
+                    if (featureName != null)
+                    {
+                        // A feature line: keep it only if it has drifted from the
+                        // baseline that regeneration will reconstruct for free.
+                        var baseline = ProceduralReceptiveField.GenerateBaselineWeight(
+                            snapshot.Id, featureName, codebookVector);
+                        if (Math.Abs(weight.Value - baseline) <= deviationThreshold) continue;
+                    }
+                    // Non-feature keys are synapses — always learned, always stored.
                 }
+
+                strongConnections[weight.Key] = (float)weight.Value;
             }
             
             return new ProceduralNeuronData
@@ -115,16 +139,24 @@ namespace GreyMatter.Core
     {
         private readonly VectorQuantizer _vectorQuantizer;
         private readonly FeatureEncoder _featureEncoder;
+        // P3: needed to walk feature lines and regenerate their baseline weights.
+        private readonly FeatureMapper? _featureMapper;
+        private readonly Func<Guid, string, bool>? _samplesFeature;
         
         // Hypernetwork-style parameters for neuron generation
         private const double BASE_THRESHOLD = -69.0;
         private const double BASE_BIAS = 0.0;
         private const double BASE_LEARNING_RATE = 0.1;
         
-        public ProceduralNeuronRegenerator(VectorQuantizer vq, FeatureEncoder encoder)
+        public ProceduralNeuronRegenerator(
+            VectorQuantizer vq, FeatureEncoder encoder,
+            FeatureMapper? featureMapper = null,
+            Func<Guid, string, bool>? samplesFeature = null)
         {
             _vectorQuantizer = vq;
             _featureEncoder = encoder;
+            _featureMapper = featureMapper;
+            _samplesFeature = samplesFeature;
         }
         
         /// <summary>
@@ -177,7 +209,28 @@ namespace GreyMatter.Core
             // Regenerate from snapshot to get proper identity
             neuron = HybridNeuron.FromSnapshot(tempSnapshot);
             
-            // Step 4: Restore synaptic weights (Hebbian connections preserved)
+            // Step 4a: REGENERATE the receptive field from the VQ prototype.
+            //
+            // This is the step that makes the thesis testable. The neuron's feature
+            // weights are rebuilt from codebook[VqCode] restricted to the dims its
+            // identity samples — no bytes were stored for any of this. Whatever
+            // learning moved beyond the deviation threshold is then layered on top
+            // in 4b. If the generated baseline is wrong, recall degrades: that is
+            // the failure mode the fidelity experiment previously could not have.
+            if (_featureMapper != null && _samplesFeature != null)
+            {
+                foreach (var featureId in _featureMapper.GetFeatureNeuronIds())
+                {
+                    var featureName = _featureMapper.GetFeatureForNeuronId(featureId);
+                    if (featureName == null) continue;
+                    if (!_samplesFeature(compactData.Id, featureName)) continue;
+
+                    neuron.InputWeights[featureId] =
+                        ProceduralReceptiveField.GenerateBaselineWeight(compactData.Id, featureName, vqVector);
+                }
+            }
+
+            // Step 4b: Apply stored deviations + synapses (overwrite the baseline)
             foreach (var connection in compactData.SynapticWeights)
             {
                 neuron.InputWeights[connection.Key] = connection.Value;
