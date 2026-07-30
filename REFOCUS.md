@@ -692,15 +692,35 @@ current code should create synapses. Per ground rules, that claim needs a comman
 - `BrainStats.TotalSynapses` reports a legacy `_synapses` list, not the synaptic
   graph; use `GetSynapticGraphSynapseCount()` for the real number.
 
-### P2 — The fidelity experiment (the experiment this project exists to run)
-Build `--fidelity-test`:
-1. Train on N sentences → snapshot **A** (full persistence, no eviction).
-2. Force-evict everything → regenerate procedurally from VQ codes + persisted
-   synapses → snapshot **B**.
-3. Replay a fixed cue set against both; measure top-k activation overlap A vs B.
-- **Exit criterion:** a number. Fidelity ≥95% = thesis supported at small scale.
-  Materially lower = we learn exactly which state procedural regen loses, and decide
-  with data whether the thesis survives.
+### P2 — The fidelity experiment ✅ HARNESS BUILT (2026-07-30)
+
+`dotnet run -- --fidelity-test [--brain-path P] [--topk 16]`
+
+1. Probe a fixed cue set, record top-k active neurons per cue → **A**
+2. `SaveAsync()` then `EvictAllClustersAsync()` — persist and unload everything
+3. Re-probe; the next activation must rebuild from disk → **B**
+4. `fidelity = |A ∩ B| / |A|` per cue, averaged
+
+Supporting pieces added to `Cerebro`:
+- `ProbeConceptAsync(concept, topK)` — activation with **no side effects**: no
+  growth, no training, no Hebbian recording, no capacity adjustment. Without
+  this the act of measuring would change what is measured.
+- `EvictAllClustersAsync()` — persist + unload every resident cluster, so the
+  re-probe is forced down the procedural regeneration path.
+
+**Selectivity is reported alongside fidelity, not after it.** Cross-concept
+overlap of the active sets is computed first, because a fidelity number is
+meaningless without it: if every cue activates the same neurons, fidelity is
+trivially 100% and measures nothing. The harness says so explicitly when
+overlap ≥25%.
+
+The cue set includes two controls (`qwertyuiop`, `zxcvbnmasd`) that never appear
+in the corpus. They should activate nothing; if they light up, whatever is being
+measured is not concept-specific recall.
+
+- **Exit criterion:** a number, with its selectivity caveat attached.
+  ≥95% fidelity *and* <25% cross-concept overlap = thesis supported at this
+  scale. Lower fidelity = we learn precisely what regeneration loses.
 
 ### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
 - Procedural loading becomes the *default* path, not the fallback.

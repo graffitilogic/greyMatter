@@ -8,6 +8,12 @@ namespace GreyMatter
     {
         static async Task Main(string[] args)
         {
+            if (args.Length > 0 && args[0] == "--fidelity-test")
+            {
+                await RunFidelityTest(args);
+                return;
+            }
+
             if (args.Length > 0 && args[0] == "--test-hebbian")
             {
                 await RunHebbianSynapseTest();
@@ -134,6 +140,9 @@ namespace GreyMatter
                 Console.WriteLine("║    dotnet run -- --cerebro-query think <word>             ║");
                 Console.WriteLine("║    dotnet run -- --inspect-brain                          ║");
                 Console.WriteLine("║                                                           ║");
+                Console.WriteLine("║  Experiments:                                             ║");
+                Console.WriteLine("║    dotnet run -- --fidelity-test  (P2 regeneration)       ║");
+                Console.WriteLine("║                                                           ║");
                 Console.WriteLine("║  Health Checks:                                           ║");
                 Console.WriteLine("║    dotnet run -- --test-hebbian   (P1 synapse creation)   ║");
                 Console.WriteLine("║                                                           ║");
@@ -150,6 +159,128 @@ namespace GreyMatter
             return defaultValue;
         }
         
+        /// <summary>
+        /// P2 (REFOCUS.md): THE experiment this project exists to run.
+        ///
+        /// Can a cortical region that is evicted and later procedurally
+        /// regenerated reproduce the activation it had before eviction?
+        ///
+        /// A: probe a fixed cue set, record top-k active neurons per cue
+        /// B: evict everything (persist + unload), re-probe from disk
+        /// fidelity = |A ∩ B| / |A| per cue
+        ///
+        /// Reports selectivity alongside it, because a fidelity number is
+        /// meaningless without it: if every cue activates the same neurons,
+        /// fidelity is trivially 100% and measures nothing.
+        /// </summary>
+        static async Task RunFidelityTest(string[] args)
+        {
+            var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
+            var topK = int.Parse(GetArgValue(args, "--topk", "16"));
+
+            Console.WriteLine("🔬 P2: Regeneration Fidelity Experiment");
+            Console.WriteLine("========================================\n");
+            Console.WriteLine($"Brain: {brainPath}   top-k: {topK}\n");
+
+            var config = new CerebroConfiguration { BrainDataPath = brainPath, UseProceduralSave = true };
+            config.ValidateAndSetup();
+            var brain = new Cerebro(brainPath);
+            brain.AttachConfiguration(config);
+            await brain.InitializeAsync();
+
+            // Cue set: common words the brain has almost certainly seen, plus
+            // controls it has not. Novel cues should activate ~nothing; if they
+            // light up, the "recall" being measured is not concept-specific.
+            var cues = new[]
+            {
+                "the", "you", "we", "are", "to", "it", "in", "so",
+                "time", "people", "know", "think", "sleep", "water",
+                "qwertyuiop", "zxcvbnmasd"   // controls: never in the corpus
+            };
+
+            // ── A: baseline, everything warm ───────────────────────────────
+            Console.WriteLine("── A: baseline (clusters resident) ──");
+            var baseline = new Dictionary<string, List<(Guid id, double act)>>();
+            foreach (var cue in cues)
+            {
+                var probe = await brain.ProbeConceptAsync(cue, topK);
+                baseline[cue] = probe;
+                Console.WriteLine($"   {cue,-12} active={probe.Count,3}  " +
+                                  (probe.Count > 0 ? $"top act={probe[0].activation:F3}" : "(nothing)"));
+            }
+
+            // ── Selectivity: do different cues activate different neurons? ──
+            var trained = cues.Take(14).Where(c => baseline[c].Count > 0).ToList();
+            double pairSum = 0; int pairs = 0; double worstPair = 0; string worstDesc = "";
+            for (int i = 0; i < trained.Count; i++)
+            for (int j = i + 1; j < trained.Count; j++)
+            {
+                var a = baseline[trained[i]].Select(p => p.id).ToHashSet();
+                var b = baseline[trained[j]].Select(p => p.id).ToHashSet();
+                if (a.Count == 0 || b.Count == 0) continue;
+                var overlap = (double)a.Intersect(b).Count() / Math.Min(a.Count, b.Count);
+                pairSum += overlap; pairs++;
+                if (overlap > worstPair) { worstPair = overlap; worstDesc = $"{trained[i]}/{trained[j]}"; }
+            }
+            var meanCross = pairs > 0 ? pairSum / pairs : 0;
+
+            Console.WriteLine();
+            Console.WriteLine("── Selectivity (cross-concept overlap of active sets) ──");
+            Console.WriteLine($"   mean={meanCross:P1}  worst={worstPair:P1} ({worstDesc})  pairs={pairs}");
+            Console.WriteLine(meanCross < 0.25
+                ? "   ✅ assemblies are distinguishable — a fidelity number will mean something"
+                : "   ⚠️  assemblies overlap heavily — fidelity below will be inflated");
+
+            // ── Evict: force the procedural path ───────────────────────────
+            Console.WriteLine();
+            Console.WriteLine("── Evicting all clusters (persist + unload) ──");
+            await brain.SaveAsync();
+            var evicted = await brain.EvictAllClustersAsync();
+            Console.WriteLine($"   evicted {evicted} clusters — next probe must rebuild from disk");
+
+            // ── B: re-probe after procedural regeneration ──────────────────
+            Console.WriteLine();
+            Console.WriteLine("── B: after eviction + procedural regeneration ──");
+            double fidSum = 0; int fidCount = 0;
+            foreach (var cue in cues)
+            {
+                var after = await brain.ProbeConceptAsync(cue, topK);
+                var before = baseline[cue];
+
+                if (before.Count == 0)
+                {
+                    Console.WriteLine($"   {cue,-12} (no baseline activation{(after.Count > 0 ? $" — but {after.Count} active AFTER: suspicious" : "")})");
+                    continue;
+                }
+
+                var beforeSet = before.Select(p => p.id).ToHashSet();
+                var afterSet = after.Select(p => p.id).ToHashSet();
+                var kept = beforeSet.Intersect(afterSet).Count();
+                var fidelity = (double)kept / beforeSet.Count;
+                fidSum += fidelity; fidCount++;
+
+                Console.WriteLine($"   {cue,-12} before={before.Count,3} after={after.Count,3} " +
+                                  $"kept={kept,3}  fidelity={fidelity:P1}");
+            }
+
+            var meanFidelity = fidCount > 0 ? fidSum / fidCount : 0;
+
+            Console.WriteLine();
+            Console.WriteLine("════════════════════════════════════════");
+            Console.WriteLine($"REGENERATION FIDELITY: {meanFidelity:P1}  (mean over {fidCount} cues, top-{topK})");
+            Console.WriteLine($"CROSS-CONCEPT OVERLAP: {meanCross:P1}");
+            Console.WriteLine("════════════════════════════════════════");
+            Console.WriteLine(meanFidelity switch
+            {
+                >= 0.95 => "✅ Thesis supported at this scale: procedural regeneration preserves the assembly.",
+                >= 0.70 => "🟡 Partial: most of the assembly survives regeneration. Find what the lost fraction has in common.",
+                >  0.10 => "🔴 Substantial loss. Regeneration is NOT reproducing the trained assembly.",
+                _       => "🔴 Regeneration reproduces essentially nothing — check that neurons persisted at all."
+            });
+            if (meanFidelity >= 0.95 && meanCross >= 0.25)
+                Console.WriteLine("   ⚠️  BUT high overlap means cues aren't distinguishable — treat this fidelity as unproven.");
+        }
+
         /// <summary>
         /// P1 (REFOCUS.md): prove that co-activated neurons form synapses.
         /// Self-contained: uses a temp brain directory, cleans up after itself.

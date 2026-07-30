@@ -2057,7 +2057,7 @@ namespace GreyMatter.Core
             // Get region ID for this pattern (VQ code or LSH hash)
             var regionId = GetRegionId(featureVector);
             
-            Console.WriteLine($"   🔍 LoadTrainedNeuronsForConcept('{concept}'): regionId={regionId}, total mappings={_regionToClusterMapping.Count}");
+            DebugLog.Debug($"   🔍 LoadTrainedNeuronsForConcept('{concept}'): regionId={regionId}, total mappings={_regionToClusterMapping.Count}");
             
             // Find clusters that were TRAINED on patterns in this region
             var clusterIds = _regionToClusterMapping.GetValueOrDefault(regionId, new List<Guid>());
@@ -2768,6 +2768,50 @@ namespace GreyMatter.Core
             multiModalScore += crossModalFeatures.Count(cmf => features.ContainsKey(cmf)) * 3.0;
             
             return multiModalScore;
+        }
+
+        // ─── P2: regeneration-fidelity support ───────────────────────────────
+        // The whole thesis in one measurement: can an evicted region, rebuilt
+        // procedurally from VQ codes + persisted synapses, reproduce the
+        // activation it had before eviction?
+
+        /// <summary>
+        /// Activation probe with NO side effects: no growth, no training, no
+        /// Hebbian recording, no capacity adjustment. Returns the top-k neuron
+        /// IDs a cue activates, which is the unit of comparison for P2.
+        /// </summary>
+        public async Task<List<(Guid neuronId, double activation)>> ProbeConceptAsync(string concept, int topK = 16)
+        {
+            var (activated, _) = await LoadTrainedNeuronsForConcept(concept);
+            return activated
+                .OrderByDescending(kvp => kvp.Value)
+                .ThenBy(kvp => kvp.Key)          // deterministic tie-break
+                .Take(topK)
+                .Select(kvp => (kvp.Key, kvp.Value))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Force every loaded cluster out of memory, persisting first. After this
+        /// the next probe must rebuild from disk — which is exactly the path P2
+        /// is testing. Returns the number of clusters evicted.
+        /// </summary>
+        public async Task<int> EvictAllClustersAsync()
+        {
+            var keys = _loadedClusters.GetKeys();
+            int evicted = 0;
+            foreach (var clusterId in keys)
+            {
+                if (_loadedClusters.TryGetValue(clusterId, out var cluster) && cluster != null)
+                {
+                    await HandleClusterEvictionAsync(clusterId, cluster);
+                    _loadedClusters.Remove(clusterId);
+                    evicted++;
+                }
+            }
+            _loadedClusters.Clear();
+            _clusterAccessTimes.Clear();
+            return evicted;
         }
 
         public void AttachConfiguration(CerebroConfiguration config)
