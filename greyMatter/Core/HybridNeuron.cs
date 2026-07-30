@@ -129,6 +129,95 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// P2.1 — how well does this input pattern match what this neuron is tuned to?
+        ///
+        /// Cosine similarity between the driven input lines and this neuron's weights
+        /// over those same lines. Range [0,1] for non-negative inputs (guaranteed by
+        /// the ON/OFF rectification in BuildTrainingFeatures).
+        ///
+        /// Replaces the raw weighted sum for recognition. The dot product alone
+        /// measures MAGNITUDE, so with density-compensated weights (7.5–22.5) a cue
+        /// driving 3 of a neuron's 8 inputs still summed to ~18 and saturated —
+        /// which is why "qwertyuiop" scored 0.993, above every real word.
+        /// Cosine measures ALIGNMENT: partial overlap yields a partial score.
+        ///
+        /// Only keys present in `inputs` participate, so synaptic entries in
+        /// InputWeights (other neurons' IDs) are naturally excluded — they are never
+        /// input lines.
+        /// </summary>
+        public double MatchQuality(Dictionary<Guid, double> inputs)
+        {
+            if (inputs.Count == 0) return 0.0;
+
+            double dot = 0, wNorm = 0, xNorm = 0;
+            foreach (var input in inputs)
+            {
+                var x = input.Value;
+                xNorm += x * x;
+                if (InputWeights.TryGetValue(input.Key, out var w))
+                {
+                    dot += x * w;
+                    wNorm += w * w;
+                }
+            }
+
+            if (dot <= 0 || wNorm <= 0 || xNorm <= 0) return 0.0;
+            return Math.Clamp(dot / (Math.Sqrt(wNorm) * Math.Sqrt(xNorm)), 0.0, 1.0);
+        }
+
+        /// <summary>
+        /// P2.1 — competitive Hebbian update (Kohonen form): move this neuron's
+        /// weights toward the input pattern it just won, then rescale so total
+        /// synaptic strength is conserved (Turrigiano synaptic scaling).
+        ///
+        /// This is the biological substitute for the supervised delta rule, which
+        /// trained EVERY neuron toward a constant target of 0.8 and therefore had
+        /// "respond to everything" as its fixed point. Here only winners learn
+        /// (lateral inhibition), and scaling means a neuron cannot become dominant
+        /// by growing weights — it can only become better MATCHED. Selectivity is
+        /// the direct consequence: a neuron that wins for "the" moves toward "the"
+        /// and is never moved toward "water".
+        ///
+        /// Recorded as STM deltas so the existing consolidation path still governs
+        /// what becomes permanent.
+        /// </summary>
+        public void ReinforceTowardInput(Dictionary<Guid, double> inputs, double rate)
+        {
+            if (inputs.Count == 0) return;
+
+            // Preserve the neuron's existing total strength over the driven lines
+            double strengthBefore = 0;
+            foreach (var input in inputs)
+                if (InputWeights.TryGetValue(input.Key, out var w0)) strengthBefore += Math.Abs(w0);
+
+            // Kohonen step toward the input, accumulated as STM
+            double strengthAfter = 0;
+            var proposed = new Dictionary<Guid, double>(inputs.Count);
+            foreach (var input in inputs)
+            {
+                if (!InputWeights.TryGetValue(input.Key, out var w)) continue;
+                var target = w + rate * (input.Value - w);
+                proposed[input.Key] = target;
+                strengthAfter += Math.Abs(target);
+            }
+            if (proposed.Count == 0 || strengthAfter <= 0) return;
+
+            // Synaptic scaling: conserve total strength across the receptive field
+            var scale = strengthBefore > 0 ? strengthBefore / strengthAfter : 1.0;
+            foreach (var kvp in proposed)
+            {
+                var scaled = kvp.Value * scale;
+                var delta = SanitizeDouble(scaled - InputWeights[kvp.Key], 0.0, $"Neuron {Id} reinforce");
+                if (Math.Abs(delta) <= 0) continue;
+
+                if (!StmWeightDeltas.ContainsKey(kvp.Key)) StmWeightDeltas[kvp.Key] = 0.0;
+                StmWeightDeltas[kvp.Key] += delta;
+                StmSalience += Math.Abs(delta);
+                LastTagTime = DateTime.UtcNow;
+            }
+        }
+
+        /// <summary>
         /// Learn by adjusting connection weights
         /// Now defaults to recording Short-Term (STM) deltas; consolidation promotes to LTM.
         /// </summary>

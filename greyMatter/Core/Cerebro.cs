@@ -662,12 +662,32 @@ namespace GreyMatter.Core
             }
             tCapacity.Stop();
 
-            // Training pass
+            // Training pass — competitive (P2.1)
+            //
+            // Was: every neuron trained toward a constant target of 0.8, whose fixed
+            // point is "respond to everything" and which cannot discriminate.
+            // Now: lateral inhibition. All neurons in the assembly compute how well
+            // they match the pattern; only the best responders learn it. Losers are
+            // untouched, so they stay tuned to whatever they already prefer.
             var tTrain = Stopwatch.StartNew();
             var trainingFeatures = BuildTrainingFeatures(featureVector, features);
+            var trainingInputs = _featureMapper.ConvertFeaturesToNeuronInputs(trainingFeatures);
+
+            // Ensure every neuron is wired to this pattern's input lines before the
+            // contest, otherwise a neuron can lose merely for never having been wired.
             foreach (var neuron in conceptNeurons)
+                EnsureFeatureWiring(neuron, trainingFeatures);
+
+            var contest = conceptNeurons
+                .Select(n => (neuron: n, match: n.MatchQuality(trainingInputs)))
+                .OrderByDescending(p => p.match)
+                .ToList();
+
+            var winnerCount = Math.Max(MinCompetitiveWinners,
+                                       (int)Math.Ceiling(contest.Count * CompetitiveWinnerFraction));
+            foreach (var (neuron, _) in contest.Take(winnerCount))
             {
-                await TrainNeuronWithFeatures(neuron, trainingFeatures);
+                neuron.ReinforceTowardInput(trainingInputs, CompetitiveLearningRate);
             }
             tTrain.Stop();
 
@@ -1969,11 +1989,43 @@ namespace GreyMatter.Core
             return result;
         }
 
+        /// <summary>
+        /// Minimum cosine match for a neuron to count as recalled. Cosine is a
+        /// genuine similarity, so this is now a meaningful bar rather than a
+        /// threshold on an unbounded sum.
+        /// </summary>
+        private const double RecallMatchThreshold = 0.5;
+
+        // P2.1 competitive-learning constants (lateral inhibition)
+        private const double CompetitiveWinnerFraction = 0.25;  // top quarter of the assembly learns
+        private const int MinCompetitiveWinners = 4;
+        private const double CompetitiveLearningRate = 0.05;    // Kohonen step toward the winning pattern
+
+        /// <summary>
+        /// Wire a neuron to any of this pattern's input lines it is missing, using
+        /// its deterministic sparse subset. Split out of the old training method so
+        /// wiring happens before the competition rather than as a side effect of it.
+        /// </summary>
+        private void EnsureFeatureWiring(HybridNeuron neuron, Dictionary<string, double> features)
+        {
+            foreach (var feature in features)
+            {
+                if (!NeuronSamplesFeature(neuron.Id, feature.Key)) continue;
+
+                var featureNeuronId = _featureMapper.GetNeuronIdForFeature(feature.Key);
+                if (!neuron.InputWeights.ContainsKey(featureNeuronId))
+                {
+                    neuron.InputWeights[featureNeuronId] =
+                        (_random.NextDouble() + 0.5) * 3.0 / ReceptiveFieldDensity;
+                }
+            }
+        }
+
         private async Task TrainNeuronWithFeatures(HybridNeuron neuron, Dictionary<string, double> features)
         {
             // Convert features to consistent neuron inputs
             var inputs = _featureMapper.ConvertFeaturesToNeuronInputs(features);
-            
+
             // Wire up any feature input this neuron is missing.
             //
             // P1.6m — this used to be `if (!neuron.InputWeights.Any())`, which was
@@ -2160,7 +2212,7 @@ namespace GreyMatter.Core
                     // For now, use simple feature overlap (can be enhanced with attention later)
                     double activation = CalculateNeuronActivation(neuron, featureVector);
                     
-                    if (activation > 0.25) // Threshold - only strong matches
+                    if (activation > RecallMatchThreshold) // cosine match, not raw sum
                     {
                         activatedNeurons[neuronId] = activation;
                         clusterActivationSum += activation;
@@ -2213,11 +2265,11 @@ namespace GreyMatter.Core
             var probeFeatures = BuildTrainingFeatures(featureVector, EmptyContext);
             var inputs = _featureMapper.ConvertFeaturesToNeuronInputs(probeFeatures);
 
-            neuron.ProcessInputs(inputs);
-            var delta = neuron.CurrentPotential - neuron.RestingPotential;
-            if (delta <= 0) return 0.0;
-
-            return Math.Tanh(delta / 20.0);
+            // P2.1: match quality, not raw sum. The unnormalised weighted sum let a
+            // partially-overlapping pattern saturate the neuron, which is how
+            // "qwertyuiop" scored 0.993. Cosine asks how ALIGNED the input is with
+            // what this neuron is tuned to.
+            return neuron.MatchQuality(inputs);
         }
 
         private static readonly Dictionary<string, double> EmptyContext = new();

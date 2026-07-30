@@ -837,6 +837,58 @@ requires a network that can tell one pattern from another. That capability does
 not currently exist, and no amount of instrumentation will reveal it, because
 there is nothing there to reveal.
 
+### P2.1 — Competitive learning + synaptic scaling (biology as north star)
+
+Direction chosen: biological mechanisms over engineered fixes. Cortex has no
+supervised target and no "0.8"; it has **lateral inhibition** and **synaptic
+scaling**. Those map onto exactly the two gaps above.
+
+**Lateral inhibition → competitive training.** All neurons in an assembly compute
+their match to the pattern; only the top 25% (min 4) learn it. Losers are
+untouched and stay tuned to what they already prefer. A neuron that wins for
+"the" is never moved toward "water" — selectivity is a direct consequence rather
+than something we have to supervise into existence.
+
+**Synaptic scaling (Turrigiano) → conserved total strength.**
+`ReinforceTowardInput` takes a Kohonen step toward the winning pattern
+(`w += rate·(x − w)`) and then rescales so the neuron's total input strength over
+its receptive field is unchanged. A neuron therefore cannot become dominant by
+growing weights — only by becoming better *matched*. This is why normalisation
+belongs at the synapse rather than bolted onto the readout.
+
+**Recognition → cosine match.** `MatchQuality` replaces the raw weighted sum.
+The dot product measured magnitude, which is how a cue driving 3 of a neuron's 8
+inputs still summed to ~18 and saturated. Cosine measures alignment. Recall
+threshold is now 0.5 on a genuine [0,1] similarity instead of 0.25 on an
+unbounded sum.
+
+Note the two learning paths are now cleanly separated by role: **neuron weights**
+learn *what pattern this cell prefers* (competitive, unsupervised), while the
+**synaptic graph** learns *what co-occurs with what* (Hebbian). Previously the
+supervised delta rule was trying and failing to do both.
+
+#### On STDP (asked 2026-07-30) — in scope at the sequence timescale, not the spike timescale
+
+- **Lateral inhibition: yes, implemented above.** k-winners-take-all is the
+  standard computational reduction and it fits this framework directly.
+- **STDP proper: no, not without a time axis.** STDP is defined on Δt between
+  pre- and post-synaptic spikes. `ProcessInputs` is a single instantaneous
+  evaluation — all inputs arrive together, every neuron evaluates once. Faithful
+  STDP needs event-driven simulation with spike queues. That is a different
+  engine, not a tweak.
+- **But there IS a real temporal axis already: word order within a sentence.**
+  Words are presented sequentially, so "pre before post" is genuinely available
+  at the concept timescale. `RecordCoactivationPattern` currently wires
+  **bidirectionally and symmetrically** — completely time-blind. An asymmetric
+  update (potentiate pre→post, depress post→pre) would give the synaptic graph
+  real causal structure and make cascades directional, which is what recall
+  through a graph ought to mean. **This is the most promising next step after
+  selectivity is verified**, and it is a modest change to one method.
+
+Sequencing: prove selectivity works (controls silent) → then make the synaptic
+graph causal → then re-run fidelity. Verifying one mechanism at a time is what
+finally worked in P1.
+
 ### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
 - Procedural loading becomes the *default* path, not the fallback.
 - Add a **persistence budget**: top-k synapses per neuron, dirty-region-only writes.
