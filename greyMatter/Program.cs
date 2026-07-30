@@ -175,13 +175,33 @@ namespace GreyMatter
         /// </summary>
         static async Task RunFidelityTest(string[] args)
         {
-            var brainPath = GetArgValue(args, "--brain-path", "/Volumes/jarvis/brainData");
             var topK = int.Parse(GetArgValue(args, "--topk", "16"));
+            var explicitPath = GetArgValue(args, "--brain-path", "");
+
+            // ISOLATION (P2.5). This experiment WRITES: SaveAsync before eviction,
+            // then EvictAllClustersAsync persists every cluster on the way out. Run
+            // against a real brain it silently folds its own 500 training sentences
+            // into that brain — one observed run took the bank from 319,706 to
+            // 646,684 synapses — so every subsequent run starts from a different,
+            // fatter baseline. An experiment must not mutate what it measures.
+            //
+            // Default is therefore a throwaway scratch brain trained from nothing:
+            // isolated, reproducible, and deleted afterwards.
+            var usingScratch = string.IsNullOrWhiteSpace(explicitPath);
+            var brainPath = usingScratch
+                ? Path.Combine(Path.GetTempPath(), "gm_fidelity_" + Guid.NewGuid().ToString("N"))
+                : explicitPath;
+            if (usingScratch) Directory.CreateDirectory(brainPath);
 
             Console.WriteLine("🔬 P2: Regeneration Fidelity Experiment");
             Console.WriteLine("========================================\n");
-            Console.WriteLine($"Brain: {brainPath}   top-k: {topK}\n");
+            Console.WriteLine($"Brain: {brainPath}   top-k: {topK}");
+            Console.WriteLine(usingScratch
+                ? "Mode:  isolated scratch brain (trained from scratch, deleted after — your brainData is untouched)\n"
+                : "Mode:  ⚠️  EXPLICIT PATH — this run WILL WRITE training and checkpoints into that brain.\n");
 
+            try
+            {
             var config = new CerebroConfiguration { BrainDataPath = brainPath, UseProceduralSave = true };
             config.ValidateAndSetup();
             var brain = new Cerebro(brainPath);
@@ -411,6 +431,27 @@ namespace GreyMatter
             });
             if (meanFidelity >= 0.95 && meanCross >= 0.25)
                 Console.WriteLine("   ⚠️  BUT high overlap means cues aren't distinguishable — treat this fidelity as unproven.");
+            }
+            finally
+            {
+                if (usingScratch)
+                {
+                    try
+                    {
+                        Directory.Delete(brainPath, recursive: true);
+                        Console.WriteLine($"\n🧹 Scratch brain removed — your brainData was never touched.");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"\n⚠️  Could not remove scratch brain at {brainPath}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"\n⚠️  This run wrote training and checkpoints into {brainPath}. " +
+                                      "Subsequent runs will start from that fatter baseline.");
+                }
+            }
         }
 
         /// <summary>

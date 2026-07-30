@@ -1105,6 +1105,31 @@ persist, evict, and reload losslessly, discrimination is real (AUC 0.902,
 d′ 2.22). What does not yet exist is any dependence of recall on procedurally
 generated structure, so there is nothing yet for a fidelity experiment to lose.
 
+### P2.5 — the experiment was mutating the thing it measured (caught 2026-07-30)
+
+`--fidelity-test` calls `SaveAsync()` before eviction, then
+`EvictAllClustersAsync()` persists every cluster on the way out. Run against a
+real brain it therefore folded its own 500 in-process training sentences
+**permanently into that brain**. Observed in one run: synapses **319,706 →
+646,684**, plus `Membership changed: 210→290`, `New cluster entry: 178
+neurons`, and so on across 258 clusters.
+
+Consequences:
+- Each run started from a fatter, different baseline than the last.
+- Comparisons across runs were never like-for-like — this is a strong candidate
+  for the run-to-run variance that had `qwertyuiop` swinging 0.000 → 0.544 and
+  activation values shifting between otherwise identical configurations.
+- `/Volumes/jarvis/brainData` has been contaminated by every fidelity run so far.
+
+*Fixed:* the experiment now defaults to an **isolated scratch brain** — a temp
+directory, trained from nothing, deleted on exit (including on the early-return
+path, via `finally`). `--brain-path` still targets a real brain but prints a loud
+warning before and after that the run will write into it.
+
+Lesson, and it belongs with the others: a measurement harness must be inert with
+respect to its subject. This one wrote to the same store it read from, and every
+number produced before this fix carries that caveat.
+
 **Next mechanism (biology): intrinsic homeostatic plasticity.** Cortical neurons
 regulate their own excitability toward a target firing rate — a cell that
 responds to everything becomes harder to excite. That is precisely the remaining
