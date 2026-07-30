@@ -84,13 +84,35 @@ Fixes (SparseSynapticGraph + Cerebro):
 - Log spam gated: `DebugLog` levels (0/1/2, env `GREYMATTER_VERBOSITY`);
   per-cluster/per-region traces now level 2, evictions/partition saves level 1.
 
-**Exit criterion:** re-run the 5-minute benchmark; expect ~1–3M synapses
-(not 65M), visible histogram lines, and checkpoint well under 60s (was 402s).
+**Result (2026-07-29 re-run):** 3.16M synapses / 255MB from 1,741 sentences —
+20× count / 14× storage reduction vs baseline; checkpoint 120s (was 402s);
+throughput doubled. Budget verified. Two residual findings → P1.6.
 
-**Open questions surfaced (diagnose before P2):**
-- Clusters reach 13K neurons; same word re-grows ~66 neurons in whatever
-  cluster its sentence-level features land in → concept scattering.
-- "Vocabulary learned: 562,539 words" from 1,496 sentences is not a real
+### P1.6 — Stable assemblies (added 2026-07-29 after the re-run)
+Re-run exposed the real growth driver: **neurons, not synapses**
+(783,935 neurons from 1,741 sentences; ~38% of neurons new in every block;
+throughput sagged 12 → 5.8 sent/sec as population grew).
+
+Root cause (verified in `FindOrCreateClusterForPattern`): best-match cluster
+selection over drifting centroids + a learning VQ codebook means the same
+word's winning cluster changes visit-to-visit; the concept re-grows its full
+~66-neuron allocation in each. Only ~293 clusters existed — words revisited
+them, but not the ones holding their neurons.
+
+Fixes:
+- **Assembly reuse:** among similarity-qualified candidate clusters, prefer
+  the one where the concept already has neurons (re-activation over
+  colonization). Recall stays pattern-based; no global word index added.
+- **Decay 0.995 → 0.98:** first checkpoint pruned exactly 0 — birth weight
+  (~0.102–0.108) × 0.995 stays above the 0.1 prune line for 4-5 cycles.
+  At 0.98 newborns die within 1-2 un-reinforced checkpoints.
+
+**Exit criterion:** 5-min benchmark shows "% new" neurons falling toward
+single digits as vocabulary saturates; neuron total plateaus instead of
+growing linearly; checkpoint prune count > 0.
+
+**Still open:**
+- "Vocabulary learned: 793,175 words" from 1,741 sentences is not a real
   vocabulary count — find what that stat actually counts.
 
 #### P1 original notes
@@ -140,6 +162,23 @@ Build `--fidelity-test`:
 - Measure recall quality and compute cost as a function of `d`.
 - **Exit criterion:** a recall-vs-d curve demonstrating useful recall inside a
   bounded activation scope — the "only render near the player" claim, quantified.
+
+### P4.5 — Assembly recipes & composition (Bill's direction, 2026-07-29)
+The compositional payoff of the procedural thesis: each stable concept has an
+**activation recipe** — its assembly signature (anchor neuron set, VQ code
+distribution, strong-synapse pattern). A compound concept ("red apple") is not
+stored; it's a **procedurally generated column composed from its constituents'
+recipes** at activation time. Direct kinship with assembly calculus
+(Papadimitriou et al.: project / associate / merge) and vector-symbolic binding.
+
+Prerequisites (why this sits after P2/P3): base assemblies must be stable
+(P1.6) and their regeneration fidelity proven (P2) before composition is
+meaningful — you can't compose recipes that don't reliably exist.
+
+First experiment when we get here: train "red" and "apple" separately, compose
+their recipes procedurally, test whether the composed column's activation
+pattern matches a jointly-trained "red apple" baseline. Known hard problem to
+respect: binding (a red apple ≠ an apple-colored red).
 
 ### P5 — Scale demonstration
 - Grow virtual neuron count 10–100× on the same machine; hold resident memory flat

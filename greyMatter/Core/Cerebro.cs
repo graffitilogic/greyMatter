@@ -851,12 +851,13 @@ namespace GreyMatter.Core
                 Console.WriteLine($"   🧠 Consolidation: promoted {totalPromoted} neurons across {clustersTouched} clusters in {sw.Elapsed.TotalSeconds:F2}s (budget/cluster={budgetPerCluster})");
 
             // Synaptic forgetting (REFOCUS.md: persistence must be earned).
-            // Decay all weights slightly, then prune anything that fell below the
-            // prune threshold. Synapses born at ~0.1 die after one un-reinforced
-            // cycle; repeatedly co-activated pathways keep climbing.
+            // Decay all weights, then prune below threshold. At 0.98, synapses
+            // born at ~0.102-0.108 die within 1-2 un-reinforced checkpoints;
+            // established pathways (≈1.0) survive ~30+ cycles. (0.995 was too
+            // gentle: first 5-min run pruned exactly 0.)
             sw.Restart();
             var synBefore = _synapticGraph.GetSynapseCount();
-            _synapticGraph.ApplyDecay(0.995f);
+            _synapticGraph.ApplyDecay(0.98f);
             var synPruned = synBefore - _synapticGraph.GetSynapseCount();
             Console.WriteLine($"   ✂️  Synaptic decay: {synBefore:N0} → {_synapticGraph.GetSynapseCount():N0} " +
                               $"(pruned {synPruned:N0}, blocked_by_budget {_synapticGraph.CreationsBlockedByBudget:N0}) " +
@@ -1492,6 +1493,29 @@ namespace GreyMatter.Core
             const double SIMILARITY_THRESHOLD = 0.65; // Lowered from 0.85 to 0.65 for better pattern matching
             
             var matches = await FindClustersMatchingPattern(featureVector, maxClusters: 5);
+
+            // Assembly reuse (REFOCUS P1.6): among similarity-qualified candidates,
+            // prefer the cluster where this concept already grew neurons. Without
+            // this, centroid drift + VQ codebook learning make the same word's
+            // best-match cluster change visit-to-visit, and it re-grows its full
+            // allocation in each (observed: 783K neurons from 1,741 sentences).
+            // Recall stays pattern-based; this only stabilizes training-time
+            // allocation — a concept re-activates its existing assembly.
+            if (!string.IsNullOrEmpty(debugLabel))
+            {
+                foreach (var m in matches)
+                {
+                    if (m.similarity < SIMILARITY_THRESHOLD) continue;
+                    var existing = await m.cluster.FindNeuronsByConcept(debugLabel);
+                    if (existing.Count > 0)
+                    {
+                        if (ShouldSampleLog())
+                            Console.WriteLine($"   ♻️ Assembly reuse: {debugLabel} → cluster {m.cluster.ClusterId.ToString().Substring(0, 8)} ({existing.Count} existing neurons, sim {m.similarity:F3})");
+                        return m.cluster;
+                    }
+                }
+            }
+
             var bestMatch = matches.FirstOrDefault(m => m.similarity >= SIMILARITY_THRESHOLD);
             
             // DEBUG: Sample logging (first 20 clusters, then every 1000th) to maintain visibility without spam
