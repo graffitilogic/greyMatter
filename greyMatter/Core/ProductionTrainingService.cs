@@ -120,9 +120,25 @@ namespace GreyMatter.Core
             // Initialize Cerebro with EnhancedBrainStorage on NAS
             _brainStorage = new EnhancedBrainStorage(nasStoragePath);
             _cerebro = new Cerebro(nasStoragePath);
-            
+
+            // Production training previously ran with NO configuration attached
+            // (_configForLogging stayed null), which silently disabled the Phase 6B
+            // procedural save path. Result: only the ~5 LTM neurons per cluster from
+            // checkpoint consolidation were ever persisted, procedural banks were
+            // never written ("Procedural bank not found" on load), and a resumed
+            // brain restored 0 neurons. Attaching config turns on compact
+            // VQ-code-based persistence for ALL neurons — the actual thesis.
+            var cerebroConfig = new CerebroConfiguration
+            {
+                BrainDataPath = nasStoragePath,
+                UseProceduralSave = true
+            };
+            cerebroConfig.ValidateAndSetup();
+            _cerebro.AttachConfiguration(cerebroConfig);
+
             Console.WriteLine("🏭 Production Training Service initialized with Cerebro");
             Console.WriteLine($"   Brain storage: {nasStoragePath}");
+            Console.WriteLine($"   Procedural save: {cerebroConfig.UseProceduralSave} (compact VQ persistence for all neurons)");
             Console.WriteLine($"   Dataset: {_datasetKey}");
             Console.WriteLine($"   LLM Teacher: {(_useLLMTeacher ? "Enabled" : "Disabled")}");
             Console.WriteLine($"   Progressive Curriculum: {_useProgressiveCurriculum}");

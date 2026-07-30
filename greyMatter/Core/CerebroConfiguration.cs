@@ -150,7 +150,8 @@ namespace GreyMatter.Core
             if (!string.IsNullOrWhiteSpace(envTD)) TrainingDataRoot = envTD!;
 
             // Optional env overrides for perf/logging
-            var envVerb = Environment.GetEnvironmentVariable("VERBOSITY");
+            var envVerb = Environment.GetEnvironmentVariable("VERBOSITY")
+                          ?? Environment.GetEnvironmentVariable("GREYMATTER_VERBOSITY");
             if (int.TryParse(envVerb, out var v)) Verbosity = Math.Max(0, Math.Min(2, v));
             var envMps = Environment.GetEnvironmentVariable("MAX_PARALLEL_SAVES");
             if (int.TryParse(envMps, out var mps)) MaxParallelSaves = Math.Max(1, Math.Min(8, mps));

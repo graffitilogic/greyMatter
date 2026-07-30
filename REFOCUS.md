@@ -251,9 +251,22 @@ resumed brain regrows from nothing (this run: 68K neurons created to relearn
 what it already "knew"); and **P2 cannot be run at all** — there is no
 persisted assembly to regenerate and compare against.
 
-This is not "limited persistence" (the thesis). It is *no* persistence, from a
-constant that was tuned for checkpoint speed. Fixing it is now the top of P3
-and blocks P2.
+This is not "limited persistence" (the thesis). It is *no* persistence.
+
+**Root cause found — a wiring gap, not a design choice:**
+`ProductionTrainingService` created `new Cerebro(nasStoragePath)` and **never
+called `AttachConfiguration`**, so `_configForLogging` stayed null and
+`UseProceduralSave` defaulted to false. The Phase 6B procedural save path —
+compact `ProceduralNeuronData` (VQ code + budgeted synapses, ~50-100 bytes)
+for *every* neuron — has therefore never run in production training. Only the
+5-per-cluster LTM consolidation path ever wrote neurons. The machinery the
+whole thesis rests on was built, tested in isolation, and left unplugged.
+
+Fixed: production training now attaches a `CerebroConfiguration` with
+`UseProceduralSave = true`. Side effects of attaching config (previously all
+inert in production runs): `MaxParallelSaves`, `CompressClusters`, and
+`Verbosity` now apply. `GREYMATTER_VERBOSITY` accepted as an alias for
+`VERBOSITY`.
 
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
