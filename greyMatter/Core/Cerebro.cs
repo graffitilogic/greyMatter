@@ -268,6 +268,10 @@ namespace GreyMatter.Core
         // ─── P1.6 instrumentation: allocation / assembly-reuse counters ───
         private long _allocEvents, _allocReuseHits, _allocAssemblyPrefHits, _allocGrowEvents, _allocNeuronsGrown;
 
+        // Inline decay cadence (training-path, single-threaded with graph writes)
+        private const int DecayEveryNLearnEvents = 5000;
+        private int _learnEventsSinceDecay;
+
         /// <summary>
         /// P1.6 instrumentation: where do neurons come from? reuse% should rise
         /// toward ~100 as vocabulary saturates; grew_events/avg_grow expose
@@ -591,6 +595,18 @@ namespace GreyMatter.Core
             // P1.6 instrumentation: reuse vs growth accounting
             _allocEvents++;
             if (conceptNeurons.Count > 0) _allocReuseHits++;
+
+            // Continuous synaptic forgetting, inline on the training path (thread-safe
+            // by construction: all graph writes happen here). Every 5,000 learn events
+            // ≈ 1 min at observed rates. Newborns (~0.106) die within ~3 un-reinforced
+            // passes; reinforced pathways persist. See REFOCUS.md P1.5/P1.6.
+            if (++_learnEventsSinceDecay >= DecayEveryNLearnEvents)
+            {
+                _learnEventsSinceDecay = 0;
+                var (dBefore, dAfter, dBlocked) = DecayAndPruneSynapses(0.97f);
+                Console.WriteLine($"   ✂️  Synaptic decay: {dBefore:N0} → {dAfter:N0} " +
+                                  $"(pruned {dBefore - dAfter:N0}, blocked_by_budget {dBlocked:N0})");
+            }
 
             // Dynamic creation balanced by reuse (removed arbitrary hit gating)
             if (conceptNeurons.Count < target)

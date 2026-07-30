@@ -106,7 +106,7 @@ namespace GreyMatter
                 Console.WriteLine("═".PadRight(80, '═'));
                 Console.WriteLine($"Total runtime: {stats.Uptime.TotalHours:F1} hours");
                 Console.WriteLine($"Sentences processed: {stats.TotalSentencesProcessed:N0}");
-                Console.WriteLine($"Vocabulary learned: {stats.VocabularySize:N0} words");
+                Console.WriteLine($"Neurons created: {stats.VocabularySize:N0} (no true vocabulary stat yet — this was mislabeled 'Vocabulary learned')");
                 Console.WriteLine($"Checkpoints saved: {stats.CheckpointsSaved}");
                 Console.WriteLine($"Validations: {stats.ValidationsPassed}/{stats.ValidationsPassed + stats.ValidationsFailed}");
                 Console.WriteLine("═".PadRight(80, '═'));

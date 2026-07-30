@@ -124,9 +124,19 @@ Fixes:
 **Exit criterion (revised):** `--no-curriculum` 5-min run shows reuse% → ~100
 and grew_events% → ~0 as tatoeba saturates; maintenance log shows pruned > 0.
 
+**P1.6b correction (2026-07-29 evening):** the maintenance-loop decay raced
+the training thread over the (non-thread-safe) synapse dictionary — training
+errors at runtime. Decay moved inline to the training path
+(every 5,000 learn events ≈ 1 min), single-threaded with all other graph
+writes. Lesson recorded: all synaptic-graph mutation stays on the training
+path; the checkpoint path only reads, guarded by the existing checkpoint lock.
+
+**Resolved:**
+- "Vocabulary learned" was `TotalNeuronsCreated` used as a proxy
+  (ProductionTrainingService checkpoint metadata). Final-stats label fixed;
+  a true distinct-concept count is a TODO.
+
 **Still open:**
-- "Vocabulary learned: 793,175 words" from 1,741 sentences is not a real
-  vocabulary count — find what that stat actually counts.
 - `Clusters: 0` and `Storage size: 103 B` in progress/final stats are bogus
   (read storage before first save).
 

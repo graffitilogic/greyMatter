@@ -416,15 +416,9 @@ namespace GreyMatter.Core
                     if (_isPaused)
                         continue;
 
-                    // Continuous synaptic forgetting (every 2 min, not at checkpoints):
-                    // newborn synapses die in ~3 un-reinforced passes; reinforced
-                    // pathways persist. See REFOCUS.md P1.5/P1.6.
-                    if (iteration % 2 == 0)
-                    {
-                        var (before, after, blocked) = _cerebro.DecayAndPruneSynapses(0.97f);
-                        Console.WriteLine($"   ✂️  Synaptic decay: {before:N0} → {after:N0} " +
-                                          $"(pruned {before - after:N0}, blocked_by_budget {blocked:N0})");
-                    }
+                    // Note: synaptic decay runs inline on the training path
+                    // (Cerebro.LearnConceptAsync, every N learn events). Running it
+                    // here raced the training thread over the synapse dictionary.
 
                     // Checkpoint if needed
                     var minutesSinceCheckpoint = (DateTime.Now - _lastCheckpoint).TotalMinutes;
