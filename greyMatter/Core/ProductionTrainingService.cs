@@ -36,6 +36,12 @@ namespace GreyMatter.Core
         private readonly string _controlFilePath;
         private readonly bool _useLLMTeacher;
         private readonly bool _useProgressiveCurriculum;
+
+        // Benchmark control: cap the corpus so it CYCLES (repeats) instead of
+        // streaming fresh sentences forever. Required to measure assembly reuse —
+        // with an unbounded corpus, novel words keep arriving and reuse% plateaus
+        // at the corpus's type/token ratio rather than saturating.
+        private readonly int? _corpusLimit;
         
         // Configuration
         private readonly int _checkpointIntervalMinutes;
@@ -91,8 +97,10 @@ namespace GreyMatter.Core
             int validationIntervalHours = 6,
             int nasArchiveIntervalHours = 24,
             bool enableAttention = true,
-            bool enableEpisodicMemory = true)
+            bool enableEpisodicMemory = true,
+            int? corpusLimit = null)
         {
+            _corpusLimit = corpusLimit;
             _datasetKey = datasetKey ?? "tatoeba_small";
             
             // Use NAS for persistent storage (not SSD!)
@@ -361,8 +369,8 @@ namespace GreyMatter.Core
                     Console.WriteLine($"📁 Loading static dataset '{datasetName}'... [Started: {staticLoadStart:HH:mm:ss.fff}]");
                     _batchNumber++;
                     var sentences = _dataProvider.LoadSentences(
-                        datasetName, 
-                        maxSentences: 500,  // REDUCED for smoke testing - cycles faster through datasets
+                        datasetName,
+                        maxSentences: _corpusLimit ?? 500,  // corpus limit keeps reloads on the same pinned set
                         shuffle: true  // SHUFFLE each batch for variety!
                     );
                     sentenceList = sentences.ToList();
@@ -767,7 +775,12 @@ namespace GreyMatter.Core
                         minWordCount: currentPhase.MinWordCount,
                         maxWordCount: currentPhase.MaxWordCount,
                         shuffle: true).ToList()
-                    : _dataProvider.LoadSentences(_datasetKey, shuffle: true).ToList();
+                    : _corpusLimit.HasValue
+                        ? _dataProvider.LoadSentences(_datasetKey, maxSentences: _corpusLimit.Value, shuffle: true).ToList()
+                        : _dataProvider.LoadSentences(_datasetKey, shuffle: true).ToList();
+
+                if (_corpusLimit.HasValue)
+                    Console.WriteLine($"🔁 Corpus limited to {sentences.Count:N0} sentences (cycling — for reuse benchmarks)");
 
                 if (sentences.Count == 0)
                 {

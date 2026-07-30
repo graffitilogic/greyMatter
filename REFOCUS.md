@@ -174,11 +174,46 @@ Freezing serves both problems.
   (was: full target, ~69). Capacity is earned through repetition — most words
   in a corpus are seen once (Zipf), and they were each costing ~69 neurons.
 
-**Exit criterion:** `--no-curriculum` 5-min run on fresh brainData shows
-`reuse%` climbing past ~90 after the freeze, `avg_grow` ≈ 16 for new concepts,
-and total neurons well under the 730K of this run at equal-or-better sentence
-throughput. Requires a brainData reset (region→cluster indexes built under the
-drifting codebook are stale).
+**Exit criterion:** 5-min run on fresh brainData shows `reuse%` climbing past
+~90 after the freeze, `avg_grow` ≈ 16 for new concepts, and total neurons well
+under the 730K of this run at equal-or-better sentence throughput. Requires a
+brainData reset (region→cluster indexes built under the drifting codebook are
+stale) **and `--corpus-limit`** (see correction below).
+
+### P1.6e — Benchmark methodology correction (2026-07-29, full log reviewed)
+
+**My "95% of growth is a known concept failing to find itself" claim was
+overstated, and the exit criterion was invalid.** `--no-curriculum` does not
+pin a small cycling corpus: with `currentPhase == null`, `LoadTrainingData()`
+calls `LoadSentences(_datasetKey, shuffle: true)` with **no maxSentences**, so
+it loaded **50,000 sentences** and the 5-min run consumed only 3,282 — every
+sentence seen exactly once, no repetition. A large share of the 37% non-reuse
+is therefore *legitimately new vocabulary*, not a reuse failure. The
+arithmetic (non-reuse ≈ grew_events) held; the interpretation didn't.
+
+The VQ drift finding (P1.6d) is unaffected — it was verified from code
+(`GetRegionId` → `QuantizeAndUpdate` mutating the codebook on every lookup),
+not inferred from these numbers. Its P2 fidelity implication also stands.
+
+**Fix:** added `--corpus-limit N`, which pins the corpus so it cycles. Reuse
+saturation is only measurable when the same sentences repeat.
+
+**What the full log does show (all genuine wins):**
+- **Throughput flat** at ~11 sent/sec / ~84 cps for the entire run (previous
+  run sagged 12 → 6.0). Bounded synapse count removed the drag.
+- **Synapse count now oscillates** rather than growing linearly: creation
+  pushes to ~1.9M, each decay pass prunes 25-28% back to ~1.4M. Floor still
+  creeps (1.18M → 1.24M → 1.36M → 1.41M), partly legitimate new vocabulary.
+- `reuse%` climbed 33.5% → ~63% and plateaued — consistent with a
+  non-repeating corpus's type/token ratio.
+- First decay pass pruned 0 (synapses too young), subsequent passes 144K,
+  486K, 442K, 507K. Working as designed.
+
+**New signal to watch:** Hebbian `passed%` declined 99.9% → ~83% and mean
+delta 20.05 → 15.9 over the run, with some events showing `avg=-62,
+above_threshold=78/241`. Neurons are accumulating in clusters whose patterns
+they don't respond to — consistent with over-allocation, and a plausible
+early-warning metric for assembly quality. Not urgent; revisit in P2/P4.
 
 **Still open:**
 - `Clusters: 0` and `Storage size: 103 B` in progress/final stats are bogus

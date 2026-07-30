@@ -83,6 +83,11 @@ namespace GreyMatter
                 // Benchmark mode: pin the dataset so curriculum advancement doesn't
                 // confound A/B comparisons (news influx masks assembly-reuse gains)
                 var noCurriculum = args.Contains("--no-curriculum");
+                // Pin corpus size so it cycles — needed to measure assembly reuse.
+                // Without it, --no-curriculum loads the WHOLE dataset (50K sentences)
+                // and never repeats, so reuse% reflects type/token ratio, not reuse.
+                var corpusLimitArg = GetArgValue(args, "--corpus-limit", "");
+                int? corpusLimit = int.TryParse(corpusLimitArg, out var cl) ? cl : (int?)null;
 
                 var service = new ProductionTrainingService(
                     datasetKey: datasetKey,
@@ -93,7 +98,8 @@ namespace GreyMatter
                     validationIntervalHours: 6,
                     nasArchiveIntervalHours: 24,
                     enableAttention: true,
-                    enableEpisodicMemory: true
+                    enableEpisodicMemory: true,
+                    corpusLimit: corpusLimit
                 );
                 
                 await service.StartAsync();
@@ -121,6 +127,7 @@ namespace GreyMatter
                 Console.WriteLine("║    dotnet run -- --production-training                    ║");
                 Console.WriteLine("║    dotnet run -- --production-training --duration 3600    ║");
                 Console.WriteLine("║    add --no-curriculum to pin dataset (benchmarking)      ║");
+                Console.WriteLine("║    add --corpus-limit 500 to cycle a small corpus         ║");
                 Console.WriteLine("║                                                           ║");
                 Console.WriteLine("║  Query & Inspection:                                      ║");
                 Console.WriteLine("║    dotnet run -- --cerebro-query stats                    ║");
