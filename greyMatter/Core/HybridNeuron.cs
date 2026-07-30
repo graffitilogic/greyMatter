@@ -45,6 +45,16 @@ namespace GreyMatter.Core
         // Phase 6B: VQ code for procedural regeneration (No Man's Sky principle)
         public int? VqCode { get; set; } = null;
 
+        /// <summary>
+        /// P3.4: how many feature lines existed the last time this neuron's
+        /// receptive field was wired. A neuron's field is defined by its IDENTITY
+        /// (which lines it samples), not by which words it happened to meet — so it
+        /// must be re-wired whenever the vocabulary grows, or the in-memory field
+        /// stays smaller than the one regeneration reconstructs.
+        /// Not persisted: regeneration always rebuilds the complete field.
+        /// </summary>
+        public int LastWiredFeatureCount { get; set; } = 0;
+
         // --- New: Short-term learning (STM) buffers and salience tracking ---
         // Accumulates transient updates which can be consolidated into LTM
         public Dictionary<Guid, double> StmWeightDeltas { get; private set; } = new();

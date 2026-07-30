@@ -1349,6 +1349,48 @@ every lost neuron to one or the other, with both columns now in the sweep CSV.
 Per the rule that has actually worked this session: measure it, do not reason
 about it.
 
+#### P3.4 — the 17% located: A and B were building different-sized fields
+
+```
+threshold  fidelity  regenerated  lost_absent  lost_demoted
+0.02         83.6       78.4%          0            47
+0.10         83.8       83.6%          0            46
+1.00         83.3       92.4%          0            48
+8.00         81.9      100.0%          0            52
+```
+
+**`lost_absent = 0` in every row.** Not one neuron vanishes across the whole
+sweep. Regeneration reproduces the neuron *set* perfectly; every loss is a
+survivor that got out-ranked. So the residual is pure activation shift — and
+since stored weights make no difference either, it is not weight error.
+
+**Cause, confirmed in the code:** `EnsureFeatureWiring` wired only the features
+present in the *current training input*, while `RegenerateNeuron` rebuilds every
+line the neuron's identity samples across the *whole* feature set. Regenerated
+neurons therefore had **larger receptive fields than they ever had in memory**.
+`MatchQuality` normalises by ‖w‖ over the full field, so a bigger field means a
+different denominator, every activation shifts slightly, and the top-16 reorders.
+Nothing lost, everything nudged — exactly the measured signature.
+
+*Fixed:* a receptive field is defined by **identity, not history**, so the
+in-memory field must be complete too. `EnsureFeatureWiring` now wires every line
+the neuron samples across all known features, guarded by vocabulary size
+(`LastWiredFeatureCount`) so the full walk only runs when new features appear.
+`FeatureMapper.GetAllFeaturesSnapshot()` added because `GetAllFeatures()` returns
+a live key collection that is unsafe to iterate on a path that can register a
+feature.
+
+**Prediction, recorded before running:** fidelity should rise sharply — A and B
+now construct the same field by the same rule, so the remaining difference is
+only genuine learned drift. If it stays at ~83%, the field sizes still disagree
+and the next step is to log field size at A and B directly rather than infer it.
+
+**Risk worth flagging:** every neuron now carries ~20% of the *entire* feature
+vocabulary rather than 20% of what it met. Fields grow with vocabulary, so
+absolute cosine values will drop and `RecallMatchThreshold` / discrimination
+statistics may need recalibrating. Watch AUC and the active counts, not just
+fidelity.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

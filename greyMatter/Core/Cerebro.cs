@@ -2013,6 +2013,23 @@ namespace GreyMatter.Core
             // Learning moves the neuron away from the prototype, and only that
             // deviation gets persisted — which is what makes procedural generation
             // load-bearing rather than decorative (it was 1.9% of stored bytes).
+            // P3.4: wire the COMPLETE generated field, not just the lines this cue
+            // happens to drive.
+            //
+            // Training used to wire only features present in the current input,
+            // while regeneration rebuilds every line the neuron's identity samples.
+            // Regenerated neurons therefore had LARGER receptive fields than they
+            // ever had in memory, which changes ‖w‖ in the cosine denominator,
+            // shifts every activation slightly and reorders the top-k. Measured
+            // signature: lost_absent=0, lost_demoted=40–52 — nothing vanished,
+            // everything merely out-ranked. That was the whole missing 17%.
+            //
+            // A field is defined by identity, not by which words a neuron happened
+            // to meet, so the in-memory field must be complete too. Guarded by
+            // vocabulary size: the full walk only runs when new features appear.
+            var featureCount = _featureMapper.GetFeatureNeuronIds().Count;
+            if (neuron.LastWiredFeatureCount == featureCount) return;
+
             float[]? prototype = null;
             if (neuron.VqCode.HasValue && _useVQVAE)
             {
@@ -2020,17 +2037,19 @@ namespace GreyMatter.Core
                 catch { prototype = null; }
             }
 
-            foreach (var feature in features)
+            foreach (var featureName in _featureMapper.GetAllFeaturesSnapshot())
             {
-                if (!NeuronSamplesFeature(neuron.Id, feature.Key)) continue;
+                if (!NeuronSamplesFeature(neuron.Id, featureName)) continue;
 
-                var featureNeuronId = _featureMapper.GetNeuronIdForFeature(feature.Key);
+                var featureNeuronId = _featureMapper.GetNeuronIdForFeature(featureName);
                 if (!neuron.InputWeights.ContainsKey(featureNeuronId))
                 {
                     neuron.InputWeights[featureNeuronId] =
-                        ProceduralReceptiveField.GenerateBaselineWeight(neuron.Id, feature.Key, prototype);
+                        ProceduralReceptiveField.GenerateBaselineWeight(neuron.Id, featureName, prototype);
                 }
             }
+
+            neuron.LastWiredFeatureCount = featureCount;
         }
 
         private async Task TrainNeuronWithFeatures(HybridNeuron neuron, Dictionary<string, double> features)

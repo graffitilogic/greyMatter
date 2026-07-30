@@ -77,6 +77,19 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// Stable snapshot of feature names, cached and rebuilt only when the
+        /// vocabulary grows. `GetAllFeatures()` hands back a live key collection,
+        /// which is unsafe to iterate on a path that may register a new feature.
+        /// </summary>
+        public string[] GetAllFeaturesSnapshot()
+        {
+            if (_featureNameCache == null || _featureNameCache.Length != _featureToNeuronId.Count)
+                _featureNameCache = _featureToNeuronId.Keys.ToArray();
+            return _featureNameCache;
+        }
+        private string[]? _featureNameCache;
+
+        /// <summary>
         /// Create feature mapping snapshot for persistence
         /// </summary>
         public FeatureMappingSnapshot CreateSnapshot()
