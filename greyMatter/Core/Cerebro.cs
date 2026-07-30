@@ -1903,6 +1903,7 @@ namespace GreyMatter.Core
             var inputIds = new HashSet<Guid>();
             foreach (var key in inputs.Keys)
                 inputIds.Add(_featureMapper.GetNeuronIdForFeature(key));
+            var inputsById = _featureMapper.ConvertFeaturesToNeuronInputs(inputs);
 
             int noOverlap = 0, partial = 0, full = 0;
             int firing = 0;
@@ -1922,9 +1923,12 @@ namespace GreyMatter.Core
                 else if (coverage > 0.95) full++;
                 else partial++;
 
-                var delta = n.CurrentPotential - n.RestingPotential;
-                deltas.Add(delta);
-                if (delta > 2.0) firing++;
+                // P2.1: MatchQuality, not CurrentPotential — the competitive path no
+                // longer calls ProcessInputs, so the old reading reported 0.00
+                // everywhere and the diagnostic was silently useless.
+                var match = n.MatchQuality(inputsById);
+                deltas.Add(match);
+                if (match > RecallMatchThreshold) firing++;
                 if (n.HasPendingStm) pendingStm++;
             }
 

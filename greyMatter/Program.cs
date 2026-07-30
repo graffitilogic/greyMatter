@@ -267,33 +267,51 @@ namespace GreyMatter
 
             // ── Control check: gibberish must NOT activate ──────────────────
             var controls = new[] { "qwertyuiop", "zxcvbnmasd" };
-            var controlActive = controls.Sum(c => baseline[c].Count);
-            var trainedMeanActive = trained.Count > 0 ? trained.Average(c => baseline[c].Count) : 0;
+
+            // Judge on activation STRENGTH, not just count. A count test cannot
+            // distinguish "control fires weakly" from "control fires like a word",
+            // and the margin is what actually matters for recall.
+            double TopAct(string c) => baseline[c].Count > 0 ? baseline[c][0].activation : 0.0;
+            var trainedTop = trained.Select(TopAct).Where(a => a > 0).ToList();
+            var controlTop = controls.Select(TopAct).ToList();
+
+            var trainedMean = trainedTop.Count > 0 ? trainedTop.Average() : 0;
+            var trainedMin = trainedTop.Count > 0 ? trainedTop.Min() : 0;
+            var controlMax = controlTop.Count > 0 ? controlTop.Max() : 0;
+            var margin = trainedMean - controlMax;
 
             Console.WriteLine();
             Console.WriteLine("── Controls (never in corpus — should activate ~nothing) ──");
             foreach (var c in controls)
-            {
-                var top = baseline[c].Count > 0 ? baseline[c][0].activation : 0;
-                Console.WriteLine($"   {c,-12} active={baseline[c].Count,3}  top act={top:F3}");
-            }
-            var controlsClean = controlActive == 0 ||
-                                (trainedMeanActive > 0 && controlActive / 2.0 < trainedMeanActive * 0.25);
+                Console.WriteLine($"   {c,-12} active={baseline[c].Count,3}  top act={TopAct(c):F3}");
+            Console.WriteLine($"   trained: mean top act={trainedMean:F3}  weakest={trainedMin:F3}");
+            Console.WriteLine($"   DISCRIMINATION MARGIN (trained mean − strongest control) = {margin:F3}");
+
+            // Clean requires the strongest control to sit clearly below the WEAKEST
+            // trained cue — i.e. a threshold exists that separates them.
+            var separable = controlMax < trainedMin;
+            var controlsClean = controlMax == 0 || (separable && margin > 0.1);
             Console.WriteLine(controlsClean
-                ? "   ✅ controls silent — activation is concept-specific"
-                : "   ❌ CONTROLS ACTIVATE AS STRONGLY AS TRAINED CUES — the probe is not " +
-                  "pattern-based, and every number below is meaningless.");
+                ? "   ✅ controls separable from trained cues — activation is concept-specific"
+                : separable
+                    ? "   🟡 controls rank below all trained cues but the margin is thin — " +
+                      "discrimination is real yet weak."
+                    : "   ❌ CONTROLS OVERLAP THE TRAINED RANGE — no threshold separates " +
+                      "language from noise, so the numbers below are not trustworthy.");
 
             Console.WriteLine();
             Console.WriteLine("════════════════════════════════════════");
             Console.WriteLine($"REGENERATION FIDELITY: {meanFidelity:P1}  (mean over {fidCount} cues, top-{topK})");
             Console.WriteLine($"CROSS-CONCEPT OVERLAP: {meanCross:P1}");
-            Console.WriteLine($"CONTROLS:              {(controlsClean ? "clean" : "ACTIVE — RESULT INVALID")}");
+            Console.WriteLine($"DISCRIMINATION MARGIN: {margin:F3}  (strongest control {controlMax:F3} vs weakest trained {trainedMin:F3})");
+            Console.WriteLine($"CONTROLS:              {(controlsClean ? "separable" : separable ? "thin margin" : "OVERLAPPING — RESULT INVALID")}");
             Console.WriteLine("════════════════════════════════════════");
             if (!controlsClean)
             {
-                Console.WriteLine("🔴 RESULT INVALID — controls activated. Fix the probe before reading fidelity.");
-                return;
+                Console.WriteLine(separable
+                    ? "🟡 Discrimination exists but is weak. Fidelity below is provisional."
+                    : "🔴 RESULT INVALID — controls overlap trained cues. Fix discrimination before reading fidelity.");
+                if (!separable) return;
             }
             Console.WriteLine(meanFidelity switch
             {

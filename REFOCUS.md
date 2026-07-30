@@ -918,6 +918,48 @@ Also observed: writing and re-reading 256 empty synapse partitions costs ~50s
 each way — the fidelity run wasn't hung, it was iterating empty partitions over
 the NAS. Worth short-circuiting when the graph is empty.
 
+#### P2.1 second run — selectivity is real but weak (2026-07-30)
+
+**First control ever fully rejected: `qwertyuiop` → 0 active, nothing.** Under
+every previous mechanism it scored at or above real words (0.839, then 0.993).
+Competitive learning + cosine matching genuinely produces selectivity.
+
+| | before P2.1 | after |
+|---|---|---|
+| `qwertyuiop` | 0.993 (top of all cues) | **0.000 (silent)** |
+| `zxcvbnmasd` | 0.770 | 0.605 |
+| trained cues | 0.73–1.00 (saturated) | 0.55–0.70 |
+| throughput | 25 sent/sec | **44.6 sent/sec** |
+| train step | 3.1 ms | **0.9 ms** |
+
+Trained cues no longer saturate and several now fall *below* top-16
+(`water`=11, `in`=12, `sleep`=12) — the 0.5 cosine threshold is a real filter
+rather than a rubber stamp. Competitive training is also ~3× cheaper than the
+old per-neuron delta rule, since only 25% of an assembly updates.
+
+**Not yet good enough:** `zxcvbnmasd` at 0.605 sits *inside* the trained range
+(0.55–0.70), above `water` (0.550) and `sleep` (0.569). One control rejected,
+one indistinguishable. No threshold separates language from noise, so fidelity
+remains unreportable — correctly.
+
+Two measurement fixes, since both diagnostics had gone stale:
+- **RF diagnostic was reporting `delta[p10=0.00 med=0.00 max=0.00] firing=0/78`**
+  — it still read `CurrentPotential`, which nothing sets any more. Now uses
+  `MatchQuality`. It had been silently useless since P2.1.
+- **Control check now judges activation STRENGTH, not count.** A count test
+  can't tell "control fires weakly" from "control fires like a word". It now
+  reports a **discrimination margin** (trained mean − strongest control) and
+  requires the strongest control to sit below the *weakest* trained cue, i.e.
+  that a separating threshold exists at all.
+
+**Next mechanism (biology): intrinsic homeostatic plasticity.** Cortical neurons
+regulate their own excitability toward a target firing rate — a cell that
+responds to everything becomes harder to excite. That is precisely the remaining
+gap: assemblies are tuned, but nothing punishes a neuron for being broadly
+responsive. Per-neuron gain/threshold adjusted from a running average of its own
+match would sharpen the margin without any supervision, and it is the natural
+partner to the lateral inhibition and synaptic scaling already in place.
+
 ### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
 - Procedural loading becomes the *default* path, not the fallback.
 - Add a **persistence budget**: top-k synapses per neuron, dirty-region-only writes.
