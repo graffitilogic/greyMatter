@@ -1843,6 +1843,48 @@ namespace GreyMatter.Core
         private const int ReceptiveFieldSampleEvery = 4000;
         private int _receptiveFieldSampleCounter;
 
+        /// <summary>
+        /// P1.7: fraction of a concept's inputs any single neuron listens to.
+        /// 0.2 of ~42 inputs ≈ 8 per neuron; with ~78 neurons per assembly each
+        /// input is still covered ~15 times, so the assembly collectively sees
+        /// everything while no two neurons see the same thing.
+        /// </summary>
+        private const double ReceptiveFieldDensity = 0.2;
+
+        /// <summary>
+        /// Deterministic membership test: does this neuron listen to this input?
+        ///
+        /// Derived purely from the neuron's identity, so a neuron's receptive-field
+        /// SHAPE is procedurally regenerable and never needs persisting — only the
+        /// learned weight values do. That is the thesis applied to the receptive
+        /// field itself (see P3: ProceduralNeuronData can drop the key set and keep
+        /// only learned deviations).
+        ///
+        /// FNV-1a over the neuron GUID and the feature key, then an avalanche mix
+        /// so neighbouring keys ("cf_11_p"/"cf_12_p") don't correlate.
+        /// </summary>
+        private static bool NeuronSamplesFeature(Guid neuronId, string featureKey)
+        {
+            unchecked
+            {
+                const uint fnvOffset = 2166136261;
+                const uint fnvPrime = 16777619;
+
+                uint h = fnvOffset;
+                Span<byte> guidBytes = stackalloc byte[16];
+                neuronId.TryWriteBytes(guidBytes);
+                foreach (var b in guidBytes) { h ^= b; h *= fnvPrime; }
+                foreach (var c in featureKey) { h ^= (byte)c; h *= fnvPrime; h ^= (byte)(c >> 8); h *= fnvPrime; }
+
+                // avalanche (murmur3 finalizer)
+                h ^= h >> 16; h *= 0x85ebca6b;
+                h ^= h >> 13; h *= 0xc2b2ae35;
+                h ^= h >> 16;
+
+                return h / (double)uint.MaxValue < ReceptiveFieldDensity;
+            }
+        }
+
         private void LogReceptiveFieldOverlap(string concept, List<HybridNeuron> neurons, Dictionary<string, double> inputs)
         {
             var inputIds = new HashSet<Guid>();
@@ -1873,9 +1915,10 @@ namespace GreyMatter.Core
 
             deltas.Sort();
             var median = deltas.Count > 0 ? deltas[deltas.Count / 2] : 0;
+            var p10 = deltas.Count > 0 ? deltas[deltas.Count / 10] : 0;
             Console.WriteLine($"   🔬 RF[{concept}]: neurons={neurons.Count} inputs={inputIds.Count} " +
                               $"coverage[none={noOverlap} partial={partial} full={full} avg={sumCoverage / Math.Max(1, neurons.Count):P0}] " +
-                              $"delta[med={median:F2} max={(deltas.Count > 0 ? deltas[^1] : 0):F2}] firing={firing}");
+                              $"delta[p10={p10:F2} med={median:F2} max={(deltas.Count > 0 ? deltas[^1] : 0):F2}] firing={firing}/{neurons.Count}");
         }
 
         private Dictionary<string, double> BuildTrainingFeatures(double[] conceptVector, Dictionary<string, double> contextFeatures)
@@ -1936,11 +1979,23 @@ namespace GreyMatter.Core
             //   rate ignored clustering, concept features, and rectification alike.
             foreach (var feature in features)
             {
+                // P1.7: each neuron listens to a deterministic SPARSE SUBSET of the
+                // concept's inputs. Wiring every neuron to every input made all
+                // neurons in an assembly functionally identical (100% fired, median
+                // delta within 2 of max) — one neuron replicated N times, no
+                // distributed code, and N copies of the same receptive field on disk.
+                if (!NeuronSamplesFeature(neuron.Id, feature.Key)) continue;
+
                 var featureNeuronId = _featureMapper.GetNeuronIdForFeature(feature.Key);
                 if (!neuron.InputWeights.ContainsKey(featureNeuronId))
                 {
-                    // Initialize with much larger weights for guaranteed activation
-                    neuron.InputWeights[featureNeuronId] = (_random.NextDouble() + 0.5) * 3.0; // Range: 1.5 to 4.5
+                    // Scale by 1/density so EXPECTED activation is unchanged
+                    // (~17 above resting) while the variance across neurons is now
+                    // real. Keeps thresholds, the tanh(delta/20) gate and decay
+                    // calibration untouched; the only thing that changed is which
+                    // inputs a given neuron can see.
+                    neuron.InputWeights[featureNeuronId] =
+                        (_random.NextDouble() + 0.5) * 3.0 / ReceptiveFieldDensity;
                 }
             }
             

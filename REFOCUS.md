@@ -573,6 +573,36 @@ graded activation, genuine sparsity, and each receptive field becomes
 **procedurally regenerable rather than stored**, which is the thesis in its
 purest form and would cut storage rather than inflate it.
 
+### P1.7 — Sparse procedural receptive fields (implemented 2026-07-30)
+
+Chosen over k-WTA because it makes the receptive field itself procedural rather
+than stored — the thesis applied one level deeper.
+
+Each neuron listens to a deterministic **sparse subset** (`ReceptiveFieldDensity
+= 0.2`, ≈8 of 42 inputs) selected by `NeuronSamplesFeature(neuronId, featureKey)`
+— FNV-1a over the GUID and key with a murmur3 avalanche. Properties:
+- **Deterministic**: same neuron, same subset, forever.
+- **Regenerable from identity alone**: the *shape* of a receptive field never
+  needs persisting; only learned weight values do. Direct P3 consequence —
+  `ProceduralNeuronData` can drop the key set entirely and store deviations.
+- **Collectively complete**: ~78 neurons × 20% still covers every input ~15×,
+  so the assembly sees everything while no two neurons see the same thing.
+- Initial weights scaled by `1/density`, so *expected* activation stays ~17 above
+  resting and thresholds / the tanh(delta/20) gate / decay stay calibrated. The
+  only thing that changed is which inputs a neuron can see.
+
+Diagnostic extended with a p10 delta and `firing=n/N` to show the spread.
+
+**Expected signature:** `coverage[none=0 partial=N full=0 avg≈20%]`, delta with a
+real p10→max spread instead of everything within 2 of the median, `firing < N`,
+and `passed%` landing somewhere between the two failure modes (22% / 100%).
+Storage should fall back below 1.34x, since each neuron stores ~8 weights
+instead of 42.
+
+**If instead** coverage is ~20% but `firing` is still N/N and deltas stay tight,
+sparsity isn't producing selectivity and the next lever is competition (k-WTA)
+rather than wiring.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).
