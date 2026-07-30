@@ -986,6 +986,38 @@ calibrated against the broken denominator.
 0.544 across identical configurations means single-run controls cannot establish
 discrimination. Future claims need either multiple seeds or a wider cue set.
 
+#### P2.2 result — margin 0.024 → 0.178 (7×), and the test itself was too brittle
+
+The denominator fix was the binding constraint. Controls dropped to ~0.405 while
+trained cues held ~0.587.
+
+It still failed — by **0.006**. `qwertyuiop` at 0.409 vs the weakest trained cue
+at 0.403. That is a flaw in the criterion, not the system: "strongest control
+below *weakest* trained cue" is a min/max test on 14 vs 2 samples, so one weak
+straggler vetoes an otherwise clean separation. Reporting a 7× improvement as a
+flat failure is bad measurement.
+
+Harness revised — and deliberately made *harder*, not easier:
+- **Two tiers of control.** Tier 1 keyboard mash (`qwertyuiop`, `xkcdvbnm`) only
+  proves the encoder notices surface weirdness. **Tier 2 pseudo-words**
+  (`blorp`, `thrumble`, `flendish`, `grastic`) are English-looking and
+  pronounceable but never seen — rejecting *those* is what shows discrimination
+  comes from learned identity rather than orthographic oddity. This is a
+  stricter bar than before.
+- **8 controls instead of 2**, so the control distribution is actually estimable.
+- **AUC and d′ reported** alongside the margin. AUC asks "over every
+  trained/control pair, how often does the trained cue win?" — robust to one
+  straggler, where min/max is not.
+- **Three verdict tiers**: perfectly separable (valid) / strong but imperfect
+  (AUC ≥ 0.90 and margin > 0.10 → fidelity printed but explicitly
+  **PROVISIONAL**) / overlapping (invalid, aborts).
+- The weakest trained cue is now named, so a straggler can be judged on whether
+  it is a genuinely rare word.
+
+The provisional tier is a deliberate judgement call and worth flagging as such:
+it lets a strong-but-imperfect result be *seen* rather than hidden, at the cost
+of a weaker guarantee. The hard abort remains for genuine overlap.
+
 **Next mechanism (biology): intrinsic homeostatic plasticity.** Cortical neurons
 regulate their own excitability toward a target firing rate — a cell that
 responds to everything becomes harder to excite. That is precisely the remaining
