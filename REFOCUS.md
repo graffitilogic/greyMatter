@@ -215,6 +215,52 @@ above_threshold=78/241`. Neurons are accumulating in clusters whose patterns
 they don't respond to — consistent with over-allocation, and a plausible
 early-warning metric for assembly quality. Not urgent; revisit in P2/P4.
 
+### P1.6f — Resume run (2026-07-30 08:35): the real blocker surfaces
+
+Run resumed from an existing checkpoint rather than a fresh brainData, which
+accidentally produced the most informative run so far.
+
+**Working as designed:**
+- **Staged growth confirmed:** `avg_grow` 68 → ~28 (mix of 16-neuron first
+  allocations and up-to-64 top-ups).
+- **Codebook froze on load** (`ImportCodebook` → `IsLearning=false`), so a
+  resumed run no longer re-drifts. The warmup-freeze path is still untested.
+
+**Two bugs of mine, both fixed here:**
+1. `--no-curriculum` only applied to the *initial* load.
+   `ReloadTrainingDataAsync` still consulted the curriculum, so at batch
+   exhaustion the run switched to `news` (log: "Loading dataset by count:
+   news"). The reload path now respects the flag.
+2. Assembly reuse probed every candidate cluster with `FindNeuronsByConcept`,
+   which calls `EnsureLoadedAsync` → up to 5 NAS loads per learn event. Fine on
+   a fresh in-memory brain, brutal on resume (`find` 0.8ms → 28.8ms). Now only
+   probes clusters already resident (`NeuronCluster.IsLoaded`).
+
+**THE BLOCKER — persistence starvation (~99.8% of neurons never persist):**
+Checkpoint consolidation budget is
+`Math.Max(5, Math.Min(50, MaxParallelSaves * 5))` = **5 neurons per cluster**
+per checkpoint. Only consolidated (LTM) neurons enter membership packs, so a
+3,000-neuron cluster persists 5. Evidence across runs:
+- `📦 New cluster entry: 5 neurons` / `Membership changed: 5→10` (every cluster)
+- earlier run: `Cluster 2213174d: 3122 total neurons, 5 LTM neurons`
+- this run's restore: `Neurons: 0`, then
+  `⚠️ Procedural bank not found for partition ...`
+
+Consequences: learning is essentially discarded at every eviction/restart; a
+resumed brain regrows from nothing (this run: 68K neurons created to relearn
+what it already "knew"); and **P2 cannot be run at all** — there is no
+persisted assembly to regenerate and compare against.
+
+This is not "limited persistence" (the thesis). It is *no* persistence, from a
+constant that was tuned for checkpoint speed. Fixing it is now the top of P3
+and blocks P2.
+
+**Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
+(legacy random cross-cluster wiring into the old `_synapses` dict), not the
+Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).
+Candidate for deletion; it predates the sparse synaptic graph and duplicates
+its job badly. The Hebbian step itself is timed but never reported.
+
 **Still open:**
 - `Clusters: 0` and `Storage size: 103 B` in progress/final stats are bogus
   (read storage before first save).

@@ -1577,6 +1577,11 @@ namespace GreyMatter.Core
                 foreach (var m in matches)
                 {
                     if (m.similarity < SIMILARITY_THRESHOLD) continue;
+                    // Only probe clusters already resident: FindNeuronsByConcept
+                    // calls EnsureLoadedAsync, so probing every candidate pulls up
+                    // to 5 clusters off the NAS per learn event (measured: find
+                    // 0.8ms → 28.8ms on a resumed brain).
+                    if (!m.cluster.IsLoaded) continue;
                     var existing = await m.cluster.FindNeuronsByConcept(debugLabel);
                     if (existing.Count > 0)
                     {

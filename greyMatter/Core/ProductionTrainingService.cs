@@ -308,7 +308,15 @@ namespace GreyMatter.Core
             {
                 // Determine which dataset to load
                 string datasetName;
-                if (_currentPhase != null)
+                if (!_useProgressiveCurriculum)
+                {
+                    // Curriculum disabled: stay on the pinned dataset. (Previously
+                    // this path still consulted the curriculum, so a --no-curriculum
+                    // run silently switched to 'news' when the batch was exhausted.)
+                    datasetName = _datasetKey;
+                    Console.WriteLine($"   Loading pinned dataset: {datasetName}");
+                }
+                else if (_currentPhase != null)
                 {
                     datasetName = _currentPhase.DatasetKey;
                     Console.WriteLine($"   Loading curriculum dataset: {datasetName}");

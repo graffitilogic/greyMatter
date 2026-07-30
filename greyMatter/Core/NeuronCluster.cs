@@ -20,6 +20,12 @@ namespace GreyMatter.Core
         
         // Lazy loading state
         private bool _isLoaded = false;
+
+        /// <summary>
+        /// True when neurons are resident in memory. Callers on the hot path use
+        /// this to avoid triggering a disk/NAS load for a speculative check.
+        /// </summary>
+        public bool IsLoaded => _isLoaded;
         private Dictionary<Guid, HybridNeuron> _neurons = new();
         private readonly object _loadLock = new object();
         
