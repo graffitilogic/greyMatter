@@ -952,6 +952,40 @@ Two measurement fixes, since both diagnostics had gone stale:
   requires the strongest control to sit below the *weakest* trained cue, i.e.
   that a separating threshold exists at all.
 
+#### P2.2 — the previous run's silent control was VARIANCE, and MatchQuality had a bug
+
+Re-run with identical settings: `qwertyuiop` went from **0.000 (silent)** to
+**0.544 / 6 active**. The "first control ever rejected" was run-to-run noise, not
+a property. Recording that plainly because it was nearly written up as progress.
+
+Measured margin with the new metric: **0.024**
+(trained mean 0.625, weakest trained 0.559, strongest control 0.601). Controls
+sit *inside* the trained range. Every cue — word or keyboard mash — lands in a
+narrow 0.55–0.68 band.
+
+**Cause: my cosine implementation normalised by the wrong denominator.**
+`wNorm` was accumulated *inside* the loop over `inputs`, so it summed only the
+weights that overlapped the current cue. A neuron with 8 input lines of which a
+cue drove just 1 was normalised by that single weight — and scored as though it
+had matched perfectly. Cosine was therefore measuring "of the lines we share, how
+aligned are we", which is near-1 for almost any pair of non-negative vectors, and
+is why the whole corpus compressed into a 0.13-wide band.
+
+*Fixed:* ‖w‖ now spans the neuron's **entire receptive field**, so the quantity
+becomes *how much of what I listen for is actually present*. A cue driving
+different input lines now scores near zero rather than near one. Requires
+distinguishing feature weights from synapses inside the shared `InputWeights`
+dictionary — `FeatureMapper.GetFeatureNeuronIds()` added for that.
+
+Thresholds recalibrated: a neuron listens to ~20% of a cue's lines, so a perfect
+match is bounded well below 1.0 — the ceiling is set by sparsity, identically for
+every neuron. Recall 0.5 → **0.2**, Hebbian 0.3 → **0.12**. The old values were
+calibrated against the broken denominator.
+
+**Method note:** one run is not a result. `qwertyuiop` flipping from 0.000 to
+0.544 across identical configurations means single-run controls cannot establish
+discrimination. Future claims need either multiple seeds or a wider cue set.
+
 **Next mechanism (biology): intrinsic homeostatic plasticity.** Cortical neurons
 regulate their own excitability toward a target firing rate — a cell that
 responds to everything becomes harder to excite. That is precisely the remaining

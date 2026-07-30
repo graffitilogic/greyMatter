@@ -663,7 +663,7 @@ namespace GreyMatter.Core
                 EnsureFeatureWiring(neuron, trainingFeatures);
 
             var contest = conceptNeurons
-                .Select(n => (neuron: n, match: n.MatchQuality(trainingInputs)))
+                .Select(n => (neuron: n, match: n.MatchQuality(trainingInputs, _featureMapper.GetFeatureNeuronIds())))
                 .OrderByDescending(p => p.match)
                 .ToList();
 
@@ -1926,7 +1926,7 @@ namespace GreyMatter.Core
                 // P2.1: MatchQuality, not CurrentPotential — the competitive path no
                 // longer calls ProcessInputs, so the old reading reported 0.00
                 // everywhere and the diagnostic was silently useless.
-                var match = n.MatchQuality(inputsById);
+                var match = n.MatchQuality(inputsById, _featureMapper.GetFeatureNeuronIds());
                 deltas.Add(match);
                 if (match > RecallMatchThreshold) firing++;
                 if (n.HasPendingStm) pendingStm++;
@@ -1982,14 +1982,18 @@ namespace GreyMatter.Core
         /// genuine similarity, so this is now a meaningful bar rather than a
         /// threshold on an unbounded sum.
         /// </summary>
-        private const double RecallMatchThreshold = 0.5;
+        // Recalibrated for full-receptive-field normalisation (P2.2). A neuron
+        // listens to ~20% of a cue's input lines, so even a perfect match is
+        // bounded well below 1.0 — the ceiling is set by sparsity, identically for
+        // every neuron. The old 0.5 was calibrated against the broken denominator.
+        private const double RecallMatchThreshold = 0.2;
 
         /// <summary>
         /// Minimum cosine match to count as co-active for Hebbian wiring. On the
         /// same [0,1] scale as recall, deliberately lower: wiring should tolerate
         /// weaker participation than recall asserts.
         /// </summary>
-        private const double HebbianCoactivationThreshold = 0.3;
+        private const double HebbianCoactivationThreshold = 0.12;
 
         // P2.1 competitive-learning constants (lateral inhibition)
         private const double CompetitiveWinnerFraction = 0.25;  // top quarter of the assembly learns
@@ -2264,7 +2268,7 @@ namespace GreyMatter.Core
             // partially-overlapping pattern saturate the neuron, which is how
             // "qwertyuiop" scored 0.993. Cosine asks how ALIGNED the input is with
             // what this neuron is tuned to.
-            return neuron.MatchQuality(inputs);
+            return neuron.MatchQuality(inputs, _featureMapper.GetFeatureNeuronIds());
         }
 
         private static readonly Dictionary<string, double> EmptyContext = new();

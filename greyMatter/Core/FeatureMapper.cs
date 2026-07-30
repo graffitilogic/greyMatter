@@ -58,6 +58,19 @@ namespace GreyMatter.Core
         /// <summary>
         /// Get all registered features
         /// </summary>
+        /// <summary>
+        /// Every neuron ID that represents a FEATURE INPUT line. Needed to tell a
+        /// neuron's receptive field apart from its synapses, which share the same
+        /// InputWeights dictionary. Cached; invalidated when a new feature appears.
+        /// </summary>
+        public HashSet<Guid> GetFeatureNeuronIds()
+        {
+            if (_featureIdCache == null || _featureIdCache.Count != _featureToNeuronId.Count)
+                _featureIdCache = new HashSet<Guid>(_featureToNeuronId.Values);
+            return _featureIdCache;
+        }
+        private HashSet<Guid>? _featureIdCache;
+
         public IEnumerable<string> GetAllFeatures()
         {
             return _featureToNeuronId.Keys;

@@ -145,23 +145,43 @@ namespace GreyMatter.Core
         /// InputWeights (other neurons' IDs) are naturally excluded — they are never
         /// input lines.
         /// </summary>
-        public double MatchQuality(Dictionary<Guid, double> inputs)
+        public double MatchQuality(Dictionary<Guid, double> inputs, HashSet<Guid>? featureInputIds = null)
         {
             if (inputs.Count == 0) return 0.0;
 
-            double dot = 0, wNorm = 0, xNorm = 0;
+            double dot = 0, xNorm = 0;
             foreach (var input in inputs)
             {
                 var x = input.Value;
                 xNorm += x * x;
                 if (InputWeights.TryGetValue(input.Key, out var w))
-                {
                     dot += x * w;
-                    wNorm += w * w;
-                }
             }
+            if (dot <= 0 || xNorm <= 0) return 0.0;
 
-            if (dot <= 0 || wNorm <= 0 || xNorm <= 0) return 0.0;
+            // ||w|| must span the neuron's WHOLE receptive field, not just the part
+            // that happens to overlap this cue.
+            //
+            // P2.1 BUG (fixed here): wNorm was accumulated only inside the loop
+            // above, i.e. only over overlapping keys. A neuron with 8 input lines of
+            // which a cue drove just 1 was normalised by that single weight and
+            // scored as if it had matched perfectly. Every cue — word or gibberish —
+            // therefore landed in a narrow 0.55–0.68 band and the discrimination
+            // margin measured 0.024.
+            //
+            // With the full receptive field in the denominator, "how much of what I
+            // listen for is actually present" becomes the quantity, and a cue that
+            // drives different input lines scores near zero.
+            double wNorm = 0;
+            foreach (var kvp in InputWeights)
+            {
+                // Synapses share this dictionary with feature inputs; only feature
+                // lines are part of the receptive field.
+                if (featureInputIds != null && !featureInputIds.Contains(kvp.Key)) continue;
+                wNorm += kvp.Value * kvp.Value;
+            }
+            if (wNorm <= 0) return 0.0;
+
             return Math.Clamp(dot / (Math.Sqrt(wNorm) * Math.Sqrt(xNorm)), 0.0, 1.0);
         }
 
