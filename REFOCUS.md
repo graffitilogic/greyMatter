@@ -1246,6 +1246,37 @@ can be thrown away and still recall?**
   100% across all thresholds would mean the baseline is still not load-bearing
   and I have missed something again.
 
+#### P3 first result (2026-07-30) — the failure mode exists
+
+**Fidelity fell from ~100% to 83.2%.** For the first time regeneration *costs*
+something, which is the whole point: recall now depends on structure that is
+generated rather than stored. Per-cue losses are uneven and informative —
+`so` 43.8%, `it` 68.8%, `are` 75.0%, against `you` at 100%.
+
+**Compression 1.66x → 4.68x** (12,650,224 → 2,704,080 bytes for 35,930 neurons):
+~75 bytes per neuron where it was ~212, of which ~60B is irreducible
+identity/metadata. So the *learned* portion collapsed from ~150B to ~15B.
+
+**But the procedural-content diagnostic was wrong and I nearly reported it.**
+It counted weights held **in memory**, which is independent of the persistence
+threshold — hence a flat "0.4%, 42.4 weights" across an entire budget sweep while
+the compression ratio was moving. It was measuring the wrong side of the save.
+Fixed: `EnhancedBrainStorage` now records what actually reached disk
+(`LastSaveWeightsStored` vs `LastSaveWeightsInMemory`), and the report states the
+fraction of the receptive field **regenerated** rather than a byte percentage
+dominated by fixed identity overhead.
+
+**Threshold sweep (0.25 / 1.0 / 4.0 / 16.0):** fidelity 84.0 / 84.7 / 81.2 /
+81.6 — a shallow downward trend, no sharp knee, and within run-to-run noise
+(AUC swung 0.913–0.990 across the same four runs). Two readings are possible and
+the fixed diagnostic should separate them: either the budget genuinely has a
+broad flat region, or the sweep barely changed what was stored. The stored-weight
+count per neuron will now say which.
+
+**Also visible:** discrimination margin went slightly negative (−0.010, −0.011)
+in two sweep runs while AUC stayed 0.91–0.99 — more evidence that the strict
+min/max margin is the noisy statistic and AUC/d′ are the ones to trust.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

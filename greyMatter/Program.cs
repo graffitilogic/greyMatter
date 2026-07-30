@@ -419,10 +419,10 @@ namespace GreyMatter
             Console.WriteLine();
             Console.WriteLine("── What this fidelity number covers ──");
             Console.WriteLine(brain.GetProceduralContentReport());
-            Console.WriteLine("   ⚠️  MatchQuality (the recall measure) reads InputWeights only — never");
-            Console.WriteLine("      Threshold/Bias, which are the only VQ-regenerated properties.");
-            Console.WriteLine("      So this measures EXPLICIT PERSISTENCE round-tripping, not procedural");
-            Console.WriteLine("      regeneration. 100% is expected and does not test the thesis.");
+            Console.WriteLine("   ✅ P3: the receptive field is now REGENERATED from (VqCode, identity) and");
+            Console.WriteLine("      only learned deviations are stored, so recall depends on the");
+            Console.WriteLine("      procedural path. Fidelity below 100% is the cost of that regeneration —");
+            Console.WriteLine("      the failure mode the experiment previously could not have.");
 
             Console.WriteLine();
             Console.WriteLine($"DISCRIMINATION:        margin={margin:F3}  AUC={auc:F3}  d′={dPrime:F2}");

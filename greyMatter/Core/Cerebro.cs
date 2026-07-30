@@ -2921,33 +2921,27 @@ namespace GreyMatter.Core
         /// </summary>
         public string GetProceduralContentReport()
         {
-            long neurons = 0, weights = 0;
-            foreach (var clusterId in _loadedClusters.GetKeys())
-            {
-                if (!_loadedClusters.TryGetValue(clusterId, out var cluster) || cluster == null) continue;
-                if (!cluster.IsLoaded) continue;
-                var ns = cluster.GetNeuronsAsync().GetAwaiter().GetResult();
-                foreach (var n in ns.Values)
-                {
-                    neurons++;
-                    foreach (var w in n.InputWeights)
-                        if (Math.Abs(w.Value) > 0.1) weights++;
-                }
-                if (neurons > 20000) break;   // sample is enough
-            }
-            if (neurons == 0) return "   🧬 Procedural content: no resident neurons to sample";
+            // P3.1 FIX: this used to count weights held in MEMORY, which is
+            // independent of the persistence threshold — so it reported a flat 0.4%
+            // across an entire budget sweep while the compression ratio moved
+            // 1.66x → 4.68x. It was measuring the wrong side of the save.
+            // Now it reports what actually reached disk.
+            var neurons = _storage.LastSaveNeuronCount;
+            if (neurons == 0) return "   🧬 Procedural content: no procedural save recorded yet";
 
-            const int vqCodeBytes = 4;      // the only regenerated-from part
-            const int identityMetaBytes = 60;  // Id, ClusterId, importance, count, tag
-            const int bytesPerWeight = 20;     // Guid + float, persisted verbatim
+            double storedPerNeuron = (double)_storage.LastSaveWeightsStored / neurons;
+            double memoryPerNeuron = (double)_storage.LastSaveWeightsInMemory / neurons;
+            double regenerated = memoryPerNeuron > 0
+                ? 1.0 - storedPerNeuron / memoryPerNeuron : 0;
+            double compactPerNeuron = (double)_storage.LastSaveCompactBytes / neurons;
+            double fullPerNeuron = (double)_storage.LastSaveFullBytes / neurons;
 
-            double avgWeights = (double)weights / neurons;
-            double explicitBytes = identityMetaBytes + avgWeights * bytesPerWeight;
-            double proceduralFraction = vqCodeBytes / (vqCodeBytes + explicitBytes);
-
-            return $"   🧬 Procedural content: {proceduralFraction:P1} of each persisted neuron " +
-                   $"({vqCodeBytes}B VQ code vs {explicitBytes:F0}B explicit: " +
-                   $"{avgWeights:F1} weights × {bytesPerWeight}B + {identityMetaBytes}B identity/meta)";
+            return
+                $"   🧬 Receptive field: {memoryPerNeuron:F1} weights per neuron, " +
+                $"{storedPerNeuron:F2} persisted → {regenerated:P1} REGENERATED from (VqCode, identity)\n" +
+                $"   🧬 Bytes per neuron: {compactPerNeuron:F0} compact vs {fullPerNeuron:F0} full " +
+                $"({(compactPerNeuron > 0 ? fullPerNeuron / compactPerNeuron : 0):F2}x), of which " +
+                $"~60B is irreducible identity/metadata";
         }
 
         public void AttachConfiguration(CerebroConfiguration config)

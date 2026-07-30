@@ -37,6 +37,14 @@ namespace GreyMatter.Storage
         /// P3: hand the store what it needs to generate receptive fields rather than
         /// store them — feature naming, the sparse-subset rule, and the codebook.
         /// </summary>
+        /// <summary>P3: stats from the most recent procedural save, for reporting
+        /// what was actually persisted rather than what sits in memory.</summary>
+        public long LastSaveWeightsStored { get; private set; }
+        public long LastSaveWeightsInMemory { get; private set; }
+        public int LastSaveFullBytes { get; private set; }
+        public int LastSaveCompactBytes { get; private set; }
+        public int LastSaveNeuronCount { get; private set; }
+
         public void ConfigureProceduralReceptiveFields(
             GreyMatter.Core.FeatureMapper mapper,
             Func<Guid, string, bool> samplesFeature,
@@ -674,6 +682,8 @@ namespace GreyMatter.Storage
             // Track compression statistics
             int totalFullBytes = 0;
             int totalCompactBytes = 0;
+            LastSaveWeightsStored = 0;
+            LastSaveWeightsInMemory = 0;
             int neuronCount = 0;
             int skippedCount = 0;
             
@@ -701,6 +711,11 @@ namespace GreyMatter.Storage
                         _globalNeuronStore.CodebookFor(neuron.VqCode),
                         _globalNeuronStore.ProceduralDeviationThreshold);
                     totalCompactBytes += procedural.EstimatedBytes();
+                    // P3: what actually reached disk, vs what the neuron holds in
+                    // memory. The gap is the receptive field that regeneration
+                    // reconstructs for free.
+                    LastSaveWeightsStored += procedural.SynapticWeights.Count;
+                    LastSaveWeightsInMemory += snapshot.InputWeights.Count(w => Math.Abs(w.Value) > 0.1);
                     neuronCount++;
                 }
             }
@@ -725,6 +740,9 @@ namespace GreyMatter.Storage
             await Task.WhenAll(tasks);
             
             // Log compression statistics
+            LastSaveFullBytes = totalFullBytes;
+            LastSaveCompactBytes = totalCompactBytes;
+            LastSaveNeuronCount = neuronCount;
             var compressionRatio = totalFullBytes > 0 ? (double)totalFullBytes / totalCompactBytes : 1.0;
             var savedBytes = totalFullBytes - totalCompactBytes;
             
