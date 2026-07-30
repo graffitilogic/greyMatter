@@ -2174,21 +2174,41 @@ namespace GreyMatter.Core
         /// Calculate how strongly a neuron should activate given input features
         /// Uses cosine similarity between input and neuron's learned patterns
         /// </summary>
+        /// <summary>
+        /// Activation of a neuron given an input pattern.
+        ///
+        /// P2 FIX: this used to ignore `featureVector` entirely and return
+        /// `0.3 + importance*0.5` — a function of the neuron alone. Consequences,
+        /// all confirmed by the first fidelity run:
+        ///   • every neuron in a cluster returned the same value for ANY cue;
+        ///   • the nonsense controls "qwertyuiop"/"zxcvbnmasd" activated exactly
+        ///     as strongly as "the" and "water" (top act 0.54/0.63);
+        ///   • recall through this path was never pattern-based, which retroactively
+        ///     invalidates the novelty-detection claims in
+        ///     docs/SYNAPTIC_NOVELTY_DETECTION.md.
+        ///
+        /// Now uses the same neuron model as training: build the concept's input
+        /// lines, run them through ProcessInputs, and report activation above
+        /// resting on the same tanh(delta/20) scale as the Hebbian gate — so probe
+        /// and training agree about what "active" means.
+        ///
+        /// Context features are deliberately omitted: a probe carries concept
+        /// identity only, so recall is tested against the concept rather than
+        /// against a remembered sentence.
+        /// </summary>
         private double CalculateNeuronActivation(HybridNeuron neuron, double[] featureVector)
         {
-            // Check neuron's importance score (how well it was trained)
-            var importance = neuron.ImportanceScore;
-            
-            if (importance < 0.1)
-                return 0.0; // Weakly trained neuron
-            
-            // For Phase 1: Return baseline activation for trained neurons
-            // This ensures we activate EXISTING neurons, not create new ones
-            // Phase 2 will enhance this with actual feature similarity calculations
-            
-            // Baseline activation weighted by neuron importance
-            return Math.Min(0.8, 0.3 + importance * 0.5);
+            var probeFeatures = BuildTrainingFeatures(featureVector, EmptyContext);
+            var inputs = _featureMapper.ConvertFeaturesToNeuronInputs(probeFeatures);
+
+            neuron.ProcessInputs(inputs);
+            var delta = neuron.CurrentPotential - neuron.RestingPotential;
+            if (delta <= 0) return 0.0;
+
+            return Math.Tanh(delta / 20.0);
         }
+
+        private static readonly Dictionary<string, double> EmptyContext = new();
 
         /// <summary>
         /// Phase 2: Propagate activation through synaptic graph in cascading layers

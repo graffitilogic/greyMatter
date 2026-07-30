@@ -265,11 +265,36 @@ namespace GreyMatter
 
             var meanFidelity = fidCount > 0 ? fidSum / fidCount : 0;
 
+            // ── Control check: gibberish must NOT activate ──────────────────
+            var controls = new[] { "qwertyuiop", "zxcvbnmasd" };
+            var controlActive = controls.Sum(c => baseline[c].Count);
+            var trainedMeanActive = trained.Count > 0 ? trained.Average(c => baseline[c].Count) : 0;
+
+            Console.WriteLine();
+            Console.WriteLine("── Controls (never in corpus — should activate ~nothing) ──");
+            foreach (var c in controls)
+            {
+                var top = baseline[c].Count > 0 ? baseline[c][0].activation : 0;
+                Console.WriteLine($"   {c,-12} active={baseline[c].Count,3}  top act={top:F3}");
+            }
+            var controlsClean = controlActive == 0 ||
+                                (trainedMeanActive > 0 && controlActive / 2.0 < trainedMeanActive * 0.25);
+            Console.WriteLine(controlsClean
+                ? "   ✅ controls silent — activation is concept-specific"
+                : "   ❌ CONTROLS ACTIVATE AS STRONGLY AS TRAINED CUES — the probe is not " +
+                  "pattern-based, and every number below is meaningless.");
+
             Console.WriteLine();
             Console.WriteLine("════════════════════════════════════════");
             Console.WriteLine($"REGENERATION FIDELITY: {meanFidelity:P1}  (mean over {fidCount} cues, top-{topK})");
             Console.WriteLine($"CROSS-CONCEPT OVERLAP: {meanCross:P1}");
+            Console.WriteLine($"CONTROLS:              {(controlsClean ? "clean" : "ACTIVE — RESULT INVALID")}");
             Console.WriteLine("════════════════════════════════════════");
+            if (!controlsClean)
+            {
+                Console.WriteLine("🔴 RESULT INVALID — controls activated. Fix the probe before reading fidelity.");
+                return;
+            }
             Console.WriteLine(meanFidelity switch
             {
                 >= 0.95 => "✅ Thesis supported at this scale: procedural regeneration preserves the assembly.",

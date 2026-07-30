@@ -722,6 +722,47 @@ measured is not concept-specific recall.
   ≥95% fidelity *and* <25% cross-concept overlap = thesis supported at this
   scale. Lower fidelity = we learn precisely what regeneration loses.
 
+### P2 run #1 — 100% fidelity, and it is **INVALID** (2026-07-30)
+
+Reported `REGENERATION FIDELITY: 100.0%`, `CROSS-CONCEPT OVERLAP: 0.0%`,
+"thesis supported". It is not. The controls caught it, which is the only reason
+this wasn't written up as a success.
+
+**`qwertyuiop` and `zxcvbnmasd` — strings never in the corpus — activated 10
+neurons each at 0.54 / 0.63, indistinguishable from "the" (10 @ 0.61) and
+"water" (16 @ 0.62).** Three bugs behind it:
+
+1. **`CalculateNeuronActivation` ignored its `featureVector` parameter entirely.**
+   It returned `0.3 + importance*0.5` — a property of the neuron, not of the cue.
+   Every neuron in a cluster returned the same value for any input. The comment
+   said "Phase 2 will enhance this with actual feature similarity"; it never was.
+   Recall through this path has **never** been pattern-based, which retroactively
+   invalidates the novelty-detection claims in `docs/SYNAPTIC_NOVELTY_DETECTION.md`
+   ("neural networks cascades, qawsedrftg activates nothing").
+   *Fixed:* the probe now builds the concept's input lines and runs the real
+   neuron model (`ProcessInputs`), reporting activation on the same
+   tanh(delta/20) scale as the Hebbian gate. Context features are omitted so a
+   probe carries concept identity only.
+
+2. **`ProceduralNeuronRegenerator.RegenerateNeuron` dropped the VQ code.** The
+   temp snapshot it rebuilds from omitted `VqCode`, so a neuron that had been
+   procedurally saved once came back with none and was skipped on the next save
+   — `170/170 neurons "has no VQ code"`, `Procedural save: 0 neurons`.
+   Procedural persistence was a **one-way trip**. *Fixed:* carry `VqCode`.
+
+3. **Consequently the eviction persisted nothing** (`examined=17, changed=0,
+   packsWritten=0`), so the re-probe re-read the same files A had read. The
+   experiment measured whether reading a file twice is deterministic. It is.
+
+Also: 0.0% cross-concept overlap across all 91 pairs was not evidence of good
+selectivity — with an importance-only activation, each cue simply resolved to a
+different cluster via `_regionToClusterMapping` and never touched another's
+neurons. Perfect scores on both axes should have read as alarming, not good.
+
+**Harness hardened:** controls are now checked explicitly and the run
+**aborts before printing a verdict** if they activate. A fidelity number is no
+longer reportable when the probe can't tell language from noise.
+
 ### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
 - Procedural loading becomes the *default* path, not the fallback.
 - Add a **persistence budget**: top-k synapses per neuron, dirty-region-only writes.

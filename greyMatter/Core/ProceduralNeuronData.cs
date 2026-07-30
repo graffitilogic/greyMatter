@@ -165,7 +165,13 @@ namespace GreyMatter.Core
                 LearningRate = BASE_LEARNING_RATE,
                 InputWeights = new Dictionary<Guid, double>(),
                 AssociatedConcepts = new List<string> { compactData.ConceptTag },
-                LastUsed = DateTime.UtcNow
+                LastUsed = DateTime.UtcNow,
+                // P2 FIX: the VQ code was dropped here, so a neuron that had been
+                // procedurally saved once could never be procedurally saved again —
+                // it came back with VqCode == null and the next save skipped it
+                // ("has no VQ code - skipping procedural save", 170/170 neurons).
+                // Procedural persistence was therefore a one-way trip.
+                VqCode = compactData.VqCode
             };
             
             // Regenerate from snapshot to get proper identity
