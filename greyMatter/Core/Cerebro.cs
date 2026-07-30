@@ -272,6 +272,17 @@ namespace GreyMatter.Core
         private const int DecayEveryNLearnEvents = 5000;
         private int _learnEventsSinceDecay;
 
+        // VQ codebook warmup: adapt to the data, then freeze so pattern → code
+        // (and therefore concept → cluster) assignment stops drifting. See
+        // VectorQuantizer.IsLearning for why drift is harmful in two places.
+        private const long VqWarmupUpdates = 20000;
+
+        // Staged growth: recruit an assembly incrementally instead of allocating
+        // the full target on first sight. Most words in a corpus are seen once
+        // (Zipf), so full-target-on-first-sight is where the neurons went:
+        // 39% of learn events grew ~69 neurons each.
+        private const int FirstAllocationNeurons = 16;
+
         /// <summary>
         /// P1.6 instrumentation: where do neurons come from? reuse% should rise
         /// toward ~100 as vocabulary saturates; grew_events/avg_grow expose
@@ -608,18 +619,29 @@ namespace GreyMatter.Core
                                   $"(pruned {dBefore - dAfter:N0}, blocked_by_budget {dBlocked:N0})");
             }
 
+            // Freeze the VQ codebook once warmed up: stable pattern → code means a
+            // known concept keeps finding its existing assembly, and persisted
+            // neuron VQ codes keep regenerating the same properties.
+            if (_vectorQuantizer.IsLearning && _vectorQuantizer.UpdateCount >= VqWarmupUpdates)
+            {
+                _vectorQuantizer.FreezeCodebook();
+                var vqStatsFreeze = _vectorQuantizer.GetStats();
+                Console.WriteLine($"   🧊 VQ codebook frozen after {VqWarmupUpdates:N0} updates " +
+                                  $"(perplexity {vqStatsFreeze.Perplexity:F2}, utilization {vqStatsFreeze.CodebookUtilization:P1}) " +
+                                  $"— pattern→code assignment is now stable");
+            }
+
             // Dynamic creation balanced by reuse (removed arbitrary hit gating)
             if (conceptNeurons.Count < target)
             {
                 var needed = target - conceptNeurons.Count;
-                // ADPC-Net Phase 2: Allow hypernetwork to allocate full target on first run
-                // Only apply growth cap for subsequent runs (prevents runaway growth)
-                if (conceptNeurons.Count > 0)
-                {
-                    // Apply per-run cap only when growing existing clusters (keeps system stable)
-                    needed = Math.Min(needed, Math.Max(0, MaxAddPerConceptPerRun));
-                }
-                
+                // Staged growth (REFOCUS P1.6d): cap the first allocation too.
+                // A concept earns capacity through repetition rather than being
+                // handed its full target the first time it is ever seen.
+                needed = conceptNeurons.Count > 0
+                    ? Math.Min(needed, Math.Max(0, MaxAddPerConceptPerRun))
+                    : Math.Min(needed, FirstAllocationNeurons);
+
                 if (needed > 0)
                 {
                     var tGrow = Stopwatch.StartNew();

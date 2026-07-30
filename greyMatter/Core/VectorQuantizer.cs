@@ -104,17 +104,39 @@ namespace GreyMatter.Core
         /// Quantize and update codebook with EMA (Exponential Moving Average)
         /// This is the training-time operation
         /// </summary>
+        // ─── Codebook stability (REFOCUS P1.6d) ───
+        // Every QuantizeAndUpdate call used to mutate the codebook, so a stable
+        // concept vector drifted to different codes over time. Consequences:
+        //   1. A known word's home cluster fell out of the candidate set → the
+        //      system re-grew a whole new assembly for a concept it already knew.
+        //   2. Neurons store a VQ code and regenerate their properties from the
+        //      codebook vector — drift after assignment silently changes what a
+        //      persisted neuron regenerates into (a P2 fidelity bug).
+        // Fix: warm up, then freeze. Lookups stay read-only after freezing.
+        public bool IsLearning { get; private set; } = true;
+        public long UpdateCount { get; private set; }
+
+        /// <summary>
+        /// Stop adapting the codebook. Quantization continues (read-only), so
+        /// pattern → code assignment becomes stable and reproducible.
+        /// </summary>
+        public void FreezeCodebook() => IsLearning = false;
+
         public (int code, float commitmentLoss) QuantizeAndUpdate(float[] embedding)
         {
             int code = Quantize(embedding);
-            
+
             // Compute commitment loss: β * ||z_e - sg[e_k]||²
             // (sg = stop gradient, so we only penalize the encoder)
             float commitmentLoss = _commitment * ComputeL2Distance(embedding, _codebook[code]);
-            
-            // EMA update for codebook
-            UpdateCodebookEMA(code, embedding);
-            
+
+            // EMA update for codebook — only while learning
+            if (IsLearning)
+            {
+                UpdateCodebookEMA(code, embedding);
+                UpdateCount++;
+            }
+
             return (code, commitmentLoss);
         }
         
@@ -266,6 +288,11 @@ namespace GreyMatter.Core
         /// <summary>
         /// Import codebook from persistence
         /// </summary>
+        /// <summary>
+        /// Restore a persisted codebook. A loaded codebook is already trained, so
+        /// it stays frozen — otherwise resuming a run would restart the drift that
+        /// invalidates existing cluster indexes and neuron VQ codes.
+        /// </summary>
         public void ImportCodebook(CodebookSnapshot snapshot)
         {
             if (snapshot.CodebookSize != _codebookSize || snapshot.EmbeddingDim != _embeddingDim)
@@ -280,6 +307,9 @@ namespace GreyMatter.Core
             Array.Copy(snapshot.EmaClusterSize, _emaClusterSize, _codebookSize);
             Array.Copy(snapshot.UsageCounts, _usageCounts, _codebookSize);
             _totalEncodings = snapshot.TotalEncodings;
+
+            // Already-trained codebook: keep it stable (see IsLearning notes)
+            IsLearning = false;
         }
         
         /// <summary>

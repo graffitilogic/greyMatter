@@ -136,6 +136,50 @@ path; the checkpoint path only reads, guarded by the existing checkpoint lock.
   (ProductionTrainingService checkpoint metadata). Final-stats label fixed;
   a true distinct-concept count is a TODO.
 
+### P1.6d — VQ codebook drift found (2026-07-29 late)
+
+**Instrumented run (`--no-curriculum`, 5 min):** decay confirmed working —
+`1,920,163 → 1,412,800 (pruned 507,363)`. 3,282 sentences (1.85× the previous
+run), 1.42M synapses persisted, checkpoint 65s. Cumulative vs the pre-budget
+baseline: **46× fewer synapses, ~14× less storage, 6× faster checkpoints.**
+
+**Allocation line answered the open question exactly:**
+`events=791 reuse=63.0% (assembly_pref=498) grew_events=309 (39.1%) avg_grow=69.1`
+- `assembly_pref` (498) == `reuse` (63.0% × 791) → reuse happens *only* when the
+  concept's home cluster appears among candidates; when it doesn't, nothing is
+  found and a fresh assembly is grown.
+- non-reuse (37%) ≈ grew_events (39.1%) → **~95% of neuron growth is a
+  known concept failing to find itself**, not capacity ratcheting.
+
+**Root cause (verified in code, not inferred):**
+`FeatureEncoder.Encode(word)` is fully deterministic — same word, same vector,
+always. But `Cerebro.GetRegionId()` calls `VectorQuantizer.QuantizeAndUpdate()`,
+which runs an EMA codebook update **on every single lookup**. A stable vector
+therefore maps to a drifting code: the word's home region moves, its home
+cluster drops out of the 5-candidate set, and the concept is treated as new.
+
+The same drift is also a latent **P2 fidelity bug**: neurons persist a VQ code
+and `ProceduralNeuronRegenerator` rebuilds Threshold/Bias from
+`GetCodebookVector(code)`. If the codebook moves after a neuron was assigned its
+code, that neuron regenerates into something different from what was saved.
+Freezing serves both problems.
+
+**Fixes:**
+- `VectorQuantizer.IsLearning` + `FreezeCodebook()`; EMA updates only while
+  learning; `ImportCodebook` marks a loaded codebook frozen (resuming a run must
+  not restart the drift).
+- Cerebro freezes after `VqWarmupUpdates = 20,000` and logs perplexity /
+  utilization at the freeze point.
+- **Staged growth:** first allocation capped at `FirstAllocationNeurons = 16`
+  (was: full target, ~69). Capacity is earned through repetition — most words
+  in a corpus are seen once (Zipf), and they were each costing ~69 neurons.
+
+**Exit criterion:** `--no-curriculum` 5-min run on fresh brainData shows
+`reuse%` climbing past ~90 after the freeze, `avg_grow` ≈ 16 for new concepts,
+and total neurons well under the 730K of this run at equal-or-better sentence
+throughput. Requires a brainData reset (region→cluster indexes built under the
+drifting codebook are stale).
+
 **Still open:**
 - `Clusters: 0` and `Storage size: 103 B` in progress/final stats are bogus
   (read storage before first save).
