@@ -202,6 +202,14 @@ namespace GreyMatter.Core
             }
             if (proposed.Count == 0 || strengthAfter <= 0) return;
 
+            // Winning the competition IS firing: record it, so ActivationCount and
+            // ImportanceScore keep tracking usage now that ProcessInputs is no
+            // longer called on the training path.
+            LastActivation = DateTime.UtcNow;
+            ActivationCount++;
+            Fatigue = Math.Min(1.0, Fatigue + 0.1);
+            ImportanceScore = CalculateImportance();
+
             // Synaptic scaling: conserve total strength across the receptive field
             var scale = strengthBefore > 0 ? strengthBefore / strengthAfter : 1.0;
             foreach (var kvp in proposed)

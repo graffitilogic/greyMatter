@@ -308,66 +308,52 @@ namespace GreyMatter.Core
         /// ADPC-Net Phase 3: Record Hebbian co-activation between neurons
         /// Neurons that fire together, wire together
         /// </summary>
-        private void RecordHebbianCoactivation(List<HybridNeuron> activeNeurons)
+        private void RecordHebbianCoactivation(List<(HybridNeuron neuron, double match)> contest)
         {
-            // ALWAYS log first few calls to diagnose synapse creation issue
             var synapseCountBefore = _synapticGraph.GetSynapseCount();
-            var isFirstCall = synapseCountBefore < 100; // Log first 100 synapses
 
             _hebbCalls++;
-            foreach (var n in activeNeurons)
+            foreach (var (_, match) in contest)
             {
-                var delta = n.CurrentPotential - n.RestingPotential;
                 _hebbNeuronsSeen++;
-                _hebbDeltaSum += delta;
-                if (delta < _hebbDeltaMin) _hebbDeltaMin = delta;
-                if (delta > _hebbDeltaMax) _hebbDeltaMax = delta;
+                _hebbDeltaSum += match;
+                if (match < _hebbDeltaMin) _hebbDeltaMin = match;
+                if (match > _hebbDeltaMax) _hebbDeltaMax = match;
             }
 
-            if (activeNeurons.Count < 2)
+            if (contest.Count < 2)
             {
                 _hebbSkippedFewNeurons++;
-                if (isFirstCall || synapseCountBefore % 10000 == 0)
-                    Console.WriteLine($"   🧬 Hebbian: <2 neurons ({activeNeurons.Count}), skipping");
+                DebugLog.Debug($"   🧬 Hebbian: <2 neurons ({contest.Count}), skipping");
                 return; // Need at least 2 neurons for connections
             }
 
-            // Build activation list with neuron IDs and activations.
-            // delta = potential above resting (typically 0..30 for driven neurons).
-            // Normalized to 0..1 via tanh(delta/20) so Hebbian Δw = η·aᵢ·aⱼ stays small
-            // and new synapses don't saturate to max weight at birth.
-            var activations = activeNeurons
-                .Select(n =>
-                {
-                    var delta = Math.Max(0, n.CurrentPotential - n.RestingPotential);
-                    return (n.Id, activation: (float)Math.Tanh(delta / 20.0));
-                })
-                .Where(pair => pair.activation > 0.1f) // ≈ delta > 2.0 above resting
+            // P2.1: co-activation now uses MatchQuality — the same [0,1] measure
+            // used for training and recall — instead of reading CurrentPotential,
+            // which ProcessInputs used to set as a side effect of the old training
+            // path. Removing that call left every neuron at resting potential
+            // (max=-70.000, avg=-70.000, above_threshold=0), so no synapse was ever
+            // created and the graph saved empty.
+            var activations = contest
+                .Where(p => p.match > HebbianCoactivationThreshold)
+                .Select(p => (p.neuron.Id, activation: (float)p.match))
                 .ToList();
             _hebbNeuronsPassed += activations.Count;
             
-            if (isFirstCall || synapseCountBefore % 1000 == 0)
-            {
-                var maxActivation = activeNeurons.Count > 0 ? activeNeurons.Max(n => n.CurrentPotential) : 0.0;
-                var avgActivation = activeNeurons.Count > 0 ? activeNeurons.Average(n => n.CurrentPotential) : 0.0;
-                Console.WriteLine($"   🧬 Hebbian: {activeNeurons.Count} neurons, max={maxActivation:F3}, avg={avgActivation:F3}, above_threshold={activations.Count}");
-                
-                // PHASE 1 DIAGNOSTIC: Sample neuron IDs being passed to synapse creation
-                if (activations.Count >= 2)
-                {
-                    Console.WriteLine($"      [PHASE1] Sample neuron IDs for synapses:");
-                    foreach (var (id, act) in activations.Take(3))
-                    {
-                        Console.WriteLine($"         {id.ToString().Substring(0,8)}: activation={act:F3}");
-                    }
-                }
-            }
-            
+            // Per-call detail is DEBUG only. These lines used to fire on every call
+            // whenever the graph was empty (isFirstCall = count < 100), which during
+            // the zero-synapse regression flooded the console hard enough to
+            // overflow the buffer and hide everything else. The 10s histogram is the
+            // level-0 signal; this is for when you already know what you're hunting.
+            DebugLog.Debug($"   🧬 Hebbian: {contest.Count} neurons, " +
+                           $"match[max={(contest.Count > 0 ? contest.Max(p => p.match) : 0):F3} " +
+                           $"avg={(contest.Count > 0 ? contest.Average(p => p.match) : 0):F3}] " +
+                           $"above_threshold={activations.Count}");
+
             if (activations.Count < 2)
             {
                 _hebbSkippedNonePassed++;
-                if (isFirstCall || synapseCountBefore % 10000 == 0)
-                    Console.WriteLine($"   🧬 Hebbian: <2 above threshold ({activations.Count}), skipping synapse creation");
+                DebugLog.Debug($"   🧬 Hebbian: <2 above threshold ({activations.Count}), skipping synapse creation");
                 return;
             }
 
@@ -376,10 +362,8 @@ namespace GreyMatter.Core
 
             var synapseCountAfter = _synapticGraph.GetSynapseCount();
             _hebbSynapsesCreated += Math.Max(0, synapseCountAfter - synapseCountBefore);
-            if (isFirstCall || synapseCountAfter % 1000 == 0)
-            {
-                Console.WriteLine($"   🧬 Hebbian: Recorded {activations.Count} co-active neurons, total synapses: {synapseCountBefore:N0} → {synapseCountAfter:N0} (+{synapseCountAfter-synapseCountBefore})");
-            }
+            DebugLog.Debug($"   🧬 Hebbian: Recorded {activations.Count} co-active neurons, " +
+                           $"total synapses: {synapseCountBefore:N0} → {synapseCountAfter:N0} (+{synapseCountAfter - synapseCountBefore})");
         }
 
         public Cerebro(string storagePath)
@@ -702,7 +686,7 @@ namespace GreyMatter.Core
 
             // ADPC-Net Phase 3: Record Hebbian co-activation
             var tHebbian = Stopwatch.StartNew();
-            RecordHebbianCoactivation(conceptNeurons);
+            RecordHebbianCoactivation(contest);
             tHebbian.Stop();
 
             // Capacity adjust
@@ -1995,6 +1979,13 @@ namespace GreyMatter.Core
         /// threshold on an unbounded sum.
         /// </summary>
         private const double RecallMatchThreshold = 0.5;
+
+        /// <summary>
+        /// Minimum cosine match to count as co-active for Hebbian wiring. On the
+        /// same [0,1] scale as recall, deliberately lower: wiring should tolerate
+        /// weaker participation than recall asserts.
+        /// </summary>
+        private const double HebbianCoactivationThreshold = 0.3;
 
         // P2.1 competitive-learning constants (lateral inhibition)
         private const double CompetitiveWinnerFraction = 0.25;  // top quarter of the assembly learns

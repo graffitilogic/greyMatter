@@ -889,6 +889,35 @@ Sequencing: prove selectivity works (controls silent) → then make the synaptic
 graph causal → then re-run fidelity. Verifying one mechanism at a time is what
 finally worked in P1.
 
+#### P2.1 first run — regression, caused by my own change
+
+`max=-70.000, avg=-70.000, above_threshold=0` on every call: **zero synapses
+created for the entire run**, graph saved empty, and the console flooded badly
+enough to overflow the buffer.
+
+Cause: the old training path called `neuron.ProcessInputs(inputs)`, which set
+`CurrentPotential` **as a side effect**. `RecordHebbianCoactivation` read that
+field to decide who was co-active. The competitive pass replaced `ProcessInputs`
+with `MatchQuality` (a pure function) and `ReinforceTowardInput`, so
+`CurrentPotential` sat at its initial value — resting, exactly −70 — and nothing
+ever passed the gate. A hidden dependency on mutable state left behind by a
+function called for a different purpose.
+
+Fixes:
+- `RecordHebbianCoactivation` now takes the competition results and uses
+  **MatchQuality** directly, so training, wiring and recall all share one [0,1]
+  activation measure and none of them depend on residual neuron state.
+- `ReinforceTowardInput` records the win as a firing event (ActivationCount,
+  LastActivation, Fatigue, ImportanceScore) — winning the competition *is*
+  firing, and those fields feed consolidation ordering and procedural save.
+- All per-call Hebbian logging moved to `DebugLog.Debug`. It was gated on
+  `isFirstCall = synapseCount < 100`, so with an empty graph it fired on **every
+  call forever**. The 10-second histogram remains the level-0 signal.
+
+Also observed: writing and re-reading 256 empty synapse partitions costs ~50s
+each way — the fidelity run wasn't hung, it was iterating empty partitions over
+the NAS. Worth short-circuiting when the graph is empty.
+
 ### P3 — Reinstate limited persistence (the deferred "Phase 2", now the point)
 - Procedural loading becomes the *default* path, not the fallback.
 - Add a **persistence budget**: top-k synapses per neuron, dirty-region-only writes.
