@@ -448,6 +448,47 @@ repeat encounters reinforce rather than recruit. `reuse%` 96.7–97.4%.
 (more InputWeights per neuron). If ON/OFF restores activation, consider
 lowering `ConceptFeatureDims` from 32 to trade discriminability for speed.
 
+### P1.6l — ON/OFF fixed the regression, lockstep returned (2026-07-30 11:16)
+
+Rectification did exactly what it was supposed to, and nothing more:
+`delta_min` 0.00 (was −6.84), `none_passed` 0 (was 257–318), mean delta
+2.04 → 3.8. My P1.6k regression is gone.
+
+**But `passed%` is back to 22.1–22.4% and `above_threshold` is 16 again** —
+the multiple-of-16 lockstep returned. Taken together with P1.6j:
+
+| variant | inputs | delta | passed% | lockstep |
+|---|---|---|---|---|
+| sentence fingerprint | non-neg | 4.1 | 22.2% | yes (16) |
+| concept, signed | signed | 2.04 | 18.5% | **broken** (0–16 spread) |
+| concept, rectified | non-neg | 3.8 | 22.2% | yes (16) |
+
+The spread in the signed variant was **cancellation noise**, not discrimination —
+random weight signs made sums land either side of threshold. Remove the noise and
+the underlying behaviour reappears unchanged. So concept-vs-sentence features were
+never what pinned the rate: something makes exactly ~16 neurons per concept
+eligible to fire regardless of what is fed in.
+
+Ruled out by code inspection this round: cross-concept pollution via
+`AssociatedConcepts` — `NeuronCluster.AddNeuronAsync` associates neurons with
+`ConceptDomain`, which is `pattern_vq_N`, never a word.
+
+**No fourth theory.** Added `LogReceptiveFieldOverlap` (sampled 1-in-4000 learn
+events, concepts with >20 neurons), reporting per concept: how many of its
+neurons have **zero** input-weight overlap with the current input lines, how many
+partial, how many full, plus median/max delta and firing count. That separates
+the two candidate explanations directly:
+- `none=62 full=16` → wiring gap: most neurons never received weights for these
+  inputs (`TrainNeuronWithFeatures` only initialises when `InputWeights` is
+  empty, so a neuron keeps whatever key set it was born with).
+- `full=78, firing=16` → excitability: the weights exist and the sums are simply
+  too low, pointing at threshold/normalisation rather than wiring.
+
+**Retained from the concept-feature work** (worth keeping regardless): neurons
+189,033 vs 280,583 pre-P1.6j, reuse 95–97%.
+**Still costing:** 29.2 sent/sec (vs 48.7), compression 1.68x (vs 2.38x) —
+both from the larger feature set; revisit once the 16 is explained.
+
 **Also observed:** `syn` in the Perf line is `CreateConceptualConnections`
 (legacy random cross-cluster wiring into the old `_synapses` dict), not the
 Hebbian step — it loads up to 3 clusters per learn event (35-105ms on resume).

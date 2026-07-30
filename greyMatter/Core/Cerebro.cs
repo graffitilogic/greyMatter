@@ -671,6 +671,15 @@ namespace GreyMatter.Core
             }
             tTrain.Stop();
 
+            // P1.6l diagnostic: why do only ~16 of a concept's neurons ever fire?
+            // Distinguishes "neuron has no weights for these inputs" (wiring gap)
+            // from "has the weights but sums too low" (excitability problem).
+            if (++_receptiveFieldSampleCounter >= ReceptiveFieldSampleEvery && conceptNeurons.Count > 20)
+            {
+                _receptiveFieldSampleCounter = 0;
+                LogReceptiveFieldOverlap(concept, conceptNeurons, trainingFeatures);
+            }
+
             // ADPC-Net Phase 3: Record Hebbian co-activation
             var tHebbian = Stopwatch.StartNew();
             RecordHebbianCoactivation(conceptNeurons);
@@ -1829,6 +1838,45 @@ namespace GreyMatter.Core
         // encoding; sentence context is retained but down-weighted to modulation.
         private const int ConceptFeatureDims = 32;   // top-magnitude dims, keeps input sparse
         private const double ContextFeatureWeight = 0.25;
+
+        // P1.6l: receptive-field overlap diagnostic
+        private const int ReceptiveFieldSampleEvery = 4000;
+        private int _receptiveFieldSampleCounter;
+
+        private void LogReceptiveFieldOverlap(string concept, List<HybridNeuron> neurons, Dictionary<string, double> inputs)
+        {
+            var inputIds = new HashSet<Guid>();
+            foreach (var key in inputs.Keys)
+                inputIds.Add(_featureMapper.GetNeuronIdForFeature(key));
+
+            int noOverlap = 0, partial = 0, full = 0;
+            int firing = 0;
+            double sumCoverage = 0;
+            var deltas = new List<double>(neurons.Count);
+
+            foreach (var n in neurons)
+            {
+                int hits = 0;
+                foreach (var id in inputIds)
+                    if (n.InputWeights.ContainsKey(id)) hits++;
+
+                var coverage = inputIds.Count == 0 ? 0 : (double)hits / inputIds.Count;
+                sumCoverage += coverage;
+                if (hits == 0) noOverlap++;
+                else if (coverage > 0.95) full++;
+                else partial++;
+
+                var delta = n.CurrentPotential - n.RestingPotential;
+                deltas.Add(delta);
+                if (delta > 2.0) firing++;
+            }
+
+            deltas.Sort();
+            var median = deltas.Count > 0 ? deltas[deltas.Count / 2] : 0;
+            Console.WriteLine($"   🔬 RF[{concept}]: neurons={neurons.Count} inputs={inputIds.Count} " +
+                              $"coverage[none={noOverlap} partial={partial} full={full} avg={sumCoverage / Math.Max(1, neurons.Count):P0}] " +
+                              $"delta[med={median:F2} max={(deltas.Count > 0 ? deltas[^1] : 0):F2}] firing={firing}");
+        }
 
         private Dictionary<string, double> BuildTrainingFeatures(double[] conceptVector, Dictionary<string, double> contextFeatures)
         {
