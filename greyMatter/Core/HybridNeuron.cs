@@ -36,7 +36,23 @@ namespace GreyMatter.Core
         
         // Metadata for clustering and persistence
         public string ConceptTag { get; set; } = "";
-        public HashSet<string> AssociatedConcepts { get; private set; } = new();
+
+        /// <summary>
+        /// P4.5: the concept this neuron was ALLOCATED for — the first one
+        /// associated, never overwritten. Distinct from AssociatedConcepts, which
+        /// also accumulates the owning cluster's ConceptDomain (see
+        /// NeuronCluster.AddNeuronAsync) and any other context the neuron meets.
+        ///
+        /// This exists because ConceptTag used to be a JOIN of up to three
+        /// concepts, and procedural regeneration rebuilt AssociatedConcepts from
+        /// that join as a single literal string ("the,pattern_a1b2c3"). Concept
+        /// identity therefore did not survive a save/load round trip.
+        /// </summary>
+        public string PrimaryConcept { get; private set; } = "";
+
+        // Case-insensitive: concepts are lowercased on association, but callers
+        // (debugLabel, cue words) are not guaranteed to be.
+        public HashSet<string> AssociatedConcepts { get; private set; } = new(StringComparer.OrdinalIgnoreCase);
         public double ImportanceScore { get; private set; } = 0.0;
 
         // New: Provisional flag (STM-only neuron not yet consolidated to LTM)
@@ -65,7 +81,10 @@ namespace GreyMatter.Core
 
         public HybridNeuron(string conceptTag = "")
         {
-            ConceptTag = conceptTag;
+            // Legacy data may carry a comma-joined tag; the allocation concept is
+            // the first element. Harmless for well-formed single-token tags.
+            ConceptTag = conceptTag?.Split(',')[0].Trim() ?? "";
+            PrimaryConcept = ConceptTag.ToLowerInvariant();
             CurrentPotential = RestingPotential;
         }
 
@@ -361,14 +380,25 @@ namespace GreyMatter.Core
         /// </summary>
         public void AssociateConcept(string concept)
         {
-            AssociatedConcepts.Add(concept.ToLowerInvariant());
+            if (string.IsNullOrWhiteSpace(concept)) return;
+            var normalized = concept.ToLowerInvariant();
+            AssociatedConcepts.Add(normalized);
+
+            // First association wins and is never revised. Previously this joined
+            // the first three concepts with commas, which meant the owning
+            // cluster's ConceptDomain ("pattern_a1b2c3") got baked into the tag
+            // alongside the word — and the tag is the ONLY concept information
+            // procedural regeneration has to work from.
+            if (string.IsNullOrEmpty(PrimaryConcept))
+                PrimaryConcept = normalized;
+
             UpdateConceptTag();
         }
 
         private void UpdateConceptTag()
         {
-            if (AssociatedConcepts.Any())
-                ConceptTag = string.Join(",", AssociatedConcepts.Take(3));
+            if (!string.IsNullOrEmpty(PrimaryConcept))
+                ConceptTag = PrimaryConcept;
         }
 
         private double CalculateImportance()
@@ -586,8 +616,18 @@ namespace GreyMatter.Core
             neuron.Id = snapshot.Id;
             
             neuron.InputWeights = snapshot.InputWeights.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-            neuron.AssociatedConcepts = snapshot.AssociatedConcepts.ToHashSet();
-            
+
+            // P4.5: split any comma-joined legacy entries so concepts persisted
+            // under the old tag scheme resolve to individual words on load,
+            // rather than to one literal "the,pattern_a1b2c3" string that no
+            // concept lookup can ever match.
+            neuron.AssociatedConcepts = snapshot.AssociatedConcepts
+                .Where(c => !string.IsNullOrWhiteSpace(c))
+                .SelectMany(c => c.Split(','))
+                .Select(c => c.Trim().ToLowerInvariant())
+                .Where(c => c.Length > 0)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             return neuron;
         }
     }

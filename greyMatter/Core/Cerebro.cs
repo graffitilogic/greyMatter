@@ -276,7 +276,12 @@ namespace GreyMatter.Core
         //   member      – non-resident, metadata says the concept lives here → load
         //   skip        – non-resident, metadata says it doesn't → no NAS hit
         //   nometa      – non-resident with no metadata (unsaved/new cluster)
+        //   probed/empty – of the candidates the gate admitted, how many were
+        //     actually searched and how many came back with zero neurons for the
+        //     concept. probed>0 with empty==probed means the gate is picking the
+        //     right cluster and concept identity is being lost inside it (P4.5).
         private long _gateResident, _gateMemberAdmit, _gateMemberSkip, _gateNoMeta;
+        private long _gateProbed, _gateProbeEmpty;
 
         // Inline decay cadence (training-path, single-threaded with graph writes)
         private const int DecayEveryNLearnEvents = 5000;
@@ -317,12 +322,14 @@ namespace GreyMatter.Core
                 : $"   📊 Allocation: events={_allocEvents:N0} reuse={100.0 * _allocReuseHits / ev:F1}% " +
                   $"(assembly_pref={_allocAssemblyPrefHits:N0}) grew_events={_allocGrowEvents:N0} " +
                   $"({100.0 * _allocGrowEvents / ev:F1}%) avg_grow={(_allocGrowEvents > 0 ? (double)_allocNeuronsGrown / _allocGrowEvents : 0):F1}" +
-                  $" | gate[resident={_gateResident:N0} member={_gateMemberAdmit:N0} skip={_gateMemberSkip:N0} nometa={_gateNoMeta:N0}]";
+                  $" | gate[resident={_gateResident:N0} member={_gateMemberAdmit:N0} skip={_gateMemberSkip:N0} nometa={_gateNoMeta:N0}]" +
+                  $" probe[searched={_gateProbed:N0} empty={_gateProbeEmpty:N0}]";
             if (reset)
             {
                 _allocEvents = _allocReuseHits = _allocAssemblyPrefHits = 0;
                 _allocGrowEvents = _allocNeuronsGrown = 0;
                 _gateResident = _gateMemberAdmit = _gateMemberSkip = _gateNoMeta = 0;
+                _gateProbed = _gateProbeEmpty = 0;
             }
             return summary;
         }
@@ -1669,6 +1676,8 @@ namespace GreyMatter.Core
                     }
                     else _gateResident++;
                     var existing = await m.cluster.FindNeuronsByConcept(debugLabel);
+                    _gateProbed++;
+                    if (existing.Count == 0) _gateProbeEmpty++;
                     if (existing.Count > 0)
                     {
                         _allocAssemblyPrefHits++;

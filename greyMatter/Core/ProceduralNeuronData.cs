@@ -237,10 +237,18 @@ namespace GreyMatter.Core
                 neuron.InputWeights[connection.Key] = connection.Value;
             }
             
-            // Step 5: Set concept tag for cluster membership
+            // Step 5: Set concept tag for cluster membership.
+            //
+            // P4.5: ConceptTag is the ONLY concept information a procedurally
+            // stored neuron carries, so it must be a single concept, not a join.
+            // It used to be string.Join(",", AssociatedConcepts.Take(3)), which
+            // meant regeneration produced AssociatedConcepts == ["the,pattern_a1b2c3"]
+            // — a literal no concept lookup could match. Split defensively for
+            // neurons already on disk under the old scheme.
             if (!string.IsNullOrEmpty(compactData.ConceptTag))
             {
-                neuron.AssociateConcept(compactData.ConceptTag);
+                foreach (var part in compactData.ConceptTag.Split(','))
+                    neuron.AssociateConcept(part.Trim());
             }
             
             return neuron;

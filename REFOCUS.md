@@ -1628,6 +1628,62 @@ outcome names its own next step, which the reuse curve alone never did.
 summary statistics): when a fix targets a decision, instrument the **decision**,
 not its downstream aggregate.
 
+#### P4.4 result — gate fixed, fault relocated one layer down
+
+First window of the resumed run: `gate[resident=0 member=18 skip=0 nometa=0]`
+with `reuse=0.0% assembly_pref=0`. The gate is admitting every candidate and
+loading the right clusters — and the concept lookup inside them still returns
+nothing. The gate was never the whole problem; it was hiding this.
+
+### P4.5 — concept identity does not survive a save/load round trip
+
+**Root cause, three links:**
+
+1. `HybridNeuron.UpdateConceptTag()` set
+   `ConceptTag = string.Join(",", AssociatedConcepts.Take(3))`.
+2. `NeuronCluster.AddNeuronAsync` calls `neuron.AssociateConcept(ConceptDomain)`,
+   so every neuron also carries its cluster's domain — `pattern_a1b2c3`. A
+   neuron allocated for "the" ends up tagged `"the,pattern_a1b2c3"`.
+3. `ProceduralNeuronData.RegenerateNeuron` rebuilds
+   `AssociatedConcepts = new List<string> { compactData.ConceptTag }` — the join
+   restored as **one literal string**.
+
+So a regenerated neuron has `AssociatedConcepts == ["the,pattern_a1b2c3"]` and
+`ConceptTag == "the,pattern_a1b2c3"`. `FindNeuronsByConcept("the")` tests
+`AssociatedConcepts.Contains("the")` (false) and
+`ConceptTag == "the"` (false) → zero neurons, every time, for every concept that
+has been through persistence. Reuse can only ever come from neurons still
+resident from this session — which is precisely the curve we kept seeing.
+
+**Why this surfaced only now.** The P1.x fix that replaced substring matching
+with exact matching in `FindNeuronsByConcept` was correct — substring matching
+was padding concepts with unrelated neurons. But substring matching had also
+been *accidentally masking* this bug: `"the"` is a substring of
+`"the,pattern_a1b2c3"`, so lookups appeared to work. A correct fix removed the
+compensation for a latent defect, which is a normal and under-appreciated way
+for old bugs to become visible.
+
+**Fix:**
+
+- `HybridNeuron.PrimaryConcept` — the concept the neuron was allocated for, set
+  on first association, never revised. `ConceptTag` is now that single token.
+- `AssociatedConcepts` becomes an `OrdinalIgnoreCase` set (callers pass raw cue
+  words; associations are lowercased).
+- `FromSnapshot` and `RegenerateNeuron` split comma-joined entries, so neurons
+  already on disk under the old scheme recover their identity on load. No
+  migration pass or data wipe needed.
+
+**Instrumentation:** `probe[searched=N empty=N]` on the Allocation line —
+of the candidates the gate admitted, how many were actually searched and how
+many returned zero neurons for the concept. `empty ≈ searched` is this bug;
+`empty ≈ 0` with reuse still low would mean something downstream of lookup.
+
+**Expected on the next resumed run:** `member` stays high, `probe empty` falls
+toward zero, reuse starts high instead of climbing from zero, and neuron
+creation drops sharply. If `probe empty` stays pinned at `searched`, the tag is
+not the last link and the next place to look is what
+`EnhancedBrainStorage` actually writes for `ConceptTag`.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
