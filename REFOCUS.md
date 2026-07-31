@@ -1391,6 +1391,72 @@ absolute cosine values will drop and `RecallMatchThreshold` / discrimination
 statistics may need recalibrating. Watch AUC and the active counts, not just
 fidelity.
 
+---
+
+## P3 RESULT — the thesis curve (2026-07-30)
+
+```
+threshold  fidelity  regenerated  stored/neuron  bytes/neuron   AUC    absent  demoted
+  0.02      100.0%      91.1%         3.73           139       0.904     0        0
+  0.05       99.7%      93.2%         2.86           121       0.885     0        1
+  0.10      100.0%      95.0%         2.11           106       0.894     0        0
+  0.25       99.3%      97.0%         1.28            90       0.913     0        2
+  0.50       99.0%      98.4%         0.68            78       0.904     0        3
+  1.00       98.3%      99.2%         0.32            70       0.837     0        5
+  2.00       96.9%      99.7%         0.12            66       0.933     0        9
+  8.00       95.5%     100.0%         0.00            64       0.837     0       13
+```
+
+The P3.4 field-size fix worked as predicted: fidelity went from a flat ~83% to
+**95.5–100%**, and for the first time the budget actually buys something. The
+curve is monotonic across a 400× range in threshold and 2.2× in bytes.
+
+**The headline:** with **zero learned weights persisted** — the receptive field
+generated in full from `(VqCode, identity)` — recall is **95.5% faithful at 64
+bytes per neuron**. Spending 14 more bytes (78 B, 0.68 stored weights) buys
+**99.0%**.
+
+Against the pre-P3 baseline of ~212 B/neuron: **2.7× smaller at 99% fidelity,
+3.3× at 95.5%.** Unlike the old "90% compression" claim, both figures are
+measured, and the compression is genuinely procedural rather than pruning —
+`regenerated` reaches 100%, meaning nothing about the receptive field is stored
+at all.
+
+**The knee is at ~0.5–1.0.** Fidelity holds ≥99% down to 78 B/neuron, then
+starts paying: 98.3% at 70 B, 96.9% at 66 B, 95.5% at 64 B. That is the answer to
+*how much can be thrown away and still recall* — for this architecture, at this
+scale: **essentially all of the learned weight state, for ~4.5 points of recall.**
+
+**`lost_absent = 0` throughout.** Regeneration never loses a neuron; the entire
+residual is a handful of survivors changing rank (0–13 out of 288 slots).
+
+### Caveats, stated plainly
+
+1. **Discrimination degraded.** AUC fell to 0.837–0.933 from 0.91–0.99, d′ to
+   1.35–1.68 from 1.5–2.2. This is the risk flagged before the run: neurons now
+   carry ~20% of the *entire* vocabulary rather than 20% of what they met, which
+   dilutes the cosine. High fidelity over less-distinguishable assemblies is
+   worth less, so this needs recovering before the result is banked — most likely
+   by recalibrating `RecallMatchThreshold` for the larger fields, or by scaling
+   field density inversely with vocabulary.
+2. **The 64 B floor is not fundamental.** It is Guid (16) + ClusterId (16) +
+   importance (4) + activation count (4) + concept tag (~20) + VqCode (4). The
+   tag is debug-only, ClusterId is implicit in the partition path, and importance
+   and count are recomputable. A real floor is nearer 20 B, which would put the
+   ratio above 10×.
+3. **Recall still leans on nearest-prototype lookup** (P2.6, P3.3). The
+   generated field carries the assembly; learned drift contributes little. That
+   the thesis works *at all* here is partly because the VQ codebook is doing the
+   representational work.
+
+### Status
+
+P2's question is answered affirmatively **for the receptive field**: procedural
+generation preserves the assembly, and the storage/fidelity trade is now a
+measured curve rather than an assertion. What remains untested is whether
+*learned* structure survives the same treatment — currently there is little
+learned structure for recall to depend on, which is the P4 problem.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
