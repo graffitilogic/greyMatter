@@ -251,6 +251,7 @@ namespace GreyMatter
                     };
                     foreach (var w in sentence.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries))
                         if (w.Length > 1) await brain.LearnConceptAsync(w, feats);
+                    brain.EndSequence();   // P4.2: causality must not cross sentences
                     if (++presented % 100 == 0) Console.Write($"\r   {presented}/{sentences.Count}");
                 }
                 Console.WriteLine($"\r   trained {presented} sentences — assemblies are live in memory\n");

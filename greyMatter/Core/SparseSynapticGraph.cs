@@ -145,6 +145,75 @@ namespace GreyMatter.Core
         }
         
         /// <summary>
+        /// P4.2 — STDP at the sequence timescale.
+        ///
+        /// Spike-timing STDP proper needs a millisecond clock this engine does not
+        /// have: ProcessInputs is one instantaneous evaluation, so there is no Δt
+        /// between pre- and post-synaptic events. But there IS a real temporal axis
+        /// already present and unused — **word order within a sentence**.
+        ///
+        /// `RecordCoactivationPattern` wires bidirectionally and symmetrically, so
+        /// the graph is completely time-blind: "cat" → "sat" and "sat" → "cat" are
+        /// indistinguishable. Here the asymmetry is applied: the previous word's
+        /// assembly POTENTIATES onto the current word's (pre before post, causal),
+        /// and the reverse direction is DEPRESSED (post before pre, anti-causal).
+        ///
+        /// That is STDP's functional signature — potentiation for predictive
+        /// pairings, depression for retrodictive ones — at the timescale this system
+        /// actually has. It gives the synaptic graph directional structure, and
+        /// gives recall something LEARNED to depend on rather than the VQ prototype
+        /// alone (the boundary P3 ran into).
+        /// </summary>
+        public void RecordCausalPattern(
+            List<(Guid neuronId, float activation)> pre,
+            List<(Guid neuronId, float activation)> post)
+        {
+            if (pre.Count == 0 || post.Count == 0) return;
+
+            if (pre.Count > MaxCoactivationGroup)
+                pre = pre.OrderByDescending(a => a.activation).Take(MaxCoactivationGroup).ToList();
+            if (post.Count > MaxCoactivationGroup)
+                post = post.OrderByDescending(a => a.activation).Take(MaxCoactivationGroup).ToList();
+
+            foreach (var (preId, preAct) in pre)
+            foreach (var (postId, postAct) in post)
+            {
+                if (preId == postId) continue;
+
+                // Causal direction: strengthen (LTP analogue)
+                RecordCoactivation(preId, postId, preAct, postAct);
+
+                // Anti-causal direction: weaken (LTD analogue). Depression only
+                // acts on synapses that already exist — it never creates one, so
+                // the out-degree budget is unaffected.
+                DepressSynapse(postId, preId, postAct * preAct * CausalDepressionRate);
+            }
+        }
+
+        /// <summary>
+        /// LTD counterpart to RecordCoactivation. Weakens an existing synapse and
+        /// removes it if it falls below the prune threshold — anti-causal pairings
+        /// should eventually cost a connection its existence.
+        /// </summary>
+        public void DepressSynapse(Guid sourceId, Guid targetId, float amount)
+        {
+            if (amount <= 0) return;
+            var key = (sourceId, targetId);
+            if (!_synapses.TryGetValue(key, out var w)) return;   // never creates
+
+            var newWeight = w - amount;
+            if (newWeight < _pruneThreshold) RemoveSynapseInternal(key);
+            else _synapses[key] = newWeight;
+        }
+
+        /// <summary>
+        /// LTD is deliberately weaker than LTP. Symmetric strength would cancel the
+        /// two directions for word pairs that occur in both orders and erase the
+        /// structure the rule exists to build.
+        /// </summary>
+        public const float CausalDepressionRate = 0.4f;
+
+        /// <summary>
         /// Get synapse weight between two neurons
         /// </summary>
         /// <returns>Weight (0.0 if no synapse exists)</returns>

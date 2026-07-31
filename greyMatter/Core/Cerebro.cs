@@ -272,6 +272,17 @@ namespace GreyMatter.Core
         private const int DecayEveryNLearnEvents = 5000;
         private int _learnEventsSinceDecay;
 
+        // P4.2: the previous word's active assembly, for sequence-level STDP.
+        // Cleared at sentence boundaries so causality never crosses them.
+        private List<(Guid neuronId, float activation)> _previousSequenceActive = new();
+
+        /// <summary>
+        /// Mark a sequence boundary (end of sentence). Without this, the last word
+        /// of one sentence would appear to causally precede the first word of the
+        /// next, and the graph would learn order that never occurred.
+        /// </summary>
+        public void EndSequence() => _previousSequenceActive = new();
+
         // VQ codebook warmup: adapt to the data, then freeze so pattern → code
         // (and therefore concept → cluster) assignment stops drifting. See
         // VectorQuantizer.IsLearning for why drift is harmful in two places.
@@ -687,6 +698,19 @@ namespace GreyMatter.Core
             // ADPC-Net Phase 3: Record Hebbian co-activation
             var tHebbian = Stopwatch.StartNew();
             RecordHebbianCoactivation(contest);
+
+            // P4.2: sequence-level STDP. The previous word's assembly potentiates
+            // onto this one and is depressed in reverse, so the graph encodes ORDER
+            // rather than mere co-occurrence.
+            var currentActive = contest
+                .Where(p => p.match > HebbianCoactivationThreshold)
+                .Select(p => (p.neuron.Id, activation: (float)p.match))
+                .ToList();
+
+            if (_previousSequenceActive.Count > 0 && currentActive.Count > 0)
+                _synapticGraph.RecordCausalPattern(_previousSequenceActive, currentActive);
+
+            if (currentActive.Count > 0) _previousSequenceActive = currentActive;
             tHebbian.Stop();
 
             // Capacity adjust

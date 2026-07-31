@@ -1493,6 +1493,66 @@ shift again, so `RecallMatchThreshold` (0.2) may need retuning — watch the act
 counts, and if controls go silent because *everything* goes silent, that is the
 threshold, not selectivity.
 
+#### P4.1 result — discrimination recovered, at a small fidelity cost
+
+```
+threshold  fidelity  regenerated  stored/neuron  bytes/neuron   AUC
+  0.02       96.2%      86.5%         4.80           160       0.981
+  0.10       97.2%      92.5%         2.67           117       0.990
+  0.25       96.5%      95.6%         1.58            96       0.990
+  1.00       96.9%      98.9%         0.38            72       0.981
+  2.00       95.5%      99.5%         0.19            68       0.990
+  8.00       92.7%     100.0%         0.00            64       0.952
+```
+
+| | P3.4 (identity fields) | P4.1 (prototype fields) |
+|---|---|---|
+| AUC | 0.837–0.933 | **0.923–0.990** (mostly ≥0.98) |
+| fidelity @ 0 stored | 95.5% | 92.7% |
+| field size | 41.9 weights | **35.6** (−15%) |
+
+Predictions: AUC recovery ✅, field shrink ✅, fidelity holding ✗ (−3 points).
+**A good trade** — discrimination is what makes a fidelity number mean anything,
+and ~3 points of recall bought ~7 points of AUC.
+
+The curve is also flatter at the top now: fidelity sits at ~96% from 160 B all
+the way down to 68 B, then drops to 92.7% at 64 B. Best operating point:
+**68 B/neuron, 99.5% regenerated, 95.5% fidelity, AUC 0.990.**
+
+`lost_absent = 0` throughout, still. Caveat: one run per threshold, and AUC
+varies ~±0.03 within a sweep, so individual points are soft; the trend is not.
+
+### P4.2 — sequence-level STDP (implemented)
+
+Bill's question from earlier, now built. Spike-timing STDP proper needs a
+millisecond clock this engine does not have — `ProcessInputs` is one
+instantaneous evaluation, so there is no Δt between pre- and post-synaptic
+events. But there *is* an unused temporal axis: **word order within a sentence**.
+
+`RecordCoactivationPattern` wires bidirectionally and symmetrically, so the graph
+has been entirely time-blind — "cat"→"sat" and "sat"→"cat" indistinguishable.
+`RecordCausalPattern` now applies the asymmetry: the previous word's assembly
+**potentiates** onto the current word's (pre before post), and the reverse
+direction is **depressed** (`DepressSynapse`, LTD analogue, which only weakens
+existing synapses and never creates one — so the out-degree budget is untouched).
+
+Depression is deliberately weaker than potentiation (`CausalDepressionRate` 0.4):
+symmetric strength would cancel both directions for word pairs occurring in both
+orders and erase the very structure the rule exists to build.
+
+`Cerebro.EndSequence()` clears the previous-assembly buffer at sentence
+boundaries — without it the graph would learn that the last word of one sentence
+causally precedes the first word of the next. Called from both
+`ProductionTrainingService` and the fidelity harness's in-process trainer.
+
+**Why this matters for the thesis:** P3 established that recall rides almost
+entirely on the VQ prototype, with learned drift contributing little — a real
+result, but a bounded one. Directional synapses give recall something *learned*
+to depend on. **Prediction: no change to the fidelity/discrimination numbers**
+(neither reads the synaptic graph), but synapse counts and decay behaviour should
+shift, and the graph acquires order information that cascade-based recall in P5
+can actually use.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

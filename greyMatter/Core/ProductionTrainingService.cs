@@ -242,6 +242,10 @@ namespace GreyMatter.Core
                             await _cerebro.LearnConceptAsync(word, features);
                         }
                     }
+                    // P4.2: sentence boundary — causality must not cross it, or the
+                    // graph learns that the last word of one sentence precedes the
+                    // first word of the next.
+                    _cerebro.EndSequence();
                     
                     _totalSentencesProcessed++;
                     _sessionSentencesProcessed++;
