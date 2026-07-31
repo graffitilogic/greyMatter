@@ -1553,6 +1553,37 @@ to depend on. **Prediction: no change to the fidelity/discrimination numbers**
 shift, and the graph acquires order information that cascade-based recall in P5
 can actually use.
 
+#### P4.2 result — prediction confirmed, and a resume regression surfaced
+
+**Fidelity and AUC did not move**, as predicted: 92.7–99.3% (was 92.7–97.2%),
+AUC 0.962–1.000 (was 0.923–0.990) — all within the ±0.03 run noise, and
+`regenerated`/`stored`/`bytes` are identical to three digits. Clean confirmation
+that the synaptic graph is decoupled from these measures. Compression improved
+slightly to **5.14x**.
+
+**Synapse count roughly doubled**, 348,806 → 783,175. Expected: the causal rule
+adds a second, *directional* population on top of the symmetric one, so the graph
+now stores order as well as co-occurrence. Decay never ran in this short session
+(5,000-event cadence, ~4,800 events), so that figure is pre-equilibrium.
+
+**Regression found — and it is mine, from P1.6f.** Assembly reuse started at
+**11.8%** and 23,905 neurons were created in 200 sentences. Cause: the
+resident-only guard on assembly reuse. On a *warm* brain it correctly avoids
+pulling 5 clusters off the NAS per learn event; on a *resumed* brain nothing is
+resident, so every concept failed to find its existing assembly and colonised a
+new one — the exact failure P1.6 was written to prevent, reintroduced for the
+resume path only.
+
+*Fixed:* non-resident candidates are now checked against
+`ClusterMetadata.ConceptLabel`, which is already in memory. If metadata says this
+cluster is the concept's home, it is worth loading; otherwise skip. Costs nothing
+and restores reuse on resume without reinstating the NAS thrash.
+
+**Not a regression:** the 0.4 sent/sec throughput. That is the NAS-resume path
+(`lookup 77 ms`, `syn 145 ms` — both cluster loads over the network), the same
+cost measured back in P1.6f. Scratch-brain training in the fidelity harness still
+runs at ~240 cps, so P4.2 itself is not slowing anything.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

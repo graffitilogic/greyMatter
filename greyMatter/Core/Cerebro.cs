@@ -1624,11 +1624,25 @@ namespace GreyMatter.Core
                 foreach (var m in matches)
                 {
                     if (m.similarity < SIMILARITY_THRESHOLD) continue;
-                    // Only probe clusters already resident: FindNeuronsByConcept
-                    // calls EnsureLoadedAsync, so probing every candidate pulls up
-                    // to 5 clusters off the NAS per learn event (measured: find
-                    // 0.8ms → 28.8ms on a resumed brain).
-                    if (!m.cluster.IsLoaded) continue;
+
+                    // P4.3: resident clusters are free to probe. Non-resident ones
+                    // are only worth a NAS load when metadata already says this is
+                    // the concept's home — ConceptLabel is held in memory, so the
+                    // check costs nothing and avoids pulling 5 clusters per event.
+                    //
+                    // The blanket "resident only" rule (P1.6f) was right for a warm
+                    // brain and wrong for a resumed one: on resume nothing is
+                    // resident, so every concept failed to find its existing
+                    // assembly and grew a new one. Measured on this run —
+                    // reuse started at 11.8% and 23,905 neurons were created in
+                    // 200 sentences, colonisation all over again.
+                    if (!m.cluster.IsLoaded)
+                    {
+                        var meta = _storage.GetClusterMetadata(m.cluster.ClusterId);
+                        if (!string.Equals(meta?.ConceptLabel, debugLabel,
+                                           StringComparison.OrdinalIgnoreCase))
+                            continue;
+                    }
                     var existing = await m.cluster.FindNeuronsByConcept(debugLabel);
                     if (existing.Count > 0)
                     {
