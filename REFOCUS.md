@@ -1574,15 +1574,59 @@ resident, so every concept failed to find its existing assembly and colonised a
 new one — the exact failure P1.6 was written to prevent, reintroduced for the
 resume path only.
 
-*Fixed:* non-resident candidates are now checked against
-`ClusterMetadata.ConceptLabel`, which is already in memory. If metadata says this
-cluster is the concept's home, it is worth loading; otherwise skip. Costs nothing
-and restores reuse on resume without reinstating the NAS thrash.
+*Attempted fix (P4.3):* check non-resident candidates against
+`ClusterMetadata.ConceptLabel`, which is already in memory. **This did not work —
+see P4.4.**
 
 **Not a regression:** the 0.4 sent/sec throughput. That is the NAS-resume path
 (`lookup 77 ms`, `syn 145 ms` — both cluster loads over the network), the same
 cost measured back in P1.6f. Scratch-brain training in the fidelity harness still
 runs at ~240 cps, so P4.2 itself is not slowing anything.
+
+### P4.4 — assembly-reuse gate, third attempt (the one that identifies the field)
+
+The P4.3 run showed reuse *still* starting at 6.2% and climbing slowly
+(6.2 → 9.7 → 23.7 → 40.0 → 38.1 → 34.8 → 41.4%), with 7,041 neurons created in
+63 sentences. The curve shape is the tell: reuse rises only as clusters happen to
+become resident *within the session*, which is exactly the P1.6f behaviour the
+fix was supposed to remove.
+
+**Cause: P4.3 gated on the wrong field.** `ClusterMetadata.ConceptLabel` is the
+cluster's *founder* — assigned once in `FindOrCreateClusterForPattern` from
+whichever word first created it, and never revised. A cluster hosts many words'
+assemblies, so the founder check admits exactly one concept and rejects every
+other legitimate member. Functionally almost identical to the residency rule it
+replaced, which is why the numbers barely moved.
+
+**The correct field already existed:** `ClusterMetadata.AssociatedConcepts` — the
+union of every member neuron's concepts (`NeuronCluster.AddNeuronAsync` unions it
+in; `CreateClusterMetadata` persists it), fully in memory after `LoadAsync`. The
+gate now admits on membership in that set, falling back to `ConceptLabel`.
+
+**Instrumentation added, because reuse% could not distinguish the failure modes.**
+Three fixes were now aimed at this gate and two missed, because a low reuse% is
+consistent with both "the gate rejected the right cluster" and "no similar cluster
+existed." The `Allocation` line now carries:
+
+```
+gate[resident=N member=N skip=N nometa=N]
+```
+
+- `resident` — candidate already materialised, probed for free
+- `member` — non-resident, metadata says the concept lives here → worth the load
+- `skip` — non-resident, metadata says it doesn't → no NAS hit
+- `nometa` — non-resident with no metadata (unsaved/new cluster)
+
+**Falsifiable read on the next resumed run.** If P4.4 is right, `member` is
+substantially non-zero from the first window and reuse starts high. If `member`
+stays ~0 while `skip` is large, `AssociatedConcepts` isn't reaching disk and the
+problem is in persistence, not the gate. If `nometa` dominates, the region map
+is pointing at clusters that were never saved — a different bug again. Each
+outcome names its own next step, which the reuse curve alone never did.
+
+*Generalises the standing rule* (measure the mechanism, don't infer it from
+summary statistics): when a fix targets a decision, instrument the **decision**,
+not its downstream aggregate.
 
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.

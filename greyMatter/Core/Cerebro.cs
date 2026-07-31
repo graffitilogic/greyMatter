@@ -268,6 +268,16 @@ namespace GreyMatter.Core
         // ─── P1.6 instrumentation: allocation / assembly-reuse counters ───
         private long _allocEvents, _allocReuseHits, _allocAssemblyPrefHits, _allocGrowEvents, _allocNeuronsGrown;
 
+        // P4.4: candidate-gate accounting in FindOrCreateClusterForPattern.
+        // Reuse% alone can't tell "the gate rejected the right cluster" from
+        // "no similar cluster existed" — two prior fixes were aimed at the wrong
+        // mechanism because that distinction wasn't measured. These separate it:
+        //   resident    – candidate already materialised, probed for free
+        //   member      – non-resident, metadata says the concept lives here → load
+        //   skip        – non-resident, metadata says it doesn't → no NAS hit
+        //   nometa      – non-resident with no metadata (unsaved/new cluster)
+        private long _gateResident, _gateMemberAdmit, _gateMemberSkip, _gateNoMeta;
+
         // Inline decay cadence (training-path, single-threaded with graph writes)
         private const int DecayEveryNLearnEvents = 5000;
         private int _learnEventsSinceDecay;
@@ -306,11 +316,13 @@ namespace GreyMatter.Core
                 ? "   📊 Allocation: no events recorded"
                 : $"   📊 Allocation: events={_allocEvents:N0} reuse={100.0 * _allocReuseHits / ev:F1}% " +
                   $"(assembly_pref={_allocAssemblyPrefHits:N0}) grew_events={_allocGrowEvents:N0} " +
-                  $"({100.0 * _allocGrowEvents / ev:F1}%) avg_grow={(_allocGrowEvents > 0 ? (double)_allocNeuronsGrown / _allocGrowEvents : 0):F1}";
+                  $"({100.0 * _allocGrowEvents / ev:F1}%) avg_grow={(_allocGrowEvents > 0 ? (double)_allocNeuronsGrown / _allocGrowEvents : 0):F1}" +
+                  $" | gate[resident={_gateResident:N0} member={_gateMemberAdmit:N0} skip={_gateMemberSkip:N0} nometa={_gateNoMeta:N0}]";
             if (reset)
             {
                 _allocEvents = _allocReuseHits = _allocAssemblyPrefHits = 0;
                 _allocGrowEvents = _allocNeuronsGrown = 0;
+                _gateResident = _gateMemberAdmit = _gateMemberSkip = _gateNoMeta = 0;
             }
             return summary;
         }
@@ -1625,24 +1637,37 @@ namespace GreyMatter.Core
                 {
                     if (m.similarity < SIMILARITY_THRESHOLD) continue;
 
-                    // P4.3: resident clusters are free to probe. Non-resident ones
-                    // are only worth a NAS load when metadata already says this is
-                    // the concept's home — ConceptLabel is held in memory, so the
-                    // check costs nothing and avoids pulling 5 clusters per event.
+                    // P4.4: resident clusters are free to probe. Non-resident ones
+                    // are only worth a NAS load when metadata already says this
+                    // concept has neurons here. _partitionMetadata is fully in
+                    // memory after LoadAsync, so the check costs nothing and
+                    // avoids pulling 5 clusters per event.
                     //
-                    // The blanket "resident only" rule (P1.6f) was right for a warm
-                    // brain and wrong for a resumed one: on resume nothing is
-                    // resident, so every concept failed to find its existing
-                    // assembly and grew a new one. Measured on this run —
-                    // reuse started at 11.8% and 23,905 neurons were created in
-                    // 200 sentences, colonisation all over again.
+                    // Two prior attempts, both wrong:
+                    //  - P1.6f gated on residency alone. Right for a warm brain,
+                    //    wrong for a resumed one: on resume nothing is resident,
+                    //    so every concept missed its assembly and grew a new one.
+                    //  - P4.3 gated on ClusterMetadata.ConceptLabel. But
+                    //    ConceptLabel is the *founder* — whichever word happened
+                    //    to create the cluster (see newCluster.ConceptLabel below,
+                    //    assigned once and never revised). A cluster hosts many
+                    //    words' assemblies, so this admitted exactly one of them
+                    //    and behaved almost identically to P1.6f.
+                    //
+                    // AssociatedConcepts is the real membership set: NeuronCluster
+                    // unions in each neuron's concepts on AddNeuronAsync, and
+                    // CreateClusterMetadata persists it.
                     if (!m.cluster.IsLoaded)
                     {
                         var meta = _storage.GetClusterMetadata(m.cluster.ClusterId);
-                        if (!string.Equals(meta?.ConceptLabel, debugLabel,
-                                           StringComparison.OrdinalIgnoreCase))
-                            continue;
+                        if (meta == null) { _gateNoMeta++; continue; }
+                        var isMember =
+                            string.Equals(meta.ConceptLabel, debugLabel, StringComparison.OrdinalIgnoreCase) ||
+                            meta.AssociatedConcepts.Contains(debugLabel, StringComparer.OrdinalIgnoreCase);
+                        if (!isMember) { _gateMemberSkip++; continue; }
+                        _gateMemberAdmit++;
                     }
+                    else _gateResident++;
                     var existing = await m.cluster.FindNeuronsByConcept(debugLabel);
                     if (existing.Count > 0)
                     {
