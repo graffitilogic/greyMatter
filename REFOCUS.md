@@ -1684,6 +1684,72 @@ creation drops sharply. If `probe empty` stays pinned at `searched`, the tag is
 not the last link and the next place to look is what
 `EnhancedBrainStorage` actually writes for `ConceptTag`.
 
+#### P4.5 result — confirmed on the first window
+
+`probe[searched=8 empty=0]`, `reuse=100.0%`, `grew_events=0` in the opening
+window and sustained. Allocation is fixed:
+
+| | before (P4.2 run) | after (P4.5 run) |
+|---|---|---|
+| neurons created | 23,905 / 200 sent | 2,672 / 361 sent |
+| per sentence | 119.5 | **7.4** (16× lower) |
+| reuse at window 1 | 11.8% | **100%** |
+| throughput | 0.4 sent/sec | 1.0 sent/sec |
+
+The `Neurons` counter reconciles exactly with the allocation stats
+(5 × 38.6 = 193 = 2,434 − 2,241; 6 × 39.7 = 238 = 2,672 − 2,434), so it is
+session-created neurons and can be trusted.
+
+**Caveat that limits the claim:** this run cycles 500 already-seen sentences on
+a brain with 15,417 prior events. Every word is known, so 100% reuse is the
+*expected* answer and does not demonstrate reuse works for novel vocabulary.
+A run on unseen sentences is needed before this is settled.
+
+**Secondary:** `avg_grow` rose from ~20 to ~39, well above
+`FirstAllocationNeurons = 16`. These are capacity ratchets on concepts that were
+*found*, not first allocations. Not urgent; noted.
+
+### P4.6 — the synaptic graph is mostly talking to itself
+
+Found while reading the P4.5 log, not from a metric — the metric could not have
+shown it, which is the point.
+
+`RecordHebbianCoactivation(contest)` is fed `contest`, and `contest` is built
+from `conceptNeurons` — **a single word's assembly**. So every symmetric synapse
+it creates connects a word's own neurons to each other. That population encodes
+nothing about which words co-occur; it re-encodes assembly membership, which
+`ClusterMetadata.AssociatedConcepts` already stores explicitly and far more
+cheaply.
+
+The only population spanning two different words is the P4.2 causal one
+(`RecordCausalPattern(previous word's assembly, current word's assembly)`).
+
+**Why this matters now rather than earlier.** Before P4.5, assemblies were
+small (16 fresh neurons per sighting) so within-assembly wiring was cheap. Now
+that reuse works, a word activates its *accumulated* assembly — co-active
+neurons per call went from ~1,000 to ~50,000 per window — and within-assembly
+wiring scales with it. Fixing allocation moved the cost into the graph.
+
+**Why it blocks P5.** Cascade recall asks whether activation spreads
+preferentially to words that *followed* a cue. If the dominant edge population
+is self-referential, a cascade mostly re-activates the cue's own assembly and
+the measurement is muddy regardless of what the causal edges encode. P5 run now
+would produce an uninterpretable number.
+
+**The thesis has a clean answer here, and it is the one leg not yet tested.**
+Within-assembly synapses are *procedurally regenerable* — derivable from
+assembly membership plus VQ code, which are already persisted. Cross-assembly
+causal synapses are **not** regenerable: they encode corpus statistics that
+exist nowhere else. So the persistence budget belongs entirely to the causal
+population. That is "limited persistence" applied to the graph rather than to
+neurons, and it is the same argument P3 made for receptive fields.
+
+**Measure first (standing rule).** Added `synapses[intra=N causal=N]` splitting
+the previously-combined `synapses_created`, which counted only the
+`RecordCoactivationPattern` delta and silently omitted the causal path
+altogether. Decide what to do about intra-assembly persistence *after* seeing
+the ratio, not before.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

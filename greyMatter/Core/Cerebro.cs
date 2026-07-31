@@ -208,7 +208,8 @@ namespace GreyMatter.Core
         private long _hebbNeuronsPassed;
         private long _hebbSkippedFewNeurons;
         private long _hebbSkippedNonePassed;
-        private long _hebbSynapsesCreated;
+        private long _hebbSynapsesCreated;   // within-assembly (symmetric)
+        private long _causalSynapsesCreated; // cross-assembly (directional, P4.2)
         private double _hebbDeltaMin = double.PositiveInfinity;
         private double _hebbDeltaMax = double.NegativeInfinity;
         private double _hebbDeltaSum;
@@ -233,12 +234,13 @@ namespace GreyMatter.Core
                 summary = $"   📊 Hebbian histogram: calls={_hebbCalls:N0} neurons={_hebbNeuronsSeen:N0} " +
                           $"passed={_hebbNeuronsPassed:N0} ({passedPct:F1}%) " + deltaPart +
                           $"skipped[few={_hebbSkippedFewNeurons:N0} none_passed={_hebbSkippedNonePassed:N0}] " +
-                          $"synapses_created={_hebbSynapsesCreated:N0}";
+                          $"synapses[intra={_hebbSynapsesCreated:N0} causal={_causalSynapsesCreated:N0}]";
             }
             if (reset)
             {
                 _hebbCalls = _hebbNeuronsSeen = _hebbNeuronsPassed = 0;
                 _hebbSkippedFewNeurons = _hebbSkippedNonePassed = _hebbSynapsesCreated = 0;
+                _causalSynapsesCreated = 0;
                 _hebbDeltaMin = double.PositiveInfinity;
                 _hebbDeltaMax = double.NegativeInfinity;
                 _hebbDeltaSum = 0;
@@ -726,8 +728,20 @@ namespace GreyMatter.Core
                 .Select(p => (p.neuron.Id, activation: (float)p.match))
                 .ToList();
 
+            // P4.6: count the two synapse populations separately. RecordHebbian-
+            // Coactivation is fed `contest`, which is built from conceptNeurons —
+            // ONE word's assembly. So every symmetric synapse it creates is
+            // WITHIN-assembly and says nothing about which words co-occur; it
+            // re-encodes membership that ClusterMetadata already stores.
+            // Only this causal call spans two different words' assemblies, so it
+            // is the only population carrying corpus structure. The old combined
+            // `synapses_created` stat could not distinguish them.
             if (_previousSequenceActive.Count > 0 && currentActive.Count > 0)
+            {
+                var causalBefore = _synapticGraph.GetSynapseCount();
                 _synapticGraph.RecordCausalPattern(_previousSequenceActive, currentActive);
+                _causalSynapsesCreated += Math.Max(0, _synapticGraph.GetSynapseCount() - causalBefore);
+            }
 
             if (currentActive.Count > 0) _previousSequenceActive = currentActive;
             tHebbian.Stop();
