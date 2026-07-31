@@ -2039,7 +2039,9 @@ namespace GreyMatter.Core
 
             foreach (var featureName in _featureMapper.GetAllFeaturesSnapshot())
             {
-                if (!NeuronSamplesFeature(neuron.Id, featureName)) continue;
+                // P4: field drawn from the VQ prototype, not identity alone —
+                // a neuron hears what it is for.
+                if (!ProceduralReceptiveField.SamplesFeature(neuron.Id, featureName, prototype)) continue;
 
                 var featureNeuronId = _featureMapper.GetNeuronIdForFeature(featureName);
                 if (!neuron.InputWeights.ContainsKey(featureNeuronId))
@@ -2052,61 +2054,12 @@ namespace GreyMatter.Core
             neuron.LastWiredFeatureCount = featureCount;
         }
 
-        private async Task TrainNeuronWithFeatures(HybridNeuron neuron, Dictionary<string, double> features)
-        {
-            // Convert features to consistent neuron inputs
-            var inputs = _featureMapper.ConvertFeaturesToNeuronInputs(features);
+        // P4: TrainNeuronWithFeatures removed — dead since the competitive
+        // pass (P2.1) replaced per-neuron delta-rule training. It carried a
+        // SECOND, now-divergent copy of the wiring rule, which is exactly how
+        // A and B ended up building different receptive fields in P3.4.
+        // One rule, one place: ProceduralReceptiveField.SamplesFeature.
 
-            // Wire up any feature input this neuron is missing.
-            //
-            // P1.6m — this used to be `if (!neuron.InputWeights.Any())`, which was
-            // the bug behind the immovable ~22% Hebbian pass rate.
-            // `InputWeights` holds TWO kinds of key: feature-input IDs (the
-            // receptive field) and other neurons' IDs (synapses, written by
-            // HybridNeuron.ConnectTo and restored by ProceduralNeuronRegenerator).
-            // NeuronCluster.GrowForConcept connects each new neuron to 3 random
-            // peers, so the dictionary was almost always non-empty — and the
-            // neuron then NEVER received feature weights at all.
-            // Measured consequence (LogReceptiveFieldOverlap, every sample):
-            //   coverage[none=62 partial=0 full=16] — binary, and exactly one
-            //   16-neuron cohort per concept had a receptive field. Everything
-            //   else was dead weight that could never fire, which is why the pass
-            //   rate ignored clustering, concept features, and rectification alike.
-            foreach (var feature in features)
-            {
-                // P1.7: each neuron listens to a deterministic SPARSE SUBSET of the
-                // concept's inputs. Wiring every neuron to every input made all
-                // neurons in an assembly functionally identical (100% fired, median
-                // delta within 2 of max) — one neuron replicated N times, no
-                // distributed code, and N copies of the same receptive field on disk.
-                if (!NeuronSamplesFeature(neuron.Id, feature.Key)) continue;
-
-                var featureNeuronId = _featureMapper.GetNeuronIdForFeature(feature.Key);
-                if (!neuron.InputWeights.ContainsKey(featureNeuronId))
-                {
-                    // Scale by 1/density so EXPECTED activation is unchanged
-                    // (~17 above resting) while the variance across neurons is now
-                    // real. Keeps thresholds, the tanh(delta/20) gate and decay
-                    // calibration untouched; the only thing that changed is which
-                    // inputs a given neuron can see.
-                    neuron.InputWeights[featureNeuronId] =
-                        (_random.NextDouble() + 0.5) * 3.0 / ReceptiveFieldDensity;
-                }
-            }
-            
-            // Process inputs and get output
-            var output = neuron.ProcessInputs(inputs);
-            
-            // Train regardless of output (supervised learning)
-            foreach (var feature in features)
-            {
-                var featureNeuronId = _featureMapper.GetNeuronIdForFeature(feature.Key);
-                // Use a target activation of 0.8 for concept learning
-                neuron.Learn(featureNeuronId, feature.Value, 0.8, output);
-            }
-            
-            await Task.CompletedTask;
-        }
 
         private async Task CreateConceptualConnections(string concept, Dictionary<string, double> features)
         {

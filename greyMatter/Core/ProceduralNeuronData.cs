@@ -217,13 +217,14 @@ namespace GreyMatter.Core
             // learning moved beyond the deviation threshold is then layered on top
             // in 4b. If the generated baseline is wrong, recall degrades: that is
             // the failure mode the fidelity experiment previously could not have.
-            if (_featureMapper != null && _samplesFeature != null)
+            if (_featureMapper != null)
             {
                 foreach (var featureId in _featureMapper.GetFeatureNeuronIds())
                 {
                     var featureName = _featureMapper.GetFeatureForNeuronId(featureId);
                     if (featureName == null) continue;
-                    if (!_samplesFeature(compactData.Id, featureName)) continue;
+                    // P4: same prototype-driven rule as training, so A and B agree.
+                    if (!ProceduralReceptiveField.SamplesFeature(compactData.Id, featureName, vqVector)) continue;
 
                     neuron.InputWeights[featureId] =
                         ProceduralReceptiveField.GenerateBaselineWeight(compactData.Id, featureName, vqVector);

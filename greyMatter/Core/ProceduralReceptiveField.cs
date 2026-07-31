@@ -70,6 +70,64 @@ namespace GreyMatter.Core
             return 3.0 + 6.0 * UnitHash(neuronId, featureKey);
         }
 
+        /// <summary>
+        /// P4 — does this neuron listen to this input line?
+        ///
+        /// Previously identity alone decided (a hash at fixed density). That is
+        /// regenerable but carries no information about what the neuron represents,
+        /// so every neuron overlapped every cue by the same ~8 lines and cosine
+        /// could not separate them: AUC fell 0.91–0.99 → 0.837–0.933 when fields
+        /// became identity-determined in P3.4.
+        ///
+        /// Before P3.4 the field was implicitly *history*-determined — a neuron only
+        /// had lines it had actually met — and that history was doing the
+        /// discriminating. History cannot be regenerated; a prototype can.
+        ///
+        /// So the field is now drawn from the neuron's VQ prototype: it listens to
+        /// lines whose codebook dimension is significant for its code, narrowed by
+        /// an identity hash so neurons sharing a code still differ. Regenerable from
+        /// 4 bytes, and correlated with meaning — a neuron hears what it is for.
+        /// </summary>
+        public const double PrototypeSignificanceQuantile = 0.35; // top ~35% of dims by magnitude
+        public const double WithinPrototypeDensity = 0.55;        // identity narrows it further
+
+        public static bool SamplesFeature(Guid neuronId, string featureKey, float[]? prototype)
+        {
+            if (prototype == null || !TryParseConceptDim(featureKey, out var dim, out var positive)
+                || dim < 0 || dim >= prototype.Length)
+            {
+                // Context lines and un-coded neurons: identity only, as before.
+                return UnitHash(neuronId, featureKey) < 0.2;
+            }
+
+            // Is this dimension significant for this prototype? Compare against the
+            // prototype's own magnitude distribution rather than a global constant,
+            // so codes with flat vectors are not starved of inputs.
+            var magnitude = Math.Abs(prototype[dim]);
+            var cutoff = SignificanceCutoff(prototype);
+            if (magnitude < cutoff) return false;
+
+            // Prefer the polarity the prototype actually expresses.
+            var componentPositive = prototype[dim] >= 0;
+            var polarityBonus = positive == componentPositive ? 0.0 : 0.25;
+
+            return UnitHash(neuronId, featureKey) < (WithinPrototypeDensity - polarityBonus);
+        }
+
+        /// <summary>
+        /// Magnitude above which a dimension counts as significant for a prototype:
+        /// its own mean |component| scaled so roughly the top third qualifies.
+        /// Cheap, allocation-free, and adaptive to the codebook vector's shape.
+        /// </summary>
+        private static double SignificanceCutoff(float[] prototype)
+        {
+            double sum = 0;
+            for (int i = 0; i < prototype.Length; i++) sum += Math.Abs(prototype[i]);
+            var mean = sum / Math.Max(1, prototype.Length);
+            // For roughly half-normal magnitudes, ~1.2x the mean keeps the top ~35%.
+            return mean * (1.0 + PrototypeSignificanceQuantile);
+        }
+
         /// <summary>Parse "cf_{dim}_p" / "cf_{dim}_n".</summary>
         public static bool TryParseConceptDim(string featureKey, out int dim, out bool positive)
         {

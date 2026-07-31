@@ -1457,6 +1457,42 @@ measured curve rather than an assertion. What remains untested is whether
 *learned* structure survives the same treatment — currently there is little
 learned structure for recall to depend on, which is the P4 problem.
 
+---
+
+### P4.1 — recover discrimination: the field should come from the prototype
+
+Diagnosing the AUC drop changed what the fix should be. Before P3.4 a neuron's
+field was implicitly **history**-determined — it only held lines it had actually
+met — and that history *was* the discriminator: a neuron trained on "the" had
+weights only on "the"'s lines, so "the" drove all of them and `blorp` drove few.
+P3.4 made fields identity-determined, which is regenerable but carries no
+information about what the neuron represents, so every neuron overlaps any cue by
+the same ~8 lines and cosine cannot separate them. Fidelity was bought with
+discrimination.
+
+History cannot be regenerated. A **prototype** can — and it costs 4 bytes.
+
+`ProceduralReceptiveField.SamplesFeature(neuronId, featureKey, prototype)` now
+draws the field from the neuron's VQ code: it listens to lines whose codebook
+dimension is significant for that code (magnitude above ~1.35× the prototype's
+own mean, so flat codes aren't starved), preferring the polarity the prototype
+expresses, narrowed by an identity hash so neurons sharing a code still differ.
+Regenerable from the code alone, and correlated with meaning — **a neuron hears
+what it is for**.
+
+Also removed `TrainNeuronWithFeatures`, dead since the competitive pass replaced
+it in P2.1. It held a *second, divergent copy of the wiring rule* — precisely the
+shape of bug that produced the P3.4 field mismatch. There is now one rule in one
+place, used by both training and regeneration.
+
+**Predictions, before running:** AUC should recover toward 0.95+ as fields
+regain meaning; fidelity should stay high since both paths still share one rule;
+field size should *shrink* (a neuron listens only to its prototype's significant
+dims), so bytes/neuron may fall further. Least certain: absolute cosine values
+shift again, so `RecallMatchThreshold` (0.2) may need retuning — watch the active
+counts, and if controls go silent because *everything* goes silent, that is the
+threshold, not selectivity.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
