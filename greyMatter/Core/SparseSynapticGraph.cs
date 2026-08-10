@@ -42,6 +42,36 @@ namespace GreyMatter.Core
         private readonly Dictionary<Guid, int> _outDegree = new();
         public long CreationsBlockedByBudget { get; private set; }
 
+        // P6 (W1): out-adjacency index, source → its target set. Required for
+        // synaptic competition: finding a neuron's weakest out-synapse otherwise
+        // means scanning all ~1.4M synapses. Bounded by MaxOutDegree, so the
+        // weakest-slot search is ≤64 lookups — O(1) amortised as specified.
+        private readonly Dictionary<Guid, HashSet<Guid>> _outTargets = new();
+
+        /// P6 counters. Instrument the DECISION, not the aggregate (ground rule 3):
+        /// "declined" and "displaced" are the two arms of the competition, and
+        /// telling them apart is the whole point of the experiment.
+        public long SynapsesDisplaced { get; private set; }
+        public long CreationsDeclined { get; private set; }
+
+        /// <summary>
+        /// Weakest out-synapse of a neuron, or null if it has none.
+        /// Linear in out-degree, which MaxOutDegree caps at 64.
+        /// </summary>
+        private (Guid target, float weight)? WeakestOutSynapse(Guid sourceId)
+        {
+            if (!_outTargets.TryGetValue(sourceId, out var targets) || targets.Count == 0)
+                return null;
+
+            Guid worst = default; float worstW = float.MaxValue; bool found = false;
+            foreach (var t in targets)
+            {
+                if (!_synapses.TryGetValue((sourceId, t), out var w)) continue;
+                if (w < worstW) { worstW = w; worst = t; found = true; }
+            }
+            return found ? (worst, worstW) : null;
+        }
+
         // Statistics
         public int SynapseCount => _synapses.Count;
         public int TotalNeurons { get; private set; }
@@ -97,18 +127,49 @@ namespace GreyMatter.Core
                 if (sourceActivation * targetActivation < CreationProductThreshold)
                     return;
 
-                // Enforce per-neuron synaptic budget
-                if (_outDegree.TryGetValue(sourceId, out var degree) && degree >= MaxOutDegree)
-                {
-                    CreationsBlockedByBudget++;
-                    return;
-                }
-
                 // Born just above the prune line: one decay pass kills it unless
                 // reinforced. Persistence must be earned through repetition.
                 var birthWeight = Math.Clamp(_pruneThreshold + deltaWeight, _minWeight, _maxWeight);
+
+                // ── P6 (W1): synaptic competition replaces budget blocking ──────
+                //
+                // Refusing every candidate once a neuron hits MaxOutDegree is
+                // first-come-first-served, not selection: whichever partners
+                // arrived first hold their slots forever. Measured consequence
+                // (P5.5): 40× more data produced FEWER reachable successor pairs
+                // (97 → 31) with 18,441,473 creations blocked.
+                //
+                // Biology allocates finite synaptic resources competitively —
+                // developmental pruning displaces weak connections rather than
+                // refusing new ones. So at budget, the candidate is compared with
+                // the weakest existing out-synapse and takes the slot if stronger.
+                //
+                // This is self-limiting rather than churning, because decay pulls
+                // unreinforced synapses toward the prune line: a slot held by a
+                // decayed, near-dead connection falls below a fresh birthWeight and
+                // is available, while a reinforced one sits well above it and is
+                // safe. Displacement therefore targets exactly the connections that
+                // stopped earning their place.
+                if (_outDegree.TryGetValue(sourceId, out var degree) && degree >= MaxOutDegree)
+                {
+                    var weakest = WeakestOutSynapse(sourceId);
+                    if (weakest == null || weakest.Value.weight >= birthWeight)
+                    {
+                        CreationsDeclined++;
+                        CreationsBlockedByBudget++;   // ground rule 9: existing readers keep working
+                        return;
+                    }
+
+                    RemoveSynapseInternal((sourceId, weakest.Value.target));
+                    SynapsesDisplaced++;
+                    degree = _outDegree.GetValueOrDefault(sourceId);
+                }
+
                 _synapses[key] = birthWeight;
                 _outDegree[sourceId] = degree + 1;
+                if (!_outTargets.TryGetValue(sourceId, out var tset))
+                    _outTargets[sourceId] = tset = new HashSet<Guid>();
+                tset.Add(targetId);
             }
         }
         
@@ -237,10 +298,16 @@ namespace GreyMatter.Core
         /// <returns>List of (targetId, weight) pairs</returns>
         public List<(Guid targetId, float weight)> GetOutgoingSynapses(Guid sourceId)
         {
-            return _synapses
-                .Where(kvp => kvp.Key.source == sourceId)
-                .Select(kvp => (kvp.Key.target, kvp.Value))
-                .ToList();
+            // P6: served from the out-adjacency index added for competition. This
+            // was a full scan of every synapse (~1.4M at 20k sentences) per call,
+            // and the cascade probe calls it once per seed neuron per cue. Same
+            // results — the caller sums masses, so ordering is immaterial — but
+            // bounded by out-degree instead of graph size.
+            var result = new List<(Guid, float)>();
+            if (!_outTargets.TryGetValue(sourceId, out var targets)) return result;
+            foreach (var t in targets)
+                if (_synapses.TryGetValue((sourceId, t), out var w)) result.Add((t, w));
+            return result;
         }
         
         /// <summary>
@@ -284,6 +351,15 @@ namespace GreyMatter.Core
             {
                 if (d <= 1) _outDegree.Remove(key.source);
                 else _outDegree[key.source] = d - 1;
+
+                // P6: keep the out-adjacency index in step with _outDegree. If these
+                // two ever disagree, WeakestOutSynapse looks at stale targets and
+                // competition silently decides against phantom synapses.
+                if (_outTargets.TryGetValue(key.source, out var tset))
+                {
+                    tset.Remove(key.target);
+                    if (tset.Count == 0) _outTargets.Remove(key.source);
+                }
             }
         }
         
@@ -433,6 +509,7 @@ namespace GreyMatter.Core
         {
             _synapses.Clear();
             _outDegree.Clear();
+            _outTargets.Clear();   // P6: index must be rebuilt with the graph
 
             foreach (var snapshot in snapshots)
             {
@@ -440,6 +517,9 @@ namespace GreyMatter.Core
                 if (_synapses.TryAdd(key, (float)snapshot.Weight))
                 {
                     _outDegree[key.Item1] = _outDegree.GetValueOrDefault(key.Item1) + 1;
+                    if (!_outTargets.TryGetValue(key.Item1, out var tset))
+                        _outTargets[key.Item1] = tset = new HashSet<Guid>();
+                    tset.Add(key.Item2);
                 }
             }
         }
@@ -451,7 +531,9 @@ namespace GreyMatter.Core
         {
             _synapses.Clear();
             _outDegree.Clear();
+            _outTargets.Clear();
             CreationsBlockedByBudget = 0;
+            SynapsesDisplaced = CreationsDeclined = 0;
             TotalNeurons = 0;
         }
     }

@@ -235,7 +235,12 @@ namespace GreyMatter.Core
                           $"passed={_hebbNeuronsPassed:N0} ({passedPct:F1}%) " + deltaPart +
                           $"skipped[few={_hebbSkippedFewNeurons:N0} none_passed={_hebbSkippedNonePassed:N0}] " +
                           $"synapses[intra={_hebbSynapsesCreated:N0} causal={_causalSynapsesCreated:N0} " +
-                          $"xword={_crossWordSynapsesCreated:N0}]";
+                          $"xword={_crossWordSynapsesCreated:N0} " +
+                          // P6/W1: the two arms of synaptic competition. Cumulative,
+                          // not per-window, so they are comparable with the
+                          // blocked_by_budget baseline (18,441,473 at 20k sentences).
+                          $"displaced={_synapticGraph.SynapsesDisplaced:N0} " +
+                          $"declined={_synapticGraph.CreationsDeclined:N0}]";
             }
             if (reset)
             {

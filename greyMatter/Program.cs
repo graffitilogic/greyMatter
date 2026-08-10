@@ -296,6 +296,22 @@ namespace GreyMatter
             // straddle the gap.
             var separated = realPmi.lo > shufPmi.hi;   // no overlap across repeats
             Console.WriteLine();
+
+            // Ground rule 6: no verdict from n=1 on a correlation-valued metric.
+            // P5.3 reported LEARNED ORDER from a single run and had to be
+            // retracted — its +0.2514 was one draw from a shuffled distribution
+            // spanning a full unit. The harness must not emit a verdict the rules
+            // do not permit; refusing is the whole point.
+            const int MinRepeatsForVerdict = 5;
+            if (repeats < MinRepeatsForVerdict)
+            {
+                Console.WriteLine($"VERDICT: INSUFFICIENT REPEATS — {repeats} run(s). " +
+                                  $"Correlation-valued metrics need --repeats {MinRepeatsForVerdict} or more " +
+                                  "before any verdict is meaningful (REFOCUS P5.4). " +
+                                  "Numbers above are diagnostic only.");
+                return;
+            }
+
             if (real.scored < 5)
                 Console.WriteLine("VERDICT: INCONCLUSIVE — too few cues had enough reachable successors to rank.");
             else if (realPmi.mean < 0.10)

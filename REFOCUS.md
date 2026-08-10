@@ -2113,27 +2113,112 @@ respect: binding (a red apple ≠ an apple-colored red).
   artifact of the whole project.
 - Only after this: reconsider big corpora, LLM teacher, richer tasks.
 
-## What Was Deleted vs. Archived
+---
 
-- **Deleted (git history keeps them):** `EthicalDriveSystem`, `LongTermGoalSystem`,
-  `DevelopmentalLearningSystem`, `InstinctualProcessor`, `ContinuousProcessor`,
-  `EnvironmentalLearner`, `EnhancedContinuousLearner`, `Simple/Biological/Language-
-  EphemeralBrain`, `ComprehensiveLanguageTrainer`, `LanguageFoundationsTrainer`,
-  `TatoebaLanguageTrainer`, `MultiSourceTrainer`, `RealisticTrainingRegimen`,
-  `LearningResourceManager`, `TrainingService`, `KnowledgeQueryCLI`, `EvalHarness`,
-  `UnifiedTrainingEvaluator`, `BrainScanVisualizer`, root scratch tests/diagnostics,
-  all `*.log`, `word_associations.json`, empty dirs.
-- **Archived to `greyMatter/docs/archive/`:** phase summaries, fix write-ups,
-  superseded roadmaps and status docs.
-- **Kept (the load-bearing core):** `Cerebro`, `HybridNeuron`, `NeuronCluster`,
-  `VectorQuantizer`, `SparseSynapticGraph`, `NeuronHypernetwork`,
-  `ProceduralNeuronData`, `ProceduralCorticalColumnGenerator`, `FeatureEncoder`,
-  `LSHPartitioner`, `EnhancedBrainStorage`, `GlobalNeuronStore`,
-  `ProductionTrainingService`, Tatoeba/Wikipedia readers, query/inspection CLIs.
+## 2026-08-10 — LIVE STATE (read this first; everything above is history)
 
-## Immediate Next Session
+CLAUDE.md's session protocol says to read *"the last 3 dated sections (bottom of
+file)."* That instruction was broken: the three sections immediately above this
+one are **stale planning from before P4**, not live state, so a cold session
+following the protocol would have read them as current and never reached P6.
+This section exists so step 1 resolves correctly. Append future dated sections
+**below** it.
 
-1. Commit this cleanup (see README note on Dropbox + git).
-2. `dotnet build` — confirm clean build after prune.
-3. Start P1: add the activation histogram, reproduce the negative-activation bug
-   on a 5-minute run, fix, prove synapse creation.
+**Numbering collisions — do not "fix" by renumbering, the commit history uses
+these names.** Two sections are called P4.5: *concept identity does not survive
+a save/load round trip* (line ~1638, the real one, committed as `61ef2e3`) and
+*assembly recipes & composition* (line ~2092, a planning block = queue item W8).
+Two are called P5: *cascade recall* (line ~1780, the experiment) and *scale
+demonstration* (line ~2109, a planning block). Where the queue in CLAUDE.md says
+P5.x it always means the cascade-recall line of work.
+
+**Undated sections.** Everything from P4.4 (line ~1586) through P6 (line ~2070)
+was written without dates, in violation of session protocol step 3. They are in
+chronological order and were committed between `1d8d21e` and `74a6590`; use
+`git log` for exact dates rather than trusting any date added retroactively.
+
+**Where the work actually stands:**
+
+- **Banked:** P3/P4.1 receptive-field regeneration (95.5% fidelity at 64 B/neuron,
+  AUC ≈ 0.99) — pending multi-seed confirmation, queue item W3.
+- **Fixed and confirmed:** allocation/assembly reuse (P4.3→P4.5). 7.4 neurons per
+  sentence, down from 119.5; reuse 100% from the first window on a resumed brain.
+  Caveat recorded in P4.5: measured on a cycling corpus the brain already knew.
+- **Open negative:** the synaptic graph is **not** shown to carry word order.
+  P5→P5.6 produced four failed measurements of that one claim — an unreachable
+  null, a spurious n=1 pass, a noise result, and an uncontrolled comparison.
+  Treat "does the graph encode order" as **unmeasured**, not as answered.
+- **Blocking finding (P5.5):** the graph saturates. 40× more data gave *fewer*
+  reachable successor pairs (97 → 31) with `blocked_by_budget` at 18,441,473.
+  This is why W1 (P6, synaptic competition) is the top queue item: there is no
+  point measuring association in a graph that cannot write new associations.
+
+**Next action:** queue item **W1** in CLAUDE.md. Its predictions are
+pre-registered in the P6 section above (line ~2082) and restated with the exact
+command in the dated section below.
+
+---
+
+## 2026-08-10 — W1 / P6 PRE-REGISTRATION (written before any code)
+
+Session protocol step 3. Nothing below was written after seeing a result.
+
+### Change
+
+At `MaxOutDegree`, a candidate synapse no longer gets refused outright. It is
+compared against the **weakest existing out-synapse** of the source neuron:
+stronger ⇒ displace it, otherwise ⇒ decline. O(1) amortised via a per-neuron
+min-track. `MaxOutDegree` stays 64 — this changes *which* 64, not how many.
+
+Rationale: blocking is first-come-first-served, which is not selection. Biology
+allocates finite synaptic resources competitively; developmental pruning
+displaces weak connections rather than refusing new ones. Limited persistence is
+the thesis, but it has to be *principled* limited persistence.
+
+### Instrumentation (ground rule 3 — instrument the decision, not the aggregate)
+
+New tag, existing tags untouched: `synapses[... displaced=N declined=N]`.
+`declined` replaces what `CreationsBlockedByBudget` counted; the old counter
+stays so nothing reading it breaks (ground rule 9).
+
+### Predictions
+
+Scored ✅/❌ explicitly after the run. Wrong predictions get recorded plainly.
+
+1. **`reached N/M` stops falling with corpus size.** At 20,000 sentences it is
+   currently *lower* than at 500 (31 pairs vs 97). Prediction: 20,000 ≥ 500.
+   This is the primary exit criterion.
+2. **`declined` ≪ current `blocked_by_budget` (18,441,473)**, with `displaced`
+   taking up a substantial share — confirming competition is actually running
+   and not silently degenerating into the old behaviour.
+3. **`R_UNIGRAM` dominance weakens at 20,000** (currently +0.3459), because a
+   frequent early partner can no longer hold a slot against a stronger later one.
+4. **Graph size stays bounded** — `MaxOutDegree` is unchanged, so total synapses
+   should stay in the same range (~630K–750K at 20k after decay). If it grows
+   sharply, competition is leaking and the budget is not being enforced.
+5. **Fidelity and AUC do not move.** The receptive-field result (W3) is
+   independent of the graph; if it shifts, something is coupled that should not be.
+
+### What would falsify the whole idea
+
+If `reached` still falls at 20,000 with `displaced` large, then displacement is
+churning — new synapses evicting each other without accumulating structure — and
+the problem is not the eviction *policy* but the budget size or the
+co-activation rule feeding it. That result argues for revisiting
+`MaxCoactivationGroup`/`CreationProductThreshold`, not for tuning the
+competition rule.
+
+### Exact commands
+
+```bash
+cd greyMatter && dotnet build -c Release
+dotnet run -c Release -- --test-hebbian
+dotnet run -c Release -- --cascade-stats --train 500   --repeats 5 --cross-word off
+dotnet run -c Release -- --cascade-stats --train 20000 --repeats 5 --cross-word off
+dotnet run -c Release -- --fidelity-test --train 500
+```
+
+Baselines to score against (from `74a6590`, `--repeats 1`, so treated as
+diagnostic and not as verdicts): 500 → `reached` 97 pairs, support 40.2%;
+20,000 → `reached` 31 pairs, support 83.9%, `blocked_by_budget` 18,441,473,
+`R_UNIGRAM` +0.3459, `R_PMI` −0.2216.
