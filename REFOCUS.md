@@ -2222,3 +2222,58 @@ Baselines to score against (from `74a6590`, `--repeats 1`, so treated as
 diagnostic and not as verdicts): 500 → `reached` 97 pairs, support 40.2%;
 20,000 → `reached` 31 pairs, support 83.9%, `blocked_by_budget` 18,441,473,
 `R_UNIGRAM` +0.3459, `R_PMI` −0.2216.
+
+---
+
+## 2026-08-10 — W1 / P6 PARTIAL RESULTS (500 sentences only; 20k not yet run)
+
+Commands run: `--test-hebbian`, then
+`--cascade-stats --train 500 --repeats 5 --cross-word off`.
+
+**`--test-hebbian`: ✅ PASS.** 0 → 8,023 synapses,
+`displaced=9 declined=6`. Competition executes and does not break basic synapse
+formation.
+
+### Prediction scoring
+
+| # | prediction | result |
+|---|---|---|
+| 1 | `reached` stops falling with corpus size (20k ≥ 500) | **not yet scoreable** — needs the 20k run |
+| 2 | `declined` ≪ 18.4M, `displaced` substantial | **partial ✅** — at 500: `displaced=79,559 declined=264,764`. Competition is genuinely running (23% of contested slots displace). Not comparable to the 18.4M baseline, which was at 20k |
+| 3 | `R_UNIGRAM` dominance weakens | **❌ at 500** — rose to **+0.5187** [0.4883..0.5565] from −0.0586 |
+| 4 | graph size stays bounded | **✅** — 691,101 vs 689,820 before |
+| 5 | fidelity/AUC unmoved | not yet run |
+
+### The 500-sentence verdict is void, by our own rule
+
+`bigram support: 127/822 (15.5%)` — the **LOW SUPPORT** warning fired. Below 20%
+the harness states that PMI degenerates to inverse word frequency and the test
+cannot measure association. So `VERDICT: NO SIGNAL` at 500 sentences says nothing
+about the model.
+
+**And this corrects P5.5.** I recorded there that the low-support hypothesis was
+"falsified" by a reading of 40.2%. That reading was computed on the *reached*
+pairs only — the same selection bias P5.6 fixed — and reached pairs are precisely
+the repeated, frequent ones. On the unbiased denominator support is **15.5%**.
+The hypothesis was not falsified; the diagnostic that appeared to falsify it was
+biased by the defect it shared with the estimator.
+
+### What R_PMI = −0.4597 actually measures
+
+Tight across repeats ([−0.4993..−0.4265]), so not noise — but **623 of 822 pairs
+now have mass 0**. With 76% ties at zero, the correlation is dominated by the
+*reached/unreached* split rather than by weight ranking among reached successors.
+Reachability tracks word frequency, and PMI by construction favours rare
+distinctive successors — the ones not reached. The strong negative is therefore
+largely a **coverage** statement, not a weight-ranking statement.
+
+### One clean, unconfounded contrast
+
+`reached`: real **199/822 (24.2%)** vs shuffled **51/723 (7.1%)** — real order
+reaches 3.4× more true successors. Large and consistent. But note it is at least
+partly the P5 tautology again: cross-concept edges exist only between words
+observed adjacent in that order, so shuffled training cannot reach real
+successors. Recorded as an observation, **not** as evidence of learned order.
+
+**Next:** the 20,000-sentence arm, which is prediction 1 and the actual exit
+criterion. Nothing here settles W1.
