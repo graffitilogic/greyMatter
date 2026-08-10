@@ -928,16 +928,43 @@ namespace GreyMatter
             // strong (2.23). A metric that degrades when you improve the experiment
             // is the wrong metric.
             var separable = controlMax < trainedMin;              // strict: a perfect threshold exists
-            var ranksWell = auc >= 0.90 && dPrime >= 1.5;         // strong but imperfect separation
             var controlsClean = controlMax == 0 || separable;
 
             Console.WriteLine(controlsClean
                 ? "   ✅ perfectly separable — a threshold cleanly divides language from noise"
-                : ranksWell
-                    ? $"   🟡 strong but imperfect: trained cues outrank controls in {auc:P0} of pairs, " +
-                      $"but '{weakest}' ({trainedMin:F3}) scores at or below the strongest control ({controlMax:F3})."
-                    : "   ❌ CONTROLS OVERLAP THE TRAINED RANGE — no threshold separates " +
-                      "language from noise, so the numbers below are not trustworthy.");
+                : $"   ❌ CONTROLS OVERLAP THE TRAINED RANGE — '{weakest}' ({trainedMin:F3}) scores at or " +
+                  $"below the strongest control ({controlMax:F3}). AUC {auc:F3} / d′ {dPrime:F2} do not " +
+                  "override this: ranking well on average is not the same as separating.");
+
+            // ── Ground rule 8: controls gate validity ───────────────────────────
+            //
+            // "If controls activate inside the trained range, the harness aborts
+            // and NO fidelity number is reportable. Never weaken a control to make
+            // a run pass."
+            //
+            // The harness did not enforce this. `ranksWell` (AUC ≥ 0.90 && d′ ≥ 1.5)
+            // invented a middle tier the rule does not have, and a run with
+            // qqzzxxjj at 0.627 against trained 'so' at 0.555 printed
+            // "REGENERATION FIDELITY: 93.4%" under a 🟡 PROVISIONAL banner.
+            // Controls beating a trained word is precisely the condition rule 8
+            // exists to catch, and a soft tier is how a control gets weakened
+            // without anyone deciding to weaken it.
+            //
+            // Discrimination diagnostics still print — they are what you need to
+            // fix the problem. The fidelity number does not.
+            if (!controlsClean)
+            {
+                Console.WriteLine();
+                Console.WriteLine("════════════════════════════════════════");
+                Console.WriteLine($"DISCRIMINATION:        margin={margin:F3}  AUC={auc:F3}  d′={dPrime:F2}");
+                Console.WriteLine($"CONTROLS:              OVERLAPPING — strongest control {controlMax:F3} " +
+                                  $"≥ weakest trained '{weakest}' {trainedMin:F3}");
+                Console.WriteLine("════════════════════════════════════════");
+                Console.WriteLine("🔴 ABORTED (ground rule 8) — controls activate inside the trained range, " +
+                                  "so no fidelity number is reportable from this run.");
+                Console.WriteLine("   Fix discrimination first. Do NOT weaken or drop a control to make this pass.");
+                return;
+            }
 
             Console.WriteLine();
             Console.WriteLine("════════════════════════════════════════");
@@ -964,15 +991,9 @@ namespace GreyMatter
                                   : "  (nothing lost)"));
             Console.WriteLine($"BUDGET:                deviation threshold={devThreshold}");
             Console.WriteLine($"DISCRIMINATION:        margin={margin:F3}  AUC={auc:F3}  d′={dPrime:F2}");
-            Console.WriteLine($"CONTROLS:              {(controlsClean ? "separable" : ranksWell ? "strong but imperfect" : "OVERLAPPING — RESULT INVALID")}");
+            // Only reachable when controlsClean — rule 8 returned above otherwise.
+            Console.WriteLine($"CONTROLS:              separable");
             Console.WriteLine("════════════════════════════════════════");
-            if (!controlsClean && !ranksWell)
-            {
-                Console.WriteLine("🔴 RESULT INVALID — controls overlap trained cues. Fix discrimination before reading fidelity.");
-                return;
-            }
-            if (!controlsClean)
-                Console.WriteLine("🟡 PROVISIONAL — discrimination is strong but not perfect; treat fidelity as indicative, not established.");
             Console.WriteLine(meanFidelity switch
             {
                 >= 0.95 => "✅ Persisted assemblies round-trip losslessly. NOT a test of the thesis — see above.",

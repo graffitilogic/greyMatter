@@ -2384,3 +2384,69 @@ and nothing else. They should not be cited either way.
 (199 → 77).** It knows less about adjacency than it did at 500 sentences. That is
 the finding, it is stable across repeats, and it is not fixed by changing which
 synapses get evicted.
+
+---
+
+## 2026-08-10 — W1 prediction 5 + a rule-8 violation in the harness
+
+`dotnet run -- --fidelity-test --train 500`
+
+### Prediction 5 — no evidence of regression, but not certifiable
+
+| | banked (P4.1) | this run |
+|---|---|---|
+| fidelity | 95.5% | 93.4% |
+| AUC | 0.990 | 0.962 |
+| regenerated | 99.5% | 98.9% |
+| bytes/neuron | 68 | 72 |
+
+AUC moved −0.028 against a documented ±0.03 noise band, so **nothing here shows
+P6 damaged the receptive-field result**. But it is n=1 against an n=1 baseline,
+which is precisely the weakness W3 exists to remove. Scored as *not a
+demonstrated regression*, not as a pass.
+
+### The harness was violating ground rule 8
+
+Rule 8: *"If controls activate inside the trained range, the harness aborts and
+no fidelity number is reportable. Never weaken a control to make a run pass."*
+
+This run printed `REGENERATION FIDELITY: 93.4%` while:
+
+```
+qqzzxxjj   0.627      ← control
+blorp      0.608      ← control
+qwertyuiop 0.596      ← control
+so         0.555      ← TRAINED
+```
+
+Three controls beat a trained word. That is the exact condition rule 8 exists to
+catch. The harness caught it, described it correctly ("'so' scores at or below
+the strongest control"), and reported the number anyway under a
+🟡 **PROVISIONAL** banner.
+
+**There is no PROVISIONAL tier in rule 8.** It came from
+`ranksWell = auc >= 0.90 && dPrime >= 1.5` — a soft middle tier that let a run
+pass on average-case ranking while failing separation. That is how a control gets
+weakened without anyone deciding to weaken it, which is the specific failure the
+rule's second sentence names.
+
+*Fixed:* `--fidelity-test` now aborts when `controlMax >= trainedMin`, printing
+discrimination diagnostics (which you need to fix it) but no fidelity number.
+`ranksWell` deleted. AUC and d′ no longer override separation — ranking well on
+average is not the same as separating.
+
+### Consequence for W3, stated before it runs
+
+W3 banks the fidelity curve across seeds. With the gate enforced, **the sweep may
+produce fewer reportable runs, possibly none.** That is not a harness bug; it is
+the honest state of the discrimination result. If little is reportable, then the
+banked 95.5% / AUC 0.990 headline was itself resting on runs rule 8 would have
+rejected, and W3 stops being "bank the good result" and becomes "find out whether
+there is one."
+
+Note also, already known from P2.6 and visible here: four of eight controls are
+silent because their VQ code maps to no cluster — a **region gate, not fine
+discrimination** — and one *trained* cue (`water`) is silent too. So AUC 0.962 is
+carried substantially by controls that never reached a cluster, while the cues
+that did reach one overlap the trained range. The separation is weaker than the
+AUC alone suggests.
