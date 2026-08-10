@@ -1940,6 +1940,51 @@ story I told about it above.
 **Verdict thresholds** on `PMI_GAP` (real − shuffled): >0.15 learned order,
 0.05–0.15 weak signal needing more data, ≤0.05 null not rejected.
 
+#### P5.3 result — both arms "passed", and one of them shouldn't have
+
+| | cross-word OFF | cross-word ON |
+|---|---|---|
+| `R_BIGRAM` | 0.1730 vs shuf 0.0843 | 0.3053 vs shuf −0.0826 |
+| `R_UNIGRAM` | −0.0141 vs shuf 0.1676 | 0.2124 vs shuf 0.3086 |
+| `R_PMI` | **+0.1838** vs shuf −0.0676 | **−0.0263** vs shuf −0.2649 |
+| `PMI_GAP` | +0.2514 | +0.2387 |
+
+**The ON arm's verdict was spurious, and the fault is the verdict rule.** Its
+real `R_PMI` is −0.0263 — the gap is positive only because the shuffled arm is
+*more* negative. A model ranking successors anti-correlated with association is
+not learning order; it is merely less anti-correlated than noise. Testing the
+gap alone, without requiring the real correlation to be positive, was wrong.
+
+**The OFF arm is defensible:** real `R_PMI` +0.1838 against a null at ~0. Right
+shape, modest size. This is the first evidence in the project of recall
+depending on something learned rather than the VQ prototype — and it holds only
+with cross-word co-activation OFF, consistent with P5.2's finding that symmetric
+within-sentence edges are order-blind.
+
+**But n=1, and the noise is not small.** `R_UNIGRAM` across the four arms:
+−0.0141, +0.1676, +0.2124, +0.3086. The real-order training is identical between
+the OFF and ON runs apart from added edges, yet this diagnostic swings 0.23.
+Reading a 0.25 gap off a single run is not justified.
+
+*Source of the variance:* cluster IDs are `Guid.NewGuid()`, so cluster iteration
+order differs every run; a neuron appearing in several assemblies resolves to
+whichever concept is walked first. Not the background evictor — that fires after
+30 minutes idle and these runs finish in seconds.
+
+*Also noted:* the shuffled arm builds a **denser** graph (434,899 vs 373,845
+causal synapses). Shuffling produces more distinct adjacent pairs, where real
+text repeats common bigrams. Density differences between arms could themselves
+influence the correlations and are not yet controlled.
+
+### P5.4 — repeats and a verdict rule that cannot fire on a negative signal
+
+- `--repeats N` (default 3), reporting mean and `[min..max]` per metric. Shuffle
+  seed varies per repeat, so the spread captures shuffle-draw variance as well as
+  probe-order variance.
+- Verdict now requires real `R_PMI ≥ 0.10` **before** any gap test, and reports
+  `LEARNED ORDER` only when the repeat ranges of real and shuffled do not
+  overlap. A large gap with overlapping ranges reports `PROMISING BUT NOISY`.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

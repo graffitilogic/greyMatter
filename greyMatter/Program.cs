@@ -246,13 +246,38 @@ namespace GreyMatter
 
             if (cues.Count == 0) { Console.WriteLine("⚠️  No cue had ≥5 distinct successors. Train more sentences."); return; }
 
-            var real = await ScoreArm(sentences, cues, bigram, unigram, topK, crossWord, shuffle: false);
-            var shuf = await ScoreArm(sentences, cues, bigram, unigram, topK, crossWord, shuffle: true);
+            // P5.4: repeats. Cluster IDs are Guid.NewGuid(), so cluster iteration
+            // order differs every run, and a neuron appearing in more than one
+            // assembly resolves to whichever concept is walked first. Single-run
+            // correlations are therefore noisy — R_UNIGRAM swung 0.23 across arms
+            // whose training differs only by added edges. A 0.25 gap read from
+            // n=1 is not a result.
+            var repeats = int.Parse(GetArgValue(args, "--repeats", "3"));
+            var reals = new List<(double rBigram, double rUnigram, double rPmi, int scored)>();
+            var shufs = new List<(double rBigram, double rUnigram, double rPmi, int scored)>();
+            for (int r = 0; r < repeats; r++)
+            {
+                Console.WriteLine($"\n═══ repeat {r + 1}/{repeats} ═══");
+                reals.Add(await ScoreArm(sentences, cues, bigram, unigram, topK, crossWord, shuffle: false, seed: 12345 + r));
+                shufs.Add(await ScoreArm(sentences, cues, bigram, unigram, topK, crossWord, shuffle: true, seed: 12345 + r));
+            }
 
-            Console.WriteLine("\n── Result ──");
-            Console.WriteLine($"R_BIGRAM:   {real.rBigram:F4}  vs shuffled {shuf.rBigram:F4}   (raw co-occurrence count)");
-            Console.WriteLine($"R_UNIGRAM:  {real.rUnigram:F4}  vs shuffled {shuf.rUnigram:F4}   (frequency, diagnostic only)");
-            Console.WriteLine($"R_PMI:      {real.rPmi:F4}  vs shuffled {shuf.rPmi:F4}   (base-rate corrected — PRIMARY)");
+            (double mean, double lo, double hi) Agg(List<(double rBigram, double rUnigram, double rPmi, int scored)> xs,
+                                                    Func<(double rBigram, double rUnigram, double rPmi, int scored), double> sel)
+                => (xs.Average(sel), xs.Min(sel), xs.Max(sel));
+
+            var realPmi = Agg(reals, x => x.rPmi);
+            var shufPmi = Agg(shufs, x => x.rPmi);
+            var realBig = Agg(reals, x => x.rBigram);
+            var shufBig = Agg(shufs, x => x.rBigram);
+            var realUni = Agg(reals, x => x.rUnigram);
+            var real = (rBigram: realBig.mean, rUnigram: realUni.mean, rPmi: realPmi.mean, scored: reals[0].scored);
+            var shuf = (rBigram: shufBig.mean, rUnigram: Agg(shufs, x => x.rUnigram).mean, rPmi: shufPmi.mean, scored: shufs[0].scored);
+
+            Console.WriteLine($"\n── Result (mean of {repeats} repeats, [min..max]) ──");
+            Console.WriteLine($"R_BIGRAM:   {realBig.mean:F4} [{realBig.lo:F4}..{realBig.hi:F4}]  vs shuffled {shufBig.mean:F4}   (raw count)");
+            Console.WriteLine($"R_UNIGRAM:  {realUni.mean:F4} [{realUni.lo:F4}..{realUni.hi:F4}]  vs shuffled {shuf.rUnigram:F4}   (diagnostic)");
+            Console.WriteLine($"R_PMI:      {realPmi.mean:F4} [{realPmi.lo:F4}..{realPmi.hi:F4}]  vs shuffled {shufPmi.mean:F4} [{shufPmi.lo:F4}..{shufPmi.hi:F4}]");
             Console.WriteLine($"CUES_SCORED: {real.scored}");
 
             // PMI is primary because raw bigram and unigram counts are collinear:
@@ -262,15 +287,28 @@ namespace GreyMatter
             var gap = real.rPmi - shuf.rPmi;
             Console.WriteLine($"PMI_GAP: {gap:+0.0000;-0.0000}   (real − shuffled; order information, if any)");
 
+            // P5.4 verdict fix. The previous rule tested the GAP alone, and fired
+            // "LEARNED ORDER" on an arm whose real R_PMI was −0.0263 — the gap was
+            // positive only because the shuffled arm was MORE negative. A model
+            // that ranks successors anti-correlated with association is not
+            // learning order; it is merely less anti-correlated than noise.
+            // Real correlation must itself be positive, and the spread must not
+            // straddle the gap.
+            var separated = realPmi.lo > shufPmi.hi;   // no overlap across repeats
             Console.WriteLine();
             if (real.scored < 5)
                 Console.WriteLine("VERDICT: INCONCLUSIVE — too few cues had enough reachable successors to rank.");
+            else if (realPmi.mean < 0.10)
+                Console.WriteLine($"VERDICT: NO SIGNAL — real R_PMI is {realPmi.mean:F4}; the graph does not rank successors " +
+                                  "by association at all. A positive gap here only means the shuffled arm is worse.");
+            else if (gap > 0.15 && separated)
+                Console.WriteLine("VERDICT: LEARNED ORDER — real R_PMI positive, beats shuffle, and repeats do not overlap.");
             else if (gap > 0.15)
-                Console.WriteLine("VERDICT: LEARNED ORDER — base-rate-corrected association survives the shuffle control.");
+                Console.WriteLine("VERDICT: PROMISING BUT NOISY — gap is large but repeat ranges overlap. Raise --repeats/--train.");
             else if (gap > 0.05)
-                Console.WriteLine("VERDICT: WEAK ORDER SIGNAL — present but small. Needs more sentences or repeats before it counts.");
+                Console.WriteLine("VERDICT: WEAK ORDER SIGNAL — present but small.");
             else
-                Console.WriteLine("VERDICT: NULL NOT REJECTED — destroying word order costs almost nothing. Order is not being learned.");
+                Console.WriteLine("VERDICT: NULL NOT REJECTED — destroying word order costs almost nothing.");
         }
 
         static List<string> Tokenize(string sentence) =>
@@ -281,7 +319,7 @@ namespace GreyMatter
         static async Task<(double rBigram, double rUnigram, double rPmi, int scored)> ScoreArm(
             List<string> sentences, List<string> cues,
             Dictionary<(string, string), int> bigram, Dictionary<string, int> unigram,
-            int topK, bool crossWord, bool shuffle)
+            int topK, bool crossWord, bool shuffle, int seed = 12345)
         {
             double sumP = 0;
             var brainPath = Path.Combine(Path.GetTempPath(), "gm_stats_" + Guid.NewGuid().ToString("N"));
@@ -295,9 +333,10 @@ namespace GreyMatter
                 brain.EnableCrossWordCoactivation = crossWord;
                 await brain.InitializeAsync();
 
-                // Fixed seed: the shuffled arm must be reproducible, or a weak
-                // result cannot be distinguished from an unlucky draw.
-                var rng = new Random(12345);
+                // Seed varies per repeat so the spread captures shuffle-draw
+                // variance too, not just probe-order variance. Fixed per repeat so
+                // any single run remains reproducible.
+                var rng = new Random(seed);
                 Console.WriteLine($"── Training arm: {(shuffle ? "SHUFFLED order (null)" : "real order")} ──");
                 int n = 0;
                 foreach (var s in sentences)
