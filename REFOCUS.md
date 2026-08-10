@@ -2585,3 +2585,79 @@ reportable. This is the same design that settled P5.3→P5.4.
 
 Prediction, recorded now: **scattered passes, ~1–2 per sweep, no threshold
 reliable.**
+
+---
+
+## 2026-08-10 — W3′ RESULT: prediction ✅ CONFIRMED. The negative result stands.
+
+5 full sweeps, 40 runs. **6 reportable (15%).**
+
+| threshold | passes / 5 | note |
+|---|---|---|
+| 0.02 | 1 | |
+| 0.05 | 0 | |
+| 0.10 | 1 | |
+| 0.25 | 1 | |
+| 0.50 | 1 | |
+| 1.00 | 2 | best, still 40% |
+| **2.00** | **0** | *was the sole pass in the previous sweep* |
+| 8.00 | 0 | |
+
+Per sweep: 0, 3, 1, 0, 2. Pre-registered: *"scattered passes, ~1–2 per sweep, no
+threshold reliable."* ✅ Confirmed. Threshold 2.00 going 0/5 confirms the earlier
+single pass was a draw, not a budget effect.
+
+### AUC = 1.000 is the gate, definitionally
+
+**All 6 passing runs have AUC exactly 1.000. All 34 failures have AUC < 1.000.**
+Not a coincidence: AUC 1.000 means every trained cue outranks every control,
+which *is* `controlMax < trainedMin` — the rule 8 condition. The two are the same
+statement.
+
+**Therefore AUC 0.990 means the gate FAILED.** Across ~104 trained×control pairs,
+0.990 is one inverted pair. The banked **95.5% / AUC 0.990** headline was one
+inversion short of passing, and rule 8 calls that a fail. That is now established,
+not suspected. *Any historical claim in this project resting on AUC 0.990 is
+retracted.*
+
+### d′ is flat everywhere: 1.76 – 2.01 across all 40 runs
+
+No relationship to threshold across a 400× storage range. Discrimination does not
+depend on the persistence budget. P3.3 restated for the third time.
+
+### The result, stated plainly
+
+**Procedurally regenerated receptive fields reproduce activation faithfully but
+are not lexically discriminative.** Both halves are true and the second undercuts
+the first:
+
+- *Regeneration works.* When a run is reportable, fidelity is 95.5–97.2% across
+  72–160 B/neuron. The procedural path reconstructs the assembly.
+- *What it reconstructs is a prototype, and a prototype has no identity.* Any
+  input quantizing to code C matches code C's neurons. So a novel pseudo-word
+  landing in a trained region scores 0.55–0.64 while weakly-trained words score
+  0.55–0.67. The distributions overlap in the tails, d′ ≈ 1.85, and whether a
+  given run separates is decided by which particular pair lands where.
+
+The thesis asked whether a procedurally regenerated region can match a persisted
+one on **recall fidelity**. The honest answer from this evidence: it reproduces
+the *pattern* faithfully, but the pattern is not specific enough for the match to
+constitute recall. 85% of runs cannot report a fidelity number at all.
+
+**Per CLAUDE.md this is written up as a negative result, not retried with tuned
+thresholds.** The 15% pass rate is not a threshold to be found; it is noise
+around a d′ that is too low everywhere.
+
+### One structural observation for whatever comes next
+
+The overlap is specifically between **weakly-trained words** and **untrained
+words that land in a trained region**. Both sit near their prototype. Separating
+them needs a per-neuron signal for *what this neuron actually saw*, as opposed to
+what its code predicts — a learned threshold or gain from the running statistics
+of its own activations.
+
+That is W6's homeostatic mechanism. Note it is also what W1b concluded the
+synaptic gate needs (`passed=99.5%` against a fixed 0.12 threshold). **Two
+independent failures, one missing mechanism.** That convergence is worth more
+than either patch, and it should be proposed to Bill as a queue change rather
+than folded in quietly.
