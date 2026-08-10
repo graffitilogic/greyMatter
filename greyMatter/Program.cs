@@ -215,7 +215,7 @@ namespace GreyMatter
         {
             var topK = int.Parse(GetArgValue(args, "--topk", "16"));
             var trainSentences = int.Parse(GetArgValue(args, "--train", "500"));
-            var crossWord = GetArgValue(args, "--cross-word", "on") != "off";
+            var crossWord = GetArgValue(args, "--cross-word", "off") == "on";
 
             Console.WriteLine("🔬 P5.2: Does synapse strength track corpus statistics?");
             Console.WriteLine("=======================================================\n");
@@ -250,20 +250,27 @@ namespace GreyMatter
             var shuf = await ScoreArm(sentences, cues, bigram, unigram, topK, crossWord, shuffle: true);
 
             Console.WriteLine("\n── Result ──");
-            Console.WriteLine($"R_BIGRAM:   {real.rBigram:F4}   (real training, mass vs bigram count)");
-            Console.WriteLine($"R_UNIGRAM:  {real.rUnigram:F4}   (frequency confound)");
-            Console.WriteLine($"R_SHUFFLED: {shuf.rBigram:F4}   (order destroyed — the null)");
+            Console.WriteLine($"R_BIGRAM:   {real.rBigram:F4}  vs shuffled {shuf.rBigram:F4}   (raw co-occurrence count)");
+            Console.WriteLine($"R_UNIGRAM:  {real.rUnigram:F4}  vs shuffled {shuf.rUnigram:F4}   (frequency, diagnostic only)");
+            Console.WriteLine($"R_PMI:      {real.rPmi:F4}  vs shuffled {shuf.rPmi:F4}   (base-rate corrected — PRIMARY)");
             Console.WriteLine($"CUES_SCORED: {real.scored}");
+
+            // PMI is primary because raw bigram and unigram counts are collinear:
+            // comparing r_bigram against r_unigram cannot separate them. Dividing
+            // out the target base rate does, so the only comparison that carries
+            // weight is PMI-real against PMI-shuffled.
+            var gap = real.rPmi - shuf.rPmi;
+            Console.WriteLine($"PMI_GAP: {gap:+0.0000;-0.0000}   (real − shuffled; order information, if any)");
 
             Console.WriteLine();
             if (real.scored < 5)
                 Console.WriteLine("VERDICT: INCONCLUSIVE — too few cues had enough reachable successors to rank.");
-            else if (real.rBigram > shuf.rBigram + 0.15 && real.rBigram > real.rUnigram + 0.10)
-                Console.WriteLine("VERDICT: LEARNED ORDER — mass tracks bigram statistics beyond frequency and beyond chance.");
-            else if (real.rBigram <= real.rUnigram + 0.10)
-                Console.WriteLine("VERDICT: FREQUENCY CONFOUND — mass tracks how common words are, not what followed what.");
+            else if (gap > 0.15)
+                Console.WriteLine("VERDICT: LEARNED ORDER — base-rate-corrected association survives the shuffle control.");
+            else if (gap > 0.05)
+                Console.WriteLine("VERDICT: WEAK ORDER SIGNAL — present but small. Needs more sentences or repeats before it counts.");
             else
-                Console.WriteLine("VERDICT: NULL NOT REJECTED — shuffled training scores comparably. Order is not being learned.");
+                Console.WriteLine("VERDICT: NULL NOT REJECTED — destroying word order costs almost nothing. Order is not being learned.");
         }
 
         static List<string> Tokenize(string sentence) =>
@@ -271,11 +278,12 @@ namespace GreyMatter
                     .Where(w => w.Length > 1).ToList();
 
         /// Train one arm and return mean Spearman correlations across cues.
-        static async Task<(double rBigram, double rUnigram, int scored)> ScoreArm(
+        static async Task<(double rBigram, double rUnigram, double rPmi, int scored)> ScoreArm(
             List<string> sentences, List<string> cues,
             Dictionary<(string, string), int> bigram, Dictionary<string, int> unigram,
             int topK, bool crossWord, bool shuffle)
         {
+            double sumP = 0;
             var brainPath = Path.Combine(Path.GetTempPath(), "gm_stats_" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(brainPath);
             try
@@ -328,9 +336,26 @@ namespace GreyMatter
                     var m = succ.Select(t => mass[t]).ToList();
                     sumB += Spearman(m, succ.Select(t => (double)bigram[(cue.ToLower(), t)]).ToList());
                     sumU += Spearman(m, succ.Select(t => (double)unigram.GetValueOrDefault(t)).ToList());
+
+                    // P5.3: base-rate-corrected association. Raw bigram count and
+                    // unigram count are strongly collinear — frequent words have
+                    // frequent bigrams — so "r_bigram ≈ r_unigram" does NOT cleanly
+                    // mean frequency is doing the work. Ranking by
+                    // count(cue,target)/count(target) divides the target's base rate
+                    // out. Within a fixed cue, count(cue) and the corpus total are
+                    // constants, so this ranks identically to pointwise mutual
+                    // information — without the log or the zero-count edge cases.
+                    sumP += Spearman(m, succ.Select(t =>
+                        bigram[(cue.ToLower(), t)] / Math.Max(1.0, unigram.GetValueOrDefault(t))).ToList());
                     scored++;
                 }
-                return scored == 0 ? (0, 0, 0) : (sumB / scored, sumU / scored, scored);
+
+                // Which synapse populations actually exist in this arm — the
+                // difference between the two arms is the mechanism, not a guess.
+                Console.WriteLine($"   graph: {brain.GetSynapticGraphSynapseCount():N0} synapses");
+                Console.WriteLine($"   {brain.GetHebbianActivationSummary(reset: false).Trim()}");
+
+                return scored == 0 ? (0, 0, 0, 0) : (sumB / scored, sumU / scored, sumP / scored, scored);
             }
             finally
             {

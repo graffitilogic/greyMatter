@@ -328,7 +328,17 @@ namespace GreyMatter.Core
         /// Toggleable so the P5.2 statistics can be run with it on and off; if
         /// the numbers come back flat we can tell whether this helped or hurt.
         /// </summary>
-        public bool EnableCrossWordCoactivation { get; set; } = true;
+        /// DEFAULT OFF as of the P5.2 measurement. Turning it on raised the
+        /// shuffled null from 0.1345 to 0.2363 while leaving the real arm flat
+        /// (0.2404 → 0.2510) — it adds structure that survives shuffling, because
+        /// symmetric within-sentence wiring depends only on the SET of words in a
+        /// sentence, which shuffling does not change. It is order-blind by
+        /// construction and it swamped the causal signal.
+        ///
+        /// Kept because the P5 forward/backward test is meaningless without it
+        /// (nothing else can create a backward cross-concept edge) — but that test
+        /// must then be read knowing these edges carry no order information.
+        public bool EnableCrossWordCoactivation { get; set; } = false;
 
         private readonly List<List<(Guid neuronId, float activation)>> _sentenceWordActive = new();
         private long _crossWordSynapsesCreated;

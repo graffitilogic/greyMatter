@@ -1888,6 +1888,58 @@ be confused with an unlucky draw.
 This null *is* reachable: a graph that stores adjacency without weighting it by
 frequency scores ~0 on `R_BIGRAM` while still passing P5 perfectly.
 
+#### P5.2 result — NEITHER arm passes. The graph does not learn word order.
+
+| | cross-word ON (P5.1) | cross-word OFF |
+|---|---|---|
+| `R_BIGRAM` | 0.2510 | 0.2404 |
+| `R_UNIGRAM` | 0.0843 | 0.2041 |
+| `R_SHUFFLED` | **0.2363** | **0.1345** |
+| verdict | NULL NOT REJECTED | FREQUENCY CONFOUND |
+
+**Headline: the central claim about the synaptic graph encoding sequence is not
+supported.** Every recall this project measures still resolves through the VQ
+prototype. P3's boundary stands.
+
+**P5.1 made it worse, and the mechanism is clear.** Turning cross-word
+co-activation on lifted the shuffled null from 0.1345 to 0.2363 while the real
+arm barely moved (0.2404 → 0.2510). Symmetric within-sentence wiring depends
+only on the **set** of words in a sentence — and shuffling within a sentence
+does not change that set, so those edges are *identical* under the null. P5.1
+added a large order-blind population that swamped the causal signal. It fixed
+the tautology in P5's forward/backward test by making the graph less
+order-sensitive. Default flipped to **off**; kept available because P5's
+fwd/bwd test is meaningless without it.
+
+**The hopeful reading, stated carefully.** In the cross-word OFF arm the real
+graph beats its own shuffled null by 0.107 (0.2404 vs 0.1345). The causal rule
+*is* doing something. It is just not separable from frequency by the test as
+built.
+
+**Where that test was unfair — my error.** Comparing `R_BIGRAM` against
+`R_UNIGRAM` cannot separate order from frequency, because the two are strongly
+collinear: frequent words have frequent bigrams. `R_UNIGRAM = 0.2041` is partly
+*caused by* order information rather than competing with it, so
+"FREQUENCY CONFOUND" was not a fair verdict on that arm.
+
+### P5.3 — base-rate-corrected association (PMI)
+
+Rank successors by `count(cue,target) / count(target)`, dividing the target's
+base rate out. Within a fixed cue, `count(cue)` and the corpus total are
+constants, so this ranks identically to pointwise mutual information without the
+log or the zero-count edge cases.
+
+`R_PMI` real vs shuffled becomes the **primary** comparison — it is the only one
+where the confound is removed by construction rather than by a threshold I chose.
+`R_BIGRAM` and `R_UNIGRAM` remain as diagnostics, now reported for both arms.
+
+Each arm also prints its synapse population (`intra` / `causal` / `xword`) and
+total, so the difference between arms is a measured mechanism rather than the
+story I told about it above.
+
+**Verdict thresholds** on `PMI_GAP` (real − shuffled): >0.15 learned order,
+0.05–0.15 weak signal needing more data, ≤0.05 null not rejected.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
