@@ -2344,3 +2344,43 @@ toward `declined`.
 W2 (re-run the order experiment) stays blocked. At `reached 0.6%` the 20k graph
 reaches almost no true successor, so **no order statistic computed on it can mean
 anything** — including the `R_PMI` figures this run is about to print.
+
+### Final scoring (all 5 repeats complete)
+
+| # | prediction | result |
+|---|---|---|
+| 1 | `reached` at 20k ≥ at 500 | **❌ FAILED** — 24.2% → **0.6%**. Absolute count 199 → 77 |
+| 2 | `declined` ≪ 18.4M, `displaced` substantial | **✅** — `declined=11,204,550` (−39%), `displaced=5,825,016` |
+| 3 | `R_UNIGRAM` dominance weakens | **unscoreable — my error, see below** |
+| 4 | graph bounded | **✅** — 670,773 synapses |
+| 5 | fidelity/AUC unmoved | **not yet run** — still owed |
+
+`reached` measured 78 and 77 on separate repeats: the metric is stable to ~1%,
+so the 40× collapse is not sampling noise.
+
+**Prediction 3 is unscoreable, and that is a defect in my pre-registration.** I
+recorded the baselines (`R_UNIGRAM +0.3459`, `reached 31 pairs`) as coming "from
+`74a6590`". They did not — they were measured *before* P5.6 changed the estimator
+to score every corpus successor with unreached = 0. Comparing today's +0.1270
+against +0.3459 conflates the P6 mechanism with an estimator change. Prediction 1
+is unaffected because it compares 500 against 20,000 **within this run**, both on
+the current estimator, which is how it was written.
+
+### The P5.4 verdict guard did its job
+
+`PMI_GAP: +0.0305` with real `R_PMI −0.0657` and non-overlapping repeat ranges.
+Under the pre-P5.4 rule this would have printed WEAK ORDER SIGNAL. The rule that
+requires real `R_PMI ≥ 0.10` *before* any gap test correctly returned NO SIGNAL
+instead. A positive gap over a negative real correlation still means only that
+the shuffled arm is worse.
+
+That said, at `reached 0.6%` **99.4% of scored pairs carry zero mass**, so all
+correlation figures from the 20k arm are measuring the reached/unreached split
+and nothing else. They should not be cited either way.
+
+### The result in one line
+
+**After 40× more data the graph reaches fewer true successors in absolute terms
+(199 → 77).** It knows less about adjacency than it did at 500 sentences. That is
+the finding, it is stable across repeats, and it is not fixed by changing which
+synapses get evicted.
