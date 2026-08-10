@@ -20,6 +20,12 @@ namespace GreyMatter
                 return;
             }
 
+            if (args.Length > 0 && args[0] == "--cascade-stats")
+            {
+                await RunCascadeStats(args);
+                return;
+            }
+
             if (args.Length > 0 && args[0] == "--test-hebbian")
             {
                 await RunHebbianSynapseTest();
@@ -149,6 +155,7 @@ namespace GreyMatter
                 Console.WriteLine("║  Experiments:                                             ║");
                 Console.WriteLine("║    dotnet run -- --fidelity-test  (P2 regeneration)       ║");
                 Console.WriteLine("║    dotnet run -- --cascade-test   (P5 order in graph)     ║");
+                Console.WriteLine("║    dotnet run -- --cascade-stats  (P5.2 learned vs freq)  ║");
                 Console.WriteLine("║                                                           ║");
                 Console.WriteLine("║  Health Checks:                                           ║");
                 Console.WriteLine("║    dotnet run -- --test-hebbian   (P1 synapse creation)   ║");
@@ -180,6 +187,192 @@ namespace GreyMatter
         /// meaningless without it: if every cue activates the same neurons,
         /// fidelity is trivially 100% and measures nothing.
         /// </summary>
+        /// <summary>
+        /// P5.2 — does synapse strength track corpus STATISTICS, or just topology?
+        ///
+        /// P5 could not fail: cross-concept edges existed only for pairs that were
+        /// adjacent in that order, so "cascade lands on successors" was a tautology.
+        /// This asks a question the architecture does not answer for free — among a
+        /// cue's KNOWN successors, does cascade mass rank them the way the corpus
+        /// does? Getting the set right is topology. Getting the ORDER right is
+        /// learning.
+        ///
+        /// Three arms, and the comparison is the result — not any single number:
+        ///
+        ///   r_bigram   real training, mass vs corpus bigram COUNT
+        ///   r_unigram  real training, mass vs target UNIGRAM count.
+        ///              The confound: if mass merely tracks how common a word is,
+        ///              this matches r_bigram and nothing sequence-specific
+        ///              was learned.
+        ///   r_shuffled training on word-order-shuffled sentences, scored against
+        ///              the REAL bigram counts. The null: destroy order, keep
+        ///              vocabulary and frequency. Should collapse to ~0.
+        ///
+        /// Verdict requires r_bigram to beat BOTH. Beating neither, or only the
+        /// shuffled arm, means frequency is doing the work.
+        /// </summary>
+        static async Task RunCascadeStats(string[] args)
+        {
+            var topK = int.Parse(GetArgValue(args, "--topk", "16"));
+            var trainSentences = int.Parse(GetArgValue(args, "--train", "500"));
+            var crossWord = GetArgValue(args, "--cross-word", "on") != "off";
+
+            Console.WriteLine("🔬 P5.2: Does synapse strength track corpus statistics?");
+            Console.WriteLine("=======================================================\n");
+            Console.WriteLine($"train: {trainSentences}   top-k: {topK}   cross-word co-activation: {(crossWord ? "ON (P5.1)" : "OFF")}\n");
+
+            var provider = new TrainingDataProvider();
+            var sentences = provider.LoadSentences("tatoeba_small", maxSentences: trainSentences, shuffle: false).ToList();
+
+            // Ground truth from the REAL corpus, used to score every arm including
+            // the shuffled one — that is what makes it a null rather than a
+            // different experiment.
+            var bigram = new Dictionary<(string, string), int>();
+            var unigram = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in sentences)
+            {
+                var w = Tokenize(s);
+                for (int i = 0; i < w.Count; i++)
+                {
+                    unigram[w[i]] = unigram.GetValueOrDefault(w[i]) + 1;
+                    if (i + 1 < w.Count)
+                        bigram[(w[i], w[i + 1])] = bigram.GetValueOrDefault((w[i], w[i + 1])) + 1;
+                }
+            }
+
+            var cues = unigram.OrderByDescending(kv => kv.Value)
+                .Where(kv => bigram.Keys.Count(k => k.Item1.Equals(kv.Key, StringComparison.OrdinalIgnoreCase)) >= 5)
+                .Take(20).Select(kv => kv.Key).ToList();
+
+            if (cues.Count == 0) { Console.WriteLine("⚠️  No cue had ≥5 distinct successors. Train more sentences."); return; }
+
+            var real = await ScoreArm(sentences, cues, bigram, unigram, topK, crossWord, shuffle: false);
+            var shuf = await ScoreArm(sentences, cues, bigram, unigram, topK, crossWord, shuffle: true);
+
+            Console.WriteLine("\n── Result ──");
+            Console.WriteLine($"R_BIGRAM:   {real.rBigram:F4}   (real training, mass vs bigram count)");
+            Console.WriteLine($"R_UNIGRAM:  {real.rUnigram:F4}   (frequency confound)");
+            Console.WriteLine($"R_SHUFFLED: {shuf.rBigram:F4}   (order destroyed — the null)");
+            Console.WriteLine($"CUES_SCORED: {real.scored}");
+
+            Console.WriteLine();
+            if (real.scored < 5)
+                Console.WriteLine("VERDICT: INCONCLUSIVE — too few cues had enough reachable successors to rank.");
+            else if (real.rBigram > shuf.rBigram + 0.15 && real.rBigram > real.rUnigram + 0.10)
+                Console.WriteLine("VERDICT: LEARNED ORDER — mass tracks bigram statistics beyond frequency and beyond chance.");
+            else if (real.rBigram <= real.rUnigram + 0.10)
+                Console.WriteLine("VERDICT: FREQUENCY CONFOUND — mass tracks how common words are, not what followed what.");
+            else
+                Console.WriteLine("VERDICT: NULL NOT REJECTED — shuffled training scores comparably. Order is not being learned.");
+        }
+
+        static List<string> Tokenize(string sentence) =>
+            sentence.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                    .Where(w => w.Length > 1).ToList();
+
+        /// Train one arm and return mean Spearman correlations across cues.
+        static async Task<(double rBigram, double rUnigram, int scored)> ScoreArm(
+            List<string> sentences, List<string> cues,
+            Dictionary<(string, string), int> bigram, Dictionary<string, int> unigram,
+            int topK, bool crossWord, bool shuffle)
+        {
+            var brainPath = Path.Combine(Path.GetTempPath(), "gm_stats_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(brainPath);
+            try
+            {
+                var config = new CerebroConfiguration { BrainDataPath = brainPath, UseProceduralSave = true };
+                config.ValidateAndSetup();
+                var brain = new Cerebro(brainPath);
+                brain.AttachConfiguration(config);
+                brain.EnableCrossWordCoactivation = crossWord;
+                await brain.InitializeAsync();
+
+                // Fixed seed: the shuffled arm must be reproducible, or a weak
+                // result cannot be distinguished from an unlucky draw.
+                var rng = new Random(12345);
+                Console.WriteLine($"── Training arm: {(shuffle ? "SHUFFLED order (null)" : "real order")} ──");
+                int n = 0;
+                foreach (var s in sentences)
+                {
+                    var feats = new Dictionary<string, double>
+                    {
+                        ["length"] = s.Length / 100.0,
+                        ["words"] = s.Split(' ').Length / 20.0,
+                        ["hasUpper"] = s.Any(char.IsUpper) ? 1.0 : 0.0,
+                        ["hasDigit"] = s.Any(char.IsDigit) ? 1.0 : 0.0,
+                        ["hasPunctuation"] = s.Any(char.IsPunctuation) ? 1.0 : 0.0
+                    };
+                    var words = Tokenize(s);
+                    // Shuffle WITHIN the sentence: identical vocabulary, identical
+                    // word frequencies, identical sentence lengths. Only order dies.
+                    if (shuffle) words = words.OrderBy(_ => rng.Next()).ToList();
+                    foreach (var w in words) await brain.LearnConceptAsync(w, feats);
+                    brain.EndSequence();
+                    if (++n % 100 == 0) Console.Write($"\r   {n}/{sentences.Count}");
+                }
+                Console.WriteLine($"\r   trained {n} sentences        ");
+
+                double sumB = 0, sumU = 0; int scored = 0;
+                foreach (var cue in cues)
+                {
+                    var mass = await brain.CascadeProbeAsync(cue, topK);
+
+                    // Rank only this cue's REAL successors that the cascade reached.
+                    // Including unreached ones would score topology again, which P5
+                    // already showed is free.
+                    var succ = bigram.Keys.Where(k => k.Item1.Equals(cue, StringComparison.OrdinalIgnoreCase))
+                                          .Select(k => k.Item2).Distinct()
+                                          .Where(t => mass.ContainsKey(t) && mass[t] > 0).ToList();
+                    if (succ.Count < 3) continue;
+
+                    var m = succ.Select(t => mass[t]).ToList();
+                    sumB += Spearman(m, succ.Select(t => (double)bigram[(cue.ToLower(), t)]).ToList());
+                    sumU += Spearman(m, succ.Select(t => (double)unigram.GetValueOrDefault(t)).ToList());
+                    scored++;
+                }
+                return scored == 0 ? (0, 0, 0) : (sumB / scored, sumU / scored, scored);
+            }
+            finally
+            {
+                try { Directory.Delete(brainPath, recursive: true); } catch { }
+            }
+        }
+
+        /// Spearman rank correlation. Ranks rather than raw values because cascade
+        /// mass and corpus counts are on wildly different scales and neither is
+        /// normally distributed — Pearson would report the scale mismatch.
+        static double Spearman(List<double> a, List<double> b)
+        {
+            if (a.Count < 3) return 0;
+            var ra = RankOf(a); var rb = RankOf(b);
+            double ma = ra.Average(), mb = rb.Average();
+            double num = 0, da = 0, db = 0;
+            for (int i = 0; i < ra.Count; i++)
+            {
+                num += (ra[i] - ma) * (rb[i] - mb);
+                da += (ra[i] - ma) * (ra[i] - ma);
+                db += (rb[i] - mb) * (rb[i] - mb);
+            }
+            return (da <= 0 || db <= 0) ? 0 : num / Math.Sqrt(da * db);
+        }
+
+        /// Average ranks for ties — corpus counts have many (most bigrams occur once).
+        static List<double> RankOf(List<double> v)
+        {
+            var idx = Enumerable.Range(0, v.Count).OrderBy(i => v[i]).ToList();
+            var r = new double[v.Count];
+            int p = 0;
+            while (p < idx.Count)
+            {
+                int q = p;
+                while (q + 1 < idx.Count && v[idx[q + 1]] == v[idx[p]]) q++;
+                double avg = (p + q) / 2.0 + 1;
+                for (int k = p; k <= q; k++) r[idx[k]] = avg;
+                p = q + 1;
+            }
+            return r.ToList();
+        }
+
         /// <summary>
         /// P5 — cascade recall. Does the synaptic graph carry ORDER?
         ///

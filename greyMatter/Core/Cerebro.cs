@@ -234,13 +234,14 @@ namespace GreyMatter.Core
                 summary = $"   📊 Hebbian histogram: calls={_hebbCalls:N0} neurons={_hebbNeuronsSeen:N0} " +
                           $"passed={_hebbNeuronsPassed:N0} ({passedPct:F1}%) " + deltaPart +
                           $"skipped[few={_hebbSkippedFewNeurons:N0} none_passed={_hebbSkippedNonePassed:N0}] " +
-                          $"synapses[intra={_hebbSynapsesCreated:N0} causal={_causalSynapsesCreated:N0}]";
+                          $"synapses[intra={_hebbSynapsesCreated:N0} causal={_causalSynapsesCreated:N0} " +
+                          $"xword={_crossWordSynapsesCreated:N0}]";
             }
             if (reset)
             {
                 _hebbCalls = _hebbNeuronsSeen = _hebbNeuronsPassed = 0;
                 _hebbSkippedFewNeurons = _hebbSkippedNonePassed = _hebbSynapsesCreated = 0;
-                _causalSynapsesCreated = 0;
+                _causalSynapsesCreated = _crossWordSynapsesCreated = 0;
                 _hebbDeltaMin = double.PositiveInfinity;
                 _hebbDeltaMax = double.NegativeInfinity;
                 _hebbDeltaSum = 0;
@@ -298,7 +299,77 @@ namespace GreyMatter.Core
         /// of one sentence would appear to causally precede the first word of the
         /// next, and the graph would learn order that never occurred.
         /// </summary>
-        public void EndSequence() => _previousSequenceActive = new();
+        public void EndSequence()
+        {
+            FlushCrossWordCoactivation();
+            _previousSequenceActive = new();
+        }
+
+        /// <summary>
+        /// P5.1 — cross-word symmetric co-activation.
+        ///
+        /// P5 found the forward/backward comparison was structurally rigged:
+        /// `DepressSynapse` never creates a synapse, and the only creator of
+        /// cross-concept edges was `RecordCausalPattern`, which potentiates
+        /// strictly pre→post. So a backward cross-concept edge was IMPOSSIBLE,
+        /// FORWARD_SHARE was pinned at 1.0 by construction, and the null could
+        /// never be rejected. The measurement was a tautology.
+        ///
+        /// The defect is architectural, not a test bug. Biological STDP modulates
+        /// an *existing* recurrent network — potentiation and depression adjust
+        /// connections that are already there. Here LTD had nothing to act on,
+        /// so "asymmetry" was merely the absence of one direction.
+        ///
+        /// This supplies the missing substrate: words co-occurring in a sentence
+        /// wire SYMMETRICALLY (both directions), and the causal rule then sculpts
+        /// that base — potentiating pre→post, depressing post→pre. Only then is
+        /// forward-vs-backward a real question with a null that can hold.
+        ///
+        /// Toggleable so the P5.2 statistics can be run with it on and off; if
+        /// the numbers come back flat we can tell whether this helped or hurt.
+        /// </summary>
+        public bool EnableCrossWordCoactivation { get; set; } = true;
+
+        private readonly List<List<(Guid neuronId, float activation)>> _sentenceWordActive = new();
+        private long _crossWordSynapsesCreated;
+
+        /// Neurons contributed per word to the sentence-level group. Small on
+        /// purpose: the point is breadth ACROSS words, not depth within one.
+        private const int CrossWordNeuronsPerWord = 2;
+
+        private void FlushCrossWordCoactivation()
+        {
+            if (!EnableCrossWordCoactivation || _sentenceWordActive.Count < 2)
+            {
+                _sentenceWordActive.Clear();
+                return;
+            }
+
+            // Round-robin across words rather than taking the globally strongest
+            // neurons. RecordCoactivationPattern truncates to the top
+            // MaxCoactivationGroup by activation, and a single dominant assembly
+            // would otherwise fill that budget by itself — reproducing exactly the
+            // within-assembly wiring this is meant to complement.
+            var group = new List<(Guid neuronId, float activation)>();
+            for (int rank = 0; rank < CrossWordNeuronsPerWord; rank++)
+            {
+                foreach (var word in _sentenceWordActive)
+                {
+                    if (rank < word.Count) group.Add(word[rank]);
+                    if (group.Count >= SparseSynapticGraph.MaxCoactivationGroup) break;
+                }
+                if (group.Count >= SparseSynapticGraph.MaxCoactivationGroup) break;
+            }
+
+            if (group.Count >= 2)
+            {
+                var before = _synapticGraph.GetSynapseCount();
+                _synapticGraph.RecordCoactivationPattern(group);
+                _crossWordSynapsesCreated += Math.Max(0, _synapticGraph.GetSynapseCount() - before);
+            }
+
+            _sentenceWordActive.Clear();
+        }
 
         // VQ codebook warmup: adapt to the data, then freeze so pattern → code
         // (and therefore concept → cluster) assignment stops drifting. See
@@ -742,6 +813,12 @@ namespace GreyMatter.Core
                 _synapticGraph.RecordCausalPattern(_previousSequenceActive, currentActive);
                 _causalSynapsesCreated += Math.Max(0, _synapticGraph.GetSynapseCount() - causalBefore);
             }
+
+            // P5.1: accumulate this word's assembly for the sentence-level
+            // symmetric pass, flushed at EndSequence(). Ordered by match quality
+            // (contest is sorted descending), so index 0 is the strongest neuron.
+            if (EnableCrossWordCoactivation && currentActive.Count > 0)
+                _sentenceWordActive.Add(currentActive);
 
             if (currentActive.Count > 0) _previousSequenceActive = currentActive;
             tHebbian.Stop();

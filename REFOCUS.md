@@ -1818,6 +1818,76 @@ That last row is the honest possibility, and P4.2 would have been theatre.
 `SIGN_TEST` (how many cues individually had fwd > bwd) guards against one
 high-frequency cue carrying the aggregate.
 
+#### P5 result — the test could not fail. That is the finding.
+
+Two runs, reproducible to three digits (SELF 59.7 / 60.7%, FORWARD_SHARE
+0.9768 / 0.9835, identical neuron counts and perplexity 211.79).
+
+Pre-registered verdict fired: **SELF-DOMINATED** (~60% of mass never leaves the
+cue's assembly). Honoured as written rather than reaching past it.
+
+**And FORWARD_SHARE 0.98 is worthless.** `bwd` was exactly `0.000` for 18 of 20
+cues. Exact zeros are a structural constraint, not a learned gradient:
+
+- `DepressSynapse` returns early if the synapse does not exist — it never creates.
+- The only creator of cross-concept edges was `RecordCausalPattern`, potentiating
+  strictly pre→post.
+- P4.6: the symmetric path wires only *within* an assembly.
+
+A backward cross-concept edge was therefore **impossible**, and FORWARD_SHARE was
+pinned at 1.0 wherever any forward edge existed. The same argument explains
+`other ≈ 0`: a cross-concept edge can only exist between words adjacent *in that
+order*, so non-successors are unreachable by construction.
+
+The experiment confirmed the graph contains the bigrams it was told to store and
+the probe recovers them. Plumbing, not learning. The null was unreachable — and
+`DepressSynapse`'s "never creates" comment had been read two turns earlier.
+
+*Rule earned:* a pre-registered null is not enough. **Check the null is
+reachable** — that some achievable state of the system would produce it.
+
+### P5.1 — cross-word symmetric co-activation (the missing substrate)
+
+The defect is architectural. Biological STDP modulates an *existing* recurrent
+network; potentiation and depression adjust connections already present. Here
+LTD had nothing to act on, so "asymmetry" was merely the absence of a direction.
+
+`FlushCrossWordCoactivation()` wires the sentence's active words together
+**symmetrically** at `EndSequence()`, giving the causal rule a real base to
+sculpt. Neurons are contributed **round-robin across words**, two per word:
+`RecordCoactivationPattern` truncates to the top 16 by activation, and a single
+dominant assembly would otherwise consume that budget alone — reproducing the
+within-assembly wiring this exists to complement.
+
+Behind `EnableCrossWordCoactivation` (default on) so P5.2 can run both ways. If
+the statistics come back flat we can tell whether this helped or hurt, rather
+than guessing — the stated risk of taking "both, model first."
+
+New counter: `synapses[... xword=N]`.
+
+### P5.2 — does synapse strength track corpus statistics, or just topology?
+
+`dotnet run -- --cascade-stats [--train N] [--cross-word off]`
+
+Getting the successor *set* right is topology, and P5 showed that is free.
+Getting their *order* right is learning. Among a cue's known successors, does
+cascade mass rank them the way the corpus does? Mean Spearman across cues
+(ranks, not raw values — mass and counts are on different scales and neither is
+normal, so Pearson would report the scale mismatch).
+
+| arm | what it is |
+|---|---|
+| `R_BIGRAM` | real training, mass vs corpus bigram count |
+| `R_UNIGRAM` | **frequency confound** — mass vs target unigram count. If this matches `R_BIGRAM`, mass tracks how common words are, not what followed what |
+| `R_SHUFFLED` | train on word-order-shuffled sentences, score against the **real** bigram counts. Identical vocabulary, frequencies and sentence lengths; only order dies |
+
+`R_BIGRAM` must beat **both** to count. Beating only the shuffled arm means
+frequency is doing the work. Shuffle uses a fixed seed so a weak result cannot
+be confused with an unlucky draw.
+
+This null *is* reachable: a graph that stores adjacency without weighting it by
+frequency scores ~0 on `R_BIGRAM` while still passing P5 perfectly.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
