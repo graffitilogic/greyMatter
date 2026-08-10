@@ -2450,3 +2450,70 @@ discrimination** — and one *trained* cue (`water`) is silent too. So AUC 0.962
 carried substantially by controls that never reached a cluster, while the cues
 that did reach one overlap the trained range. The separation is weaker than the
 AUC alone suggests.
+
+---
+
+## 2026-08-10 — Rule 8 gate confirmed firing, AT THE BANKED AUC
+
+`dotnet run -- --fidelity-test --train 500` → **🔴 ABORTED (ground rule 8)**.
+
+```
+trained:  mean=0.802  weakest=0.616 ('time')
+controls: mean=0.371  strongest=0.636 (zxcvbnmasd)
+separation: AUC=0.990  d′=1.89  margin=0.166
+```
+
+**AUC is 0.990 — the banked headline figure — and the run is still unreportable.**
+That is the whole point of rule 8: `AUC 0.990` describes average-case ranking and
+is fully compatible with a control outscoring a trained word. The two numbers
+were never measuring the same thing, and the headline has been quoting the one
+that cannot fail.
+
+### What this does and does not say about the banked result
+
+*Does:* the 95.5% / AUC 0.990 headline can no longer be assumed valid, because we
+now have a run reproducing that AUC while failing the control gate.
+
+*Does not:* prove the original run failed rule 8. Per CLAUDE.md the pseudo-word
+tier (`blorp`, `thrumble`, …) was **added after** mash-only controls proved too
+easy, so the banked run may have faced only tier-1 controls. Re-running at the
+banked threshold with the current control set is what settles it — which is now
+W3's actual job.
+
+### Why controls activate at all — mechanism, not mystery
+
+`ProbeConceptAsync` → `LoadTrainedNeuronsForConcept` derives a region from the
+cue's feature vector, then activates that region's neurons. Nothing checks that
+the cue was ever trained. And since P3/P4.1 the receptive field is *generated
+from the VQ prototype*, so **any** input quantizing to code C matches code C's
+neurons well — trained or not. A control that lands in a real region scores
+0.55–0.64; weak trained words score 0.55–0.67. They overlap because at deviation
+threshold 1 only 0.38 of 35.6 weights per neuron are individuated (`PROCEDURAL:`
+line): the assemblies are almost pure prototype, and a prototype cannot tell you
+who has visited it.
+
+The four silent controls are silent for an unrelated reason — their code maps to
+no cluster at all (P2.6's region gate). So the discrimination that exists is
+mostly regional, not lexical.
+
+### W3, reframed by this — proposed, awaiting Bill
+
+"Bank the curve" is not currently possible: at the banked threshold there is no
+reportable number. But this suggests a sharper experiment using the sweep that
+already exists.
+
+Storage and discrimination should trade off in the same direction: lower
+deviation threshold ⇒ more individuated weights stored ⇒ assemblies less like
+their prototype ⇒ controls separate. So:
+
+**W3′ — find the storage budget at which rule 8 passes.** Run
+`scripts/sweep_fidelity.sh` and record, per threshold, whether the run is
+reportable at all. The deliverable becomes a **fidelity-vs-storage curve
+restricted to thresholds that pass the control gate**, with the cheapest passing
+budget as the honest headline. Prediction to pre-register: the gate passes only
+at low thresholds (≈0.02–0.10), so the true cost per neuron is well above 64 B
+and the real compression ratio is materially worse than 5.14×.
+
+If **no** threshold passes, then prototype-generated fields cannot discriminate
+lexical identity at all, and that — not a fidelity percentage — is the project's
+actual result about procedural regeneration.
