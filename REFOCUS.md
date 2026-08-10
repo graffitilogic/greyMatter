@@ -2277,3 +2277,70 @@ successors. Recorded as an observation, **not** as evidence of learned order.
 
 **Next:** the 20,000-sentence arm, which is prediction 1 and the actual exit
 criterion. Nothing here settles W1.
+
+---
+
+## 2026-08-10 — W1 / P6 VERDICT: prediction 1 FAILED. Competition is not the fix.
+
+From repeat 3/5 of `--cascade-stats --train 20000 --repeats 5 --cross-word off`
+(correlation metrics await the final block; the reached counts below are per-arm
+counts, not correlations, and are already decisive).
+
+### Prediction 1 — ❌ FAILED, and by a wide margin
+
+| corpus | reached | fraction |
+|---|---|---|
+| 500 | 199 / 822 | **24.2%** |
+| 20,000 | 78 / 14,090 | **0.6%** |
+
+Not merely "still falling" — a 40× collapse in fraction, and the **absolute**
+count fell too (199 → 78) despite 40× more data and 17× more scoreable pairs.
+
+### Prediction 2 — ✅ passed, which makes the failure informative
+
+`displaced=5,893,927 declined=10,901,610`. `blocked_by_budget` fell 18,441,473 →
+10,901,610 (−41%), and 35% of contested slots now displace. **Competition is
+working exactly as designed. It just does not help.**
+
+### Prediction 4 — ✅ graph bounded: 681,639 synapses (was ~632K)
+
+### The pre-registered falsification condition is met exactly
+
+The write-up above stated: *if `reached` still falls with `displaced` large, then
+displacement is churning and the problem is the budget size or the co-activation
+rule feeding it — not the eviction policy.* Both conditions hold.
+
+**5,893,927 displacements against a 681,639-synapse graph: every slot was
+overwritten ~8.6× over.** Competition converted a graph that froze early into one
+that never settles. Neither accumulates structure.
+
+### Where the arithmetic says the real bottleneck is
+
+- 155,402 learn events × up to 240 pairs per `RecordCoactivationPattern`
+  ≈ **37M creation attempts**
+- ~59,000 neurons × `MaxOutDegree` 64 = **3.8M slots**
+- ≈ **10× oversubscribed.** No eviction policy can fix a 10× oversubscription;
+  it only decides which arbitrary subset survives each moment.
+
+And the source of that flood is visible in the same line: `neurons=9,368,066
+passed=9,321,538 (99.5%)`. `HebbianCoactivationThreshold = 0.12` against a mean
+match of 0.53 admits essentially everything. **The Hebbian gate is not a gate.**
+Selection is currently done entirely by `MaxCoactivationGroup`'s top-16 cut —
+downstream of a filter that filters nothing.
+
+### Proposed queue change — NOT implemented; awaiting Bill (queue discipline)
+
+W1 as specified is complete and its central prediction is falsified. That is a
+real result and should be recorded as one, not retried with a tuned threshold.
+
+Proposal: **W1b — make the co-activation gate selective** before any further
+order experiment. Raise `CreationProductThreshold` and/or make
+`HebbianCoactivationThreshold` adaptive (a per-neuron running mean, i.e. the
+homeostatic mechanism already queued as W6), so that far fewer pairs ever
+contend. The prediction to pre-register: attempts fall by ~an order of magnitude,
+`reached` rises with corpus size instead of collapsing, and `displaced` drops
+toward `declined`.
+
+W2 (re-run the order experiment) stays blocked. At `reached 0.6%` the 20k graph
+reaches almost no true successor, so **no order statistic computed on it can mean
+anything** — including the `R_PMI` figures this run is about to print.
