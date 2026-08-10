@@ -1750,6 +1750,74 @@ the previously-combined `synapses_created`, which counted only the
 altogether. Decide what to do about intra-assembly persistence *after* seeing
 the ratio, not before.
 
+#### P4.6 result — prediction WRONG, and usefully so
+
+Measured: `intra=0 causal=16`, `intra=548 causal=1,016`, `intra=425 causal=960`,
+`intra=438 causal=577`. **Causal creation runs 1.5–2× intra, and intra is
+frequently zero.** I predicted intra would dominate. It does not.
+
+Mechanism, clear in hindsight: intra-assembly pairs are a *finite* set — 16 top
+neurons wire pairwise, capped by `MaxOutDegree = 64` — so an established
+assembly saturates and `RecordCoactivation` only strengthens from then on,
+creating nothing. Causal pairs keep being novel because word *combinations*
+keep varying. Within-assembly wiring is a bounded one-time cost per assembly,
+largely already paid on this brain.
+
+So **"fixing allocation moved the cost into the graph" was wrong.** Total growth
+fell to ~280 synapses/sentence (from ~900); the graph is converging to a bounded
+equilibrium and `MaxOutDegree` is doing the job the thesis asks of it.
+
+What survives: the symmetric population is within-assembly and duplicates
+`ClusterMetadata`. True, and an argument about *persistence*. Not an argument
+about growth, and not the emergency it was framed as.
+
+**The counters answered the wrong question.** They measure *flow* — synapses
+created per window. What decides whether P5 is interpretable is *stock*: of the
+1.69M synapses already in the graph, what fraction is intra. Those accumulated
+under regimes since fixed. Rather than a separate census, P5's probe classifies
+cascade targets by concept — answering both on one run.
+
+### P5 — Cascade recall (implemented, awaiting first result)
+
+**The test the project has been building toward.** Every recall measured so far
+(P2, P3, P4.1) resolves through the VQ prototype: quantize the cue, the nearest
+codebook entry names a region, that region's neurons light up. Learned structure
+never had to be right for those numbers to look good — the boundary P3 hit.
+
+`Cerebro.CascadeProbeAsync` probes the **synaptic graph** instead: take the
+cue's assembly, follow outgoing synapses one step, aggregate mass by target
+*concept*. The codebook is never consulted.
+
+Harness: `dotnet run -- --cascade-test [--train N] [--topk K]`. Isolated scratch
+brain by default (P2.5 reasoning: an experiment must not mutate what it
+measures). Bigram ground truth is recorded from the same token stream the brain
+sees, in the same order, so tokenization cannot disagree.
+
+**Reported buckets:**
+
+- `self` — cue's own assembly (P4.6's within-assembly population)
+- `fwd` — words that followed the cue in the corpus
+- `bwd` — words that preceded it
+- `both` — words that did both. **Bucketed separately, not double-counted.**
+  They carry no directional information; counting them on both sides would
+  inflate each equally and wash out the effect being measured.
+- `other`, plus `UNRESOLVED` for mass landing on evicted-cluster neurons —
+  reported rather than silently dropped, and flagged as biasing the split above 20%.
+
+**Verdicts fixed in advance**, so the result cannot be reinterpreted afterwards
+into whatever is convenient:
+
+| condition | verdict |
+|---|---|
+| self > 50% of mass | SELF-DOMINATED — cascade never leaves the cue |
+| forward share > 0.55 | FORWARD BIAS — the graph carries order; P4.2 works |
+| forward share < 0.45 | BACKWARD BIAS — pre/post argument order is inverted |
+| 0.45–0.55 | **NULL NOT REJECTED — the causal rule is not doing work** |
+
+That last row is the honest possibility, and P4.2 would have been theatre.
+`SIGN_TEST` (how many cues individually had fwd > bwd) guards against one
+high-frequency cue carrying the aggregate.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.

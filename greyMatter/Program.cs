@@ -14,6 +14,12 @@ namespace GreyMatter
                 return;
             }
 
+            if (args.Length > 0 && args[0] == "--cascade-test")
+            {
+                await RunCascadeTest(args);
+                return;
+            }
+
             if (args.Length > 0 && args[0] == "--test-hebbian")
             {
                 await RunHebbianSynapseTest();
@@ -142,6 +148,7 @@ namespace GreyMatter
                 Console.WriteLine("║                                                           ║");
                 Console.WriteLine("║  Experiments:                                             ║");
                 Console.WriteLine("║    dotnet run -- --fidelity-test  (P2 regeneration)       ║");
+                Console.WriteLine("║    dotnet run -- --cascade-test   (P5 order in graph)     ║");
                 Console.WriteLine("║                                                           ║");
                 Console.WriteLine("║  Health Checks:                                           ║");
                 Console.WriteLine("║    dotnet run -- --test-hebbian   (P1 synapse creation)   ║");
@@ -173,6 +180,189 @@ namespace GreyMatter
         /// meaningless without it: if every cue activates the same neurons,
         /// fidelity is trivially 100% and measures nothing.
         /// </summary>
+        /// <summary>
+        /// P5 — cascade recall. Does the synaptic graph carry ORDER?
+        ///
+        /// Isolated scratch brain by default, same reasoning as P2.5: this trains,
+        /// and an experiment must not mutate what it measures.
+        /// </summary>
+        static async Task RunCascadeTest(string[] args)
+        {
+            var topK = int.Parse(GetArgValue(args, "--topk", "16"));
+            var trainSentences = int.Parse(GetArgValue(args, "--train", "500"));
+            var explicitPath = GetArgValue(args, "--brain-path", "");
+            var usingScratch = string.IsNullOrWhiteSpace(explicitPath);
+            var brainPath = usingScratch
+                ? Path.Combine(Path.GetTempPath(), "gm_cascade_" + Guid.NewGuid().ToString("N"))
+                : explicitPath;
+            if (usingScratch) Directory.CreateDirectory(brainPath);
+
+            Console.WriteLine("🔬 P5: Cascade Recall — does the graph encode ORDER?");
+            Console.WriteLine("====================================================\n");
+            Console.WriteLine($"Brain: {brainPath}   top-k: {topK}   train: {trainSentences}");
+            Console.WriteLine(usingScratch
+                ? "Mode:  isolated scratch brain (deleted after — your brainData is untouched)\n"
+                : "Mode:  ⚠️  EXPLICIT PATH — this run WILL WRITE into that brain.\n");
+
+            try
+            {
+                var config = new CerebroConfiguration { BrainDataPath = brainPath, UseProceduralSave = true };
+                config.ValidateAndSetup();
+                var brain = new Cerebro(brainPath);
+                brain.AttachConfiguration(config);
+                await brain.InitializeAsync();
+
+                // ── Train in-process, recording bigram ground truth ────────────
+                //
+                // The corpus is the only source of truth about what followed what.
+                // Recording it here — from the same token stream the brain sees, in
+                // the same order — guarantees the ground truth and the training
+                // cannot disagree about tokenization.
+                var successors = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                var predecessors = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+                var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+                Console.WriteLine($"── Training {trainSentences} sentences in-process ──");
+                var provider = new TrainingDataProvider();
+                var sentences = provider.LoadSentences("tatoeba_small", maxSentences: trainSentences, shuffle: false).ToList();
+                int presented = 0;
+                foreach (var sentence in sentences)
+                {
+                    var feats = new Dictionary<string, double>
+                    {
+                        ["length"] = sentence.Length / 100.0,
+                        ["words"] = sentence.Split(' ').Length / 20.0,
+                        ["hasUpper"] = sentence.Any(char.IsUpper) ? 1.0 : 0.0,
+                        ["hasDigit"] = sentence.Any(char.IsDigit) ? 1.0 : 0.0,
+                        ["hasPunctuation"] = sentence.Any(char.IsPunctuation) ? 1.0 : 0.0
+                    };
+                    var words = sentence.ToLower()
+                        .Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                        .Where(w => w.Length > 1)
+                        .ToList();
+
+                    for (int i = 0; i < words.Count; i++)
+                    {
+                        seen[words[i]] = seen.GetValueOrDefault(words[i]) + 1;
+                        if (i + 1 < words.Count)
+                        {
+                            if (!successors.TryGetValue(words[i], out var s))
+                                successors[words[i]] = s = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            s.Add(words[i + 1]);
+                            if (!predecessors.TryGetValue(words[i + 1], out var p))
+                                predecessors[words[i + 1]] = p = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            p.Add(words[i]);
+                        }
+                        await brain.LearnConceptAsync(words[i], feats);
+                    }
+                    brain.EndSequence();   // causality must not cross sentences
+                    if (++presented % 100 == 0) Console.Write($"\r   {presented}/{sentences.Count}");
+                }
+                Console.WriteLine($"\r   trained {presented} sentences — assemblies live in memory\n");
+
+                // Cues: the most frequent words with both successors and
+                // predecessors recorded. Rare words have too few bigrams for the
+                // forward/backward split to mean anything.
+                var cues = seen
+                    .Where(kv => successors.GetValueOrDefault(kv.Key)?.Count >= 3
+                              && predecessors.GetValueOrDefault(kv.Key)?.Count >= 3)
+                    .OrderByDescending(kv => kv.Value)
+                    .Take(20)
+                    .Select(kv => kv.Key)
+                    .ToList();
+
+                if (cues.Count == 0)
+                {
+                    Console.WriteLine("⚠️  No cue had ≥3 successors and ≥3 predecessors. Train more sentences.");
+                    return;
+                }
+
+                Console.WriteLine("── Cascade: seed the cue's assembly, follow synapses one step ──");
+                Console.WriteLine($"{"cue",-12} {"self%",7} {"fwd",9} {"bwd",9} {"both",9} {"other",9}  {"fwd share",10}");
+
+                double totalFwd = 0, totalBwd = 0, totalSelf = 0, totalOther = 0, totalBoth = 0;
+                double unresolved = 0;
+                int cuesForwardWins = 0, cuesScored = 0;
+
+                foreach (var cue in cues)
+                {
+                    var mass = await brain.CascadeProbeAsync(cue, topK);
+                    if (mass.Count == 0) { Console.WriteLine($"{cue,-12} (no cascade)"); continue; }
+
+                    var succ = successors.GetValueOrDefault(cue) ?? new HashSet<string>();
+                    var pred = predecessors.GetValueOrDefault(cue) ?? new HashSet<string>();
+
+                    double self = mass.GetValueOrDefault(""), fwd = 0, bwd = 0, both = 0, other = 0;
+                    unresolved += mass.GetValueOrDefault(Cerebro.UnresolvedKey);
+                    foreach (var (concept, m) in mass)
+                    {
+                        if (concept.Length == 0 || concept == Cerebro.UnresolvedKey) continue;
+                        bool isS = succ.Contains(concept), isP = pred.Contains(concept);
+                        // A word that both followed AND preceded the cue carries no
+                        // directional information — bucketed separately rather than
+                        // double-counted, which would inflate both sides equally and
+                        // wash out the very effect being measured.
+                        if (isS && isP) both += m;
+                        else if (isS) fwd += m;
+                        else if (isP) bwd += m;
+                        else other += m;
+                    }
+
+                    var totalMass = self + fwd + bwd + both + other;
+                    if (totalMass <= 0) { Console.WriteLine($"{cue,-12} (no mass)"); continue; }
+
+                    var directional = fwd + bwd;
+                    var fwdShare = directional > 0 ? fwd / directional : double.NaN;
+                    Console.WriteLine($"{cue,-12} {100.0 * self / totalMass,6:F1}% {fwd,9:F3} {bwd,9:F3} " +
+                                      $"{both,9:F3} {other,9:F3}  {(double.IsNaN(fwdShare) ? "    n/a" : $"{fwdShare,9:F3}")}");
+
+                    totalSelf += self; totalFwd += fwd; totalBwd += bwd;
+                    totalBoth += both; totalOther += other;
+                    if (directional > 0) { cuesScored++; if (fwd > bwd) cuesForwardWins++; }
+                }
+
+                var grand = totalSelf + totalFwd + totalBwd + totalBoth + totalOther;
+                if (grand <= 0) { Console.WriteLine("\n⚠️  No cascade mass at all — the graph is not reachable from these cues."); return; }
+
+                var dirTotal = totalFwd + totalBwd;
+                var overallShare = dirTotal > 0 ? totalFwd / dirTotal : double.NaN;
+
+                Console.WriteLine("\n── Result ──");
+                var unresolvedPct = 100.0 * unresolved / (grand + unresolved);
+                Console.WriteLine($"UNRESOLVED: {unresolvedPct:F1}% of cascade mass hit neurons with no resolvable concept");
+                if (unresolvedPct > 20.0)
+                    Console.WriteLine("⚠️  HIGH — clusters were evicted during the run, so the split below is " +
+                                      "computed on a biased subset. Re-run with fewer sentences or a larger LRU " +
+                                      "before believing the verdict.");
+                Console.WriteLine($"SELF:   {100.0 * totalSelf / grand:F1}% of cascade mass stays in the cue's own assembly");
+                Console.WriteLine($"CASCADE: fwd={totalFwd:F3} bwd={totalBwd:F3} both={totalBoth:F3} other={totalOther:F3}");
+                Console.WriteLine($"FORWARD_SHARE: {overallShare:F4}   (null hypothesis = 0.5000)");
+                Console.WriteLine($"SIGN_TEST: {cuesForwardWins}/{cuesScored} cues had fwd > bwd");
+
+                // Plain-language read, stated in advance so the result cannot be
+                // reinterpreted after the fact to mean whatever is convenient.
+                Console.WriteLine();
+                if (totalSelf / grand > 0.5)
+                    Console.WriteLine("VERDICT: SELF-DOMINATED — most mass never leaves the cue's assembly.");
+                else if (double.IsNaN(overallShare))
+                    Console.WriteLine("VERDICT: NO DIRECTIONAL MASS — cascade reaches no successor or predecessor.");
+                else if (overallShare > 0.55)
+                    Console.WriteLine("VERDICT: FORWARD BIAS — graph carries order. P4.2's causal rule is doing work.");
+                else if (overallShare < 0.45)
+                    Console.WriteLine("VERDICT: BACKWARD BIAS — direction is inverted somewhere. Check pre/post argument order.");
+                else
+                    Console.WriteLine("VERDICT: NULL NOT REJECTED — forward ≈ backward. The causal rule is not doing work.");
+            }
+            finally
+            {
+                if (usingScratch)
+                {
+                    try { Directory.Delete(brainPath, recursive: true); }
+                    catch (Exception ex) { Console.WriteLine($"\n⚠️  Could not remove scratch brain at {brainPath}: {ex.Message}"); }
+                }
+            }
+        }
+
         static async Task RunFidelityTest(string[] args)
         {
             var topK = int.Parse(GetArgValue(args, "--topk", "16"));

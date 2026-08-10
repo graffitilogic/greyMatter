@@ -2946,6 +2946,103 @@ namespace GreyMatter.Core
         }
 
         /// <summary>
+        /// P5 — cascade recall. THE test the project has been building toward.
+        ///
+        /// Every recall measured so far (P2, P3, P4.1) resolves through the VQ
+        /// prototype: a cue is quantized, the nearest codebook entry names a
+        /// region, and that region's neurons light up. Learned structure never
+        /// had to be right for those numbers to look good — which is exactly the
+        /// boundary P3 hit and could not cross.
+        ///
+        /// This probes the SYNAPTIC GRAPH instead. Take the cue's assembly, follow
+        /// its outgoing synapses one step, and ask where the activation lands.
+        /// Nothing here consults the codebook.
+        ///
+        /// Returns mass per target concept, plus the cue's own assembly under
+        /// the "" key (self-mass — see below).
+        ///
+        /// Two independent questions, one measurement:
+        ///
+        ///  1. Does activation LEAVE the cue's own assembly? P4.6 established that
+        ///     the symmetric Hebbian population is entirely within-assembly (it is
+        ///     fed `contest`, built from a single concept's neurons). If self-mass
+        ///     dominates, the cascade is just re-lighting the cue and any forward
+        ///     signal is noise on top of that.
+        ///
+        ///  2. Does it flow preferentially FORWARD? P4.2 potentiates
+        ///     previous→current and depresses current→previous. If that works,
+        ///     mass on corpus successors should exceed mass on predecessors.
+        ///     If forward ≈ backward, the causal rule is doing nothing and P4.2
+        ///     was theatre. That null is the point of the experiment.
+        /// </summary>
+        /// Sentinel for cascade mass landing on neurons whose concept could not be
+        /// resolved (evicted cluster). Not a legal word: tokens are length &gt; 1.
+        public const string UnresolvedKey = " unresolved";
+
+        public async Task<Dictionary<string, double>> CascadeProbeAsync(string cue, int topK = 16)
+        {
+            var result = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+
+            var seed = await ProbeConceptAsync(cue, topK);
+            if (seed.Count == 0) return result;
+
+            // Resolve target neurons → concept. After in-process training every
+            // cluster is resident, so this is a memory walk; PrimaryConcept (P4.5)
+            // is the allocation concept rather than the polluted joined tag.
+            var neuronConcept = new Dictionary<Guid, string>();
+            foreach (var cluster in _loadedClusters.GetValues())
+            {
+                if (!cluster.IsLoaded) continue;
+                foreach (var kvp in await cluster.GetNeuronsAsync())
+                {
+                    var c = kvp.Value.PrimaryConcept;
+                    if (!string.IsNullOrEmpty(c)) neuronConcept[kvp.Key] = c;
+                }
+            }
+
+            // Normalize seed activations so cues with larger assemblies are not
+            // trivially louder — we compare DISTRIBUTIONS across cues, not totals.
+            var seedTotal = seed.Sum(s => Math.Abs(s.activation));
+            if (seedTotal <= 0) return result;
+
+            var seedIds = seed.Select(s => s.neuronId).ToHashSet();
+
+            foreach (var (neuronId, activation) in seed)
+            {
+                var share = Math.Abs(activation) / seedTotal;
+                foreach (var (targetId, weight) in _synapticGraph.GetOutgoingSynapses(neuronId))
+                {
+                    var mass = share * weight;
+
+                    // Self-mass: target belongs to the cue's own assembly. Tracked
+                    // separately under "" so it cannot be mistaken for recall of
+                    // another word.
+                    if (seedIds.Contains(targetId) ||
+                        (neuronConcept.TryGetValue(targetId, out var tc0) &&
+                         string.Equals(tc0, cue, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        result[""] = result.GetValueOrDefault("") + mass;
+                        continue;
+                    }
+
+                    // Unresolvable targets are REPORTED, not silently dropped. If a
+                    // cluster was evicted, its neurons have no concept here, and
+                    // quietly skipping them would understate the cascade while
+                    // leaving the totals looking clean. The harness fails the run
+                    // if this fraction is large.
+                    if (!neuronConcept.TryGetValue(targetId, out var targetConcept))
+                    {
+                        result[UnresolvedKey] = result.GetValueOrDefault(UnresolvedKey) + mass;
+                        continue;
+                    }
+                    result[targetConcept] = result.GetValueOrDefault(targetConcept) + mass;
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
         /// P3.3 — every neuron the probe CONSIDERED, not just the winners.
         ///
         /// The sweep showed fidelity pinned at ~83% whether 1.6 weights per neuron
