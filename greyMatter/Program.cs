@@ -366,7 +366,7 @@ namespace GreyMatter
                 // hundreds of observations instead of a mean of tiny ones.
                 var pooledMass = new List<double>();
                 var pooledPmi = new List<double>();
-                int pairsTotal = 0, pairsRepeated = 0;
+                int pairsTotal = 0, pairsRepeated = 0, pairsReached = 0;
 
                 double sumB = 0, sumU = 0; int scored = 0;
                 foreach (var cue in cues)
@@ -376,12 +376,24 @@ namespace GreyMatter
                     // Rank only this cue's REAL successors that the cascade reached.
                     // Including unreached ones would score topology again, which P5
                     // already showed is free.
+                    // P5.6: score both arms on the SAME pairs — every corpus
+                    // successor of this cue, whether or not the cascade reached it,
+                    // with unreached scored as mass 0.
+                    //
+                    // Filtering to reached successors made the arms incomparable:
+                    // at 500 sentences the real arm was scored on 97 pairs and the
+                    // shuffled arm on 16, because shuffling destroys adjacency so
+                    // real successors are mostly unreachable in that graph. That is
+                    // not a null — it is a different, much smaller experiment, and
+                    // it explains the shuffled arm's wild run-to-run range.
+                    // Failing to reach a true successor is a real failure and must
+                    // score as one, not vanish from the sample.
                     var succ = bigram.Keys.Where(k => k.Item1.Equals(cue, StringComparison.OrdinalIgnoreCase))
-                                          .Select(k => k.Item2).Distinct()
-                                          .Where(t => mass.ContainsKey(t) && mass[t] > 0).ToList();
+                                          .Select(k => k.Item2).Distinct().ToList();
                     if (succ.Count < 3) continue;
 
-                    var m = succ.Select(t => mass[t]).ToList();
+                    var m = succ.Select(t => mass.GetValueOrDefault(t, 0.0)).ToList();
+                    if (m.All(x => x <= 0)) continue;   // cue unreachable entirely
                     sumB += Spearman(m, succ.Select(t => (double)bigram[(cue.ToLower(), t)]).ToList());
                     sumU += Spearman(m, succ.Select(t => (double)unigram.GetValueOrDefault(t)).ToList());
 
@@ -407,6 +419,7 @@ namespace GreyMatter
                     {
                         pairsTotal++;
                         if (bigram[(cue.ToLower(), t)] > 1) pairsRepeated++;
+                        if (mass.GetValueOrDefault(t, 0.0) > 0) pairsReached++;
                     }
 
                     // Within-cue normalized ranks (0..1) make groups of different
@@ -421,7 +434,9 @@ namespace GreyMatter
 
                 var pooled = Spearman(pooledMass, pooledPmi);
                 var supportPct = pairsTotal > 0 ? 100.0 * pairsRepeated / pairsTotal : 0;
+                var reached = pooledMass.Count == 0 ? 0 : 100.0 * pairsReached / pairsTotal;
                 Console.WriteLine($"   pooled r={pooled:F4} over {pooledMass.Count} pairs | " +
+                                  $"reached {pairsReached}/{pairsTotal} ({reached:F1}%) | " +
                                   $"bigram support: {pairsRepeated}/{pairsTotal} ({supportPct:F1}%) seen >1×");
                 if (supportPct < 20 && !shuffle)
                     Console.WriteLine("   ⚠️  LOW SUPPORT — most bigrams occur once, so PMI ≈ 1/word-frequency. " +

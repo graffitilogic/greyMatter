@@ -2030,6 +2030,59 @@ analogue of P5's unreachable null.
 **Next run is a diagnostic, not a verdict:** `--train 500` to read support at the
 current size, then scale up (5,000–50,000 sentences) if it confirms.
 
+#### P5.5 result — hypothesis falsified, two bigger problems found
+
+Support is **40.2%** at 500 sentences and **83.9%** at 20,000. Bigrams are *not*
+mostly singletons; the low-support explanation was wrong. Diagnostic did its job.
+
+**Problem 1 — the arms were not comparable.** At 500 sentences the real arm was
+scored on **97 pairs**, the shuffled arm on **16**. The successor filter kept
+only pairs the cascade *reached*, and shuffling destroys adjacency, so most real
+successors are unreachable in the shuffled graph and silently dropped from the
+sample. That is not a null; it is a different and much smaller experiment,
+and it explains the shuffled arm's full-unit run-to-run range.
+
+*Fixed in P5.6:* score both arms over **every corpus successor** of each cue,
+with unreached successors scored as mass 0. Failing to reach a true successor is
+a real failure and must count as one rather than vanish. New `reached N/M (X%)`
+diagnostic.
+
+**Problem 2 — the graph saturates, and this is the important one.**
+
+| | 500 sentences | 20,000 sentences |
+|---|---|---|
+| pairs scored (real) | 97 | **31** |
+| `blocked_by_budget` | — | **18,441,473** |
+| graph size | 690K | 632K (after decay from 1.39M) |
+| `R_UNIGRAM` (real) | −0.0586 | **+0.3459** |
+| `R_PMI` (real) | +0.1144 | **−0.2216** |
+
+**40× more data produced fewer reachable successors.** `MaxOutDegree = 64` fills
+with whatever arrives first and then blocks 18.4M creation attempts. Later
+information cannot be written at all. Meanwhile mass increasingly tracks raw word
+frequency (`R_UNIGRAM` +0.3459) and *anti*-tracks association (`R_PMI` −0.2216) —
+exactly what saturation predicts, since high-frequency words monopolise the
+64 slots and crowd out informative but rarer pairings.
+
+This is not a measurement artifact. It is an architectural limit, and it stands
+independent of every problem above.
+
+### P6 — synaptic competition instead of budget blocking (proposed)
+
+`MaxOutDegree` blocking is not selection, it is *first-come-first-served*. The
+thesis says limited persistence should be **principled** selection.
+
+Biology's answer is synaptic competition: a neuron has finite resources, and new
+synapses **displace the weakest existing ones** rather than being refused. That
+is what developmental pruning does. Concretely: at budget, compare the candidate
+pairing's strength against the weakest existing out-synapse and displace it if
+the candidate is stronger; otherwise decline. Cost stays O(1) amortised with a
+per-neuron min-track.
+
+Prediction, stated before implementation: reachable pairs should stop *falling*
+with corpus size, and `R_UNIGRAM` dominance should weaken — because a frequent
+early partner would no longer hold a slot against a stronger later one.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
