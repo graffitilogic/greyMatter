@@ -2517,3 +2517,71 @@ and the real compression ratio is materially worse than 5.14×.
 If **no** threshold passes, then prototype-generated fields cannot discriminate
 lexical identity at all, and that — not a fidelity percentage — is the project's
 actual result about procedural regeneration.
+
+---
+
+## 2026-08-10 — W3′ sweep: prediction FALSIFIED, and the one pass is suspect
+
+```
+threshold  fidelity  stored/neuron  bytes  auc    dprime
+0.02       NA        NA             NA     0.962  1.90
+0.05       NA        NA             NA     0.981  2.00
+0.10       NA        NA             NA     0.990  1.91
+0.25       NA        NA             NA     0.952  1.90
+0.50       NA        NA             NA     0.971  1.91
+1.00       NA        NA             NA     0.971  1.80
+2.00       95.5      0.19           68     1.000  2.05   ← only reportable run
+8.00       NA        NA             NA     0.981  1.92
+```
+
+### Prediction ❌ FALSIFIED, in the opposite direction
+
+Pre-registered: *"passes only at low thresholds (≈0.02–0.10), so real cost per
+neuron is well above 64 B."* The only pass is threshold **2.00**, which stores
+**0.19** weights/neuron — *less* than threshold 1.00's 0.38. More individuation
+did not help. The proposed storage↔discrimination tradeoff does not exist.
+
+### Why the single pass should not be believed (rule 4)
+
+**`AUC = 1.000`.** Every 100% this project has produced was a broken measurement.
+First hypothesis must be that the run could not fail.
+
+The decisive column is **d′: 1.90, 2.00, 1.91, 1.90, 1.91, 1.80, 2.05, 1.92**.
+Flat across a **400× range** of storage budget. AUC likewise wanders 0.95–1.00
+with no trend in threshold. **Discrimination does not depend on the deviation
+threshold at all** — which is P3.3 restated: stored deviations contribute nothing
+to telling a trained cue from a control.
+
+So threshold 2.00 did not pass *because of* its budget. Every threshold sits at
+d′ ≈ 1.9, right at the edge of the gate, and one draw in eight happened to land
+with its strongest control below its weakest trained cue. Rule 8 is being decided
+by run-to-run variance, not by storage.
+
+Supporting detail: this row (95.5% fidelity, 99.5% regenerated, 68 B) matches the
+**banked headline exactly**, which previously reported AUC 0.990 at the same
+budget. Same run type, AUC differing 0.990 vs 1.000 across runs — consistent with
+the documented ±0.03 noise. So the banked headline most likely came from this
+threshold and passed or failed the gate by the same coin flip.
+
+### Consequence, stated plainly
+
+n=1 per threshold. **CLAUDE.md rule 6 forbids a verdict from n=1**, and this
+sweep is exactly that. The correct reading is not "threshold 2.0 is the answer"
+but "**7 of 8 thresholds are unreportable and the 8th is one lucky draw.**"
+
+### Next — pre-registered before running
+
+Run the **full sweep 5×** and record, per threshold, how many runs are
+reportable. This is the same design that settled P5.3→P5.4.
+
+- If passes scatter randomly across thresholds at ~1-in-8, the gate outcome is
+  noise, **no budget reliably discriminates**, and the honest result is that
+  prototype-generated fields cannot separate lexical identity from a novel input
+  sharing their VQ code. That is a real negative result about the thesis and
+  should be written up as one.
+- If threshold 2.00 passes 5/5 while others fail, something genuinely happens
+  there and it needs a mechanism before it is believed — d′ being flat says there
+  currently isn't one.
+
+Prediction, recorded now: **scattered passes, ~1–2 per sweep, no threshold
+reliable.**
