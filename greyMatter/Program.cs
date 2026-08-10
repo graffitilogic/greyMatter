@@ -359,6 +359,15 @@ namespace GreyMatter
                 }
                 Console.WriteLine($"\r   trained {n} sentences        ");
 
+                // P5.5: pooled pairs. Per-cue Spearman over 3–10 successors has
+                // enormous variance — averaging 18 such correlations gave
+                // R_PMI ranges spanning a full unit. Pooling within-cue normalized
+                // ranks across all cue→successor pairs gives ONE correlation over
+                // hundreds of observations instead of a mean of tiny ones.
+                var pooledMass = new List<double>();
+                var pooledPmi = new List<double>();
+                int pairsTotal = 0, pairsRepeated = 0;
+
                 double sumB = 0, sumU = 0; int scored = 0;
                 foreach (var cue in cues)
                 {
@@ -384,10 +393,39 @@ namespace GreyMatter
                     // out. Within a fixed cue, count(cue) and the corpus total are
                     // constants, so this ranks identically to pointwise mutual
                     // information — without the log or the zero-count edge cases.
-                    sumP += Spearman(m, succ.Select(t =>
-                        bigram[(cue.ToLower(), t)] / Math.Max(1.0, unigram.GetValueOrDefault(t))).ToList());
+                    var pmi = succ.Select(t =>
+                        bigram[(cue.ToLower(), t)] / Math.Max(1.0, unigram.GetValueOrDefault(t))).ToList();
+                    sumP += Spearman(m, pmi);
                     scored++;
+
+                    // Support diagnostic: how many of these pairs were actually
+                    // OBSERVED more than once? If nearly none, count(cue,target) is
+                    // effectively constant at 1, PMI degenerates to 1/count(target),
+                    // and the test measures inverse word frequency rather than
+                    // association — no amount of repeats can rescue that.
+                    foreach (var t in succ)
+                    {
+                        pairsTotal++;
+                        if (bigram[(cue.ToLower(), t)] > 1) pairsRepeated++;
+                    }
+
+                    // Within-cue normalized ranks (0..1) make groups of different
+                    // sizes comparable so they can be pooled.
+                    var rm = RankOf(m); var rp = RankOf(pmi);
+                    for (int i = 0; i < rm.Count; i++)
+                    {
+                        pooledMass.Add(rm[i] / rm.Count);
+                        pooledPmi.Add(rp[i] / rp.Count);
+                    }
                 }
+
+                var pooled = Spearman(pooledMass, pooledPmi);
+                var supportPct = pairsTotal > 0 ? 100.0 * pairsRepeated / pairsTotal : 0;
+                Console.WriteLine($"   pooled r={pooled:F4} over {pooledMass.Count} pairs | " +
+                                  $"bigram support: {pairsRepeated}/{pairsTotal} ({supportPct:F1}%) seen >1×");
+                if (supportPct < 20 && !shuffle)
+                    Console.WriteLine("   ⚠️  LOW SUPPORT — most bigrams occur once, so PMI ≈ 1/word-frequency. " +
+                                      "This test cannot measure association at this corpus size.");
 
                 // Which synapse populations actually exist in this arm — the
                 // difference between the two arms is the mechanism, not a guess.

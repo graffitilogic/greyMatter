@@ -1985,6 +1985,51 @@ influence the correlations and are not yet controlled.
   `LEARNED ORDER` only when the repeat ranges of real and shuffled do not
   overlap. A large gap with overlapping ranges reports `PROMISING BUT NOISY`.
 
+#### P5.4 result — P5.3's signal was noise. There is no order effect.
+
+Five repeats, cross-word OFF:
+
+```
+R_PMI:  -0.0360 [-0.2714..0.1161]   shuffled  0.0187 [-0.4768..0.4541]
+PMI_GAP: -0.0547        VERDICT: NO SIGNAL
+```
+
+The shuffled arm spans nearly a full unit. P5.3's +0.2514 was one draw from that
+distribution. **The graph does not rank successors by association.**
+
+*My error in reading it:* I called P5.3 "plausible pending repeats" when a
+diagnostic swinging 0.23 between near-identical conditions warranted "probably
+noise." Second time in this sequence a single favourable number set the framing
+before the variance was known. The rule that follows: **no verdict from n=1 on
+any correlation-valued metric** — the repeat loop should have existed before the
+first result was reported, not after.
+
+### P5.5 — the estimator and the corpus are both too small
+
+More repeats will not fix this. Two separate defects:
+
+**1. The estimator.** Per-cue Spearman runs over 3–10 successors; averaging 18
+such correlations is a mean of very high-variance terms. Replaced with a
+**pooled** correlation: within-cue normalized ranks (0..1, so groups of
+different sizes are comparable) pooled across all cue→successor pairs, giving one
+correlation over hundreds of observations.
+
+**2. The corpus — likely fatal at this size.** 500 sentences is roughly 3,500
+tokens and ~3,000 bigram instances over a vocabulary in the thousands, so nearly
+every bigram occurs exactly **once**. If `count(cue,target)` is constant at 1,
+then `count(cue,target)/count(target)` collapses to `1/count(target)` and `R_PMI`
+measures inverse word frequency, not association. That would explain both the
+near-zero mean and the enormous spread.
+
+Stated as a hypothesis with its own test rather than asserted: new
+`bigram support: N/M (X%) seen >1×` diagnostic, with an explicit LOW SUPPORT
+warning below 20%. If support is low, the negative result says nothing about the
+model — it says the experiment had no signal available to detect, the data-side
+analogue of P5's unreachable null.
+
+**Next run is a diagnostic, not a verdict:** `--train 500` to read support at the
+current size, then scale up (5,000–50,000 sentences) if it confirms.
+
 ### P4 — Scoped activation distance (the "observer" concept)
 - Make cascade depth / activation-distance `d` a first-class runtime parameter.
 - Measure recall quality and compute cost as a function of `d`.
