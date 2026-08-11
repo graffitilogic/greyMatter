@@ -14,6 +14,12 @@ namespace GreyMatter
                 return;
             }
 
+            if (args.Length > 0 && args[0] == "--encoder-ceiling")
+            {
+                RunEncoderCeiling(args);
+                return;
+            }
+
             if (args.Length > 0 && args[0] == "--cascade-test")
             {
                 await RunCascadeTest(args);
@@ -187,6 +193,160 @@ namespace GreyMatter
         /// meaningless without it: if every cue activates the same neurons,
         /// fidelity is trivially 100% and measures nothing.
         /// </summary>
+        // Cue sets shared by --fidelity-test and --encoder-ceiling. Hoisted so the
+        // ceiling diagnostic measures EXACTLY the cues the fidelity gate judges;
+        // two drifting copies would make the comparison meaningless.
+        static readonly string[] TrainedCueSet =
+        {
+            "the", "you", "we", "are", "to", "it", "in", "so",
+            "time", "people", "know", "think", "sleep", "water"
+        };
+        static readonly string[] MashControlSet = { "qwertyuiop", "zxcvbnmasd", "xkcdvbnm", "qqzzxxjj" };
+        static readonly string[] PseudoControlSet = { "blorp", "thrumble", "flendish", "grastic" };
+
+        /// <summary>
+        /// ENCODER CEILING — what is separable BEFORE any learning happens?
+        ///
+        /// `FeatureEncoder.Encode` builds its 128 dims from orthographic features,
+        /// character n-grams, phonetic features and word statistics. Every one of
+        /// those is SURFACE FORM. There is no semantic or distributional content:
+        /// the encoder describes how a word is spelled and pronounced, never what
+        /// it means or where it occurs.
+        ///
+        /// If that is so, then `blorp` and `flendish` — English-looking by
+        /// construction — are genuinely close to short real words in the only space
+        /// the system can see, and the control gate has been asking the
+        /// architecture to recover a distinction the input never contained.
+        ///
+        /// This runs NO training and touches no brain. It measures the ceiling the
+        /// encoder imposes, so we can tell whether every result in RESULTS.md was
+        /// about procedural generation or about the encoder underneath it.
+        ///
+        /// The decisive comparison is CEILING_AUC against the system's measured
+        /// AUC (0.94–1.00 across 40 runs). If they match, the architecture added
+        /// nothing and we have been measuring the encoder all along.
+        /// </summary>
+        static void RunEncoderCeiling(string[] args)
+        {
+            var maxSentences = int.Parse(GetArgValue(args, "--train", "500"));
+            var encoder = new FeatureEncoder();
+
+            Console.WriteLine("🔬 ENCODER CEILING — separability before any learning");
+            Console.WriteLine("=====================================================\n");
+
+            static double Cos(double[] a, double[] b)
+            {
+                double dot = 0, na = 0, nb = 0;
+                for (int i = 0; i < a.Length; i++) { dot += a[i] * b[i]; na += a[i] * a[i]; nb += b[i] * b[i]; }
+                return (na <= 0 || nb <= 0) ? 0 : dot / (Math.Sqrt(na) * Math.Sqrt(nb));
+            }
+
+            var trainedVecs = TrainedCueSet.ToDictionary(w => w, w => encoder.Encode(w));
+            var controls = MashControlSet.Concat(PseudoControlSet).ToArray();
+            var controlVecs = controls.ToDictionary(w => w, w => encoder.Encode(w));
+
+            // ── A. Can raw encoder distance tell a trained word from a control? ──
+            //
+            // Score = max cosine to any trained cue. For a trained cue that is its
+            // similarity to its nearest OTHER trained cue (self excluded — scoring
+            // a word against itself would return 1.0 and manufacture separation).
+            Console.WriteLine("── A. max cosine to the trained set ──");
+            double MaxToTrained(string w, double[] v) => trainedVecs
+                .Where(kv => !kv.Key.Equals(w, StringComparison.OrdinalIgnoreCase))
+                .Max(kv => Cos(v, kv.Value));
+
+            var trainedScores = new List<double>();
+            foreach (var w in TrainedCueSet)
+            {
+                var s = MaxToTrained(w, trainedVecs[w]);
+                trainedScores.Add(s);
+                Console.WriteLine($"   {w,-12} {s:F3}  (nearest other trained word)");
+            }
+            Console.WriteLine();
+            var controlScores = new List<double>();
+            foreach (var w in controls)
+            {
+                var s = MaxToTrained(w, controlVecs[w]);
+                controlScores.Add(s);
+                var nearest = trainedVecs.OrderByDescending(kv => Cos(controlVecs[w], kv.Value)).First().Key;
+                var tier = MashControlSet.Contains(w) ? "mash  " : "pseudo";
+                Console.WriteLine($"   {w,-12} {s:F3}  [{tier}] nearest trained = '{nearest}'");
+            }
+
+            // AUC and d′ on the SAME statistic the fidelity harness uses, so the
+            // two numbers are directly comparable.
+            int wins = 0, ties = 0, pairs = 0;
+            foreach (var t in trainedScores)
+                foreach (var c in controlScores)
+                {
+                    pairs++;
+                    if (t > c) wins++; else if (Math.Abs(t - c) < 1e-9) ties++;
+                }
+            var auc = pairs > 0 ? (wins + 0.5 * ties) / pairs : 0;
+            double Mean(List<double> xs) => xs.Count > 0 ? xs.Average() : 0;
+            double Var(List<double> xs) { var m = Mean(xs); return xs.Count > 1 ? xs.Sum(x => (x - m) * (x - m)) / (xs.Count - 1) : 0; }
+            var sd = Math.Sqrt((Var(trainedScores) + Var(controlScores)) / 2);
+            var dPrime = sd > 1e-9 ? (Mean(trainedScores) - Mean(controlScores)) / sd : 0;
+            var separable = controlScores.Max() < trainedScores.Min();
+
+            Console.WriteLine();
+            Console.WriteLine($"CEILING_AUC:    {auc:F3}");
+            Console.WriteLine($"CEILING_DPRIME: {dPrime:F2}");
+            Console.WriteLine($"CEILING_GATE:   {(separable ? "SEPARABLE" : "OVERLAPPING")} " +
+                              $"(strongest control {controlScores.Max():F3} vs weakest trained {trainedScores.Min():F3})");
+
+            // ── B. Vocabulary-wide crowding ──
+            Console.WriteLine("\n── B. vocabulary-wide nearest-neighbour similarity ──");
+            var provider = new TrainingDataProvider();
+            var vocab = provider.LoadSentences("tatoeba_small", maxSentences: maxSentences, shuffle: false)
+                .SelectMany(s => s.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                .Where(w => w.Length > 1).Distinct().Take(3000).ToList();
+            var vecs = vocab.Select(encoder.Encode).ToList();
+            Console.WriteLine($"   vocabulary: {vocab.Count:N0} distinct words");
+
+            var nn = new List<double>();
+            for (int i = 0; i < vecs.Count; i++)
+            {
+                double best = -1;
+                for (int j = 0; j < vecs.Count; j++) if (i != j) { var c = Cos(vecs[i], vecs[j]); if (c > best) best = c; }
+                nn.Add(best);
+            }
+            nn.Sort();
+            Console.WriteLine($"   NN_SIM: median={nn[nn.Count / 2]:F3} p90={nn[(int)(nn.Count * 0.9)]:F3} max={nn[^1]:F3}");
+            Console.WriteLine($"   pairs above 0.95: {nn.Count(x => x > 0.95)} | above 0.90: {nn.Count(x => x > 0.90)}");
+
+            // ── C. Does the existing 32-of-128 sparse code actually separate? ──
+            //
+            // BuildTrainingFeatures already takes the top-K dims by magnitude, so
+            // the system IS sparse-coding. Theoretical capacity C(128,32) is
+            // astronomical; the question is realised capacity — do distinct words
+            // actually produce distinct top-K sets? This tests the k-of-n proposal
+            // directly, using the encoder's own sparsification, before building it.
+            Console.WriteLine("\n── C. realised capacity of the top-k dimension code ──");
+            foreach (var k in new[] { 4, 8, 16, 32 })
+            {
+                var codes = vecs.Select(v => string.Join(",", Enumerable.Range(0, v.Length)
+                    .OrderByDescending(i => Math.Abs(v[i])).ThenBy(i => i).Take(k).OrderBy(i => i))).ToList();
+                var distinct = codes.Distinct().Count();
+                Console.WriteLine($"   TOPK_COLLISIONS k={k,2}: {distinct:N0}/{codes.Count:N0} distinct " +
+                                  $"({100.0 * (codes.Count - distinct) / codes.Count:F1}% collide)");
+            }
+
+            Console.WriteLine("\n── Read this against the system's measured numbers ──");
+            Console.WriteLine("   Measured across 40 fidelity runs: AUC 0.94–1.00, d′ 1.76–2.09.");
+            Console.WriteLine(auc >= 0.90
+                ? "   ⚠️  CEILING_AUC is in the same band as the system's measured AUC. The\n" +
+                  "       encoder alone accounts for the observed separation, and the learning\n" +
+                  "       architecture cannot be credited with it. Every result in RESULTS.md\n" +
+                  "       is then a statement about this encoder, not about procedural generation."
+                : "   ✅ CEILING_AUC is well below the measured AUC, so learning is adding real\n" +
+                  "       separation and the architecture is doing work the encoder does not.");
+            if (!separable)
+                Console.WriteLine("   ⚠️  Controls overlap the trained range in RAW encoder space, before any\n" +
+                                  "       learning. Rule 8 has been asking the architecture to recover a\n" +
+                                  "       distinction the input never contained.");
+        }
+
         /// <summary>
         /// P5.2 — does synapse strength track corpus STATISTICS, or just topology?
         ///
@@ -777,18 +937,17 @@ namespace GreyMatter
             // controls it has not. Novel cues should activate ~nothing; if they
             // light up, the "recall" being measured is not concept-specific.
             // Trained cues, then two tiers of control.
-            var trainedCues = new[]
-            {
-                "the", "you", "we", "are", "to", "it", "in", "so",
-                "time", "people", "know", "think", "sleep", "water"
-            };
+            // Shared with --encoder-ceiling so that diagnostic measures EXACTLY
+            // these cues. Two drifting copies would void the comparison between
+            // the encoder's ceiling and the system's measured separation.
+            var trainedCues = TrainedCueSet;
             // Tier 1 — keyboard mash. Orthographically un-English, so rejecting
             // these only proves the encoder notices surface weirdness.
-            var mashControls = new[] { "qwertyuiop", "zxcvbnmasd", "xkcdvbnm", "qqzzxxjj" };
+            var mashControls = MashControlSet;
             // Tier 2 — pseudo-words. English-looking, pronounceable, never in the
             // corpus. THIS is the real test: rejecting these means discrimination
             // comes from learned identity rather than orthographic oddity.
-            var pseudoControls = new[] { "blorp", "thrumble", "flendish", "grastic" };
+            var pseudoControls = PseudoControlSet;
 
             var controls = mashControls.Concat(pseudoControls).ToArray();
             var cues = trainedCues.Concat(controls).ToArray();
