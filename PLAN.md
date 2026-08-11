@@ -504,6 +504,86 @@ call it a success. The honest bar is separating morphological neighbours, and th
 control set should probably be extended with in-vocabulary near-neighbours before
 any positive result is banked.
 
+## 6d. MEASURED — the top-32 seed is dead, and the encoder's defect is not what I said
+
+```
+OVERLAP:   median=27/32  p90=29/32  max=31/32
+           ≥30/32 overlap: 63 words | ≥28: 429
+DIM_USAGE: 125/128 dims used | >90% of words: 1 | <10%: 5
+```
+
+### The design is falsified on paper
+
+Median overlap of **27/32** means a typical word shares 27 of its 32 dimensions
+with its nearest neighbour. With uniform weights that is a field cosine of
+**27/32 = 0.844**, against a target that must stay **above 0.741** for a trained
+cue while keeping non-trained cues below it.
+
+**The top-32 seed produces fields more confusable than the encoder already is.**
+Not marginal — worse than the scheme it was meant to replace. Killed before a
+line of implementation.
+
+### And the rarity fix has nothing to work with
+
+I proposed IDF weighting on the theory that top-magnitude dims are generic and
+discrimination hides in the tail. `DIM_USAGE` says **1** dim is generic (>90% of
+words) and **5** are discriminative (<10%), out of 125 used. Almost everything
+sits in the 10–90% band, so there is no rare/common structure to sharpen.
+
+My reading of the k=4 collision figure was also wrong: 46.3% collision at k=4 is
+not one universally-shared dim but a *small pool of moderately-common dims*
+filling the top ranks for whole classes of similar-shaped words.
+
+### The real defect: distinct, but not separated
+
+```
+if      ~ so      0.954
+had     ~ look    0.949
+outer   ~ future  0.938
+```
+
+These are **unrelated words the encoder cannot tell apart**. I predicted the hard
+pairs would be morphological (`sleep`/`sleeps`); the failure is general.
+
+So the encoder's problem is **not** missing identity — §C proved identity
+survives, 1,355/1,355 distinct. It is **degenerate geometry**: every word sits
+0.7–0.95 from every other word. Distinctness without separation.
+
+That also explains `CEILING_AUC = 0.455`. The encoder cannot separate trained
+from control because it barely separates anything from anything.
+
+### Data bug found on the way
+
+`surprise`~`surprise.` 0.948, `world.`~`world:` 0.941, `think`~`think.` 0.938.
+**Punctuation is not stripped.** `think` and `think.` are distinct vocabulary
+entries receiving distinct assemblies. This inflates the vocabulary, duplicates
+concepts, and manufactures near-identical pairs — and it has been contaminating
+every run in the project. Cheap to fix; fix it before any further measurement.
+
+### The genuinely encouraging finding
+
+**The architecture reaches AUC 0.94–1.00 on top of a nearly degenerate input
+space.** Learning is overcoming a bad encoder. That is the reverse of my
+hypothesis two sections ago, and it implies the same machinery on a competent
+representation would do materially better. The architecture has been carrying the
+encoder, not the other way round.
+
+### The design axis this exposes
+
+| | identity | generalisation |
+|---|---|---|
+| current surface encoder | poor (0.844 typical overlap) | excessive |
+| random sparse code (32-of-128) | excellent (~8/32 expected overlap → ~0.25 cosine) | none |
+
+The useful designs live between these poles. That is a real axis to choose a
+position on, not a patch — and choosing it is a representation decision, which
+means the encoder is looking less like a component and more like the project.
+
+**Score:** three successive designs killed on paper — k-of-n coding, typed-assembly
+seeds, top-32 seeds — for roughly a minute of compute each. Recorded as the
+capacity-first rule working, and as the counterfactual for how the previous cycle
+would have spent that time.
+
 ---
 
 ## 7. ⚠️ Missing from the list: complementary learning systems
@@ -526,26 +606,42 @@ that failed.
 
 Ordered so that the answer to each changes what the next one means.
 
-1. **Is the target intelligence, or efficient storage/retrieval?** They pull in
-   opposite directions and the last cycle never chose explicitly. Two of the
-   three measured legs failed on *capacity*, which is a storage property.
-2. **What assigns neuron type (§6a)?** This single question decides whether the
-   typed-assembly design has real capacity or has merely relocated the
-   collision. Answer it on paper before anything is built.
-2a. **Does the typed/sparse composition variant deserve a real test?** Cheap to
-   falsify: compose assemblies from types, re-run the fidelity control gate.
-   **Arithmetic first** — how many items must be distinguishable, and what
-   `T`, `k` does that need?
-3. **If ANN units ≈ neurons and biology's edge is unit count, not density (§1),
-   is "many tiny units" the actual architectural bet?** That is a different
-   project from "compress a cortex onto a laptop."
-4. **Is spiking worth adopting at all (§3)** — or is it a transmission medium we
-   would be copying for its aesthetics?
-5. **Which of the fixed global thresholds should become neuromodulatory (§1)?**
-   This was the diagnosed root cause of both greyMatter failures and it is the
-   cheapest biologically-motivated change available.
-6. **What is the smallest experiment that could falsify the whole next
-   direction?** Ask it before writing code this time.
+*Revised 2026-08-10 after §6b–6d. The seed-design questions are struck: they were
+answered on paper, in the negative.*
+
+**A. Is the encoder now the project?** Every measured failure traces to
+representation quality, and the architecture has been out-performing its input
+(§6d). "Build a better representation" and "build a brain-like architecture" are
+different projects with different literatures and different success criteria.
+This one gates everything below it.
+
+**B. Intelligence, or efficient storage/retrieval?** Still unanswered, and now
+sharper: all three measured failures were *capacity* failures, which is a storage
+property. If the honest target is storage, the surviving assets (regeneration at
+95.5–97.9%, partitioned eviction, allocation) are the deliverable and the
+cognitive framing should be dropped.
+
+**C. Where on the identity ↔ generalisation axis (§6d)?** Surface encoding gives
+excessive similarity and no identity; random sparse codes give perfect identity
+and no generalisation; distributional embeddings give both but are *learned*,
+which imports someone else's representation. Pick a position deliberately — this
+is the decision the last cycle made by accident.
+
+**D. Does greyMatter continue, fork, or stop?** The thesis as originally posed has
+a documented negative result. The machinery underneath it works. Those two facts
+support different answers and the choice is Bill's.
+
+**E. What is the smallest experiment that could falsify the next direction?**
+Ask before writing code. This has now paid for itself four times.
+
+**F. Deferred BNN items**, live but not blocking: many-small-units as the
+architectural bet (§1); whether spiking is computational or a transmission medium
+(§3); which fixed global thresholds should become neuromodulatory (§1) — the
+diagnosed root cause of both greyMatter failures.
+
+**Housekeeping, independent of all of the above:** strip punctuation in
+tokenisation (§6d). It has been inflating the vocabulary and duplicating concepts
+in every run to date.
 
 ---
 
