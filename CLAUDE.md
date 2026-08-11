@@ -252,7 +252,22 @@ A model skimming this codebase or its docs will infer several things that are
   any new mechanism).* Terminal statement of the W3′ and P5 negative results,
   what survives, and the recurring fixed-threshold pattern.
 
-- [ ] **W6 — per-neuron familiarity trace (REFRAMED 2026-08-10, Bill).**
+- [x] **W6 — per-neuron familiarity trace.** *Done 2026-08-10 (`b8d383a`),
+  REFOCUS "W6 RESULT".* **NULL CONFIRMED — negative result is final.**
+  `MeanFiringMatch` persisted and round-tripped correctly. Direction right
+  (controls penalised 2.2× more than trained), magnitude irrelevant: 0.005
+  against a 0.436 gap ≈ 1% of the deciding scale. d′ 1.75–2.09 vs baseline
+  1.76–2.01; gate 7/40 vs 6/40. **Do not retry with a tuned λ** — no coefficient
+  fixes a 1% effect on a 44% gap. Root cause is arithmetic, not tuning: 343
+  effective VQ codes against a vocabulary in the low thousands means many words
+  share a code, so lexical identity is destroyed at quantisation, before learning.
+  Procedural generation and per-item identity are in tension whenever the seed
+  space is smaller than the item space. Also surfaced: `bytes_per_neuron` is a
+  formula with a hardcoded meta constant, not a disk measurement — the 2.7–5.1×
+  compression figures under-report. Original framing retained below for the
+  reasoning.
+
+- [ ] ~~**W6 — per-neuron familiarity trace (REFRAMED 2026-08-10, Bill).**~~
   **Do not implement this as homeostatic threshold adjustment.** That framing has
   a reachable null that kills it: the two populations needing separation —
   weakly-trained words (0.55–0.67) and untrained words landing in a trained

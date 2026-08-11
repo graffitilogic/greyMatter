@@ -2773,3 +2773,73 @@ for i in 1 2 3 4 5; do ./greyMatter/scripts/sweep_fidelity.sh; done
 ```
 
 Baseline to beat: 6/40 reportable, d′ 1.76–2.01, 68 B/neuron at threshold 1.
+
+---
+
+## 2026-08-10 — W6 RESULT: null confirmed. The negative result is final.
+
+| # | prediction | result |
+|---|---|---|
+| 1 | d′ rises above 1.76–2.01 | **❌** 1.75–2.09, unchanged |
+| 2 | gate passes ≥4/5 at some budget | **❌** 7/40 (vs 6/40 baseline); best threshold 2/5 |
+| 3 | fidelity ≥90% at passing budgets | **✅** 95.5–97.9% |
+| 4 | bytes +4 (68 → 72) | **❌** unchanged — separate finding, below |
+| 5 | trained penalty < control penalty | **❌** gap 0.0055, under the 0.01 bar |
+
+```
+FAMILIARITY: penalty trained=0.0046 control=0.0101  gap=+0.0055
+⚠️  penalties are equal — the familiarity trace is not discriminating
+```
+
+### The mechanism is directionally right and quantitatively irrelevant
+
+Controls were penalised **2.2×** more than trained cues (0.0101 vs 0.0046) —
+exactly the predicted direction. But the absolute size is ~0.005 against a
+trained/control gap of **0.436**: about **1%** of the scale that decides
+anything. The Kohonen drift the trace measures is real and negligible. This is
+P3.3 for the fourth time — learned weight movement contributes almost nothing to
+recall.
+
+So the failure is not "the idea was wrong in principle." It is "the quantity it
+depends on is two orders of magnitude too small to matter." No λ tuning fixes a
+1% effect on a 44% gap; that is why this is being recorded as final rather than
+retried.
+
+### Prediction 4's failure is a separate, real finding
+
+Bytes per neuron are **identical to baseline** at every threshold (79, 117, 160)
+despite a genuinely persisted new 4-byte field. And it *is* persisted —
+familiarity penalties are non-zero when measured after eviction and
+regeneration, so `MeanFiringMatch` survived the round trip.
+
+Therefore `bytes_per_neuron` is a **formula with a hardcoded identity/meta
+constant**, not a measurement of what reaches disk. **The compression figures
+(2.7–5.1×) are estimates and they under-report.** Recorded as a caveat on the one
+surviving positive claim; not chased here.
+
+### Verdict
+
+The queue entry said: *"If no, the negative result in `RESULTS.md` is complete
+and final."* It is no. `RESULTS.md` updated accordingly.
+
+### Why this was forced, not unlucky — the pigeonhole argument
+
+Worth stating because it explains every negative result at once, and it is
+arithmetic rather than measurement.
+
+The VQ codebook holds 512 codes at 67% utilisation ≈ **343 effective codes**. The
+500-sentence corpus has a vocabulary in the low thousands. By pigeonhole, several
+words necessarily share each code — and the receptive field is *generated from
+the code*. **Lexical identity is destroyed at quantisation time, before any
+learning happens.**
+
+That is the tension the No Man's Sky analogy conceals. In NMS the seed **is** the
+identity: no two planets share a seed, so regenerating from the seed loses
+nothing. Here the seed is shared across many words, so regeneration cannot
+recover which word it was. Making codes ≈ vocabulary would restore identity — and
+would make the code an index per word, i.e. storing the word, at which point the
+compression is gone.
+
+**Procedural generation and per-item identity are in direct tension whenever the
+seed space is smaller than the item space.** That is a structural statement about
+the thesis, not a bug to be fixed.

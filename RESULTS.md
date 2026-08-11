@@ -168,6 +168,10 @@ Not everything here is negative. These hold:
   measurable, 86–99% of weights regenerated rather than stored.
 - **Compression is real but modest** — 2.7–5.1×, honest and reproducible. (Any
   older "90% compression" or "trillion-parameter" claim is false and retracted.)
+  **Caveat found 2026-08-10:** `bytes_per_neuron` did not move when a genuinely
+  persisted 4-byte field was added, so it is a formula with a hardcoded
+  identity/meta constant rather than a measurement of what reaches disk. These
+  figures are estimates and they under-report.
 - **Allocation and assembly reuse work.** After fixing a chain of defects, neuron
   creation fell from **119.5 to 7.4 per sentence**, with assembly reuse at 100%
   from the first window on a resumed brain. Concept identity now survives a
@@ -192,7 +196,36 @@ convergence is the most useful thing the negative results produced.
 
 ---
 
-## The one open question
+## Why this was forced, not unlucky
+
+One argument explains every negative result above, and it is arithmetic rather
+than measurement.
+
+The VQ codebook holds 512 codes at 67% utilisation — **~343 effective codes** —
+against a corpus vocabulary in the low thousands. By pigeonhole, many words
+necessarily share a code. The receptive field is *generated from that code*.
+So **lexical identity is destroyed at quantisation time, before any learning
+happens.** No amount of learned weight adjustment recovers it, because the
+regeneration path never sees the word — only the code.
+
+This is the tension the *No Man's Sky* analogy conceals. In that game the seed
+**is** the identity: no two planets share a seed, so regenerating from the seed
+loses nothing. Here the seed is shared across many words, so regeneration cannot
+recover which word it was. Enlarging the codebook until codes ≈ vocabulary would
+restore identity — and would make the code an index per word, i.e. storing the
+word, at which point the compression is gone.
+
+> **Procedural generation and per-item identity are in direct tension whenever
+> the seed space is smaller than the item space.** Compression comes precisely
+> from collisions, and collisions are precisely what destroys identity.
+
+This is a structural property of the approach, not a defect in this
+implementation. Any system regenerating item-specific structure from a shared
+seed will hit it.
+
+## The one question that was open — now closed
+
+*(Resolved 2026-08-10, W6. Retained because the reasoning is the useful part.)*
 
 A naive fix — homeostatic thresholds that punish broadly-responsive neurons —
 has a **reachable null that kills it**: the two populations needing separation
@@ -223,6 +256,29 @@ That makes a clean, thesis-aligned question:
 
 Both outcomes are informative, and the null is reachable. That is the bar this
 project's later experiments were held to, and the earlier ones were not.
+
+### Answer: no. Measured, W6, 2026-08-10
+
+`MeanFiringMatch` — a running mean of the match values that actually made each
+neuron fire — was implemented, persisted, and round-tripped through regeneration.
+
+```
+FAMILIARITY: penalty trained=0.0046  control=0.0101  gap=+0.0055
+d′ 1.75–2.09 (baseline 1.76–2.01)   gate 7/40 (baseline 6/40)
+```
+
+The mechanism worked **in the predicted direction** — controls were penalised
+2.2× more than trained cues — and was **quantitatively irrelevant**: ~0.005
+against a trained/control gap of 0.436, about 1% of the deciding scale. Learned
+drift is real and negligible, consistent with the earlier finding that storing
+zero learned weights performed as well as storing all of them.
+
+No tuning fixes a 1% effect on a 44% gap. Combined with the pigeonhole argument
+above, this closes the question: the identity a prototype cannot carry was
+already destroyed at quantisation, and a few bytes of per-neuron history cannot
+reconstruct what the seed never encoded.
+
+**The negative result is complete.**
 
 ---
 
