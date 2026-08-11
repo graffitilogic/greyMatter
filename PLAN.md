@@ -351,6 +351,100 @@ why that leg was never testable.
 
 ---
 
+## 6b. ENCODER CEILING measured, 2026-08-10 — both my predictions wrong
+
+`dotnet run -- --encoder-ceiling --train 500`. No training, no brain.
+
+### My hypothesis was falsified
+
+I predicted the encoder would account for the measured separation, making
+`RESULTS.md` a document about `FeatureEncoder` rather than about the thesis.
+
+```
+CEILING_AUC:    0.455        (chance)
+CEILING_DPRIME: -0.03
+```
+
+**Raw encoder distance carries no information about trained vs control.** The
+system's measured AUC of 0.94–1.00 is therefore *real separation that learning
+produces*, not an artefact inherited from the input. The architecture is doing
+work.
+
+Why my framing was wrong: `max cosine to the trained set` tests whether trained
+words form a **cluster** in encoder space. They do not — common English words
+are not orthographically alike. But the system does not rely on clustering; each
+trained word has a **dedicated assembly tuned to its own vector**. That is
+memory, and memory beats clustering here.
+
+### Identity survives the encoder intact — this is the important number
+
+```
+TOPK_COLLISIONS k= 4:   728/1,355 distinct (46.3% collide)
+TOPK_COLLISIONS k= 8: 1,292/1,355 distinct ( 4.6% collide)
+TOPK_COLLISIONS k=16: 1,352/1,355 distinct ( 0.2% collide)
+TOPK_COLLISIONS k=32: 1,355/1,355 distinct ( 0.0% collide)
+```
+
+`k = 32` is exactly `ConceptFeatureDims` — the code the system *already* computes
+and already feeds to training. **Zero collisions across the whole vocabulary.**
+
+So the pigeonhole argument in `RESULTS.md` is not retracted, it is **relocated**:
+
+| stage | identity |
+|---|---|
+| `FeatureEncoder` → 128-dim vector | **preserved** |
+| top-32 dims (`BuildTrainingFeatures`) | **preserved — 0% collisions** |
+| VQ quantise → 1 of ~343 codes | **destroyed — ≈3.9 words per code** |
+| receptive field generated from that code | irrecoverable |
+
+The information was never missing. It is discarded at a single, identifiable
+step, and that step is the one the whole regeneration scheme is built on.
+
+### The margin, and a hard design target
+
+Section A also gives a number nothing before it did. With lossless storage a
+trained cue matches itself at 1.000, and the strongest control sits at **0.741**
+(`zxcvbnmasd` nearest `so`).
+
+| | trained | strongest control | margin |
+|---|---|---|---|
+| raw encoder (lossless) | 1.000 | 0.741 | **+0.259** |
+| measured system (VQ prototype) | 0.609 | 0.636 | **−0.027** |
+
+**Procedural regeneration consumed the entire available margin and overshot.**
+That makes the thesis question quantitative for the first time: *how much of a
+0.259 identity margin can survive compression?*
+
+And it settles a fairness question that has been open since the gate was added:
+**rule 8 is achievable.** A lossless store passes it comfortably. The gate was
+never demanding a distinction the input lacked.
+
+> **Design constraint for any successor scheme:** regeneration must keep a
+> trained cue's match above **0.741**. Checkable on paper, before code.
+
+### What this makes the obvious next step
+
+Do not generate the receptive field from the VQ code. Generate it from the
+**top-32 dimension set**, which is already computed, already injective over the
+vocabulary, and already the training input.
+
+Storage arithmetic, for the capacity-first rule:
+
+- top-32 set = 32 indices × 7 bits = **28 bytes per concept** (not per neuron)
+- current assembly = 16 neurons × 68 B = **1,088 bytes**
+- ≈ **39× compression, with identity preserved**
+
+This is exactly Bill's §6a framing: a **composed, injective seed** rather than a
+lossy single index. `seed × timestamp × coordinates`, not `seed`.
+
+**Open question before building:** the top-32 set identifies a concept, but the
+regenerated field must also *discriminate* — a novel word sharing 28 of 32 dims
+must score measurably lower. Overlap-based scoring gives that for free
+(28/32 vs 32/32), but it needs checking against the 0.741 constraint on paper
+first.
+
+---
+
 ## 7. ⚠️ Missing from the list: complementary learning systems
 
 Biology does not use one memory system. **Hippocampus** does fast, sparse,

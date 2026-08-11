@@ -223,6 +223,36 @@ This is a structural property of the approach, not a defect in this
 implementation. Any system regenerating item-specific structure from a shared
 seed will hit it.
 
+### ⚠️ Narrowed 2026-08-10 by direct measurement (`--encoder-ceiling`)
+
+The statement above is correct but was applied too broadly. Measurement locates
+the loss at one specific step rather than in the approach:
+
+| stage | identity |
+|---|---|
+| `FeatureEncoder` → 128-dim vector | **preserved** |
+| top-32 dims, the actual training input | **preserved — 0 collisions in 1,355 words** |
+| VQ quantise → 1 of ~343 codes | **destroyed — ≈3.9 words per code** |
+
+The encoder is not the bottleneck; it separates the entire vocabulary without
+error. Identity is discarded at quantisation, by a *hard single-index* seed.
+A composed or sparse seed of the same size does not have that property.
+
+Two further corrections fall out:
+
+- **The architecture was doing real work.** Raw encoder distance separates
+  trained cues from controls at `AUC 0.455` — chance. The measured 0.94–1.00
+  therefore comes from learning, not from the input.
+- **Rule 8 was achievable, not unfair.** Losslessly stored, a trained cue matches
+  at 1.000 against a strongest control of 0.741 — a margin of **+0.259**. The
+  measured system runs at **−0.027**. Procedural regeneration consumed the whole
+  margin. Any successor scheme must keep trained matches above **0.741**.
+
+So the negative result stands for **this** implementation — hard VQ seeds cannot
+carry lexical identity — and the general claim about procedural generation is
+withdrawn to: *a lossy single-index seed destroys identity; whether a composed
+injective seed preserves it is untested.*
+
 ## The one question that was open — now closed
 
 *(Resolved 2026-08-10, W6. Retained because the reasoning is the useful part.)*
