@@ -2661,3 +2661,30 @@ synaptic gate needs (`passed=99.5%` against a fixed 0.12 threshold). **Two
 independent failures, one missing mechanism.** That convergence is worth more
 than either patch, and it should be proposed to Bill as a queue change rather
 than folded in quietly.
+
+---
+
+## 2026-08-10 — Write-up delivered; W6 reframed by Bill
+
+**`RESULTS.md` written** (sanctioned exception to ground rule 1 — terminal
+artifact, not live state; REFOCUS.md remains the single status doc).
+
+**Bill corrected the W6 proposal, and the correction is rule 5.** I proposed
+homeostatic threshold adjustment without checking its null was reachable. His
+objection: the two populations needing separation occupy the *same match range*
+(weakly-trained 0.55–0.67, untrained-in-region 0.55–0.64), so raising per-neuron
+thresholds silences both — false positives traded for false negatives, d′ flat.
+It would have presented as "sharpening the margin" while changing nothing. Same
+error class as P5's unreachable null, proposed by me one turn after writing that
+rule down.
+
+**Reframed:** the discriminative signal is **activation history**, which a
+prototype field cannot represent by construction. Verified against the code —
+`ActivationCount` is an `int` (4 bytes), present in `ProceduralCompactData`,
+persisted, round-tripped through `RegenerateNeuron`, and **never read by
+recall**: `MatchQuality` is pure cosine over `InputWeights`. Bill's "~4 bytes
+already sitting in the 64 B floor" is exact.
+
+W6 in the queue is now that question, with its own null pre-named (a familiarity
+term that lifts trained and novel cues equally). Order fixed by Bill:
+**write-up first, W6 second.**
