@@ -2688,3 +2688,88 @@ already sitting in the 64 B floor" is exact.
 W6 in the queue is now that question, with its own null pre-named (a familiarity
 term that lifts trained and novel cues equally). Order fixed by Bill:
 **write-up first, W6 second.**
+
+---
+
+## 2026-08-10 — W6 PRE-REGISTRATION (written before any code)
+
+Corpus stays at 500 sentences / 14 trained cues / 8 controls for this run —
+Bill's call: try W6 first, widen only if it produces a positive worth defending.
+
+### Correction to the framing, before the design
+
+**`ActivationCount` used alone is exactly the pre-named null.** It is a
+per-neuron constant: it shifts every cue's score by the same amount regardless of
+what is being probed, so trained and novel cues move together and d′ cannot
+change. A count of past firings says how *popular* a neuron is, not whether *this
+input* is one it knows.
+
+To discriminate, the trace must interact with the current input. The minimal
+quantity that does is the neuron's **expected match** — a running mean of the
+`MatchQuality` values that actually caused it to fire.
+
+### Why that can work, mechanistically
+
+`ReinforceTowardInput` applies a Kohonen step, so a neuron's weights are
+`prototype + drift toward the words that trained it`. A trained cue matches
+prototype *and* drift; a novel cue sharing the VQ code matches only the
+prototype. So a novel cue should land **below** the neuron's own historical mean
+match, while a trained cue lands near it.
+
+That is a per-neuron, per-input comparison — not a threshold raise, and not the
+null.
+
+### Design
+
+- `HybridNeuron.MeanFiringMatch` (float), running mean over `ActivationCount`,
+  updated in `ReinforceTowardInput` where firing is already recorded.
+- Persisted in `NeuronSnapshot` and `ProceduralCompactData`.
+  **Honest cost: +4 bytes/neuron (68 → 72).** Bill's "already in the 64 B floor"
+  holds for `ActivationCount` but not for this; the trace is new state.
+- `MatchQuality` is **unchanged** (ground rule 9 — it is read everywhere). New
+  `FamiliarityAdjustedMatch()` used only by the probe/recall path:
+
+  ```
+  penalty  = max(0, MeanFiringMatch − match)
+  adjusted = match − λ · penalty        (λ = 1.0 default)
+  ```
+
+  Neurons with `ActivationCount < 5` get no adjustment — insufficient history.
+  Only inputs falling *below* what the neuron habitually responds to are
+  penalised; a trained cue at its own mean is untouched.
+
+### Predictions — scored ✅/❌ after the run
+
+1. **d′ rises above its flat 1.76–2.01 band.** Primary signal.
+2. **Control gate passes ≥4/5 sweeps at some budget** (currently 6/40 = 15%,
+   scattered). This is the exit criterion.
+3. **Fidelity does not collapse** — ≥90% at any passing budget. The adjustment
+   must not destroy assembly reconstruction to buy discrimination.
+4. **Bytes/neuron rises by exactly 4** (68 → 72 at threshold 1). If it moves by
+   anything else, something other than the trace is being persisted.
+5. **Trained cues take a smaller mean penalty than controls.** This is the
+   mechanism check (ground rule 3 — instrument the decision). If penalties are
+   equal, the idea has failed even if d′ happens to move.
+
+### The reachable null, stated explicitly
+
+If `MeanFiringMatch` is essentially uniform across neurons, the adjustment is a
+constant shift, trained and novel cues are penalised equally, and **d′ stays
+flat**. That is the achievable state producing the null, and P3.3 makes it
+plausible: learned weight drift contributed almost nothing to recall, and if the
+drift is negligible then a trained cue and a novel cue both sit at the prototype
+match with nothing between them.
+
+Prediction 5 detects this directly, and separates "the trace is uninformative"
+from "the trace is informative but λ is wrong."
+
+### Exact commands
+
+```bash
+cd greyMatter && dotnet build -c Release
+dotnet run -c Release -- --test-hebbian
+dotnet run -c Release -- --fidelity-test --train 500
+for i in 1 2 3 4 5; do ./greyMatter/scripts/sweep_fidelity.sh; done
+```
+
+Baseline to beat: 6/40 reportable, d′ 1.76–2.01, 68 B/neuron at threshold 1.

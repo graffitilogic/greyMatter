@@ -62,6 +62,62 @@ namespace GreyMatter.Core
         public int? VqCode { get; set; } = null;
 
         /// <summary>
+        /// W6 — familiarity trace. Running mean of the `MatchQuality` values that
+        /// actually caused this neuron to fire.
+        ///
+        /// Why not `ActivationCount`, which is already persisted and free:
+        /// a count is a per-neuron CONSTANT. It shifts every cue's score by the
+        /// same amount regardless of what is being probed, so trained and novel
+        /// cues move together and d′ cannot change. That is precisely the null
+        /// this experiment has to avoid. A discriminative trace must interact with
+        /// the current input.
+        ///
+        /// Why this one can discriminate: `ReinforceTowardInput` applies a Kohonen
+        /// step, so a neuron's weights are `prototype + drift toward the words that
+        /// trained it`. A trained cue matches prototype AND drift and lands near
+        /// this mean; a novel cue sharing the VQ code matches only the prototype
+        /// and should land below it.
+        ///
+        /// Cost: 4 bytes/neuron, persisted. Unlike ActivationCount this is NEW
+        /// state — it is not inside the existing 64 B floor.
+        /// </summary>
+        public float MeanFiringMatch { get; private set; } = 0f;
+
+        /// Below this much history the trace is noise, so no adjustment is applied.
+        public const int MinHistoryForFamiliarity = 5;
+
+        /// <summary>
+        /// W6 — recall-path score. `MatchQuality` is deliberately left untouched
+        /// (ground rule 9: it is read in many places, including training).
+        ///
+        /// Penalises only inputs falling BELOW what this neuron habitually
+        /// responds to. A trained cue sitting at its own historical mean is
+        /// unaffected; a novel cue that merely shares the VQ prototype should sit
+        /// under it and lose ground.
+        ///
+        /// Reachable null, stated in the pre-registration: if MeanFiringMatch is
+        /// uniform across neurons, this is a constant shift, trained and novel
+        /// cues are penalised equally, and d′ does not move.
+        /// </summary>
+        public double FamiliarityAdjustedMatch(
+            Dictionary<Guid, double> inputs,
+            HashSet<Guid>? featureInputIds = null,
+            double lambda = 1.0,
+            Action<double>? recordPenalty = null)
+        {
+            var match = MatchQuality(inputs, featureInputIds);
+            if (ActivationCount < MinHistoryForFamiliarity || MeanFiringMatch <= 0)
+            {
+                recordPenalty?.Invoke(0.0);
+                return match;
+            }
+
+            var penalty = Math.Max(0.0, MeanFiringMatch - match);
+            recordPenalty?.Invoke(penalty);
+            return Math.Max(0.0, match - lambda * penalty);
+        }
+
+        /// <summary>
         /// P3.4: how many feature lines existed the last time this neuron's
         /// receptive field was wired. A neuron's field is defined by its IDENTITY
         /// (which lines it samples), not by which words it happened to meet — so it
@@ -230,7 +286,8 @@ namespace GreyMatter.Core
         /// Recorded as STM deltas so the existing consolidation path still governs
         /// what becomes permanent.
         /// </summary>
-        public void ReinforceTowardInput(Dictionary<Guid, double> inputs, double rate)
+        public void ReinforceTowardInput(Dictionary<Guid, double> inputs, double rate,
+                                         double? firedAtMatch = null)
         {
             if (inputs.Count == 0) return;
 
@@ -258,6 +315,24 @@ namespace GreyMatter.Core
             ActivationCount++;
             Fatigue = Math.Min(1.0, Fatigue + 0.1);
             ImportanceScore = CalculateImportance();
+
+            // W6: running mean of the match values that actually made this neuron
+            // fire. Updated here because winning the competition IS firing.
+            //
+            // The caller MUST pass the match it already computed. Recomputing it
+            // here as MatchQuality(inputs) would normalise ‖w‖ over all of
+            // InputWeights — which mixes feature lines with synapses to other
+            // neurons (the P1.6m trap) — while recall passes featureNeuronIds and
+            // normalises over the receptive field only. The two scales differ, the
+            // stored mean would sit systematically below every recall-time match,
+            // the penalty would always be 0, and the experiment would return its
+            // own null by construction rather than by measurement.
+            if (firedAtMatch is double m)
+            {
+                MeanFiringMatch = ActivationCount <= 1
+                    ? (float)m
+                    : MeanFiringMatch + (float)((m - MeanFiringMatch) / ActivationCount);
+            }
 
             // Synaptic scaling: conserve total strength across the receptive field
             var scale = strengthBefore > 0 ? strengthBefore / strengthAfter : 1.0;
@@ -592,7 +667,8 @@ namespace GreyMatter.Core
                 Threshold = SanitizeDouble(threshold, 0.5, $"Neuron {Id} threshold"),
                 LearningRate = SanitizeDouble(learningRate, 0.01, $"Neuron {Id} learningRate"),
                 IsProvisional = isProvisional,
-                VqCode = vqCode // Phase 6B: Store VQ code for procedural regeneration
+                VqCode = vqCode, // Phase 6B: Store VQ code for procedural regeneration
+                MeanFiringMatch = MeanFiringMatch // W6: familiarity trace (4 bytes)
             };
         }
 
@@ -610,7 +686,8 @@ namespace GreyMatter.Core
                 LastUsed = snapshot.LastUsed,
                 ImportanceScore = snapshot.ImportanceScore,
                 IsProvisional = snapshot.IsProvisional,
-                VqCode = snapshot.VqCode // Phase 6B: Restore VQ code for procedural regeneration
+                VqCode = snapshot.VqCode, // Phase 6B: Restore VQ code for procedural regeneration
+                MeanFiringMatch = snapshot.MeanFiringMatch // W6: familiarity trace
             };
             // Ensure identity is preserved across loads
             neuron.Id = snapshot.Id;
@@ -662,5 +739,10 @@ namespace GreyMatter.Core
         public bool IsProvisional { get; set; } = false;
         [MessagePack.Key(11)]
         public int? VqCode { get; set; } = null; // Phase 6B: VQ code for procedural regeneration
+        // W6: familiarity trace. New key appended — existing keys keep their
+        // indices so already-persisted neurons deserialise unchanged (default 0,
+        // which FamiliarityAdjustedMatch treats as "no history, no adjustment").
+        [MessagePack.Key(12)]
+        public float MeanFiringMatch { get; set; } = 0f;
     }
 }

@@ -65,6 +65,20 @@ namespace GreyMatter.Core
         /// </summary>
         [Key(6)]
         public string ConceptTag { get; set; } = "";
+
+        /// <summary>
+        /// W6 — familiarity trace: running mean of the MatchQuality values that
+        /// made this neuron fire. 4 bytes, and unlike ActivationCount this is NEW
+        /// state rather than something already inside the 64 B floor.
+        ///
+        /// It must be persisted, because it is the one thing regeneration cannot
+        /// reconstruct: the prototype determines what a neuron WOULD respond to,
+        /// never what it actually saw. Appended as Key(7) so existing partitions
+        /// deserialise with 0 — which FamiliarityAdjustedMatch treats as "no
+        /// history, no adjustment".
+        /// </summary>
+        [Key(7)]
+        public float MeanFiringMatch { get; set; } = 0f;
         
         /// <summary>
         /// Convert full NeuronSnapshot to compact procedural representation.
@@ -113,6 +127,7 @@ namespace GreyMatter.Core
                 SynapticWeights = strongConnections,
                 ImportanceScore = (float)snapshot.ImportanceScore,
                 ActivationCount = snapshot.ActivationCount,
+                MeanFiringMatch = snapshot.MeanFiringMatch,   // W6
                 ClusterId = clusterId,
                 ConceptTag = snapshot.ConceptTag
             };
@@ -192,6 +207,7 @@ namespace GreyMatter.Core
                 ConceptTag = compactData.ConceptTag,
                 ImportanceScore = compactData.ImportanceScore,
                 ActivationCount = compactData.ActivationCount,
+                MeanFiringMatch = compactData.MeanFiringMatch,   // W6: survives regeneration
                 Bias = neuron.Bias,
                 Threshold = neuron.Threshold,
                 LearningRate = BASE_LEARNING_RATE,

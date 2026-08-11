@@ -915,6 +915,22 @@ namespace GreyMatter
             foreach (var c in pseudoControls)
                 Console.WriteLine($"      {c,-12} active={baseline[c].Count,3}  top act={TopAct(c):F3}");
 
+            // W6 prediction 5 — the mechanism check. d′ moving is not enough: if
+            // trained cues and controls take the SAME familiarity penalty, the
+            // trace is uninformative and any d′ change came from somewhere else.
+            // Probing each group separately and reading the penalty between them is
+            // the only way to tell those apart.
+            brain.ReadMeanFamiliarityPenalty();                       // reset
+            foreach (var c in trainedCues) await brain.ProbeConceptAsync(c, topK);
+            var trainedPenalty = brain.ReadMeanFamiliarityPenalty();
+            foreach (var c in controls) await brain.ProbeConceptAsync(c, topK);
+            var controlPenalty = brain.ReadMeanFamiliarityPenalty();
+            Console.WriteLine($"   FAMILIARITY: penalty trained={trainedPenalty:F4} " +
+                              $"control={controlPenalty:F4}  gap={controlPenalty - trainedPenalty:+0.0000;-0.0000}");
+            if (Math.Abs(controlPenalty - trainedPenalty) < 0.01)
+                Console.WriteLine("   ⚠️  penalties are equal — the familiarity trace is not discriminating " +
+                                  "(W6's pre-registered null). Any d′ change is coming from elsewhere.");
+
             var weakest = trained.OrderBy(TopAct).FirstOrDefault();
             Console.WriteLine($"   trained: mean={trainedMean:F3}  weakest={trainedMin:F3} ('{weakest}')");
             Console.WriteLine($"   controls: mean={controlMean:F3}  strongest={controlMax:F3}");

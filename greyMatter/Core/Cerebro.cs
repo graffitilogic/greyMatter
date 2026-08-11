@@ -787,9 +787,13 @@ namespace GreyMatter.Core
 
             var winnerCount = Math.Max(MinCompetitiveWinners,
                                        (int)Math.Ceiling(contest.Count * CompetitiveWinnerFraction));
-            foreach (var (neuron, _) in contest.Take(winnerCount))
+            foreach (var (neuron, match) in contest.Take(winnerCount))
             {
-                neuron.ReinforceTowardInput(trainingInputs, CompetitiveLearningRate);
+                // W6: hand over the match already computed in `contest` — it was
+                // measured with GetFeatureNeuronIds(), the same normalisation
+                // recall uses. See ReinforceTowardInput for why recomputing it
+                // inside the neuron would silently produce the null.
+                neuron.ReinforceTowardInput(trainingInputs, CompetitiveLearningRate, match);
             }
             tTrain.Stop();
 
@@ -2431,7 +2435,41 @@ namespace GreyMatter.Core
             // partially-overlapping pattern saturate the neuron, which is how
             // "qwertyuiop" scored 0.993. Cosine asks how ALIGNED the input is with
             // what this neuron is tuned to.
-            return neuron.MatchQuality(inputs, _featureMapper.GetFeatureNeuronIds());
+            //
+            // W6: recall goes through the familiarity-adjusted score. Cosine alone
+            // cannot separate a trained word from a novel one sharing its VQ code,
+            // because the field is GENERATED from that code — the prototype says
+            // what a neuron would respond to, never what it actually saw.
+            // Training still uses raw MatchQuality (ground rule 9); only recall is
+            // adjusted, so the two are deliberately no longer the same quantity.
+            if (!EnableFamiliarityTrace)
+                return neuron.MatchQuality(inputs, _featureMapper.GetFeatureNeuronIds());
+
+            return neuron.FamiliarityAdjustedMatch(
+                inputs, _featureMapper.GetFeatureNeuronIds(), FamiliarityLambda,
+                penalty => { _familiarityPenaltySum += penalty; _familiarityPenaltyCount++; });
+        }
+
+        /// W6 toggle, so the null can be measured against the same build.
+        public bool EnableFamiliarityTrace { get; set; } = true;
+        public double FamiliarityLambda { get; set; } = 1.0;
+
+        private double _familiarityPenaltySum;
+        private long _familiarityPenaltyCount;
+
+        /// <summary>
+        /// W6 mechanism check (ground rule 3 — instrument the decision). Mean
+        /// familiarity penalty applied since the last read. The experiment compares
+        /// this between trained cues and controls: if the penalties are equal, the
+        /// trace is uninformative and the idea has failed even if d′ happens to
+        /// move for some other reason.
+        /// </summary>
+        public double ReadMeanFamiliarityPenalty()
+        {
+            var mean = _familiarityPenaltyCount > 0
+                ? _familiarityPenaltySum / _familiarityPenaltyCount : 0.0;
+            _familiarityPenaltySum = 0; _familiarityPenaltyCount = 0;
+            return mean;
         }
 
         private static readonly Dictionary<string, double> EmptyContext = new();
