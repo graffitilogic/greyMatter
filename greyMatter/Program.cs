@@ -332,6 +332,71 @@ namespace GreyMatter
                                   $"({100.0 * (codes.Count - distinct) / codes.Count:F1}% collide)");
             }
 
+            // ── D. Overlap distribution and per-dimension rarity ──
+            //
+            // Zero collisions at k=32 only says max overlap ≤ 31. An overlap of
+            // 31/32 still yields near-identical generated fields, so injectivity
+            // alone does not buy discrimination — the OVERLAP distribution does,
+            // and it is the number the successor design turns on.
+            //
+            // The collision curve above (46.3% colliding at k=4, 0% at k=32) says
+            // the highest-magnitude dims are largely SHARED across words: generic
+            // features like length and vowel ratio. Discrimination lives in the
+            // low-magnitude tail. That is fatal for any magnitude-weighted field,
+            // which emphasises exactly the least discriminative dims — the defect
+            // the current prototype already has. This measures the alternative:
+            // weight each dim by how rare it is to appear in a top-k set at all.
+            const int K = 32;
+            var sets = vecs.Select(v => Enumerable.Range(0, v.Length)
+                .OrderByDescending(i => Math.Abs(v[i])).ThenBy(i => i).Take(K).ToHashSet()).ToList();
+
+            var overlaps = new List<int>();
+            for (int i = 0; i < sets.Count; i++)
+            {
+                int best = 0;
+                for (int j = 0; j < sets.Count; j++)
+                    if (i != j) { var o = sets[i].Count(d => sets[j].Contains(d)); if (o > best) best = o; }
+                overlaps.Add(best);
+            }
+            overlaps.Sort();
+            Console.WriteLine($"\n── D. top-{K} overlap with the nearest other word ──");
+            Console.WriteLine($"   OVERLAP: median={overlaps[overlaps.Count / 2]}/{K} " +
+                              $"p90={overlaps[(int)(overlaps.Count * 0.9)]}/{K} max={overlaps[^1]}/{K}");
+            Console.WriteLine($"   words with ≥30/{K} overlap: {overlaps.Count(o => o >= 30)} " +
+                              $"| ≥28: {overlaps.Count(o => o >= 28)}");
+
+            var df = new int[128];
+            foreach (var s in sets) foreach (var d in s) df[d]++;
+            var used = Enumerable.Range(0, 128).Where(d => df[d] > 0).ToList();
+            var generic = used.Count(d => df[d] > sets.Count * 0.9);
+            var rare = used.Count(d => df[d] < sets.Count * 0.1);
+            Console.WriteLine($"   DIM_USAGE: {used.Count}/128 dims used | " +
+                              $"in >90% of words: {generic} (generic) | in <10%: {rare} (discriminative)");
+
+            // ── E. The control set may be easier than the real vocabulary ──
+            //
+            // Strongest control-to-trained similarity is measured above; compare it
+            // with how close ordinary corpus words get to each other. If controls
+            // are FURTHER away than typical vocabulary neighbours, rule 8 has been
+            // testing the easy case and the real discrimination problem —
+            // morphological relatives like sleep/sleeps/sleeping — is untested.
+            Console.WriteLine($"\n── E. is the control set easier than the vocabulary? ──");
+            var hardest = new List<(string a, string b, double sim)>();
+            for (int i = 0; i < vecs.Count; i++)
+                for (int j = i + 1; j < vecs.Count; j++)
+                {
+                    var c = Cos(vecs[i], vecs[j]);
+                    if (c > 0.93) hardest.Add((vocab[i], vocab[j], c));
+                }
+            foreach (var (a, b, s) in hardest.OrderByDescending(x => x.sim).Take(8))
+                Console.WriteLine($"   {a,-14} ~ {b,-14} {s:F3}");
+            Console.WriteLine($"   CONTROL_DIFFICULTY: strongest control {controlScores.Max():F3} " +
+                              $"vs vocabulary NN median {nn[nn.Count / 2]:F3}");
+            Console.WriteLine(controlScores.Max() < nn[nn.Count / 2]
+                ? "   ⚠️  Controls sit FURTHER from trained words than typical vocabulary words sit\n" +
+                  "       from each other. Rule 8 tests the easy case; real discrimination is harder."
+                : "   ✅ Controls are at least as hard as typical vocabulary neighbours.");
+
             Console.WriteLine("\n── Read this against the system's measured numbers ──");
             Console.WriteLine("   Measured across 40 fidelity runs: AUC 0.94–1.00, d′ 1.76–2.09.");
             Console.WriteLine(auc >= 0.90

@@ -443,6 +443,67 @@ must score measurably lower. Overlap-based scoring gives that for free
 (28/32 vs 32/32), but it needs checking against the 0.741 constraint on paper
 first.
 
+## 6c. PAPER CHECK on the top-32 seed — it does not clear, and here is why
+
+*Done 2026-08-10 before any implementation. Outcome: the design as sketched
+inherits the defect it was meant to fix, plus one number is missing.*
+
+### The collision curve already condemns magnitude weighting
+
+```
+k= 4: 46.3% collide      k=16: 0.2% collide
+k= 8:  4.6% collide      k=32: 0.0% collide
+```
+
+46.3% collision at k=4 means the **highest-magnitude dimensions are largely the
+same dims across many words** — generic surface features (length, vowel ratio)
+that nearly every word shares. All discriminating power sits in the low-magnitude
+tail, roughly ranks 5–32.
+
+The current prototype weights the receptive field **by magnitude**. It therefore
+emphasises exactly the dimensions carrying the least identity. **A successor
+seeded from the top-32 but still magnitude-weighted inherits the same defect** —
+a higher-resolution version of the thing that already failed.
+
+**Derived fix: rarity weighting.** Weight each dim by how unusual it is to appear
+in a top-32 set at all (inverse document frequency). Generic dims contribute ≈0,
+rare dims dominate, and emphasis inverts onto the dims that separate. This is
+free — no extra storage, since it is a fixed per-dim scalar computed from the
+vocabulary.
+
+### The missing number, which the check cannot proceed without
+
+Zero collisions at k=32 says only that **max overlap ≤ 31**. An overlap of 31/32
+still produces near-identical generated fields. Injectivity does not buy
+discrimination; the **overlap distribution** does, and it was never measured.
+
+Guessing it is what produced the last three retractions, so §D was added to
+`--encoder-ceiling` to measure it: median / p90 / max overlap with the nearest
+other word, plus per-dimension usage (how many dims are generic vs
+discriminative). Still no training.
+
+### And a caveat on the target that likely matters more than the design
+
+| | similarity |
+|---|---|
+| strongest control → trained | **0.741** |
+| vocabulary median nearest-neighbour | **0.833** |
+| vocabulary max nearest-neighbour | **0.954** |
+
+**The controls are easier than the real vocabulary.** `blorp` and `qwertyuiop`
+sit *further* from trained words than ordinary corpus words sit from each other,
+because the corpus is full of morphological relatives (`sleep`/`sleeps`/
+`sleeping`).
+
+So clearing 0.741 is **necessary but nowhere near sufficient**. The genuine
+discrimination problem lives at 0.954, and rule 8 has never tested it. §E
+measures this directly and lists the hardest real pairs.
+
+**Consequence for the gate:** if the successor scheme clears 0.741 we should not
+call it a success. The honest bar is separating morphological neighbours, and the
+control set should probably be extended with in-vocabulary near-neighbours before
+any positive result is banked.
+
 ---
 
 ## 7. ⚠️ Missing from the list: complementary learning systems
