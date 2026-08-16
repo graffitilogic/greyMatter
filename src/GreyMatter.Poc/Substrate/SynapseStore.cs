@@ -209,6 +209,34 @@ public sealed class SynapseStore
         return removed;
     }
 
+    /// <summary>
+    /// Load a slot's segment from persisted arrays (§4.4 step 3, hydrate).
+    /// Truncates to the cap: a recipe written under a larger `SynapseCapPerNeuron`
+    /// must load without corrupting the neighbouring segment.
+    /// </summary>
+    public void Hydrate(int slot, uint[] targets, float[] weights)
+    {
+        int n = Math.Min(targets.Length, CapPerNeuron);
+        int start = SegmentStart(slot);
+        Array.Copy(targets, 0, Target, start, n);
+        Array.Copy(weights, 0, Weight, start, n);
+        Degree[slot] = n;
+    }
+
+    /// <summary>
+    /// Copy a slot's segment out for persistence, reusing the destination arrays
+    /// when they are already the right size so repeated consolidation of the same
+    /// neuron does not allocate.
+    /// </summary>
+    public void Capture(int slot, ref uint[] targets, ref float[] weights)
+    {
+        int n = Degree[slot];
+        if (targets.Length != n) { targets = new uint[n]; weights = new float[n]; }
+        int start = SegmentStart(slot);
+        Array.Copy(Target, start, targets, 0, n);
+        Array.Copy(Weight, start, weights, 0, n);
+    }
+
     /// <summary>Move a slot's whole segment. Called by NeuronPool compaction.</summary>
     public void MoveSlot(int from, int to)
     {

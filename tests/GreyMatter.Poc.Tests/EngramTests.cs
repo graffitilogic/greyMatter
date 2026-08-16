@@ -305,6 +305,35 @@ public class EngramTests : IDisposable
     /// The audit must be able to FAIL, or it certifies nothing. Legacy wrote
     /// concept strings into partitions (§1.5); this is that scenario.
     /// </summary>
+    /// <summary>
+    /// The semantic check must catch text hand-packed through a NON-string encoding
+    /// — which is exactly what the legacy tree's ConceptTag and string concept index
+    /// would look like if someone "fixed" the guardrail by byte-packing them.
+    /// Without this test, raising MinSemanticLength to suppress chance matches could
+    /// silently disable the check.
+    /// </summary>
+    [Fact]
+    public void Audit_CatchesAWordListPackedAsRawBytesRatherThanStrings()
+    {
+        var store = new EngramStore(_dir);
+        var words = new[] { "elephant", "kitchen", "morning", "brother", "picture" };
+
+        // Packed as byte arrays inside a MessagePack bin, so no str token exists.
+        var packed = System.Text.Encoding.ASCII.GetBytes(string.Join('\0', words));
+        var payload = MessagePack.MessagePackSerializer.Serialize(new object[] { 1, packed, 2.5 });
+
+        using (var fs = new FileStream(store.PathFor(3), FileMode.Create))
+        using (var gz = new System.IO.Compression.GZipStream(fs, System.IO.Compression.CompressionLevel.Optimal))
+            gz.Write(payload, 0, payload.Length);
+
+        var report = StoreAudit.Scan(store, words.ToHashSet());
+
+        Assert.Equal(0, report.StringTokens);          // genuinely no strings…
+        Assert.True(report.CorpusWordHits >= 3,        // …but the words are still there
+            $"semantic check missed a packed word list: {report.CorpusWordHits} hits");
+        Assert.False(report.Clean);
+    }
+
     [Fact]
     public void Audit_CatchesAStringSmuggledIntoAPartitionFile()
     {

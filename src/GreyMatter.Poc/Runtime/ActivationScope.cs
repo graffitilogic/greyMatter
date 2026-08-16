@@ -78,17 +78,32 @@ public sealed class ActivationScope : IDisposable
     /// Make a virtual neuron resident, regenerating its receptive field from its
     /// recipe. Already-resident neurons are touched, not regenerated (§4.4 step 3).
     /// </summary>
-    public int Materialize(uint virtualId)
+    public int Materialize(uint virtualId) => Materialize(virtualId, throwIfFull: true);
+
+    /// <summary>
+    /// Materialize, returning −1 when the pool cannot make room (every resident
+    /// neuron is active on the current tick). The cascade truncates on −1.
+    /// </summary>
+    public int TryMaterialize(uint virtualId) => Materialize(virtualId, throwIfFull: false);
+
+    private int Materialize(uint virtualId, bool throwIfFull)
     {
         int existing = _pool.Find(virtualId);
         if (existing >= 0) { _pool.Touch(existing); return existing; }
 
-        int slot = _pool.Materialize(virtualId, _onEvict);
+        int slot = throwIfFull ? _pool.Materialize(virtualId, _onEvict)
+                               : _pool.TryMaterialize(virtualId, _onEvict);
+        if (slot < 0) return -1;
 
         var recipe = RecipeFor(virtualId);
         Regeneration.Regenerate(recipe, _codebook, _regenScratch);
         Array.Copy(_regenScratch, 0, _stm, (long)slot * Dim, Dim);
         _dirty[slot] = false;
+
+        // §4.4 step 3 — hydrate the synapse segment. Without this the graph exists
+        // only for as long as a neuron stays resident, so learning cannot outlive
+        // the working set and a resumed run restores nothing.
+        _synapses.Hydrate(slot, recipe.SynapseTargets, recipe.SynapseWeights);
 
         _pool.Familiarity[slot] = recipe.Familiarity;
         _pool.Threshold[slot] = 1f;
@@ -136,9 +151,15 @@ public sealed class ActivationScope : IDisposable
 
     private void ConsolidateSlot(int slot)
     {
+        var recipe = RecipeFor(_pool.VirtualId[slot]);
+
+        // Synapses are captured whether or not the receptive field moved: a neuron
+        // can acquire connections without its own weights drifting past threshold,
+        // and those connections are where P4 showed recall actually lives.
+        _synapses.Capture(slot, ref recipe.SynapseTargets, ref recipe.SynapseWeights);
+
         if (!_dirty[slot]) return;
 
-        var recipe = RecipeFor(_pool.VirtualId[slot]);
         recipe.Familiarity = _pool.Familiarity[slot];
 
         var learned = new float[Dim];
@@ -158,8 +179,19 @@ public sealed class ActivationScope : IDisposable
 
     public IReadOnlyDictionary<uint, NeuronRecipe> Recipes => _recipes;
 
-    /// <summary>Recipes carrying at least one deviation — the only ones worth persisting.</summary>
-    public IEnumerable<NeuronRecipe> DirtyRecipes() => _recipes.Values.Where(r => r.DeviationCount > 0);
+    /// <summary>
+    /// Install a recipe loaded from disk, so a resumed run regenerates from stored
+    /// deviations and synapses rather than from a fresh prototype.
+    /// </summary>
+    public void AdoptRecipe(NeuronRecipe recipe) => _recipes[recipe.Id] = recipe;
+
+    /// <summary>
+    /// Recipes holding something regeneration would not reproduce — deviations OR
+    /// synapses. Filtering on deviations alone silently dropped every neuron that
+    /// had learned connections without its own field drifting past threshold, which
+    /// is most of them.
+    /// </summary>
+    public IEnumerable<NeuronRecipe> DirtyRecipes() => _recipes.Values.Where(r => r.HasLearnedState);
 
     public void Dispose() => ConsolidateAll();
 }

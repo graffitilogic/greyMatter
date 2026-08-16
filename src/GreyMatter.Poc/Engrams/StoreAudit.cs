@@ -46,6 +46,21 @@ public sealed class StoreAudit
 
     public const int MinRunLength = 4;
 
+    /// <summary>
+    /// Minimum length for the SEMANTIC check. Longer than <see cref="MinRunLength"/>
+    /// because short matches are dominated by chance: roughly 5,000 of the 457,000
+    /// possible four-letter lowercase strings are English words (~1.1%), so a store
+    /// with thousands of letter runs will match a few no matter what it contains.
+    /// Measured on a clean 50k-sentence store — 2,840 runs, 4 vocabulary matches
+    /// ("WisE", "tIlL", "puts", "loUD"), all chance.
+    ///
+    /// At six letters the ratio is ~15,000 in 309 million (~0.005%), so a match is
+    /// evidence rather than noise. Any genuinely smuggled word list contains many
+    /// long words; the residual blind spot is a store holding ONLY short words,
+    /// which the exact string-token check already covers for real strings.
+    /// </summary>
+    public const int MinSemanticLength = 6;
+
     /// <param name="vocabulary">
     /// Training-corpus words to test letter runs against. When null, only the
     /// exact string-token check runs — still decisive for the guardrail, but the
@@ -55,7 +70,7 @@ public sealed class StoreAudit
                               int minRun = MinRunLength, int maxFindings = 50)
     {
         var findings = new List<Finding>();
-        int files = 0, stringTokens = 0, corpusHits = 0, letterRuns = 0, ascendingExcluded = 0;
+        int files = 0, stringTokens = 0, corpusHits = 0, letterRuns = 0, ascendingExcluded = 0, chanceExcluded = 0;
         long rawBytes = 0, payloadBytes = 0;
 
         foreach (var path in store.PartitionFiles())
@@ -93,6 +108,7 @@ public sealed class StoreAudit
             {
                 letterRuns++;
                 if (vocabulary is null) continue;
+                if (run.Length < MinSemanticLength) { chanceExcluded++; continue; }
                 if (!vocabulary.Contains(run.ToLowerInvariant())) continue;
 
                 // Strictly-ascending runs are sorted integer arrays, not text.
@@ -105,6 +121,15 @@ public sealed class StoreAudit
                 // ascending runs removes the aliasing without weakening the check.
                 if (IsStrictlyAscending(run)) { ascendingExcluded++; continue; }
 
+                // Mixed case is a chance artifact, not text. Once synapse blocks
+                // (uint32 targets, float32 weights) reach disk, arbitrary bytes land
+                // in the letter range constantly: a 50k-sentence store produced 2,840
+                // letter runs across 498 partitions, of which 4 matched the training
+                // vocabulary — "WisE", "tIlL", "puts", "loUD", i.e. the chance rate
+                // for short words. Real stored text is case-consistent, so requiring
+                // consistency removes the noise without weakening detection.
+                if (!IsCaseConsistent(run)) { chanceExcluded++; continue; }
+
                 corpusHits++;
                 if (findings.Count < maxFindings)
                     findings.Add(new Finding(Path.GetFileName(path), offset, run, "CORPUS_WORD"));
@@ -112,7 +137,7 @@ public sealed class StoreAudit
         }
 
         return new Report(files, rawBytes, payloadBytes, stringTokens, corpusHits, letterRuns,
-                          ascendingExcluded, findings);
+                          ascendingExcluded + chanceExcluded, findings);
     }
 
     /// <summary>
@@ -193,6 +218,21 @@ public sealed class StoreAudit
                 yield return (start, System.Text.Encoding.ASCII.GetString(data, start, i - start));
             start = -1;
         }
+    }
+
+    /// <summary>Real stored text is consistently cased; random bytes are not.</summary>
+    private static bool IsCaseConsistent(string s)
+    {
+        bool anyUpper = false, anyLower = false;
+        foreach (var c in s)
+        {
+            if (char.IsUpper(c)) anyUpper = true;
+            else if (char.IsLower(c)) anyLower = true;
+        }
+        // All-lower, all-upper, or Capitalised are all plausible text.
+        if (!(anyUpper && anyLower)) return true;
+        for (int i = 1; i < s.Length; i++) if (char.IsUpper(s[i])) return false;
+        return true;
     }
 
     /// <summary>Sorted integer arrays read as ascending letters; real text does not.</summary>

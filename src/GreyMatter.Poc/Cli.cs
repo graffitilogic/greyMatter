@@ -73,7 +73,10 @@ public static class Cli
                     && result.LiftVsUntrained.mean >= 0.05
                     && result.Separated ? 0 : 1;
             }
-            case "order": return NotYet("gm eval order", "P5");
+            case "order":
+                OrderEval.Run(cfg, args);
+                Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
+                return 0;   // any rule-compliant verdict is a pass; the gate is that it runs
             case "scale": return NotYet("gm eval scale", "P6");
             default:
                 Console.Error.WriteLine($"unknown eval '{argv[1]}'");
@@ -149,11 +152,52 @@ public static class Cli
         Console.WriteLine("   accumulating context…");
         Pipeline.Trainer.AccumulateContext(encoder, corpus.Sentences(cfg.Dataset, sentences));
 
-        using var scope = new Runtime.ActivationScope(cfg);
-        var trainer = new Pipeline.Trainer(cfg, scope, encoder);
-        var stats = trainer.Run(corpus.Sentences(cfg.Dataset, sentences));
+        // ── Resume ──────────────────────────────────────────────────────────
+        long alreadyDone = 0;
+        int codebookVersion = 0;
+        Runtime.ActivationScope scope;
+        Engrams.LshIndex lsh;
 
-        var lsh = new Engrams.LshIndex(cfg.Seed);
+        if (args.Has("--resume") && Pipeline.Checkpoint.Exists(cfg))
+        {
+            var restored = Pipeline.Checkpoint.Resume(cfg);
+            scope = restored.Scope;
+            lsh = restored.Lsh;
+            alreadyDone = restored.SentencesConsumed;
+            codebookVersion = restored.CodebookVersion;
+            Console.WriteLine($"   resumed at sentence {alreadyDone:N0} " +
+                              $"(codebook v{codebookVersion}, {scope.Recipes.Count:N0} recipes restored)");
+
+            if (alreadyDone >= sentences)
+            {
+                Console.WriteLine($"   nothing to do: checkpoint already covers {alreadyDone:N0} ≥ {sentences:N0}.");
+                scope.Dispose();
+                return 0;
+            }
+        }
+        else
+        {
+            if (args.Has("--resume"))
+                Console.WriteLine($"   --resume requested but no checkpoint at {Pipeline.Checkpoint.PathFor(cfg)}; starting fresh.");
+            scope = new Runtime.ActivationScope(cfg);
+            lsh = new Engrams.LshIndex(cfg.Seed);
+        }
+
+        using var _ = scope;
+
+        var checkpointEvery = args.Int("--checkpoint-every", 10_000);
+        var trainer = new Pipeline.Trainer(cfg, scope, encoder)
+        {
+            CheckpointEvery = checkpointEvery,
+            OnCheckpoint = done => Pipeline.Checkpoint.Save(cfg, scope, lsh, alreadyDone + done, codebookVersion)
+        };
+
+        // Skip what the checkpoint already consumed. The stream is deterministic,
+        // so Skip lands on exactly the sentence the interrupted run stopped at.
+        var stream = corpus.Sentences(cfg.Dataset, sentences).Skip((int)alreadyDone);
+        var stats = trainer.Run(stream);
+
+        Pipeline.Checkpoint.Save(cfg, scope, lsh, sentences, codebookVersion);
         var partitions = Pipeline.Trainer.Persist(cfg, scope, lsh);
 
         Console.WriteLine($"\n── Learned ──");
@@ -261,13 +305,16 @@ public static class Cli
         var store = new Engrams.EngramStore(cfg.BrainDataPath);
         var files = store.PartitionFiles().ToList();
         var bytes = store.TotalBytes();
-        var recipes = files.Count == 0 ? 0 : store.TotalRecipes();
+        var (recipes, deviations, synapses) = files.Count == 0 ? (0, 0L, 0L) : store.Totals();
 
         Console.WriteLine($"BRAIN_DATA_PATH: {cfg.BrainDataPath}");
         Console.WriteLine($"PARTITIONS:      {files.Count:N0}");
         Console.WriteLine($"RECIPES:         {recipes:N0}");
+        Console.WriteLine($"DEVIATIONS:      {deviations:N0}");
+        Console.WriteLine($"SYNAPSES:        {synapses:N0}");
         Console.WriteLine($"BYTES_TOTAL:     {bytes:N0}");
         Console.WriteLine($"BYTES_PER_NEURON: {(recipes > 0 ? (double)bytes / recipes : 0):F1}");
+        Console.WriteLine($"CHECKPOINT:      {(Pipeline.Checkpoint.Exists(cfg) ? $"present, {Pipeline.Checkpoint.Load(cfg)!.SentencesConsumed:N0} sentences" : "none")}");
         return 0;
     }
 
@@ -308,7 +355,7 @@ public static class Cli
             return corpus.Sentences(cfg.Dataset, sentences)
                 .SelectMany(s => s.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries))
                 .Select(w => new string(w.Where(char.IsLetter).ToArray()))
-                .Where(w => w.Length >= Engrams.StoreAudit.MinRunLength)
+                .Where(w => w.Length >= Engrams.StoreAudit.MinSemanticLength)
                 .ToHashSet();
         }
         catch (Exception ex)

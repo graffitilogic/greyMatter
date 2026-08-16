@@ -41,6 +41,14 @@ public sealed class EngramPartition
     /// <summary>Member ids, sorted and DELTA-ENCODED — sorted uints delta far smaller than raw.</summary>
     [Key(11)] public uint[] AssemblyMembers { get; set; } = Array.Empty<uint>();
 
+    /// <summary>
+    /// Out-synapses, CSR over the same recipe ordering as DeviationOffsets.
+    /// Neuron i owns [SynapseOffsets[i], SynapseOffsets[i+1]).
+    /// </summary>
+    [Key(12)] public int[] SynapseOffsets { get; set; } = new[] { 0 };
+    [Key(13)] public uint[] SynapseTargets { get; set; } = Array.Empty<uint>();
+    [Key(14)] public float[] SynapseWeights { get; set; } = Array.Empty<float>();
+
     [IgnoreMember] public int RecipeCount => Ids.Length;
 
     public static EngramPartition FromRecipes(uint bucket, IReadOnlyList<NeuronRecipe> recipes)
@@ -57,12 +65,15 @@ public sealed class EngramPartition
             DeviationOffsets = new int[n + 1]
         };
 
-        int total = 0;
-        foreach (var r in recipes) total += r.DeviationCount;
+        int total = 0, synTotal = 0;
+        foreach (var r in recipes) { total += r.DeviationCount; synTotal += r.SynapseCount; }
         p.DeviationDims = new ushort[total];
         p.DeviationDeltas = new float[total];
+        p.SynapseOffsets = new int[n + 1];
+        p.SynapseTargets = new uint[synTotal];
+        p.SynapseWeights = new float[synTotal];
 
-        int off = 0;
+        int off = 0, synOff = 0;
         for (int i = 0; i < n; i++)
         {
             var r = recipes[i];
@@ -76,8 +87,14 @@ public sealed class EngramPartition
             Array.Copy(r.DeviationDims, 0, p.DeviationDims, off, r.DeviationCount);
             Array.Copy(r.DeviationDeltas, 0, p.DeviationDeltas, off, r.DeviationCount);
             off += r.DeviationCount;
+
+            p.SynapseOffsets[i] = synOff;
+            Array.Copy(r.SynapseTargets, 0, p.SynapseTargets, synOff, r.SynapseCount);
+            Array.Copy(r.SynapseWeights, 0, p.SynapseWeights, synOff, r.SynapseCount);
+            synOff += r.SynapseCount;
         }
         p.DeviationOffsets[n] = off;
+        p.SynapseOffsets[n] = synOff;
         return p;
     }
 
@@ -93,6 +110,12 @@ public sealed class EngramPartition
         };
         Array.Copy(DeviationDims, start, r.DeviationDims, 0, len);
         Array.Copy(DeviationDeltas, start, r.DeviationDeltas, 0, len);
+
+        int sStart = SynapseOffsets[i], sLen = SynapseOffsets[i + 1] - sStart;
+        r.SynapseTargets = new uint[sLen];
+        r.SynapseWeights = new float[sLen];
+        Array.Copy(SynapseTargets, sStart, r.SynapseTargets, 0, sLen);
+        Array.Copy(SynapseWeights, sStart, r.SynapseWeights, 0, sLen);
         return r;
     }
 
@@ -227,17 +250,28 @@ public sealed class EngramStore
 
     public long TotalBytes() => PartitionFiles().Sum(f => new FileInfo(f).Length);
 
-    public int TotalRecipes()
+    /// <summary>
+    /// Recipes, deviations and synapses across the whole store. Store-level totals,
+    /// not resident ones — a resumed run has different residency but should hold the
+    /// same learned state, so this is the metric equivalence is judged on.
+    /// </summary>
+    public (int recipes, long deviations, long synapses) Totals()
     {
-        int n = 0;
+        int recipes = 0;
+        long deviations = 0, synapses = 0;
         foreach (var f in PartitionFiles())
         {
             using var fs = new FileStream(f, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var gz = new GZipStream(fs, CompressionMode.Decompress);
-            n += MessagePackSerializer.Deserialize<EngramPartition>(gz, Options).RecipeCount;
+            var p = MessagePackSerializer.Deserialize<EngramPartition>(gz, Options);
+            recipes += p.RecipeCount;
+            deviations += p.DeviationDims.Length;
+            synapses += p.SynapseTargets.Length;
         }
-        return n;
+        return (recipes, deviations, synapses);
     }
+
+    public int TotalRecipes() => Totals().recipes;
 
     public void DeleteAll()
     {

@@ -26,6 +26,12 @@ public sealed class Trainer
     /// </summary>
     public HashSet<string> HeldOut { get; init; } = new();
 
+    /// <summary>Sentences between checkpoints. 0 disables mid-run checkpointing.</summary>
+    public int CheckpointEvery { get; init; }
+
+    /// <summary>Invoked with the number of sentences consumed in THIS run.</summary>
+    public Action<long>? OnCheckpoint { get; init; }
+
     public sealed record Stats(int Sentences, int Tokens, int Skipped, double Seconds,
                                long WithinCueUpdates, long SequenceUpdates,
                                long Truncations, long Consolidations, long DeviationsWritten,
@@ -72,10 +78,23 @@ public sealed class Trainer
 
             if (decayEvery > 0 && sentenceCount % decayEvery == 0) _plasticity.Decay();
 
+            if (CheckpointEvery > 0 && sentenceCount % CheckpointEvery == 0 && OnCheckpoint is not null)
+            {
+                // Consolidate before writing, or the checkpoint records recipes that
+                // are missing everything still sitting in the working set.
+                _scope.ConsolidateAll();
+                OnCheckpoint(sentenceCount);
+                if (!quiet) Console.WriteLine($"   ✔ checkpoint at {sentenceCount:N0} sentences");
+            }
+
             if (!quiet && sentenceCount % 1000 == 0)
+            {
+                var elapsed = sw.Elapsed.TotalSeconds;
+                var rate = sentenceCount / Math.Max(1e-9, elapsed);
                 Console.WriteLine($"   {sentenceCount:N0} sentences   {tokenCount:N0} tokens   " +
                                   $"resident {_scope.Pool.Count:N0}   synapses {_scope.Synapses.TotalSynapses:N0}   " +
-                                  $"{sentenceCount / sw.Elapsed.TotalSeconds:F0} sent/s");
+                                  $"{rate:F0} sent/s   elapsed {elapsed / 60:F1}m");
+            }
         }
 
         _scope.ConsolidateAll();

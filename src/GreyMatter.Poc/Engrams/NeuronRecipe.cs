@@ -31,7 +31,28 @@ public sealed class NeuronRecipe
     public ushort[] DeviationDims = Array.Empty<ushort>();
     public float[] DeviationDeltas = Array.Empty<float>();
 
+    /// <summary>
+    /// The neuron's out-synapses, as virtual target ids and weights.
+    ///
+    /// **An extension to §4.3's stated schema, and a necessary one.** §4.3 lists a
+    /// recipe as id/vqCode/seed/deviations/familiarity/activationCount, with no
+    /// synapses — but §4.4 step 3 requires materialization to "hydrate their
+    /// synapse segments", and there is nowhere else for them to come from. Without
+    /// this the graph lives only in the working set: it is destroyed on eviction,
+    /// learning cannot accumulate past <c>WorkingSetMax</c>, and a resumed run
+    /// restores nothing that matters. P4 established that recall lives in exactly
+    /// these synapses, so losing them loses the system.
+    ///
+    /// Still no strings — targets are uint virtual ids, as everything persisted is.
+    /// </summary>
+    public uint[] SynapseTargets = Array.Empty<uint>();
+    public float[] SynapseWeights = Array.Empty<float>();
+
     public int DeviationCount => DeviationDims.Length;
+    public int SynapseCount => SynapseTargets.Length;
+
+    /// <summary>A recipe worth persisting: it holds something regeneration would not reproduce.</summary>
+    public bool HasLearnedState => DeviationDims.Length > 0 || SynapseTargets.Length > 0;
 
     public NeuronRecipe() { }
 

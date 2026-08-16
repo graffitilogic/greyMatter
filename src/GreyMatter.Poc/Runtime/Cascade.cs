@@ -61,14 +61,17 @@ public sealed class Cascade
 
         for (int i = 0; i < memberCount; i++)
         {
-            if (pool.Count >= pool.Capacity && !pool.IsResident(_members[i]))
+            // Ask the pool to make room rather than pre-testing whether it is full.
+            // Pre-testing `Count >= Capacity` refused EVERY materialization once the
+            // pool first filled, freezing the working set at exactly WorkingSetMax
+            // for the rest of the run — the evict/regenerate cycle, which is the
+            // entire premise of the project, never ran.
+            if (_scope.TryMaterialize(_members[i]) < 0)
             {
-                // The pool is full of THIS tick's neurons; nothing is evictable.
                 truncatedHere++;
                 Truncations++;
                 continue;
             }
-            _scope.Materialize(_members[i]);
             Regenerations++;
         }
 

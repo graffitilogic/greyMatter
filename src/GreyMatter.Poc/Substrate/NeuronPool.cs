@@ -103,10 +103,31 @@ public sealed class NeuronPool
     /// </summary>
     public int Materialize(uint virtualId, Action<int>? onEvict = null)
     {
+        int slot = TryMaterialize(virtualId, onEvict);
+        if (slot < 0)
+            throw new InvalidOperationException(
+                $"Cannot materialize: all {Capacity:N0} slots hold neurons active on the current tick. " +
+                $"The activation scope exceeds WorkingSetMax ({Capacity:N0}). Raise WorkingSetMax or " +
+                "lower ActivationWidth/scope size.");
+        return slot;
+    }
+
+    /// <summary>
+    /// Materialize, or return −1 when the pool is full of neurons that are all
+    /// active on the current tick and therefore cannot be evicted.
+    ///
+    /// Callers that can degrade gracefully (the cascade truncates) should use this
+    /// and check for −1, NOT pre-test <c>Count == Capacity</c>. Pre-testing was a
+    /// real defect: it refused every materialization once the pool first filled, so
+    /// the working set froze at exactly <c>WorkingSetMax</c> neurons for the rest of
+    /// the run and the evict/regenerate cycle never ran at all.
+    /// </summary>
+    public int TryMaterialize(uint virtualId, Action<int>? onEvict = null)
+    {
         int existing = Find(virtualId);
         if (existing >= 0) { LastActiveTick[existing] = Tick; return existing; }
 
-        if (Count == Capacity) EvictBatch(onEvict);
+        if (Count == Capacity && !EvictBatch(onEvict)) return -1;
 
         int slot = Count++;
         VirtualId[slot] = virtualId;
@@ -129,7 +150,8 @@ public sealed class NeuronPool
     /// Evict the least-recently-active <c>_evictBatch</c> neurons. Two passes:
     /// find the tick cut-off, then compact. Both are flat scans.
     /// </summary>
-    private void EvictBatch(Action<int>? onEvict)
+    /// <returns>true when at least one slot was freed.</returns>
+    private bool EvictBatch(Action<int>? onEvict)
     {
         Array.Copy(LastActiveTick, _tickSample, Count);
         Array.Sort(_tickSample, 0, Count);
@@ -178,15 +200,9 @@ public sealed class NeuronPool
         Count = write;
 
         // Nothing was evictable: every resident neuron belongs to the scope being
-        // built this cycle. That is a configuration error, not a runtime condition
-        // to paper over — the caller asked for an activation scope wider than the
-        // whole working set. Failing loudly here is what stops it from surfacing
-        // later as mysteriously truncated recall.
-        if (Count == Capacity)
-            throw new InvalidOperationException(
-                $"Cannot materialize: all {Capacity:N0} slots hold neurons active on the current tick. " +
-                $"The activation scope exceeds WorkingSetMax ({Capacity:N0}). Raise WorkingSetMax or " +
-                "lower ActivationWidth/scope size.");
+        // built this cycle. The caller decides whether that is fatal (Materialize
+        // throws) or a graceful truncation (TryMaterialize returns −1).
+        return Count < Capacity;
     }
 
     /// <summary>
