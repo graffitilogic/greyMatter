@@ -26,7 +26,14 @@ public sealed class Config
 
     // ── Engrams (§4.3) ──
     public int VqCodebookSize { get; set; } = 512;
-    public double DeviationThreshold { get; set; } = 0.01;
+
+    /// <summary>
+    /// Ported legacy default (<c>ProceduralReceptiveField.DefaultDeviationThreshold</c>
+    /// = 1.0), as §4.5 requires. This is the persistence budget dial: raise it and
+    /// fewer deviations persist (smaller, lossier); lower it and more do. Weights
+    /// are O(45), so a threshold of 1.0 is roughly 2% of a typical weight.
+    /// </summary>
+    public double DeviationThreshold { get; set; } = 1.0;
 
     // ── Run control ──
     public int Seed { get; set; } = 12345;

@@ -23,10 +23,10 @@ public static class Cli
             {
                 "eval" => Eval(argv, args, cfg),
                 "bench" => Bench(argv, args, cfg),
-                "learn" => NotYet("gm learn", "P4"),
-                "probe" => NotYet("gm probe", "P4"),
-                "stats" => NotYet("gm stats", "P3"),
-                "audit" => NotYet("gm audit", "P3"),
+                "learn" => Learn(args, cfg),
+                "probe" => Probe(args, cfg),
+                "stats" => Stats(args, cfg),
+                "audit" => Audit(args, cfg),
                 "config" => Dump(cfg),
                 "-h" or "--help" or "help" => Usage(),
                 _ => Unknown(argv[0])
@@ -65,7 +65,14 @@ public static class Cli
                 Console.WriteLine($"SEED:    {cfg.Seed}");
                 return rc;
 
-            case "recall": return NotYet("gm eval recall", "P4");
+            case "recall":
+            {
+                var result = RecallEval.Run(cfg, args);
+                Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
+                return result.Refusal is null
+                    && result.LiftVsUntrained.mean >= 0.05
+                    && result.Separated ? 0 : 1;
+            }
             case "order": return NotYet("gm eval order", "P5");
             case "scale": return NotYet("gm eval scale", "P6");
             default:
@@ -81,11 +88,14 @@ public static class Cli
     /// </summary>
     private static int Bench(string[] argv, Args args, Config cfg)
     {
-        if (argv.Length < 2 || argv[1] != "substrate")
+        if (argv.Length < 2 || argv[1] is not ("substrate" or "store"))
         {
             Console.Error.WriteLine("usage: gm bench substrate [--cycles 10000] [--scope 2000]");
+            Console.Error.WriteLine("       gm bench store [--recipes 100000] [--drift-scale 1.0]");
             return 1;
         }
+
+        if (argv[1] == "store") return BenchStore(args, cfg);
 
         var cycles = args.Int("--cycles", 10_000);
         var scope = args.Int("--scope", 2_000);
@@ -120,6 +130,195 @@ public static class Cli
         Console.WriteLine($"\nP1_GATE: {(pass ? "PASS" : "FAIL")}");
         Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
         return pass ? 0 : 1;
+    }
+
+    private static int Learn(Args args, Config cfg)
+    {
+        var sentences = args.Int("--sentences", 500);
+        var corpus = new Pipeline.Corpus(cfg.TrainingDataRoot, args.Has("--local-sample"));
+
+        Console.WriteLine("🧠 LEARN");
+        Console.WriteLine("========\n");
+        Console.WriteLine($"source:    {corpus.Describe(cfg.Dataset)}");
+        Console.WriteLine($"sentences: {sentences:N0}   seed {cfg.Seed}");
+        Console.WriteLine($"space:     {cfg.BaselineNeuronCount:N0} virtual, {cfg.WorkingSetMax:N0} resident");
+        Console.WriteLine($"scope:     depth {cfg.ActivationDepth}, width {cfg.ActivationWidth}, " +
+                          $"assembly {Runtime.Assembly.Size(cfg.Sparsity)}\n");
+
+        var encoder = new Encoding.ContextEncoder(cfg);
+        Console.WriteLine("   accumulating context…");
+        Pipeline.Trainer.AccumulateContext(encoder, corpus.Sentences(cfg.Dataset, sentences));
+
+        using var scope = new Runtime.ActivationScope(cfg);
+        var trainer = new Pipeline.Trainer(cfg, scope, encoder);
+        var stats = trainer.Run(corpus.Sentences(cfg.Dataset, sentences));
+
+        var lsh = new Engrams.LshIndex(cfg.Seed);
+        var partitions = Pipeline.Trainer.Persist(cfg, scope, lsh);
+
+        Console.WriteLine($"\n── Learned ──");
+        Console.WriteLine($"SENTENCES: {stats.Sentences:N0}   TOKENS: {stats.Tokens:N0}   " +
+                          $"{stats.Sentences / Math.Max(1e-9, stats.Seconds):F0} sentences/sec");
+        Console.WriteLine($"MS_PER_SENTENCE: {1000.0 * stats.Seconds / Math.Max(1, stats.Sentences):F2}");
+        Console.WriteLine($"SYNAPSES: {stats.Synapses:N0}   " +
+                          $"within-cue {stats.WithinCueUpdates:N0}   sequence {stats.SequenceUpdates:N0}");
+        Console.WriteLine($"WORKING_SET_HIGH_WATER: {stats.WorkingSetHighWater:N0} / {cfg.WorkingSetMax:N0}");
+        Console.WriteLine($"CASCADE_TRUNCATIONS: {stats.Truncations:N0}");
+        Console.WriteLine($"CONSOLIDATIONS: {stats.Consolidations:N0}   " +
+                          $"DEVIATIONS_WRITTEN: {stats.DeviationsWritten:N0}");
+        Console.WriteLine($"PARTITIONS_WRITTEN: {partitions:N0} → {cfg.BrainDataPath}");
+        Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
+        return 0;
+    }
+
+    private static int Probe(Args args, Config cfg)
+    {
+        var cue = args.Value("--cue", null);
+        if (cue is null) { Console.Error.WriteLine("usage: gm probe --cue <word> [--topk 16]"); return 1; }
+
+        var topk = args.Int("--topk", 16);
+        var sentences = args.Int("--sentences", 500);
+        var corpus = new Pipeline.Corpus(cfg.TrainingDataRoot, args.Has("--local-sample"));
+
+        var encoder = new Encoding.ContextEncoder(cfg);
+        Pipeline.Trainer.AccumulateContext(encoder, corpus.Sentences(cfg.Dataset, sentences));
+
+        using var scope = new Runtime.ActivationScope(cfg);
+        var trainer = new Pipeline.Trainer(cfg, scope, encoder);
+        trainer.Run(corpus.Sentences(cfg.Dataset, sentences), quiet: true);
+
+        var code = encoder.Encode(cue);
+        var cascade = new Runtime.Cascade(cfg, scope);
+        var readout = cascade.Run(code, learningMode: false);
+
+        Console.WriteLine($"CUE:        {cue}");
+        Console.WriteLine($"CODE_HASH:  {code.Hash():x16}   dims {code.K}");
+        Console.WriteLine($"ASSEMBLY:   {readout.Materialized} materialized, {readout.Truncated} truncated");
+        Console.WriteLine($"WINNERS:    {readout.WinnerCount}");
+        Console.WriteLine($"TOTAL_MASS: {readout.TotalMass:F3}   mean {readout.MeanWinnerMass:F4}   " +
+                          $"self {readout.SelfMass:F3}");
+
+        Console.WriteLine($"\ntop {topk} winners (virtual id → activation):");
+        var winners = cascade.Winners(readout.WinnerCount);
+        var scores = cascade.WinnerScores(readout.WinnerCount);
+        for (int i = 0; i < Math.Min(topk, readout.WinnerCount); i++)
+            Console.WriteLine($"   {scope.Pool.VirtualId[winners[i]],10} → {scores[i]:F4}");
+
+        Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
+        return 0;
+    }
+
+    /// <summary>P3 gate instrument: populate a store and measure it.</summary>
+    private static int BenchStore(Args args, Config cfg)
+    {
+        var recipes = args.Int("--recipes", 100_000);
+        var driftScale = args.Double("--drift-scale", 1.0);
+
+        Console.WriteLine("⚙️  ENGRAM STORE BENCHMARK — plan.md P3 gate");
+        Console.WriteLine("============================================\n");
+        Console.WriteLine($"recipes:   {recipes:N0}");
+        Console.WriteLine($"path:      {cfg.BrainDataPath}");
+        Console.WriteLine($"codebook:  {cfg.VqCodebookSize} × {cfg.SurfaceDimensions}   " +
+                          $"deviation threshold {cfg.DeviationThreshold}   seed {cfg.Seed}");
+        Console.WriteLine($"drift scale:    {driftScale} weight units (threshold decides what persists)\n");
+
+        var r = Engrams.StoreBench.Run(cfg, recipes, driftScale);
+
+        Console.WriteLine($"\n── Storage ──");
+        Console.WriteLine($"RECIPES:          {r.Recipes:N0}");
+        Console.WriteLine($"PARTITIONS:       {r.Partitions:N0}");
+        Console.WriteLine($"BYTES_TOTAL:      {r.Bytes:N0}");
+        Console.WriteLine($"BYTES_PER_NEURON: {r.BytesPerNeuron:F1}");
+        Console.WriteLine($"DEVIATIONS_PER_NEURON: {r.MeanDeviationsPerNeuron:F1} mean, {r.MaxDeviations} max " +
+                          $"(of {cfg.SurfaceDimensions} dims)");
+        Console.WriteLine($"CODEBOOK_UTILIZATION: {r.CodebookUtilization:P1}");
+        Console.WriteLine($"GATE_SIZE: {(r.BytesPerNeuron <= 100 ? "PASS" : "FAIL")} (requires ≤ 100 B/neuron)");
+
+        Console.WriteLine($"\n── Regeneration fidelity ──");
+        Console.WriteLine($"WEIGHTS_CHECKED:  {r.FidelityChecked:N0}");
+        Console.WriteLine($"VIOLATIONS:       {r.FidelityViolations:N0}");
+        Console.WriteLine($"MAX_ABS_ERROR:    {r.MaxAbsError:F6} (threshold {cfg.DeviationThreshold})");
+        Console.WriteLine($"GATE_FIDELITY: {(r.FidelityViolations == 0 ? "PASS" : "FAIL")} " +
+                          "(requires 100% of weights within DeviationThreshold)");
+
+        var audit = Engrams.StoreAudit.Scan(new Engrams.EngramStore(cfg.BrainDataPath), CorpusVocabulary(cfg));
+        Console.WriteLine($"\n── Guardrail ──");
+        Console.WriteLine($"STRING_TOKENS: {audit.StringTokens}   CORPUS_WORDS: {audit.CorpusWordHits}   " +
+                          $"(letter runs {audit.LetterRuns:N0}, {audit.AscendingExcluded:N0} excluded as sorted dim arrays)");
+        Console.WriteLine($"GATE_STRINGS: {(audit.Clean ? "PASS" : "FAIL")} " +
+                          $"across {audit.FilesScanned} partitions, {audit.PayloadBytes:N0} payload bytes");
+        foreach (var f in audit.Findings.Take(10))
+            Console.WriteLine($"   ⚠️  {f.File} @{f.Offset} [{f.Kind}] \"{f.Text}\"");
+
+        bool pass = r.BytesPerNeuron <= 100 && r.FidelityViolations == 0 && audit.Clean;
+        Console.WriteLine($"\nP3_GATE: {(pass ? "PASS" : "FAIL")}");
+        Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
+        return pass ? 0 : 1;
+    }
+
+    private static int Stats(Args args, Config cfg)
+    {
+        var store = new Engrams.EngramStore(cfg.BrainDataPath);
+        var files = store.PartitionFiles().ToList();
+        var bytes = store.TotalBytes();
+        var recipes = files.Count == 0 ? 0 : store.TotalRecipes();
+
+        Console.WriteLine($"BRAIN_DATA_PATH: {cfg.BrainDataPath}");
+        Console.WriteLine($"PARTITIONS:      {files.Count:N0}");
+        Console.WriteLine($"RECIPES:         {recipes:N0}");
+        Console.WriteLine($"BYTES_TOTAL:     {bytes:N0}");
+        Console.WriteLine($"BYTES_PER_NEURON: {(recipes > 0 ? (double)bytes / recipes : 0):F1}");
+        return 0;
+    }
+
+    private static int Audit(Args args, Config cfg)
+    {
+        if (!args.Has("--strings"))
+        {
+            Console.Error.WriteLine("usage: gm audit --strings");
+            return 1;
+        }
+
+        var report = Engrams.StoreAudit.Scan(new Engrams.EngramStore(cfg.BrainDataPath), CorpusVocabulary(cfg));
+        Console.WriteLine($"AUDIT_PATH:    {cfg.BrainDataPath}");
+        Console.WriteLine($"FILES_SCANNED: {report.FilesScanned:N0}");
+        Console.WriteLine($"RAW_BYTES:     {report.RawBytes:N0}");
+        Console.WriteLine($"PAYLOAD_BYTES: {report.PayloadBytes:N0} (decompressed — gzip is not a guardrail)");
+        Console.WriteLine($"STRING_TOKENS: {report.StringTokens:N0} (exact: a record cannot hold a string without one)");
+        Console.WriteLine($"CORPUS_WORDS:  {report.CorpusWordHits:N0} of {report.LetterRuns:N0} letter runs matched training vocabulary\n" +
+                          $"               ({report.AscendingExcluded:N0} excluded as strictly-ascending — sorted dim arrays, not text)");
+
+        foreach (var f in report.Findings.Take(25))
+            Console.WriteLine($"   ⚠️  {f.File} @{f.Offset} [{f.Kind}] \"{f.Text}\"");
+
+        Console.WriteLine($"\nAUDIT: {(report.Clean ? "CLEAN" : "FAIL — readable text found in the brain store")}");
+        return report.Clean ? 0 : 1;
+    }
+
+    /// <summary>
+    /// Training vocabulary for the audit's semantic check. Words of ≥4 letters
+    /// only, matching the minimum run length — shorter ones would flag on
+    /// coincidental integer aliasing rather than on stored text.
+    /// </summary>
+    private static IReadOnlySet<string> CorpusVocabulary(Config cfg, int sentences = 5000)
+    {
+        try
+        {
+            var corpus = new Pipeline.Corpus(cfg.TrainingDataRoot);
+            return corpus.Sentences(cfg.Dataset, sentences)
+                .SelectMany(s => s.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                .Select(w => new string(w.Where(char.IsLetter).ToArray()))
+                .Where(w => w.Length >= Engrams.StoreAudit.MinRunLength)
+                .ToHashSet();
+        }
+        catch (Exception ex)
+        {
+            // A missing corpus must not silently downgrade the guardrail to the
+            // token-only check without saying so.
+            Console.Error.WriteLine($"⚠️  audit: corpus vocabulary unavailable ({ex.Message}); " +
+                                    "running the exact string-token check only.");
+            return new HashSet<string>();
+        }
     }
 
     private static int Dump(Config cfg) { Console.WriteLine(cfg.ToJson()); return 0; }

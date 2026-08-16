@@ -1,0 +1,212 @@
+using GreyMatter.Poc.Encoding;
+using GreyMatter.Poc.Substrate;
+
+namespace GreyMatter.Poc.Runtime;
+
+/// <summary>
+/// plan.md §4.4 steps 2–4 and 7 — propagation with k-WTA inhibition, and the
+/// readout recall is measured from.
+///
+/// The k-WTA step is the interneuron-inhibition LEGO: every step keeps only the
+/// <c>ActivationWidth</c> strongest and silences the rest, expressed as a bounded
+/// partial selection rather than a sort (§7).
+///
+/// Neurons reachable by synapse but not resident are regenerated on demand; past
+/// the working-set cap the cascade TRUNCATES. That truncation is the
+/// accuracy-for-scale trade the whole project is about, so it is counted and
+/// reported rather than hidden.
+/// </summary>
+public sealed class Cascade
+{
+    private readonly Config _cfg;
+    private readonly ActivationScope _scope;
+
+    private readonly uint[] _members;
+    private readonly int[] _active;
+    private readonly int[] _winners;
+    private readonly float[] _winnerScores;
+
+    public long Truncations { get; private set; }
+    public long Regenerations { get; private set; }
+
+    public Cascade(Config cfg, ActivationScope scope)
+    {
+        _cfg = cfg;
+        _scope = scope;
+        _members = new uint[Assembly.Size(cfg.Sparsity)];
+        _active = new int[Math.Max(cfg.ActivationWidth * 4, _members.Length * 2)];
+        _winners = new int[cfg.ActivationWidth];
+        _winnerScores = new float[cfg.ActivationWidth];
+    }
+
+    public ReadOnlySpan<int> Winners(int count) => _winners.AsSpan(0, count);
+    public ReadOnlySpan<float> WinnerScores(int count) => _winnerScores.AsSpan(0, count);
+
+    public sealed record Readout(int WinnerCount, float TotalMass, float MeanWinnerMass,
+                                 float SelfMass, int Materialized, int Truncated);
+
+    /// <summary>
+    /// Run one cue to completion. Returns the readout; the winners of the final
+    /// step remain available via <see cref="Winners"/> for the learning pass.
+    /// </summary>
+    public Readout Run(in SparseCode code, bool learningMode)
+    {
+        _scope.AdvanceTick();
+        var pool = _scope.Pool;
+        var synapses = _scope.Synapses;
+
+        // ── Materialize the cue's assembly ──────────────────────────────────
+        int memberCount = Assembly.Members(code, _cfg.BaselineNeuronCount, _members);
+        int truncatedHere = 0;
+
+        for (int i = 0; i < memberCount; i++)
+        {
+            if (pool.Count >= pool.Capacity && !pool.IsResident(_members[i]))
+            {
+                // The pool is full of THIS tick's neurons; nothing is evictable.
+                truncatedHere++;
+                Truncations++;
+                continue;
+            }
+            _scope.Materialize(_members[i]);
+            Regenerations++;
+        }
+
+        // Resolve slots only after every materialization — eviction compacts the
+        // pool and moves survivors, so indices captured earlier are stale.
+        int activeCount = 0;
+        for (int i = 0; i < memberCount && activeCount < _active.Length; i++)
+        {
+            int slot = pool.Find(_members[i]);
+            if (slot < 0) continue;
+            _active[activeCount++] = slot;
+
+            // Drive from the cue: assembly members start at full activation.
+            pool.Potential[slot] = 1f;
+        }
+
+        float selfMass = 0;
+        int winnerCount = 0;
+
+        // ── Propagate ───────────────────────────────────────────────────────
+        for (int step = 0; step < _cfg.ActivationDepth; step++)
+        {
+            for (int i = 0; i < activeCount; i++)
+            {
+                int slot = _active[i];
+                float drive = pool.Potential[slot];
+                if (drive < pool.Threshold[slot] * 0.5f) continue;
+
+                int start = synapses.SegmentStart(slot);
+                int degree = synapses.Degree[slot];
+                int end = start + degree;
+
+                // Activation is CONSERVED, not multiplied: a neuron distributes its
+                // drive across its out-synapses rather than sending the full amount
+                // down each one. Without this a neuron with 32 synapses emits 32×
+                // what it received, mass grows ~32× per step, and by depth 4 every
+                // cue saturates whatever ceiling exists — measured at 3.3e10 for
+                // trained and control alike, AUC exactly 0.500. Dividing by degree
+                // makes retained mass a statement about synaptic STRUCTURE (how much
+                // a scope keeps circulating) rather than about out-degree.
+                float share = drive / degree;
+
+                for (int s = start; s < end; s++)
+                {
+                    int target = pool.Find(synapses.Target[s]);
+                    if (target < 0) continue;   // evicted; the cascade cannot follow
+
+                    float v = pool.Potential[target] + synapses.Weight[s] * share;
+                    pool.Potential[target] = v > MaxPotential ? MaxPotential : v;
+
+                    // Reached neurons join the active set so the next step can
+                    // propagate from them — this is what makes depth mean anything.
+                    if (activeCount < _active.Length && !Contains(_active, activeCount, target))
+                        _active[activeCount++] = target;
+                }
+            }
+
+            winnerCount = SelectTopK(pool, _active, activeCount, _winners, _winnerScores);
+
+            for (int i = 0; i < activeCount; i++) pool.Potential[_active[i]] = 0f;
+            for (int i = 0; i < winnerCount; i++)
+            {
+                int slot = _winners[i];
+                pool.Potential[slot] = _winnerScores[i];
+                pool.Fatigue[slot] += 0.01f;
+                pool.Familiarity[slot] = MathF.Min(1f, pool.Familiarity[slot] + 0.001f);
+                pool.Touch(slot);
+            }
+        }
+
+        // ── Readout ─────────────────────────────────────────────────────────
+        //
+        // Total mass surviving k-WTA after ActivationDepth steps. An untrained
+        // assembly has no synapses, so its members receive nothing beyond the
+        // initial drive and mass decays to the cue itself; a trained one has
+        // learned lateral weights that carry mass forward. That difference IS the
+        // recall signal, and it is why a trained and an untrained word can have
+        // equally valid assemblies and still be distinguishable.
+        float total = 0;
+        for (int i = 0; i < winnerCount; i++) total += _winnerScores[i];
+
+        // Mass that landed back on the cue's own members, as a separate diagnostic.
+        for (int i = 0; i < winnerCount; i++)
+        {
+            uint vid = pool.VirtualId[_winners[i]];
+            for (int m = 0; m < memberCount; m++)
+                if (_members[m] == vid) { selfMass += _winnerScores[i]; break; }
+        }
+
+        // Leave the pool electrically clean.
+        //
+        // Not doing this was a real defect: a cue's winners kept their potential
+        // after Run returned, and Materialize only zeroes NEWLY resident neurons.
+        // So potential accumulated across every cue in a run, grew without bound,
+        // and reached Infinity → NaN. The recall eval reported "trained mass NaN"
+        // and AUC 0.000 — which reads like a null result and is in fact arithmetic
+        // overflow. Residual charge from the previous cue is also a correctness
+        // problem in its own right: it makes a probe depend on what was probed
+        // before it.
+        for (int i = 0; i < activeCount; i++) pool.Potential[_active[i]] = 0f;
+
+        return new Readout(winnerCount, total,
+                           winnerCount > 0 ? total / winnerCount : 0f,
+                           selfMass, memberCount - truncatedHere, truncatedHere);
+    }
+
+    /// <summary>Ceiling on a single neuron's potential; see the clamp in Run.</summary>
+    private const float MaxPotential = 1e9f;
+
+    private static bool Contains(int[] arr, int count, int value)
+    {
+        for (int i = 0; i < count; i++) if (arr[i] == value) return true;
+        return false;
+    }
+
+    /// <summary>Bounded partial selection — a reduction, not a sort of the scope (§7).</summary>
+    private static int SelectTopK(NeuronPool pool, int[] slots, int slotCount, int[] winners, float[] scores)
+    {
+        int k = winners.Length;
+        int found = 0;
+        for (int i = 0; i < slotCount; i++)
+        {
+            int slot = slots[i];
+            float v = pool.Potential[slot];
+            if (v <= 0f) continue;
+            if (found == k && v <= scores[k - 1]) continue;
+
+            int pos = found < k ? found : k - 1;
+            while (pos > 0 && scores[pos - 1] < v)
+            {
+                scores[pos] = scores[pos - 1];
+                winners[pos] = winners[pos - 1];
+                pos--;
+            }
+            scores[pos] = v;
+            winners[pos] = slot;
+            if (found < k) found++;
+        }
+        return found;
+    }
+}
