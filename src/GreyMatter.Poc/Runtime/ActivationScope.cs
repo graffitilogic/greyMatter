@@ -47,7 +47,11 @@ public sealed class ActivationScope : IDisposable
         _cfg = cfg;
         Dim = cfg.SurfaceDimensions;
         _pool = new NeuronPool(cfg.WorkingSetMax);
-        _synapses = new SynapseStore(cfg.WorkingSetMax, cfg.SynapseCapPerNeuron);
+        _synapses = new SynapseStore(cfg.WorkingSetMax, cfg.SynapseCapPerNeuron)
+        {
+            WithinAssemblyCap = cfg.WithinAssemblyCap,
+            ContestErosion = (float)cfg.ContestErosion
+        };
         _codebook = codebook ?? new VqCodebook(cfg.VqCodebookSize, cfg.SurfaceDimensions, cfg.Seed);
 
         _stm = new float[(long)cfg.WorkingSetMax * Dim <= int.MaxValue

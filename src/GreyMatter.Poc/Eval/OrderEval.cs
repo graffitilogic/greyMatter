@@ -152,7 +152,7 @@ public static class OrderEval
         // Rule 3: the real correlation must itself be positive. A positive gap over
         // a more-negative null is not learning.
         if (realPmi.mean < 0.10)
-            return $"NO SIGNAL — real R_PMI is {realPmi.mean:+0.0000}; the graph does not rank successors " +
+            return $"NO SIGNAL — real R_PMI is {realPmi.mean:+0.0000;-0.0000}; the graph does not rank successors " +
                    "by association at all. A positive gap here would only mean the shuffled arm is worse.";
 
         bool separated = realPmi.lo > shufPmi.hi;

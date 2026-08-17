@@ -57,17 +57,43 @@ public static class AttributionEval
         var (counts, meanWeights) = syn.PopulationCensus(scope.Pool.Count);
         long liveTotal = counts.Sum();
 
-        Console.WriteLine("| population | live slots | share | mean w | proposals | created | strengthened | displaced | declined | decline rate |");
-        Console.WriteLine("|---|---|---|---|---|---|---|---|---|---|");
+        Console.WriteLine("| population | live slots | share | mean w | proposals | created | strengthened | displaced | decline (all) | decline (threshold) | **decline (pressure)** |");
+        Console.WriteLine("|---|---|---|---|---|---|---|---|---|---|---|");
+        var pressureRate = new double[3];
         for (int p = 0; p < 3; p++)
         {
             long proposals = syn.CreatedBy[p] + syn.StrengthenedBy[p] + syn.DisplacedBy[p] + syn.DeclinedBy[p];
             double declineRate = proposals > 0 ? (double)syn.DeclinedBy[p] / proposals : 0;
+            pressureRate[p] = proposals > 0 ? (double)syn.DeclinedPressureBy[p] / proposals : 0;
+            double thresholdRate = proposals > 0 ? (double)syn.DeclinedThresholdBy[p] / proposals : 0;
             double share = liveTotal > 0 ? (double)counts[p] / liveTotal : 0;
             Console.WriteLine($"| {PopNames[p]} | {counts[p]:N0} | {share:P1} | {meanWeights[p]:F3} | " +
                               $"{proposals:N0} | {syn.CreatedBy[p]:N0} | {syn.StrengthenedBy[p]:N0} | " +
-                              $"{syn.DisplacedBy[p]:N0} | {syn.DeclinedBy[p]:N0} | {declineRate:P1} |");
+                              $"{syn.DisplacedBy[p]:N0} | {declineRate:P1} | {thresholdRate:P1} | **{pressureRate[p]:P1}** |");
         }
+        Console.WriteLine("\nThe P7.1 gate's \"decline rate\" is the PRESSURE column. A threshold decline means");
+        Console.WriteLine("the two neurons were not jointly active enough to be worth wiring — the activation");
+        Console.WriteLine("gate working as designed, not budget starvation.");
+        Console.WriteLine($"CROSS_PRESSURE_DECLINE: {Math.Max(pressureRate[1], pressureRate[2]):P1} " +
+                          "(worst of cross-assembly / cross-cue — P7.1 gate needs < 50%)");
+
+        // P7.2 gate denominator: displacement among proposals that actually FACED a
+        // full segment. Measured against all proposals it is diluted by everything
+        // competition could not have influenced.
+        Console.WriteLine("\n── P7.2: displacement among proposals that faced a FULL segment ──\n");
+        Console.WriteLine("| population | proposals at full | displaced | win rate |");
+        Console.WriteLine("|---|---|---|---|");
+        long atFullAll = 0, displacedAll = 0;
+        for (int p = 0; p < 3; p++)
+        {
+            long atFull = syn.ProposalsAtFullBy[p];
+            atFullAll += atFull; displacedAll += syn.DisplacedBy[p];
+            Console.WriteLine($"| {PopNames[p]} | {atFull:N0} | {syn.DisplacedBy[p]:N0} | " +
+                              $"{(atFull > 0 ? (double)syn.DisplacedBy[p] / atFull : 0):P3} |");
+        }
+        Console.WriteLine($"\nDISPLACEMENT_AT_FULL: {(atFullAll > 0 ? (double)displacedAll / atFullAll : 0):P3} " +
+                          "(P7.2 gate needs ≥ 0.500%)");
+        Console.WriteLine($"EROSION_EVENTS: {syn.ContestErosions:N0}   WEIGHT_ERODED: {syn.WeightEroded:F1}");
         Console.WriteLine($"\nLIVE_SYNAPSES: {liveTotal:N0} of {(long)scope.Pool.Count * cfg.SynapseCapPerNeuron:N0} slots " +
                           $"({(double)liveTotal / Math.Max(1, (long)scope.Pool.Count * cfg.SynapseCapPerNeuron):P1} full)");
         Console.WriteLine($"CROSS_SHARE: {(liveTotal > 0 ? (double)(counts[1] + counts[2]) / liveTotal : 0):P1} " +

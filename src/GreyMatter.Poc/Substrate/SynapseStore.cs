@@ -60,6 +60,30 @@ public sealed class SynapseStore
     public float PruneThreshold { get; init; } = 0.1f;
     public float CreationProductThreshold { get; init; } = 0.15f;
 
+    /// <summary>P7.1b — slot budget for within-assembly edges. See Config.WithinAssemblyCap.</summary>
+    public int WithinAssemblyCap { get; init; } = int.MaxValue;
+
+    /// <summary>
+    /// P7.2 — heterosynaptic erosion. When a candidate is refused at a full segment,
+    /// the incumbent it lost to is weakened by this much times the candidate's
+    /// coactivation product.
+    ///
+    /// The defect: a candidate is born at PruneThreshold + η ≈ 0.11 while incumbents
+    /// reinforce upward, so any incumbent above 0.11 is permanently safe and
+    /// first-arrival wins forever (P7.0.3: displacement 0.142% of proposals). This is
+    /// the plan's second candidate mechanism — "incumbent weight decay that keeps
+    /// saturated edges contestable without destroying them" — chosen over
+    /// probabilistic challenge because it needs no per-candidate state, and over
+    /// pressure-derived birth weights because those need a shadow score for every
+    /// rejected pair.
+    ///
+    /// Self-limiting by construction: an incumbent that is still genuinely being
+    /// coactivated is re-strengthened by its own traffic, so erosion removes exactly
+    /// the edges that stopped earning their slot while sustained pressure builds
+    /// behind them. 0 disables it and reproduces pre-P7.2 behaviour.
+    /// </summary>
+    public float ContestErosion { get; init; }
+
     // §6.1 rule 3 in spirit: instrument the DECISION, not just the aggregate.
     // "declined" and "displaced" are the two arms of synaptic competition and
     // telling them apart is what makes the counter worth keeping.
@@ -74,6 +98,31 @@ public sealed class SynapseStore
     public readonly long[] StrengthenedBy = new long[3];
     public readonly long[] DisplacedBy = new long[3];
     public readonly long[] DeclinedBy = new long[3];
+
+    /// <summary>
+    /// Declines split by CAUSE, because the two mean opposite things for the P7.1
+    /// gate. A threshold decline means "these two neurons were not jointly active
+    /// enough to be worth wiring" — the activation gate doing its job, and unrelated
+    /// to budget. A pressure decline means "there was no slot and displacement
+    /// failed" — actual starvation. Only the second is what "budget-starved" means.
+    /// </summary>
+    public readonly long[] DeclinedThresholdBy = new long[3];
+    public readonly long[] DeclinedPressureBy = new long[3];
+
+    /// <summary>
+    /// Creation proposals that arrived at an ALREADY-FULL segment, per population.
+    ///
+    /// This is the P7.2 gate's denominator. Displacement measured against *all*
+    /// proposals (0.142% in P7.0.3) mixes in every proposal that found a free slot
+    /// or failed the activation threshold, neither of which competition could have
+    /// affected. The question the gate asks is: when a candidate does face a full
+    /// segment, how often does it win?
+    /// </summary>
+    public readonly long[] ProposalsAtFullBy = new long[3];
+
+    /// <summary>Incumbent erosion events, and total weight eroded (P7.2).</summary>
+    public long ContestErosions { get; private set; }
+    public double WeightEroded { get; private set; }
 
     public SynapseStore(int slotCapacity, int capPerNeuron)
     {
@@ -140,12 +189,27 @@ public sealed class SynapseStore
             return;
         }
 
-        if (sourceActivation * targetActivation < CreationProductThreshold) { Declined++; DeclinedBy[pop]++; return; }
+        if (sourceActivation * targetActivation < CreationProductThreshold)
+        { Declined++; DeclinedBy[pop]++; DeclinedThresholdBy[pop]++; return; }
+
+        // P7.1b — within-assembly edges may not consume the whole segment. They
+        // encode only "this cue fired", which familiarity already tracks, and left
+        // uncapped they take 99.9% of slots and starve every edge that could carry
+        // association.
+        if (population == SynapsePopulation.WithinAssembly && WithinAssemblyCap < CapPerNeuron)
+        {
+            int withinCount = 0;
+            for (int i = start; i < end; i++) if (Population[i] == 0) withinCount++;
+            if (withinCount >= WithinAssemblyCap)
+            { Declined++; DeclinedBy[pop]++; DeclinedPressureBy[pop]++; return; }
+        }
 
         float birthWeight = Math.Clamp(PruneThreshold + delta, MinWeight, MaxWeight);
 
         if (degree >= CapPerNeuron)
         {
+            ProposalsAtFullBy[pop]++;
+
             // Competitive displacement, not first-come-first-served. Refusing
             // every candidate once the cap is hit means whichever partners arrived
             // first hold their slots forever — legacy P5.5 measured 18.4M creations
@@ -154,12 +218,38 @@ public sealed class SynapseStore
             // dying connection loses it to a fresh one while a reinforced slot
             // sits safely above birthWeight. Displacement targets exactly the
             // connections that stopped earning their place.
+            // A cross-* candidate contests the weakest WITHIN-ASSEMBLY incumbent by
+            // preference: the reserved budget is meaningless if a starved population
+            // has to out-compete its own kind for the slots set aside for it.
             int weakest = -1;
             float weakestW = float.MaxValue;
-            for (int i = start; i < end; i++)
-                if (Weight[i] < weakestW) { weakestW = Weight[i]; weakest = i; }
+            if (population != SynapsePopulation.WithinAssembly && WithinAssemblyCap < CapPerNeuron)
+            {
+                for (int i = start; i < end; i++)
+                    if (Population[i] == 0 && Weight[i] < weakestW) { weakestW = Weight[i]; weakest = i; }
+            }
+            if (weakest < 0)
+            {
+                weakestW = float.MaxValue;
+                for (int i = start; i < end; i++)
+                    if (Weight[i] < weakestW) { weakestW = Weight[i]; weakest = i; }
+            }
 
-            if (weakest < 0 || weakestW >= birthWeight) { Declined++; DeclinedBy[pop]++; return; }
+            if (weakest < 0 || weakestW >= birthWeight)
+            {
+                // The candidate loses — but pressure leaves a mark. Without this the
+                // incumbent is safe forever and competition is decorative.
+                if (weakest >= 0 && ContestErosion > 0f)
+                {
+                    float erosion = ContestErosion * sourceActivation * targetActivation;
+                    float before = Weight[weakest];
+                    Weight[weakest] = Math.Max(MinWeight, before - erosion);
+                    ContestErosions++;
+                    WeightEroded += before - Weight[weakest];
+                }
+                Declined++; DeclinedBy[pop]++; DeclinedPressureBy[pop]++;
+                return;
+            }
 
             Target[weakest] = targetVirtualId;
             Weight[weakest] = birthWeight;
@@ -319,5 +409,8 @@ public sealed class SynapseStore
         Created = Strengthened = Displaced = Declined = Pruned = 0;
         Array.Clear(CreatedBy); Array.Clear(StrengthenedBy);
         Array.Clear(DisplacedBy); Array.Clear(DeclinedBy);
+        Array.Clear(DeclinedThresholdBy); Array.Clear(DeclinedPressureBy);
+        Array.Clear(ProposalsAtFullBy);
+        ContestErosions = 0; WeightEroded = 0;
     }
 }

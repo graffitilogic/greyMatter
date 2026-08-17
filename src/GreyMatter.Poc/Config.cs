@@ -14,6 +14,28 @@ public sealed class Config
     public int WorkingSetMax { get; set; } = 100_000;
     public int SynapseCapPerNeuron { get; set; } = 32;
 
+    /// <summary>
+    /// P7.1b — how many of a neuron's <see cref="SynapseCapPerNeuron"/> slots
+    /// within-assembly edges may occupy. The remainder is reserved for
+    /// cross-assembly and cross-cue edges.
+    ///
+    /// P7.0.1 measured within-assembly at 99.9% of live slots with the segment
+    /// 100.0% full, and exactly zero cross-assembly synapses ever created. P7.1a then
+    /// showed that unsaturating k-WTA raises cross-assembly PROPOSALS from 17,410 to
+    /// 420 million while still creating zero, because a candidate born at 0.11 cannot
+    /// displace an incumbent in a full segment. Proposals are not the bottleneck;
+    /// slots are.
+    ///
+    /// A value ≥ SynapseCapPerNeuron reproduces pre-P7.1 behaviour exactly.
+    /// </summary>
+    public int WithinAssemblyCap { get; set; } = 8;   // P7.1 adopted default; >= SynapseCapPerNeuron = pre-P7.1
+
+    /// <summary>
+    /// P7.2 — heterosynaptic erosion rate. See SynapseStore.ContestErosion.
+    /// 0 reproduces pre-P7.2 behaviour.
+    /// </summary>
+    public double ContestErosion { get; set; }
+
     // ── Activation scope (§4.4) ──
     public int ActivationDepth { get; set; } = 4;
     public int ActivationWidth { get; set; } = 256;
@@ -34,7 +56,7 @@ public sealed class Config
     ///
     /// Default 0 reproduces pre-P7.1 behaviour exactly.
     /// </summary>
-    public int PropagatedWinnerQuota { get; set; }
+    public int PropagatedWinnerQuota { get; set; } = 64;   // P7.1 adopted default; 0 = pre-P7.1
 
     // ── Encoding (§4.2) ──
     public int PatternSize { get; set; } = 2048;   // n
