@@ -48,6 +48,7 @@ public sealed class EngramPartition
     [Key(12)] public int[] SynapseOffsets { get; set; } = new[] { 0 };
     [Key(13)] public uint[] SynapseTargets { get; set; } = Array.Empty<uint>();
     [Key(14)] public float[] SynapseWeights { get; set; } = Array.Empty<float>();
+    [Key(15)] public byte[] SynapsePopulations { get; set; } = Array.Empty<byte>();
 
     [IgnoreMember] public int RecipeCount => Ids.Length;
 
@@ -72,6 +73,7 @@ public sealed class EngramPartition
         p.SynapseOffsets = new int[n + 1];
         p.SynapseTargets = new uint[synTotal];
         p.SynapseWeights = new float[synTotal];
+        p.SynapsePopulations = new byte[synTotal];
 
         int off = 0, synOff = 0;
         for (int i = 0; i < n; i++)
@@ -91,6 +93,8 @@ public sealed class EngramPartition
             p.SynapseOffsets[i] = synOff;
             Array.Copy(r.SynapseTargets, 0, p.SynapseTargets, synOff, r.SynapseCount);
             Array.Copy(r.SynapseWeights, 0, p.SynapseWeights, synOff, r.SynapseCount);
+            if (r.SynapsePopulations.Length >= r.SynapseCount)
+                Array.Copy(r.SynapsePopulations, 0, p.SynapsePopulations, synOff, r.SynapseCount);
             synOff += r.SynapseCount;
         }
         p.DeviationOffsets[n] = off;
@@ -116,6 +120,9 @@ public sealed class EngramPartition
         r.SynapseWeights = new float[sLen];
         Array.Copy(SynapseTargets, sStart, r.SynapseTargets, 0, sLen);
         Array.Copy(SynapseWeights, sStart, r.SynapseWeights, 0, sLen);
+        r.SynapsePopulations = new byte[sLen];
+        if (SynapsePopulations.Length >= sStart + sLen)
+            Array.Copy(SynapsePopulations, sStart, r.SynapsePopulations, 0, sLen);
         return r;
     }
 

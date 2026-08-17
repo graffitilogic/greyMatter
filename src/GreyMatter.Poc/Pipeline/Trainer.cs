@@ -67,7 +67,8 @@ public sealed class Trainer
                 var readout = _cascade.Run(code, learningMode: true);
                 if (readout.WinnerCount > 0)
                     _plasticity.Learn(_cascade.Winners(readout.WinnerCount),
-                                      _cascade.WinnerScores(readout.WinnerCount));
+                                      _cascade.WinnerScores(readout.WinnerCount),
+                                      _cascade.LastCueMembers(_cascade.LastMemberCount));
                 tokenCount++;
             }
 

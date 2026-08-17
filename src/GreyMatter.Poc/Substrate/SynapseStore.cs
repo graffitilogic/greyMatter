@@ -1,6 +1,19 @@
 namespace GreyMatter.Poc.Substrate;
 
 /// <summary>
+/// P7.0 — where a synapse came from, and therefore what it can possibly encode.
+/// </summary>
+public enum SynapsePopulation : byte
+{
+    /// <summary>Both endpoints are members of the same cue's assembly. Can only encode "this cue fired".</summary>
+    WithinAssembly = 0,
+    /// <summary>Same cue, but the endpoints span different assemblies — reached via propagation.</summary>
+    CrossAssembly = 1,
+    /// <summary>Directed edge from the previous cue's winners to this cue's. The sequence channel.</summary>
+    CrossCue = 2
+}
+
+/// <summary>
 /// plan.md §4.1 — CSR-style bounded adjacency over the materialized set.
 ///
 /// Each resident slot owns a fixed segment of <c>CapPerNeuron</c> entries at
@@ -25,6 +38,18 @@ public sealed class SynapseStore
     public readonly float[] Weight;
     public readonly int[] Degree;
 
+    /// <summary>
+    /// P7.0 — provenance of each synapse, parallel to Target/Weight.
+    ///
+    /// The addendum's A.1 hypothesis 1 is that the budget is consumed by
+    /// within-assembly edges, which encode only "I fired" (i.e. frequency, already
+    /// tracked by familiarity), leaving no slots for the cross-assembly and
+    /// cross-cue edges that could carry association. That is a claim about
+    /// PROVENANCE, and provenance is not currently recorded — so it cannot be
+    /// confirmed or killed. This array records it.
+    /// </summary>
+    public readonly byte[] Population;
+
     public int CapPerNeuron { get; }
     public int SlotCapacity { get; }
 
@@ -44,6 +69,12 @@ public sealed class SynapseStore
     public long Declined { get; private set; }
     public long Pruned { get; private set; }
 
+    // Per-population proposal accounting (P7.0 gate). Indexed by SynapsePopulation.
+    public readonly long[] CreatedBy = new long[3];
+    public readonly long[] StrengthenedBy = new long[3];
+    public readonly long[] DisplacedBy = new long[3];
+    public readonly long[] DeclinedBy = new long[3];
+
     public SynapseStore(int slotCapacity, int capPerNeuron)
     {
         if (slotCapacity <= 0) throw new ArgumentOutOfRangeException(nameof(slotCapacity));
@@ -58,6 +89,7 @@ public sealed class SynapseStore
         CapPerNeuron = capPerNeuron;
         Target = new uint[entries];
         Weight = new float[entries];
+        Population = new byte[entries];
         Degree = new int[slotCapacity];
     }
 
@@ -87,9 +119,11 @@ public sealed class SynapseStore
     /// kills it unless it is reinforced. Persistence is earned by repetition.
     /// </summary>
     public void RecordCoactivation(int slot, uint sourceVirtualId, uint targetVirtualId,
-                                   float sourceActivation, float targetActivation)
+                                   float sourceActivation, float targetActivation,
+                                   SynapsePopulation population = SynapsePopulation.WithinAssembly)
     {
         if (sourceVirtualId == targetVirtualId) return;
+        int pop = (int)population;
 
         int start = SegmentStart(slot);
         int degree = Degree[slot];
@@ -102,10 +136,11 @@ public sealed class SynapseStore
             if (Target[i] != targetVirtualId) continue;
             Weight[i] = Math.Clamp(Weight[i] + delta, MinWeight, MaxWeight);
             Strengthened++;
+            StrengthenedBy[pop]++;
             return;
         }
 
-        if (sourceActivation * targetActivation < CreationProductThreshold) return;
+        if (sourceActivation * targetActivation < CreationProductThreshold) { Declined++; DeclinedBy[pop]++; return; }
 
         float birthWeight = Math.Clamp(PruneThreshold + delta, MinWeight, MaxWeight);
 
@@ -124,18 +159,22 @@ public sealed class SynapseStore
             for (int i = start; i < end; i++)
                 if (Weight[i] < weakestW) { weakestW = Weight[i]; weakest = i; }
 
-            if (weakest < 0 || weakestW >= birthWeight) { Declined++; return; }
+            if (weakest < 0 || weakestW >= birthWeight) { Declined++; DeclinedBy[pop]++; return; }
 
             Target[weakest] = targetVirtualId;
             Weight[weakest] = birthWeight;
+            Population[weakest] = (byte)pop;
             Displaced++;
+            DisplacedBy[pop]++;
             return;
         }
 
         Target[end] = targetVirtualId;
         Weight[end] = birthWeight;
+        Population[end] = (byte)pop;
         Degree[slot] = degree + 1;
         Created++;
+        CreatedBy[pop]++;
     }
 
     /// <summary>
@@ -175,6 +214,7 @@ public sealed class SynapseStore
                     int last = start + degree - 1;
                     Target[i] = Target[last];
                     Weight[i] = Weight[last];
+                    Population[i] = Population[last];
                     degree--;
                     removed++;
                 }
@@ -200,6 +240,7 @@ public sealed class SynapseStore
                 int last = start + degree - 1;
                 Target[i] = Target[last];
                 Weight[i] = Weight[last];
+                Population[i] = Population[last];
                 degree--;
                 removed++;
             }
@@ -214,12 +255,16 @@ public sealed class SynapseStore
     /// Truncates to the cap: a recipe written under a larger `SynapseCapPerNeuron`
     /// must load without corrupting the neighbouring segment.
     /// </summary>
-    public void Hydrate(int slot, uint[] targets, float[] weights)
+    public void Hydrate(int slot, uint[] targets, float[] weights, byte[]? populations = null)
     {
         int n = Math.Min(targets.Length, CapPerNeuron);
         int start = SegmentStart(slot);
         Array.Copy(targets, 0, Target, start, n);
         Array.Copy(weights, 0, Weight, start, n);
+        if (populations is not null && populations.Length >= n)
+            Array.Copy(populations, 0, Population, start, n);
+        else
+            Array.Clear(Population, start, n);
         Degree[slot] = n;
     }
 
@@ -228,13 +273,30 @@ public sealed class SynapseStore
     /// when they are already the right size so repeated consolidation of the same
     /// neuron does not allocate.
     /// </summary>
-    public void Capture(int slot, ref uint[] targets, ref float[] weights)
+    public void Capture(int slot, ref uint[] targets, ref float[] weights, ref byte[] populations)
     {
         int n = Degree[slot];
         if (targets.Length != n) { targets = new uint[n]; weights = new float[n]; }
+        if (populations.Length != n) populations = new byte[n];
         int start = SegmentStart(slot);
         Array.Copy(Target, start, targets, 0, n);
         Array.Copy(Weight, start, weights, 0, n);
+        Array.Copy(Population, start, populations, 0, n);
+    }
+
+    /// <summary>Live synapse count and mean weight per population, over resident slots.</summary>
+    public (long[] counts, double[] meanWeight) PopulationCensus(int liveSlots)
+    {
+        var counts = new long[3];
+        var sums = new double[3];
+        for (int slot = 0; slot < liveSlots; slot++)
+        {
+            int start = SegmentStart(slot), end = start + Degree[slot];
+            for (int i = start; i < end; i++) { counts[Population[i]]++; sums[Population[i]] += Weight[i]; }
+        }
+        var means = new double[3];
+        for (int p = 0; p < 3; p++) means[p] = counts[p] > 0 ? sums[p] / counts[p] : 0;
+        return (counts, means);
     }
 
     /// <summary>Move a slot's whole segment. Called by NeuronPool compaction.</summary>
@@ -243,6 +305,7 @@ public sealed class SynapseStore
         int degree = Degree[from];
         Array.Copy(Target, SegmentStart(from), Target, SegmentStart(to), degree);
         Array.Copy(Weight, SegmentStart(from), Weight, SegmentStart(to), degree);
+        Array.Copy(Population, SegmentStart(from), Population, SegmentStart(to), degree);
         Degree[to] = degree;
         Degree[from] = 0;
     }
@@ -254,5 +317,7 @@ public sealed class SynapseStore
     {
         Array.Clear(Degree);
         Created = Strengthened = Displaced = Declined = Pruned = 0;
+        Array.Clear(CreatedBy); Array.Clear(StrengthenedBy);
+        Array.Clear(DisplacedBy); Array.Clear(DeclinedBy);
     }
 }

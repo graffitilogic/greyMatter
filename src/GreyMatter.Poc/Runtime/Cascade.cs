@@ -25,6 +25,11 @@ public sealed class Cascade
     private readonly int[] _active;
     private readonly int[] _winners;
     private readonly float[] _winnerScores;
+    private readonly byte[] _hop;
+    private readonly int[] _deliveredBy;
+    private readonly float[] _massByHop = new float[3];
+    private readonly float[] _driveByPopulation = new float[3];
+    private readonly int[] _winnersByHop = new int[3];
 
     public long Truncations { get; private set; }
     public long Regenerations { get; private set; }
@@ -37,13 +42,39 @@ public sealed class Cascade
         _active = new int[Math.Max(cfg.ActivationWidth * 4, _members.Length * 2)];
         _winners = new int[cfg.ActivationWidth];
         _winnerScores = new float[cfg.ActivationWidth];
+        _hop = new byte[_active.Length];
+        _deliveredBy = new int[_active.Length];
     }
 
     public ReadOnlySpan<int> Winners(int count) => _winners.AsSpan(0, count);
     public ReadOnlySpan<float> WinnerScores(int count) => _winnerScores.AsSpan(0, count);
 
     public sealed record Readout(int WinnerCount, float TotalMass, float MeanWinnerMass,
-                                 float SelfMass, int Materialized, int Truncated);
+                                 float SelfMass, int Materialized, int Truncated)
+    {
+        /// <summary>P7.0 — mass by hop: [0] the cue's own drive, [1] one synapse away, [2] two or more.</summary>
+        public float[] MassByHop { get; init; } = new float[3];
+
+        /// <summary>
+        /// P7.0 — drive INJECTED by each synapse population, summed at delivery.
+        ///
+        /// Different units from <see cref="MassByHop"/> deliberately. Classifying a
+        /// surviving winner by "the population that delivered it" undercounts
+        /// catastrophically: an assembly member starts at hop 0 and is then topped up
+        /// by within-assembly edges, so the drive those edges contribute is real but
+        /// belongs to a node that is still hop 0. The first version of this metric
+        /// reported 0.0 for every population as a result. Measuring at the point of
+        /// delivery attributes it correctly.
+        /// </summary>
+        public float[] DriveByPopulation { get; init; } = new float[3];
+
+        /// <summary>P7.0 — how many k-WTA winners were at each hop.</summary>
+        public int[] WinnersByHop { get; init; } = new int[3];
+    }
+
+    /// <summary>The cue's assembly members from the last Run — needed to classify edge provenance.</summary>
+    public ReadOnlySpan<uint> LastCueMembers(int count) => _members.AsSpan(0, count);
+    public int LastMemberCount { get; private set; }
 
     /// <summary>
     /// Run one cue to completion. Returns the readout; the winners of the final
@@ -57,7 +88,15 @@ public sealed class Cascade
 
         // ── Materialize the cue's assembly ──────────────────────────────────
         int memberCount = Assembly.Members(code, _cfg.BaselineNeuronCount, _members);
+        LastMemberCount = memberCount;
         int truncatedHere = 0;
+
+        // P7.0 attribution. hopOf[slot-index-into-_active] records how many synapse
+        // steps from the cue a neuron was first reached; deliveredBy records which
+        // synapse population delivered its most recent input.
+        Array.Clear(_massByHop);
+        Array.Clear(_driveByPopulation);
+        Array.Clear(_winnersByHop);
 
         for (int i = 0; i < memberCount; i++)
         {
@@ -82,6 +121,8 @@ public sealed class Cascade
         {
             int slot = pool.Find(_members[i]);
             if (slot < 0) continue;
+            _hop[activeCount] = 0;
+            _deliveredBy[activeCount] = -1;          // hop 0 arrives by no synapse
             _active[activeCount++] = slot;
 
             // Drive from the cue: assembly members start at full activation.
@@ -114,18 +155,34 @@ public sealed class Cascade
                 // a scope keeps circulating) rather than about out-degree.
                 float share = drive / degree;
 
+                int sourceHop = _hop[i];
+
                 for (int s = start; s < end; s++)
                 {
                     int target = pool.Find(synapses.Target[s]);
                     if (target < 0) continue;   // evicted; the cascade cannot follow
 
-                    float v = pool.Potential[target] + synapses.Weight[s] * share;
+                    float contribution = synapses.Weight[s] * share;
+                    _driveByPopulation[synapses.Population[s]] += contribution;
+
+                    float v = pool.Potential[target] + contribution;
                     pool.Potential[target] = v > MaxPotential ? MaxPotential : v;
 
                     // Reached neurons join the active set so the next step can
                     // propagate from them — this is what makes depth mean anything.
-                    if (activeCount < _active.Length && !Contains(_active, activeCount, target))
+                    int existing = IndexOf(_active, activeCount, target);
+                    if (existing < 0)
+                    {
+                        if (activeCount >= _active.Length) continue;
+                        _hop[activeCount] = (byte)Math.Min(2, sourceHop + 1);
+                        _deliveredBy[activeCount] = synapses.Population[s];
                         _active[activeCount++] = target;
+                    }
+                    else if (_hop[existing] > sourceHop + 1)
+                    {
+                        _hop[existing] = (byte)Math.Min(2, sourceHop + 1);
+                        _deliveredBy[existing] = synapses.Population[s];
+                    }
                 }
             }
 
@@ -153,6 +210,16 @@ public sealed class Cascade
         float total = 0;
         for (int i = 0; i < winnerCount; i++) total += _winnerScores[i];
 
+        // Attribute the surviving mass. A winner's hop and delivering population
+        // are looked up from the active set it came from.
+        for (int i = 0; i < winnerCount; i++)
+        {
+            int idx = IndexOf(_active, activeCount, _winners[i]);
+            if (idx < 0) continue;
+            _massByHop[_hop[idx]] += _winnerScores[i];
+            _winnersByHop[_hop[idx]]++;
+        }
+
         // Mass that landed back on the cue's own members, as a separate diagnostic.
         for (int i = 0; i < winnerCount; i++)
         {
@@ -175,16 +242,21 @@ public sealed class Cascade
 
         return new Readout(winnerCount, total,
                            winnerCount > 0 ? total / winnerCount : 0f,
-                           selfMass, memberCount - truncatedHere, truncatedHere);
+                           selfMass, memberCount - truncatedHere, truncatedHere)
+        {
+            MassByHop = (float[])_massByHop.Clone(),
+            DriveByPopulation = (float[])_driveByPopulation.Clone(),
+            WinnersByHop = (int[])_winnersByHop.Clone()
+        };
     }
 
     /// <summary>Ceiling on a single neuron's potential; see the clamp in Run.</summary>
     private const float MaxPotential = 1e9f;
 
-    private static bool Contains(int[] arr, int count, int value)
+    private static int IndexOf(int[] arr, int count, int value)
     {
-        for (int i = 0; i < count; i++) if (arr[i] == value) return true;
-        return false;
+        for (int i = 0; i < count; i++) if (arr[i] == value) return i;
+        return -1;
     }
 
     /// <summary>Bounded partial selection — a reduction, not a sort of the scope (§7).</summary>

@@ -103,7 +103,7 @@ public sealed class ActivationScope : IDisposable
         // §4.4 step 3 — hydrate the synapse segment. Without this the graph exists
         // only for as long as a neuron stays resident, so learning cannot outlive
         // the working set and a resumed run restores nothing.
-        _synapses.Hydrate(slot, recipe.SynapseTargets, recipe.SynapseWeights);
+        _synapses.Hydrate(slot, recipe.SynapseTargets, recipe.SynapseWeights, recipe.SynapsePopulations);
 
         _pool.Familiarity[slot] = recipe.Familiarity;
         _pool.Threshold[slot] = 1f;
@@ -156,7 +156,8 @@ public sealed class ActivationScope : IDisposable
         // Synapses are captured whether or not the receptive field moved: a neuron
         // can acquire connections without its own weights drifting past threshold,
         // and those connections are where P4 showed recall actually lives.
-        _synapses.Capture(slot, ref recipe.SynapseTargets, ref recipe.SynapseWeights);
+        _synapses.Capture(slot, ref recipe.SynapseTargets, ref recipe.SynapseWeights,
+                          ref recipe.SynapsePopulations);
 
         if (!_dirty[slot]) return;
 

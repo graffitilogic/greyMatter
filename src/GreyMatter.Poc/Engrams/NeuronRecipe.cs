@@ -48,6 +48,9 @@ public sealed class NeuronRecipe
     public uint[] SynapseTargets = Array.Empty<uint>();
     public float[] SynapseWeights = Array.Empty<float>();
 
+    /// <summary>P7.0 provenance, parallel to the arrays above. See SynapsePopulation.</summary>
+    public byte[] SynapsePopulations = Array.Empty<byte>();
+
     public int DeviationCount => DeviationDims.Length;
     public int SynapseCount => SynapseTargets.Length;
 

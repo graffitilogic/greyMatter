@@ -41,7 +41,7 @@ public static class Cli
 
     private static int Eval(string[] argv, Args args, Config cfg)
     {
-        if (argv.Length < 2) { Console.Error.WriteLine("usage: gm eval <encoder-ceiling|recall|order|scale>"); return 1; }
+        if (argv.Length < 2) { Console.Error.WriteLine("usage: gm eval <encoder-ceiling|recall|order|scale|attribution>"); return 1; }
 
         switch (argv[1])
         {
@@ -73,6 +73,9 @@ public static class Cli
                     && result.LiftVsUntrained.mean >= 0.05
                     && result.Separated ? 0 : 1;
             }
+            case "attribution":
+                AttributionEval.Run(cfg, args);
+                return 0;
             case "order":
                 OrderEval.Run(cfg, args);
                 Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
@@ -393,7 +396,7 @@ public static class Cli
               gm learn  --dataset tatoeba_small --sentences 500 [--config f.json] [--resume]
               gm probe  --cue <word> [--topk 16]
               gm eval   encoder-ceiling [--train 500] [--vocab 3000]
-              gm eval   recall | order | scale
+              gm eval   recall | order | scale | attribution
               gm bench  substrate [--cycles 10000] [--scope 2000]
               gm stats
               gm audit  --strings

@@ -27,6 +27,7 @@ public sealed class Plasticity
     /// <summary>Previous cue's winners, as VIRTUAL ids — slots move under compaction.</summary>
     private readonly uint[] _trace;
     private int _traceCount;
+    private readonly HashSet<uint> _cueMembers = new();
 
     public float NeuronLearningRate { get; init; } = 0.05f;
 
@@ -52,7 +53,15 @@ public sealed class Plasticity
     /// Learn from one cue's winners. <paramref name="winners"/> are slots and
     /// <paramref name="scores"/> their activation, both from the cascade's final step.
     /// </summary>
-    public void Learn(ReadOnlySpan<int> winners, ReadOnlySpan<float> scores)
+    /// <param name="cueMembers">
+    /// Virtual ids of the cue's own assembly. Needed to classify each within-cue
+    /// edge as WithinAssembly (both endpoints in the cue's assembly — encodes only
+    /// "this cue fired") or CrossAssembly (at least one endpoint reached by
+    /// propagation). That distinction is A.1 hypothesis 1 and cannot be measured
+    /// without it.
+    /// </param>
+    public void Learn(ReadOnlySpan<int> winners, ReadOnlySpan<float> scores,
+                      ReadOnlySpan<uint> cueMembers = default)
     {
         var pool = _scope.Pool;
         var synapses = _scope.Synapses;
@@ -64,6 +73,11 @@ public sealed class Plasticity
         if (max <= 0f) { EndCue(winners, pool); return; }
         float inv = 1f / max;
 
+        // Membership lookup for the cue's assembly, rebuilt per cue. Small (256)
+        // and only touched on the learning path, not the propagation path.
+        _cueMembers.Clear();
+        for (int i = 0; i < cueMembers.Length; i++) _cueMembers.Add(cueMembers[i]);
+
         // ── Within-cue Hebbian coactivation ─────────────────────────────────
         for (int i = 0; i < winners.Length; i++)
         {
@@ -71,10 +85,17 @@ public sealed class Plasticity
             uint vi = pool.VirtualId[si];
             float ai = scores[i] * inv;
 
+            bool sourceInAssembly = _cueMembers.Count == 0 || _cueMembers.Contains(vi);
+
             for (int j = 0; j < winners.Length; j++)
             {
                 if (i == j) continue;
-                synapses.RecordCoactivation(si, vi, pool.VirtualId[winners[j]], ai, scores[j] * inv);
+                uint vj = pool.VirtualId[winners[j]];
+                var population = sourceInAssembly && _cueMembers.Contains(vj)
+                    ? SynapsePopulation.WithinAssembly
+                    : SynapsePopulation.CrossAssembly;
+
+                synapses.RecordCoactivation(si, vi, vj, ai, scores[j] * inv, population);
                 WithinCueUpdates++;
             }
 
@@ -98,7 +119,8 @@ public sealed class Plasticity
                 // Directed: previous → current only. The asymmetry IS the order
                 // information; wiring both ways would erase it.
                 synapses.RecordCoactivation(pre, _trace[p], pool.VirtualId[winners[i]],
-                                            SequenceStrength, scores[i] * inv);
+                                            SequenceStrength, scores[i] * inv,
+                                            SynapsePopulation.CrossCue);
                 SequenceUpdates++;
             }
         }
