@@ -77,7 +77,9 @@ public static class Cli
                 OrderEval.Run(cfg, args);
                 Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
                 return 0;   // any rule-compliant verdict is a pass; the gate is that it runs
-            case "scale": return NotYet("gm eval scale", "P6");
+            case "scale":
+                ScaleSweep.Run(cfg, args);
+                return 0;
             default:
                 Console.Error.WriteLine($"unknown eval '{argv[1]}'");
                 return 1;
