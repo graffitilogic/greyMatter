@@ -144,6 +144,23 @@ public sealed class SynapseStore
 
     public int SegmentStart(int slot) => slot * CapPerNeuron;
 
+    private int CountOf(int start, int end, int population)
+    {
+        int n = 0;
+        for (int i = start; i < end; i++) if (Population[i] == population) n++;
+        return n;
+    }
+
+    /// <param name="onlyPopulation">−1 to consider every slot.</param>
+    private void FindWeakest(int start, int end, int onlyPopulation, ref int weakest, ref float weakestW)
+    {
+        for (int i = start; i < end; i++)
+        {
+            if (onlyPopulation >= 0 && Population[i] != onlyPopulation) continue;
+            if (Weight[i] < weakestW) { weakestW = Weight[i]; weakest = i; }
+        }
+    }
+
     public long TotalSynapses
     {
         get { long n = 0; for (int i = 0; i < Degree.Length; i++) n += Degree[i]; return n; }
@@ -192,48 +209,49 @@ public sealed class SynapseStore
         if (sourceActivation * targetActivation < CreationProductThreshold)
         { Declined++; DeclinedBy[pop]++; DeclinedThresholdBy[pop]++; return; }
 
-        // P7.1b — within-assembly edges may not consume the whole segment. They
-        // encode only "this cue fired", which familiarity already tracks, and left
-        // uncapped they take 99.9% of slots and starve every edge that could carry
-        // association.
-        if (population == SynapsePopulation.WithinAssembly && WithinAssemblyCap < CapPerNeuron)
-        {
-            int withinCount = 0;
-            for (int i = start; i < end; i++) if (Population[i] == 0) withinCount++;
-            if (withinCount >= WithinAssemblyCap)
-            { Declined++; DeclinedBy[pop]++; DeclinedPressureBy[pop]++; return; }
-        }
-
         float birthWeight = Math.Clamp(PruneThreshold + delta, MinWeight, MaxWeight);
 
-        if (degree >= CapPerNeuron)
+        // ── Capacity and contest ────────────────────────────────────────────
+        //
+        // Two ways a candidate can find no room, and BOTH must be contestable:
+        //
+        //   • its population's budget is spent (P7.1b WithinAssemblyCap), or
+        //   • the whole segment is full (SynapseCapPerNeuron).
+        //
+        // Treating only the second as "at capacity" left a dead window that P7.1
+        // itself created: with the cap at 8, a within-assembly candidate was refused
+        // at its population budget and never contested anything, so within-assembly
+        // incumbents became permanently safe from their own kind. The adversarial
+        // bench measured 0 proposals-at-full as a result — every one was refused one
+        // step earlier.
+        bool populationFull = population == SynapsePopulation.WithinAssembly
+                           && WithinAssemblyCap < CapPerNeuron
+                           && CountOf(start, end, 0) >= WithinAssemblyCap;
+        bool segmentFull = degree >= CapPerNeuron;
+
+        if (populationFull || segmentFull)
         {
             ProposalsAtFullBy[pop]++;
 
-            // Competitive displacement, not first-come-first-served. Refusing
-            // every candidate once the cap is hit means whichever partners arrived
-            // first hold their slots forever — legacy P5.5 measured 18.4M creations
-            // blocked and FEWER reachable pairs from 40× more data. Decay pulls
-            // unreinforced synapses toward the prune line, so a slot held by a
-            // dying connection loses it to a fresh one while a reinforced slot
-            // sits safely above birthWeight. Displacement targets exactly the
-            // connections that stopped earning their place.
-            // A cross-* candidate contests the weakest WITHIN-ASSEMBLY incumbent by
-            // preference: the reserved budget is meaningless if a starved population
-            // has to out-compete its own kind for the slots set aside for it.
+            // Competitive displacement, not first-come-first-served. Refusing every
+            // candidate at capacity means whichever partners arrived first hold their
+            // slots forever — legacy P5.5 measured 18.4M creations blocked and FEWER
+            // reachable pairs from 40× more data.
+            //
+            // Contest scope: a candidate whose own population is full contests its own
+            // kind. A cross-* candidate at a full segment contests the weakest
+            // within-assembly incumbent by preference, because the reserved budget is
+            // meaningless if a starved population must out-compete itself for the
+            // slots set aside for it.
             int weakest = -1;
             float weakestW = float.MaxValue;
-            if (population != SynapsePopulation.WithinAssembly && WithinAssemblyCap < CapPerNeuron)
-            {
-                for (int i = start; i < end; i++)
-                    if (Population[i] == 0 && Weight[i] < weakestW) { weakestW = Weight[i]; weakest = i; }
-            }
-            if (weakest < 0)
-            {
-                weakestW = float.MaxValue;
-                for (int i = start; i < end; i++)
-                    if (Weight[i] < weakestW) { weakestW = Weight[i]; weakest = i; }
-            }
+
+            if (populationFull)
+                FindWeakest(start, end, onlyPopulation: 0, ref weakest, ref weakestW);
+            else if (population != SynapsePopulation.WithinAssembly && WithinAssemblyCap < CapPerNeuron)
+                FindWeakest(start, end, onlyPopulation: 0, ref weakest, ref weakestW);
+
+            if (weakest < 0) FindWeakest(start, end, onlyPopulation: -1, ref weakest, ref weakestW);
 
             if (weakest < 0 || weakestW >= birthWeight)
             {

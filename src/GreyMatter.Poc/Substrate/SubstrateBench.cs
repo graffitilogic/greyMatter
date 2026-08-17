@@ -21,12 +21,16 @@ public static class SubstrateBench
         int Cycles, int ScopeSize, double Seconds, double CyclesPerSecond,
         int Gen0, int Gen1, int Gen2, long AllocatedBytes,
         long Synapses, int HighWaterMark, long Materialized, long Evicted,
-        long Created, long Strengthened, long Displaced, long Declined);
+        long Created, long Strengthened, long Displaced, long Declined, long ProposalsAtFull);
 
     public static Result Run(Config cfg, int cycles, int scopeSize, bool quiet = false)
     {
         var pool = new NeuronPool(cfg.WorkingSetMax);
-        var synapses = new SynapseStore(cfg.WorkingSetMax, cfg.SynapseCapPerNeuron);
+        var synapses = new SynapseStore(cfg.WorkingSetMax, cfg.SynapseCapPerNeuron)
+        {
+            WithinAssemblyCap = cfg.WithinAssemblyCap,
+            ContestErosion = (float)cfg.ContestErosion
+        };
         pool.OnSlotMoved = synapses.MoveSlot;
 
         // Scratch, allocated once. Anything allocated inside the loop would show
@@ -65,7 +69,8 @@ public static class SubstrateBench
             GC.CollectionCount(0) - gen0, GC.CollectionCount(1) - gen1, GC.CollectionCount(2) - gen2,
             GC.GetAllocatedBytesForCurrentThread() - alloc0,
             synapses.TotalSynapses, pool.HighWaterMark, pool.TotalMaterialized, pool.TotalEvicted,
-            synapses.Created, synapses.Strengthened, synapses.Displaced, synapses.Declined);
+            synapses.Created, synapses.Strengthened, synapses.Displaced, synapses.Declined,
+            synapses.ProposalsAtFullBy.Sum());
     }
 
     /// <summary>One full materialize → propagate → learn → evict cycle.</summary>

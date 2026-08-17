@@ -41,7 +41,7 @@ public static class Cli
 
     private static int Eval(string[] argv, Args args, Config cfg)
     {
-        if (argv.Length < 2) { Console.Error.WriteLine("usage: gm eval <encoder-ceiling|recall|order|scale|attribution>"); return 1; }
+        if (argv.Length < 2) { Console.Error.WriteLine("usage: gm eval <encoder-ceiling|recall|order|scale|attribution|shift>"); return 1; }
 
         switch (argv[1])
         {
@@ -73,6 +73,9 @@ public static class Cli
                     && result.LiftVsUntrained.mean >= 0.05
                     && result.Separated ? 0 : 1;
             }
+            case "shift":
+                ShiftEval.Run(cfg, args);
+                return 0;
             case "attribution":
                 AttributionEval.Run(cfg, args);
                 return 0;
@@ -133,6 +136,9 @@ public static class Cli
         Console.WriteLine($"MATERIALIZED: {r.Materialized:N0}   EVICTED: {r.Evicted:N0}");
         Console.WriteLine($"SYNAPSES: {r.Synapses:N0}   created {r.Created:N0}   strengthened {r.Strengthened:N0}");
         Console.WriteLine($"COMPETITION: displaced {r.Displaced:N0}   declined {r.Declined:N0}");
+        Console.WriteLine($"PROPOSALS_AT_FULL: {r.ProposalsAtFull:N0}   " +
+                          $"DISPLACEMENT_AT_FULL: {(r.ProposalsAtFull > 0 ? (double)r.Displaced / r.ProposalsAtFull : 0):P3} " +
+                          "(P7.2 gate needs ≥ 0.500%)");
 
         var pass = r.CyclesPerSecond >= 50 && r.Gen2 == 0 && r.HighWaterMark <= cfg.WorkingSetMax;
         Console.WriteLine($"\nP1_GATE: {(pass ? "PASS" : "FAIL")}");
@@ -396,7 +402,7 @@ public static class Cli
               gm learn  --dataset tatoeba_small --sentences 500 [--config f.json] [--resume]
               gm probe  --cue <word> [--topk 16]
               gm eval   encoder-ceiling [--train 500] [--vocab 3000]
-              gm eval   recall | order | scale | attribution
+              gm eval   recall | order | scale | attribution | shift
               gm bench  substrate [--cycles 10000] [--scope 2000]
               gm stats
               gm audit  --strings
