@@ -186,7 +186,8 @@ public sealed class Cascade
                 }
             }
 
-            winnerCount = SelectTopK(pool, _active, activeCount, _winners, _winnerScores);
+            winnerCount = SelectTopK(pool, _active, activeCount, _winners, _winnerScores,
+                                     _hop, _cfg.PropagatedWinnerQuota);
 
             for (int i = 0; i < activeCount; i++) pool.Potential[_active[i]] = 0f;
             for (int i = 0; i < winnerCount; i++)
@@ -259,20 +260,61 @@ public sealed class Cascade
         return -1;
     }
 
-    /// <summary>Bounded partial selection — a reduction, not a sort of the scope (§7).</summary>
-    private static int SelectTopK(NeuronPool pool, int[] slots, int slotCount, int[] winners, float[] scores)
+    /// <summary>
+    /// Bounded partial selection — a reduction, not a sort of the scope (§7).
+    ///
+    /// With <paramref name="propagatedQuota"/> &gt; 0 this runs as TWO selections:
+    /// an open contest for (k − quota) slots, and a contest restricted to propagated
+    /// (hop ≥ 1) neurons for the reserved remainder. Reserved slots left unfilled are
+    /// returned to the open pool, so the quota never wastes capacity.
+    ///
+    /// The open contest is unrestricted rather than members-only on purpose: a
+    /// propagated neuron strong enough to beat an assembly member on raw potential
+    /// should win on merit, and the quota is a floor on propagated representation,
+    /// not a cap on it.
+    /// </summary>
+    private static int SelectTopK(NeuronPool pool, int[] slots, int slotCount,
+                                  int[] winners, float[] scores,
+                                  byte[] hop, int propagatedQuota)
     {
         int k = winners.Length;
+        if (propagatedQuota <= 0)
+            return Select(pool, slots, slotCount, winners, scores, 0, k, hop, propagatedOnly: false);
+
+        int quota = Math.Min(propagatedQuota, k);
+        int openSlots = k - quota;
+
+        int found = Select(pool, slots, slotCount, winners, scores, 0, openSlots, hop, propagatedOnly: false);
+
+        // Reserved contest: propagated only, excluding anything already selected.
+        int reserved = SelectExcluding(pool, slots, slotCount, winners, scores, found, quota, hop);
+        found += reserved;
+
+        // Hand unfilled reserved slots back to the open pool.
+        int unused = quota - reserved;
+        if (unused > 0)
+            found += SelectExcluding(pool, slots, slotCount, winners, scores, found, unused, hop: null);
+
+        return found;
+    }
+
+    private static int Select(NeuronPool pool, int[] slots, int slotCount,
+                              int[] winners, float[] scores, int offset, int capacity,
+                              byte[]? hop, bool propagatedOnly)
+    {
+        if (capacity <= 0) return 0;
         int found = 0;
         for (int i = 0; i < slotCount; i++)
         {
+            if (propagatedOnly && hop is not null && hop[i] == 0) continue;
+
             int slot = slots[i];
             float v = pool.Potential[slot];
             if (v <= 0f) continue;
-            if (found == k && v <= scores[k - 1]) continue;
+            if (found == capacity && v <= scores[offset + capacity - 1]) continue;
 
-            int pos = found < k ? found : k - 1;
-            while (pos > 0 && scores[pos - 1] < v)
+            int pos = offset + (found < capacity ? found : capacity - 1);
+            while (pos > offset && scores[pos - 1] < v)
             {
                 scores[pos] = scores[pos - 1];
                 winners[pos] = winners[pos - 1];
@@ -280,7 +322,43 @@ public sealed class Cascade
             }
             scores[pos] = v;
             winners[pos] = slot;
-            if (found < k) found++;
+            if (found < capacity) found++;
+        }
+        return found;
+    }
+
+    /// Same selection, skipping slots already chosen. <paramref name="hop"/> non-null
+    /// restricts the contest to propagated neurons.
+    private static int SelectExcluding(NeuronPool pool, int[] slots, int slotCount,
+                                       int[] winners, float[] scores, int chosen, int capacity,
+                                       byte[]? hop)
+    {
+        if (capacity <= 0) return 0;
+        int found = 0;
+        for (int i = 0; i < slotCount; i++)
+        {
+            if (hop is not null && hop[i] == 0) continue;
+
+            int slot = slots[i];
+            float v = pool.Potential[slot];
+            if (v <= 0f) continue;
+
+            bool already = false;
+            for (int c = 0; c < chosen; c++) if (winners[c] == slot) { already = true; break; }
+            if (already) continue;
+
+            if (found == capacity && v <= scores[chosen + capacity - 1]) continue;
+
+            int pos = chosen + (found < capacity ? found : capacity - 1);
+            while (pos > chosen && scores[pos - 1] < v)
+            {
+                scores[pos] = scores[pos - 1];
+                winners[pos] = winners[pos - 1];
+                pos--;
+            }
+            scores[pos] = v;
+            winners[pos] = slot;
+            if (found < capacity) found++;
         }
         return found;
     }

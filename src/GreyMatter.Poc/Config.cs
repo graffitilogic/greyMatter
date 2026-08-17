@@ -18,6 +18,24 @@ public sealed class Config
     public int ActivationDepth { get; set; } = 4;
     public int ActivationWidth { get; set; } = 256;
 
+    /// <summary>
+    /// P7.1a — k-WTA slots reserved for PROPAGATED (hop ≥ 1) neurons.
+    ///
+    /// P7.0.4 measured the root cause of the association gap: assembly size
+    /// (Sparsity × NeuronsPerDim = 256) exactly equals ActivationWidth (256), so the
+    /// cue's own assembly starts at potential 1.0 and fills every winner slot —
+    /// 4,064 hop-0 winners against 32 hop-1 winners across 16 cues. A propagated
+    /// neuron essentially cannot win, so it never enters the Hebbian pairing, so no
+    /// cross-assembly synapse is ever created (measured: exactly 0).
+    ///
+    /// This reserves slots that only propagated neurons may occupy. Unfilled reserved
+    /// slots fall back to assembly members, so the quota costs nothing when there is
+    /// nothing propagated to put in it.
+    ///
+    /// Default 0 reproduces pre-P7.1 behaviour exactly.
+    /// </summary>
+    public int PropagatedWinnerQuota { get; set; }
+
     // ── Encoding (§4.2) ──
     public int PatternSize { get; set; } = 2048;   // n
     public int Sparsity { get; set; } = 32;        // k
