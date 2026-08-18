@@ -14,10 +14,10 @@ procedural generation, render-distance lazy loading, vector quantisation.
 
 | | |
 |---|---|
+| **`Prompt.md`** | The specification. Short, and the authority the plan answers to. |
 | **`plan.md`** | The implementation plan and its rules of engagement. Phase definitions, component specs, and the evaluation protocol. Start here. |
 | **`RESULTS.md`** | Append-only findings log. Every number carries the command line that produced it. This is the real state of the project. |
 | **`src/GreyMatter.Poc/`** | The proof-of-concept. Deterministic, allocation-free in the hot path, data-oriented for an eventual CUDA port. |
-| **`greyMatter/`** | Legacy tree. Read-only reference quarry — components were ported out of it, never added to it. |
 
 ## Running it
 

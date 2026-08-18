@@ -12,6 +12,7 @@ The current codebase is the residue of many refactor cycles. The following rules
 
 1. **Do not read or consult git history.** The current working tree plus this plan is the entire input.
 2. **The legacy code is a read-only reference quarry.** Never edit files in `greyMatter/` (the existing project). Port logic *out* of it; never bolt new work *onto* it.
+   *(Historical as of Addendum B.3, 2026-08-18: the legacy tree has been deleted. Recoverable from git history if ever needed. The rule is kept as the record of how the rebuild was conducted.)*
 3. **Phase gates are hard.** Do not begin phase N+1 until phase N's gate passes. If a gate fails twice after honest attempts, STOP, write the finding in `RESULTS.md`, and surface it to Bill. Do not redesign mid-phase to chase the gate.
 4. **No refactoring of a phase that has passed its gate.** If later work reveals a defect, fix the defect minimally; do not restructure.
 5. **One plan document (this one), one results document (`RESULTS.md`, append-only).** Do not create additional strategy/architecture/vision markdown files. The old `docs/` folder was emptied for a reason.
@@ -69,6 +70,8 @@ Bill's sequencing: prove the algorithms in .NET, port to CUDA afterward. The leg
 - *"Success: train on a random dataset and test recall vs neural-network scales"* — the pieces exist but are welded into `Cerebro`; the rebuild makes this a first-class pipeline (§5, P5–P6).
 
 ### 1.6 Decision: clean rebuild beside the legacy tree
+
+*(Historical as of Addendum B.3, 2026-08-18: the rebuild is complete and the legacy tree deleted. §1 stays as the record of what was inherited and why the rebuild happened — it is not a description of the current repo.)*
 
 Given the refactor fatigue and the tangle above, this plan directs a **fresh, minimal project in the same solution**, porting only the table in §1.2. The legacy project stays on disk, read-only, as reference. When P6 passes, ask Bill before deleting anything. Do not "clean up" the legacy tree along the way — that is a tangent.
 
@@ -431,3 +434,152 @@ re-examined outside its P2.3 valley, with the OOV artifact controls A-R1 already
 divide base rates out in the learning rule rather than the readout; **(d)** SDM-style content
 addressing over engrams. Each would be its own gated phase with a registered eval. None are
 licensed by this addendum.
+
+---
+
+# Addendum B (2026-08-18) — P9: Measure the right thing, then close; and the legacy cleanout
+
+**Status of Addendum A:** P7.0 PASS, P7.1 PASS, P7.2 displacement PASS / shift criterion
+UNMEASURED (instrument measured the wrong observable — P7.2.8). P7.3 was **never attempted as
+specified**: Bill reviewed the P7.2.8 evidence and elected to take the A.5 fallbacks directly — a
+recorded deviation from A-R4, decided by the plan's author. P8(a) failed its own pre-committed
+rule and corrected P7.2.8's diagnosis on the way. P8(c) ran its two honest attempts and hit the
+A.4 stop rule. All §0, §6.1 and A.2 rules remain in force.
+
+## B.0 Where the evidence actually stands
+
+The diagnosis chain is complete, and every link is measured: **not the budget** (P7.1:
+cross-share 0% → 74.6%, multi-hop mass 0% → 33%), **not competition** (P7.2: displacement at
+capacity 0.000% → 8.472%), **not the substrate** (P8a: co-occurring pairs 60% connected vs 15%
+null, 418× the edge mass). The constraint is the learning rule — and P8c's two attempts sharpened
+that into something more specific than A.5(c) anticipated:
+
+- The λ that makes base-rate division *mechanically correct* (weight–frequency correlation ≈ 0 at
+  λ=0.001) produces **no association** (`R_PMI` −0.075).
+- The λ values that produce the project's only positive, null-separated association signal
+  (λ=0.02: `R_PMI` +0.18 vs shuffled +0.04) do it by **sparsification** — pruning the graph to
+  high-covariance edges at the cost of half the real path coverage — not by the registered
+  normalisation mechanism.
+- The event-wise anti-Hebbian rule A.5(c) actually describes was **never tested**: P8c's
+  registration explicitly recorded that its analytic-proxy form "falsifies analytic base-rate
+  correction over a saturating familiarity proxy, not the event-wise rule A.5(c) describes." That
+  falsification is what happened. The event-wise rule needs an in-edge index the substrate lacks.
+
+And one course-correction that outranks all of the above:
+
+**The project has been grading itself on its hardest metric and never ran its most relevant one.**
+`gm eval order` asks the graph to rank a cue's *successors against each other* by base-rate-
+corrected sequence statistics — syntagmatic order, the hardest association question available.
+Prompt.md's ask ("conceptual engrams"; the north-star example is `water`~`drink`-class relatedness)
+is the *easier and more fundamental* question: does the cue's activated graph distinguish related
+words from unrelated ones at all? That is exactly the `gm eval assoc` instrument P7.3 specified as
+an equal-alternative gate ("passing either at full rigor is a P7.3 pass") — **and it was never
+built or run**. Meanwhile P8a measured, at default settings, co-occurring pairs 60% connected with
+418× the edge mass of frequency-matched non-co-occurring pairs. That is precisely the raw material
+an association AUC reads out. It is plausible the system already passes the Prompt.md-relevant
+gate at defaults, and the only reason we don't know is that the instrument doesn't exist.
+
+P9 therefore starts by measuring the right thing, and only then decides how much more mechanism
+work Prompt.md actually requires.
+
+## B.1 Rules, amended
+
+- **B-R1. A.5 ledger.** A.5(a) is consumed (tested, failed its pre-committed rule — P8a). A.5(c)
+  is consumed *in its analytic-proxy form only* (P8c); the event-wise form is untested and is P9.2.
+  A.5(b) and A.5(d) remain locked behind a design review. No third λ grid, ever — P8c.4's stop
+  rule stands; P9.1 is a different hypothesis (mechanism discrimination), not a retune.
+- **B-R2. The P8c bars do not move.** Any adoption decision in P9 is judged against the unchanged
+  P8c.0 criteria (weight–freq falls; connectivity gap ≥ +0.30; recall lift ≥ +0.05 separated;
+  `R_PMI` ≥ +0.10 with `PMI_GAP` ≥ +0.15, non-overlapping) — or, for the assoc route, the
+  unchanged P7.3 bar (`ASSOC_AUC` ≥ 0.70 vs shuffled ≤ 0.55, separated).
+- **B-R3. The shift eval stays parked.** Its redesign (cascade-mediated observable, aggregated
+  pairs — P7.2.8 consequence 1) is registered only if and when a P9 gate needs it. Rebuilding a
+  defective instrument nobody currently depends on is a tangent.
+- **B-R4. Instrument-first discipline, kept:** P9.0 changes no behaviour; every mechanism phase
+  after it changes exactly one thing and re-verifies recall (A-R3).
+
+## B.2 Phases and gates
+
+### P9.0 — Build and run `gm eval assoc` (the missing P7.3 instrument)
+As specified in P7.3, unchanged: for each cue, rank frequency-matched in-vocabulary words that
+*did* co-occur with it (within-sentence, window ±2) against those that never did, by cascade mass;
+AUC over the cue set, ≥5 repeats, same-pairs shuffled null (A-R2 polices any readout arithmetic).
+Run at current defaults (λ=0, `ContestErosion` 1e-5, quota 64, cap 8) and, as a recorded
+diagnostic arm only, at λ=0.02. Registration paragraph in `RESULTS.md` first (rule 6).
+**Gate:** the instrument runs end-to-end and emits a rule-compliant verdict — any verdict,
+including a refusal, passes the *instrument* gate (the P5 precedent). **Decision fork, fixed
+now:** `ASSOC_AUC` ≥ 0.70 vs shuffled ≤ 0.55 separated at defaults → **P7.3 is declared passed on
+its association arm**; skip P9.1/P9.2 and go directly to P9.3. Below the bar → its per-cue
+diagnostics become P9.1's baseline. Between (signal but short) → P9.1 proceeds with the assoc
+metric added to its judgement alongside order.
+
+### P9.1 — Discriminate sparsification from normalisation (the P8c.5 open question)
+One registered experiment, three arms differing in exactly one mechanism, all at the P8c-strongest
+operating point so results are comparable to the recorded +0.18:
+(i) **depression as measured** (λ=0.02 — prunes via the creation guard and rescales);
+(ii) **rescale-only** — identical Δw but weights floor-clamped above the prune/guard thresholds so
+no edge is ever deleted by depression;
+(iii) **prune-only** — λ=0, plus a post-hoc covariance prune that removes the same *fraction* of
+edges arm (i) loses (coverage-matched by construction), touching no surviving weight.
+Judge each arm on `R_PMI`/`PMI_GAP`, `ASSOC_AUC`, connectivity gap and coverage, recall lift —
+≥5 repeats, shuffled nulls, seeds fixed.
+**Gate:** the arms separate — the +0.18 is attributed to one mechanism with non-overlapping
+ranges. **Adoption** only if some arm meets B-R2's unchanged bars in full; otherwise record which
+mechanism carries the signal and what coverage it costs, and take that to Bill. This phase's two
+honest attempts are its own (new hypothesis, per P8c.5's closing paragraph); it is not λ-grid #3.
+
+### P9.2 — The event-wise rule, on its own substrate change (conditional)
+Only if P9.0 and P9.1 both end short of their bars. Add the in-edge index (CSR by target
+alongside CSR by source — a registered substrate change; re-run the P1 bench and re-verify its
+gate before any learning experiment), then implement A.5(c) as written: depress s→t when t fires
+without s. Expected magnitude ∝ p(t)(1−p(s)) — the correct sign P8c.0 derived and could not
+implement. **Gate:** the unchanged P8c.0 criteria, judged once, two attempts max, stop rule as
+ever. A failure here, after P9.1, exhausts the synaptic-channel program: the finding goes to Bill
+with A.5(b)/(d) as the remaining reviewed options.
+
+### P9.3 — Close out Prompt.md (former P7.4, unchanged in substance)
+Triggered by **any** association pass (P9.0 fork, P9.1 adoption, or P9.2). Re-run the working-set
+sweep scoring association/order metrics; refresh the scale grid at adopted defaults; settle
+bytes/neuron against `SynapseCapPerNeuron` at the chosen operating point.
+**Gate:** the accuracy-for-scale curve appears on recall that has content — truncations > 0 in
+constrained cells with monotone-trending degradation of the association metric — recorded as the
+final deliverable table for Prompt.md's success clause.
+
+## B.3 The legacy cleanout (Bill's directive, authorized now)
+
+Bill's call: the point of diminishing returns on borrowing from the old architecture has been
+reached or passed. The evidence agrees — every §1.2 port candidate has been ported or deliberately
+replaced, P7–P8 mined the legacy tree for nothing but one comment, and the only asset with
+plausible future value (`Core/LLMTeacher.cs`, deferred to P10) is recoverable from git history if
+ever needed. §0 rule 1 forbids consulting history for *design decisions*; using git as the recycle
+bin for a deleted file is not that.
+
+Execute as **one commit containing no code changes**, at any point before or during P9:
+
+1. **Audit first** (recorded in the `RESULTS.md` entry): confirm `src/` and `tests/` contain no
+   reference to the legacy project (project refs, usings, paths); confirm the legacy tree's only
+   unported asset of note is `LLMTeacher.cs`; list anything else found or state there was nothing.
+2. **Delete:** the entire legacy project `greyMatter/` (source, scripts, tests, .vscode, test_data);
+   the empty root `docs/`; stray `.DS_Store` files (and add to `.gitignore` if absent).
+3. **Solution:** remove the `greyMatter` project entry and its configuration/nesting lines from
+   `GreyMatter.sln`, leaving Poc and Tests.
+4. **Restore `Prompt.md` to the repo root.** It is this plan's stated authority (§ header) and is
+   currently absent from the tree. The plan cannot outrank a file that isn't there.
+5. **Docs:** update README's "Where to look" table (drop the legacy row); add a one-line note at
+   §0 rule 2 and §1.6 marking them historical as of this addendum — do not rewrite them (the
+   assessment stays as the record of what was inherited and why the rebuild happened).
+6. **Verify, then record:** `dotnet build GreyMatter.sln -c Release` clean; full test suite green;
+   `gm eval recall --repeats 3 --train 500 --working-set-max 500000` reproduces the recorded
+   numbers; `gm audit --strings` clean. Paste all four commands and outcomes into the `RESULTS.md`
+   cleanout entry. If any check fails, revert the commit rather than patching forward.
+
+Out of scope for the repo cleanout, flagged for Bill to handle when convenient: legacy brain data
+under `/Volumes/jarvis/brainData` (the POC writes to `brainData_poc` and scratch paths), and the
+legacy `bin/`/`obj/` build residue disappears with the tree.
+
+## B.4 Definition of done, restated
+
+Done is P9.3's gate: Prompt.md's success clause measured on recall that carries association, at
+scale, on commodity hardware, with nothing readable on disk — plus a repo whose only source tree
+is the POC. The fallback ledger (B-R1) and stop rules bound everything else. When P9.3 passes, or
+when P9.2 fails its two attempts: stop, present to Bill.

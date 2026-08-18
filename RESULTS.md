@@ -2082,3 +2082,63 @@ registration.
   is the better target.
 
 ---
+
+# Addendum B — P9 and the legacy cleanout
+
+## B.3 — Legacy cleanout
+
+**Date:** 2026-08-18. One commit, **no code changes**, per B.3.
+
+### Step 1 — audit (recorded, as B.3.1 requires)
+
+| check | result |
+|---|---|
+| `ProjectReference` from `src/`,`tests/` to legacy | **none** — the only one is `tests → src/GreyMatter.Poc/Poc.csproj` |
+| `using GreyMatter.{Core,Learning,Storage,DataIntegration,Evaluations}` in POC | **none** |
+| `greyMatter/` path strings in POC sources | **none** |
+| legacy tree committed (so deletion is recoverable) | **101 files tracked, nothing uncommitted** |
+| unported asset of note | `Core/LLMTeacher.cs` (22,696 B), tracked, deferred to P10 |
+| anything else found | **nothing.** The largest remaining files are `Cerebro.cs` (172,820 B), `Program.cs` (120,431 B) and `EnhancedBrainStorage.cs` (89,315 B) — all three are the accreted classes §1.1 identified as the reason for the rebuild, and all were port sources, not port candidates. |
+
+### Steps 2–5 — executed
+
+- Deleted `greyMatter/` (101 tracked files), the empty `docs/`, and stray `.DS_Store` files
+  (`.gitignore` already covered them).
+- `GreyMatter.sln`: removed the `greyMatter` project entry and its four
+  `{5AEA7501-…}` configuration lines. Zero occurrences of the legacy GUID remain; Poc and Tests
+  are the only projects.
+- `Prompt.md`: present at repo root and **added to git** — it was restored as a file but untracked,
+  so the plan's stated authority was still absent from the repository proper.
+- README: legacy row dropped; `Prompt.md` added to the "Where to look" table as the authority.
+- `plan.md` §0 rule 2 and §1.6: annotated *historical as of B.3*, **not rewritten** — §1 remains
+  the record of what was inherited and why the rebuild happened.
+
+Addendum B itself was uncommitted (`M plan.md`) when this ran, so it is included in this commit.
+
+### Step 6 — verification
+
+```bash
+dotnet build GreyMatter.sln -c Release
+dotnet test tests/GreyMatter.Poc.Tests/GreyMatter.Poc.Tests.csproj -c Release
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recall --repeats 3 --train 500 --working-set-max 500000 --brain-data-path <scratch>/clean_recall
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- audit --strings --brain-data-path <scratch>/clean_audit
+```
+
+| check | outcome |
+|---|---|
+| solution build | **0 errors**, 1 pre-existing warning (below) |
+| test suite | **138 passed**, 0 failed |
+| recall smoke | `SYSTEM_AUC` 1.000, `UNTRAINED` 0.500, `LIFT +0.500` [+0.500..+0.500], separated, `GRADED_RHO +0.730` [+0.680..+0.757] — **matches the pre-cleanout λ=0 measurement in P8c.1 exactly** |
+| `gm audit --strings` | **CLEAN** — 412 partitions, 81,932,577 payload bytes, 0 string tokens, 0 corpus words |
+
+**The audit check was run twice, and the first run was worthless.** Against the recall eval's path
+it reported `FILES_SCANNED: 0` — recall uses scratch brains and deletes them, so "CLEAN" was a
+statement about an empty directory. Re-run against a store populated by `gm learn --sentences 600`
+(412 partitions, 82 MB of payload) it is a real check. Recording this because a green tick on zero
+files is exactly the kind of vacuous verification this project has twice been caught by.
+
+**Pre-existing warning, deliberately not fixed:** `ScaleSweep.cs(65,41) CS8604` — possible null
+argument to `Path.Combine`, from `args.Value("--sweep-path", …)` returning `string?`. It predates
+this commit and only became visible because earlier builds filtered output to errors. B.3 specifies
+no code changes in the cleanout commit, so it stays; logged here as a known cleanup.
+
