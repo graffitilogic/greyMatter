@@ -36,6 +36,18 @@ public sealed class Config
     /// </summary>
     public double ContestErosion { get; set; }
 
+    /// <summary>
+    /// P8c — base-rate depression coefficient λ in Δw = η·a_s·a_t − λ·a_s·rate(t).
+    ///
+    /// Hebbian coactivation accumulates weight in proportion to count(s,t), so a
+    /// frequent successor wins every ranking simply by entering more coactivation
+    /// events. PMI needs count(s,t) divided by count(t); this subtracts the target's
+    /// marginal rate so the rule measures covariance rather than co-occurrence.
+    ///
+    /// 0 reproduces pre-P8c behaviour.
+    /// </summary>
+    public double BaseRateDepression { get; set; }
+
     // ── Activation scope (§4.4) ──
     public int ActivationDepth { get; set; } = 4;
     public int ActivationWidth { get; set; } = 256;
@@ -57,6 +69,24 @@ public sealed class Config
     /// Default 0 reproduces pre-P7.1 behaviour exactly.
     /// </summary>
     public int PropagatedWinnerQuota { get; set; } = 64;   // P7.1 adopted default; 0 = pre-P7.1
+
+    /// <summary>
+    /// P8a — fraction of an assembly's members drawn from its code's ACTIVE DIMS
+    /// (therefore shared with any code containing those dims) rather than from its
+    /// code hash (therefore private).
+    ///
+    /// P7.2.8 measured the problem this addresses: `to → be`, one of the most
+    /// frequent bigrams in English, has 7,164 synapses across 256 fully-resident
+    /// members and ZERO edges into `be`'s assembly. With hash-disjoint assemblies,
+    /// whether two words have any synaptic path at all is close to a lottery, and
+    /// Hebbian learning cannot encode an association across neuron sets that never
+    /// form an edge.
+    ///
+    /// 0 reproduces current behaviour exactly. 1 reproduces the P4.3 defect-4 failure
+    /// mode, where every word shared ~216 of 256 members and no word was ever
+    /// untrained — which is why this is a dial and not a switch.
+    /// </summary>
+    public double AssemblyOverlap { get; set; }
 
     // ── Encoding (§4.2) ──
     public int PatternSize { get; set; } = 2048;   // n
@@ -87,6 +117,16 @@ public sealed class Config
         var json = File.ReadAllText(path);
         return JsonSerializer.Deserialize<Config>(json, JsonOpts) ?? new Config();
     }
+
+    /// <summary>
+    /// A copy for a single experiment arm. MemberwiseClone rather than a hand-written
+    /// member list: every eval that sweeps a parameter needs one of these, and five
+    /// hand-written copies had already silently dropped two newly-added fields
+    /// (AssemblyOverlap, BaseRateDepression), which makes a sweep quietly measure the
+    /// default instead of the swept value. Every field is a value type or string, so
+    /// a shallow copy is a complete one.
+    /// </summary>
+    public Config Clone() => (Config)MemberwiseClone();
 
     public string ToJson() => JsonSerializer.Serialize(this, JsonOpts);
 

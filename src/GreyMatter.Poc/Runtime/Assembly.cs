@@ -48,22 +48,46 @@ public static class Assembly
     /// the run seed: assemblies must be stable across runs and processes, or a
     /// store written by one run is meaningless to the next.
     /// </summary>
-    public static int Members(in SparseCode code, int baselineNeuronCount, uint[] members)
+    public static int Members(in SparseCode code, int baselineNeuronCount, uint[] members,
+                              double assemblyOverlap = 0.0)
     {
         uint space = (uint)baselineNeuronCount;
         ulong hash = code.Hash();
 
         int want = Math.Min(members.Length, Size(code.K));
-        for (uint j = 0; j < want; j++)
-            members[j] = (uint)(Rng.Mix(hash ^ Rng.Mix(j)) % space);
+        if (want == 0) return 0;
+
+        // P8a — the leading `shared` slots are derived from the code's ACTIVE DIMS,
+        // so two codes sharing a dim share that dim's neurons; the rest stay derived
+        // from the code hash and remain private to this code.
+        //
+        // Expected shared members between two codes ≈ overlap × size × (shared dims / k),
+        // i.e. proportional to code similarity, which is the whole point. Deriving
+        // shared slots dim-first (dim index varying fastest) rather than
+        // neuron-first matters: it spreads a partial overlap across many dims instead
+        // of concentrating it in the first few, so the proportionality holds at low
+        // overlap settings too.
+        int shared = (int)Math.Round(Math.Clamp(assemblyOverlap, 0.0, 1.0) * want);
+        int k = Math.Max(1, code.Dims.Length);
+
+        for (int i = 0; i < shared; i++)
+        {
+            uint dim = (uint)code.Dims[i % k];
+            uint j = (uint)(i / k);
+            members[i] = (uint)(Rng.Mix(((ulong)dim << 32) | j) % space);
+        }
+
+        for (int i = shared; i < want; i++)
+            members[i] = (uint)(Rng.Mix(hash ^ Rng.Mix((uint)i)) % space);
 
         return want;
     }
 
-    public static uint[] Members(in SparseCode code, int baselineNeuronCount)
+    public static uint[] Members(in SparseCode code, int baselineNeuronCount,
+                                 double assemblyOverlap = 0.0)
     {
         var members = new uint[Size(code.K)];
-        int n = Members(code, baselineNeuronCount, members);
+        int n = Members(code, baselineNeuronCount, members, assemblyOverlap);
         return n == members.Length ? members : members[..n];
     }
 }

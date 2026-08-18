@@ -229,7 +229,7 @@ public static class ScaleSweep
                 foreach (var t in targets)
                 {
                     double m = 0;
-                    foreach (var vid in Assembly.Members(encoder.Encode(t), runCfg.BaselineNeuronCount))
+                    foreach (var vid in Assembly.Members(encoder.Encode(t), runCfg.BaselineNeuronCount, runCfg.AssemblyOverlap))
                         if (active.TryGetValue(vid, out var v)) m += v;
                     mass.Add(m);
 
@@ -276,22 +276,13 @@ public static class ScaleSweep
         Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
     }
 
-    private static Config With(Config c, int neurons, int depth, int width, string path) => new()
+    private static Config With(Config c, int neurons, int depth, int width, string path)
     {
-        BaselineNeuronCount = neurons,
-        WorkingSetMax = c.WorkingSetMax,
-        SynapseCapPerNeuron = c.SynapseCapPerNeuron,
-        ActivationDepth = depth,
-        ActivationWidth = width,
-        PatternSize = c.PatternSize,
-        Sparsity = c.Sparsity,
-        ContextBlend = c.ContextBlend,
-        SurfaceDimensions = c.SurfaceDimensions,
-        VqCodebookSize = c.VqCodebookSize,
-        DeviationThreshold = c.DeviationThreshold,
-        Seed = c.Seed,
-        BrainDataPath = path,
-        TrainingDataRoot = c.TrainingDataRoot,
-        Dataset = c.Dataset
-    };
+        var cfg = c.Clone();
+        cfg.BaselineNeuronCount = neurons;
+        cfg.ActivationDepth = depth;
+        cfg.ActivationWidth = width;
+        cfg.BrainDataPath = path;
+        return cfg;
+    }
 }

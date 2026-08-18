@@ -50,7 +50,8 @@ public sealed class ActivationScope : IDisposable
         _synapses = new SynapseStore(cfg.WorkingSetMax, cfg.SynapseCapPerNeuron)
         {
             WithinAssemblyCap = cfg.WithinAssemblyCap,
-            ContestErosion = (float)cfg.ContestErosion
+            ContestErosion = (float)cfg.ContestErosion,
+            BaseRateDepression = (float)cfg.BaseRateDepression
         };
         _codebook = codebook ?? new VqCodebook(cfg.VqCodebookSize, cfg.SurfaceDimensions, cfg.Seed);
 

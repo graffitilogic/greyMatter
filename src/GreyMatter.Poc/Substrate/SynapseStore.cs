@@ -60,6 +60,15 @@ public sealed class SynapseStore
     public float PruneThreshold { get; init; } = 0.1f;
     public float CreationProductThreshold { get; init; } = 0.15f;
 
+    /// <summary>
+    /// P8c — base-rate depression coefficient. See Config.BaseRateDepression. The
+    /// caller supplies the target's marginal rate; this class does not track it.
+    /// </summary>
+    public float BaseRateDepression { get; init; }
+
+    /// <summary>P8c accounting: how much weight base-rate depression removed.</summary>
+    public double BaseRateSuppressed { get; private set; }
+
     /// <summary>P7.1b — slot budget for within-assembly edges. See Config.WithinAssemblyCap.</summary>
     public int WithinAssemblyCap { get; init; } = int.MaxValue;
 
@@ -186,7 +195,8 @@ public sealed class SynapseStore
     /// </summary>
     public void RecordCoactivation(int slot, uint sourceVirtualId, uint targetVirtualId,
                                    float sourceActivation, float targetActivation,
-                                   SynapsePopulation population = SynapsePopulation.WithinAssembly)
+                                   SynapsePopulation population = SynapsePopulation.WithinAssembly,
+                                   float targetRate = 0f)
     {
         if (sourceVirtualId == targetVirtualId) return;
         int pop = (int)population;
@@ -195,7 +205,15 @@ public sealed class SynapseStore
         int degree = Degree[slot];
         int end = start + degree;
 
-        float delta = LearningRate * sourceActivation * targetActivation;
+        // P8c — covariance rather than co-occurrence: strengthen only to the extent
+        // the target's activation exceeds its own base rate. Without the second term
+        // a frequent target accrues weight from every cue it appears with, which is
+        // the measured reason cascade mass ranks by frequency (R_UNIGRAM +0.09)
+        // rather than by association (R_PMI −0.06).
+        float hebbian = LearningRate * sourceActivation * targetActivation;
+        float suppression = BaseRateDepression * sourceActivation * targetRate;
+        float delta = hebbian - suppression;
+        if (suppression > 0f) BaseRateSuppressed += suppression;
 
         for (int i = start; i < end; i++)
         {
@@ -208,6 +226,11 @@ public sealed class SynapseStore
 
         if (sourceActivation * targetActivation < CreationProductThreshold)
         { Declined++; DeclinedBy[pop]++; DeclinedThresholdBy[pop]++; return; }
+
+        // A candidate whose covariance is non-positive has no evidence behind it:
+        // the target was no more active than its own base rate predicts. Creating it
+        // would add an edge that depression must then remove.
+        if (delta <= 0f) { Declined++; DeclinedBy[pop]++; DeclinedThresholdBy[pop]++; return; }
 
         float birthWeight = Math.Clamp(PruneThreshold + delta, MinWeight, MaxWeight);
 
@@ -429,6 +452,6 @@ public sealed class SynapseStore
         Array.Clear(DisplacedBy); Array.Clear(DeclinedBy);
         Array.Clear(DeclinedThresholdBy); Array.Clear(DeclinedPressureBy);
         Array.Clear(ProposalsAtFullBy);
-        ContestErosions = 0; WeightEroded = 0;
+        ContestErosions = 0; WeightEroded = 0; BaseRateSuppressed = 0;
     }
 }

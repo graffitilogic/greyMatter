@@ -87,7 +87,7 @@ public sealed class Cascade
         var synapses = _scope.Synapses;
 
         // ── Materialize the cue's assembly ──────────────────────────────────
-        int memberCount = Assembly.Members(code, _cfg.BaselineNeuronCount, _members);
+        int memberCount = Assembly.Members(code, _cfg.BaselineNeuronCount, _members, _cfg.AssemblyOverlap);
         LastMemberCount = memberCount;
         int truncatedHere = 0;
 

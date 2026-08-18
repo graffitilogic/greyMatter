@@ -262,22 +262,5 @@ public static class RecallEval
     private static Result Empty(int repeats, string refusal) =>
         new(repeats, (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), (0, 0, 0), false, 0, 0, 0, 0, refusal);
 
-    private static Config Clone(Config c) => new()
-    {
-        BaselineNeuronCount = c.BaselineNeuronCount,
-        WorkingSetMax = c.WorkingSetMax,
-        SynapseCapPerNeuron = c.SynapseCapPerNeuron,
-        ActivationDepth = c.ActivationDepth,
-        ActivationWidth = c.ActivationWidth,
-        PatternSize = c.PatternSize,
-        Sparsity = c.Sparsity,
-        ContextBlend = c.ContextBlend,
-        SurfaceDimensions = c.SurfaceDimensions,
-        VqCodebookSize = c.VqCodebookSize,
-        DeviationThreshold = c.DeviationThreshold,
-        Seed = c.Seed,
-        BrainDataPath = c.BrainDataPath,
-        TrainingDataRoot = c.TrainingDataRoot,
-        Dataset = c.Dataset
-    };
+    private static Config Clone(Config c) => c.Clone();
 }

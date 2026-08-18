@@ -95,7 +95,12 @@ public sealed class Plasticity
                     ? SynapsePopulation.WithinAssembly
                     : SynapsePopulation.CrossAssembly;
 
-                synapses.RecordCoactivation(si, vi, vj, ai, scores[j] * inv, population);
+                // P8c — the target's own marginal activation rate, so the rule can
+                // subtract it. Familiarity is the substrate's running estimate of
+                // "how often does this neuron win", already maintained per k-WTA win
+                // and already persisted with the recipe.
+                synapses.RecordCoactivation(si, vi, vj, ai, scores[j] * inv, population,
+                                            targetRate: pool.Familiarity[winners[j]]);
                 WithinCueUpdates++;
             }
 
@@ -120,7 +125,8 @@ public sealed class Plasticity
                 // information; wiring both ways would erase it.
                 synapses.RecordCoactivation(pre, _trace[p], pool.VirtualId[winners[i]],
                                             SequenceStrength, scores[i] * inv,
-                                            SynapsePopulation.CrossCue);
+                                            SynapsePopulation.CrossCue,
+                                            targetRate: pool.Familiarity[winners[i]]);
                 SequenceUpdates++;
             }
         }
