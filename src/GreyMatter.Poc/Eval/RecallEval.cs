@@ -149,6 +149,9 @@ public static class RecallEval
         Console.WriteLine($"SEPARATED: {separated} (system and untrained repeat ranges do not overlap)");
         Console.WriteLine($"WORKING_SET_HIGH_WATER: {highWater:N0} / {workingMax:N0}");
         Console.WriteLine($"CASCADE_TRUNCATIONS: {truncations:N0}");
+        SampleCheck.Report(
+            new ArmSample("trained", split.Trained.Count, split.Trained.Count, split.Trained.Count),
+            new ArmSample("control", split.Controls.Count, split.Controls.Count, split.Controls.Count));
 
         var rho = Harness.Aggregate(gradedRhos);
         var gap = Harness.Aggregate(truncGaps);

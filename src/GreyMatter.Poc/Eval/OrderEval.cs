@@ -127,6 +127,9 @@ public static class OrderEval
         Console.WriteLine($"R_PMI:      {realPmi.mean:+0.0000;-0.0000} [{realPmi.lo:+0.0000;-0.0000}..{realPmi.hi:+0.0000;-0.0000}]   vs shuffled {shufPmi.mean:+0.0000;-0.0000} [{shufPmi.lo:+0.0000;-0.0000}..{shufPmi.hi:+0.0000;-0.0000}]");
         Console.WriteLine($"PMI_GAP:    {gap:+0.0000;-0.0000}   (real − shuffled)");
         Console.WriteLine($"CUES_SCORED: {scored}");
+        SampleCheck.Report(
+            new ArmSample("real", reals[0].CuesScored, cues.Count, reals[0].CuesScored),
+            new ArmSample("shuffled", shufs[0].CuesScored, cues.Count, shufs[0].CuesScored));
         Console.WriteLine($"SUPPORT:    {support:P1} of scored bigrams occur more than once");
 
         var verdict = Decide(repeats, scored, support, realPmi, shufPmi, gap);

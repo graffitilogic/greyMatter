@@ -2561,3 +2561,130 @@ design decision depends on which is right. That is a bounded diagnostic task —
 comparisons on one brain, with per-pair values printed rather than aggregated — not another phase of
 mechanism changes.
 
+## P9.3D — Registration: reconcile P8a against P9.2R
+
+**Date:** 2026-08-19
+
+Two instruments disagree about whether the edges carry association. P8a/P9.1: co-occurring pairs
+60% connected vs a 15% null, mass ratio 418×. P9.2R `edge`, the same quantity: `ASSOC_AUC` 0.493
+against a 0.519 null. Every remaining design decision depends on which is right, so nothing else
+proceeds until this is settled.
+
+**Suspect, stated before measuring.** `ConnectivityEval`'s null is built by walking cues in order
+and targets in order, collecting non-adjacent `(cue, target)` combinations, and breaking out of
+**both** loops at `pairCount`. With ~40 targets and most combinations non-adjacent, the first cue
+alone can supply all 40 control pairs — so the null may be one cue's edge mass rather than a sample
+across cues, while the co-occurring arm spans all 40. That is a §6.1 rule 2 violation (the null not
+scored on comparable pairs), and it inflates the ratio if that cue happens to be poorly connected.
+
+**Test:** report the cue distribution of the control set, then rebuild the null balanced across
+cues (equal pairs per cue, same frequency-matching) and re-measure. Decision rule fixed now:
+
+- gap and ratio **collapse** under a balanced null ⇒ P8a's 418× was a sampling artifact, P9.2R is
+  right, and the edges do **not** carry association. P8a's conclusion and everything resting on it
+  is corrected.
+- gap and ratio **survive** ⇒ P8a is right, and the discrepancy lies in AssocEval's AUC — next
+  suspect is pairs scoring zero in both arms.
+
+No behaviour change; instrument only.
+
+## P9.3D — Result: P8a's null was unbalanced. Its headline numbers are inflated ~35×.
+
+**Date:** 2026-08-19 (run by Bill in terminal; the agent's SMB session had gone stale)
+
+```bash
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval connectivity --train 2000 --brain-data-path /tmp/p93d
+```
+
+```
+null spread: 21 distinct cues supply 21 control pairs (max 1 from any one cue)
+real spread: 21 distinct cues supply 40 pairs
+```
+
+| | P8a (unbalanced null) | P9.3D (balanced null) |
+|---|---|---|
+| co-occurring connectivity | 60.0% | 60.0% (unchanged, as expected) |
+| **null connectivity** | **15.0%** | **38.1%** |
+| `CONNECTIVITY_GAP` | +0.450 | **+0.219** |
+| `MEAN_MASS_RATIO` | **418×** | **11.96×** |
+| null mean mass | 0.49 | 17.13 |
+
+**The suspect registered before measuring was correct.** The original null walked cues in order and
+broke out of both loops at `pairCount`, so the first cue supplied essentially all 40 control pairs
+while the real arm spanned 21 cues — a §6.1 rule 2 violation. Spread across the same 21 cues, the
+null's connectivity rises 15.0% → 38.1% and its mean mass rises 0.49 → 17.13, collapsing the
+headline ratio from **418× to 11.96×**.
+
+### Corrections to the record
+
+**P8a.1, P8a.2 and P8a.3 quote 60%/15% and 418× throughout, and those numbers are wrong.** The
+correct figures at the same settings are 60%/38.1% and 11.96×. Everywhere this project has written
+"co-occurring pairs are 60% connected against a 15% null with 418× the edge mass" — including
+P8a.2's correction of P7.2.8, P9.0's "raw material an association AUC reads out", and B.0's premise
+that the system might already pass the association gate — the effect is real but roughly an order of
+magnitude smaller than stated.
+
+**P8a's conclusions survive in direction, not in magnitude.** The gap is still positive and
+substantial (+0.219, 11.96×), so P8a.2's core correction of P7.2.8 stands: direct paths are *not* a
+lottery, they do track co-occurrence. But "418×" was never a property of the graph.
+
+### The reconciliation, and what it leaves
+
+The two instruments are now much closer, and neither is simply right:
+
+- **P8a was overstated** by an unbalanced null (418× → 12×).
+- **P9.2R is not fully explained** by that alone. A 12× mass ratio should still lift an AUC above
+  0.5, and `edge` measured 0.493.
+
+The leading remaining suspect — listed in P9.2R and now the obvious one — is **ties at zero**. With
+connectivity 60% and 38.1%, roughly 40% of related pairs and 62% of unrelated pairs have *no edge at
+all*, so ~25% of all comparisons are 0-vs-0 and score 0.5 by definition. An AUC over a mostly-empty
+matrix is dominated by ties regardless of what the non-empty entries say. **This is a hypothesis,
+not a finding** — it predicts a specific number (the tie fraction in `Harness.Auc`) and should be
+measured before it is believed, given this project's record on plausible-sounding explanations.
+
+### Standing issue: null construction is now the recurring defect
+
+This is the **fourth** measurement in P7–P9 where a null was built on a different sample than its
+real arm: P7.2.5 (residency-dependent retention), P9.0 (within-sentence shuffle preserving
+sentence co-occurrence), P9.2R's still-open discrepancy, and now P8a's unbalanced cue spread. Three
+were caught only after they had produced a published number.
+
+Worth a standing check rather than case-by-case vigilance: **every eval should print the sample
+composition of both arms** — how many items, drawn from how many cues, with what retention — the way
+`RETENTION` and `null spread` now do. Where those lines exist the defect was visible immediately;
+where they did not, it took a contradiction between instruments to surface it.
+
+## P9.3E — Sample-composition check, made executable
+
+**Date:** 2026-08-19
+
+Four nulls in P7–P9 were built on a different sample than their real arm, and three produced a
+published number before anyone noticed:
+
+| | defect | how it surfaced |
+|---|---|---|
+| P7.2.5 | retention varied with residency — 15/24 suppressed vs 5/24 unaffected | only when the numbers looked too good |
+| P9.0 | within-sentence shuffle preserved the co-occurrence it was meant to destroy | real 0.574 vs null 0.569, read as CONFOUNDED |
+| P8a | one cue supplied the entire null against 21 in the real arm | only when a second instrument contradicted it |
+| P9.2R | still open | contradiction with P8a |
+
+Where a composition line existed (`RETENTION`, `null spread`) the defect was visible immediately.
+Where it did not, it took two instruments disagreeing. So the convention is now a check.
+
+`ArmSample` + `SampleCheck.Report` in [Eval/Harness.cs](src/GreyMatter.Poc/Eval/Harness.cs): every
+arm reports items scored, items offered, retention, and distinct cues; the check warns and returns
+false when arms differ by more than 25% in size or at all in cue coverage. Wired into
+`gm eval recall`, `order` and `assoc`; `connectivity` and `shift` already had their own lines.
+
+```
+SAMPLE:       trained: 16 from 16 cues   |   control: 16 from 16 cues
+```
+
+**The check is tested against the actual historical defects** — `P8aUnbalancedNullIsCaught`
+(40 pairs/21 cues vs 40 pairs/1 cue) and `UnequalRetentionIsCaught` (15/24 vs 5/24) both assert it
+returns false. A check that cannot fail would have been the fifth instance of this bug. Tests: 143
+passing (5 added).
+
+This does not fix any past number; it makes the next one visible at the point it is produced.
+

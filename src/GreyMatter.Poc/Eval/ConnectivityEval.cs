@@ -59,17 +59,32 @@ public static class ConnectivityEval
         // adjacently in the corpus.
         var cues = cooccurring.Select(p => p.Item1).Distinct().ToList();
         var targets = cooccurring.Select(p => p.Item2).Distinct().ToList();
+
+        // P9.3D — the null must be spread across the SAME cues the co-occurring arm
+        // uses. The original build walked cues in order and broke out of both loops
+        // at pairCount, so with ~40 targets and most combinations non-adjacent the
+        // FIRST cue supplied every control pair: a one-cue null compared against a
+        // forty-cue real arm, which is §6.1 rule 2 and inflates the ratio whenever
+        // that cue happens to be poorly connected.
+        int perCueQuota = Math.Max(1, pairCount / Math.Max(1, cues.Count));
         var control = new List<(string, string)>();
+        var controlByCue = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var c in cues)
         {
+            int taken = 0;
             foreach (var t in targets)
             {
                 if (bigram.ContainsKey((c, t)) || c == t) continue;
                 control.Add((c, t));
-                if (control.Count >= pairCount) break;
+                controlByCue[c] = controlByCue.GetValueOrDefault(c) + 1;
+                if (++taken >= perCueQuota) break;
             }
             if (control.Count >= pairCount) break;
         }
+        Console.WriteLine($"null spread: {controlByCue.Count} distinct cues supply {control.Count} control pairs " +
+                          $"(max {(controlByCue.Count > 0 ? controlByCue.Values.Max() : 0)} from any one cue)");
+        Console.WriteLine($"real spread: {cooccurring.Select(p => p.Item1).Distinct().Count()} distinct cues " +
+                          $"supply {cooccurring.Count} pairs\n");
 
         var encoder = new ContextEncoder(cfg);
         Trainer.AccumulateContext(encoder, sentences);

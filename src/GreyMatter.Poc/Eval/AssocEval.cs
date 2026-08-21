@@ -89,6 +89,7 @@ public static class AssocEval
 
         var realAucs = new List<double>();
         var nullAucs = new List<double>();
+        ArmScore lastReal = new(0, 0, 0, 0, 0, 0), lastNull = new(0, 0, 0, 0, 0, 0);
 
         if (modes.Length > 1)
         {
@@ -132,6 +133,7 @@ public static class AssocEval
 
             realAucs.Add(real.Auc);
             nullAucs.Add(shuf.Auc);
+            lastReal = real; lastNull = shuf;
 
             Console.WriteLine($"   repeat {r + 1}/{repeats}: ASSOC_AUC {real.Auc:F3} (d′ {real.DPrime:F2})   " +
                               $"shuffled {shuf.Auc:F3}   related {real.RelatedMean:F1} vs unrelated {real.UnrelatedMean:F1}   " +
@@ -148,6 +150,9 @@ public static class AssocEval
                           "(order destroyed, unigram frequency preserved, same pairs)");
         Console.WriteLine($"ASSOC_GAP:    {real5.mean - null5.mean:+0.000;-0.000}");
         Console.WriteLine($"SEPARATED:    {separated}");
+        SampleCheck.Report(
+            new ArmSample("real", lastReal.PairsScored, lastReal.PairsScored, lastReal.CuesScored),
+            new ArmSample("shuffled", lastNull.PairsScored, lastNull.PairsScored, lastNull.CuesScored));
 
         var refusal = Verdicts.RefuseForRepeats(repeats);
         Console.WriteLine();

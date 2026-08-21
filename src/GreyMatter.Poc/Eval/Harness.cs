@@ -107,6 +107,61 @@ public static class Harness
 }
 
 /// <summary>
+/// Sample composition of one experimental arm, and the check that two arms were
+/// scored on comparable samples.
+///
+/// Added after the fourth null in P7–P9 was found to have been built on a different
+/// sample than its real arm: P7.2.5 (retention varied with residency), P9.0
+/// (within-sentence shuffle preserved the co-occurrence it was meant to destroy),
+/// P9.2R (still open), and P8a (one cue supplied the entire null, inflating the
+/// headline ratio 35×). Three of the four surfaced only after publishing a number.
+///
+/// Where a composition line already existed the defect was visible immediately;
+/// where it did not, it took two instruments contradicting each other to find. So
+/// every arm prints its composition, and §6.1 rule 2 gets an executable check
+/// instead of a convention.
+/// </summary>
+public readonly record struct ArmSample(string Name, int Scored, int Offered, int DistinctCues)
+{
+    public double Retention => Offered > 0 ? (double)Scored / Offered : 0;
+
+    public override string ToString() =>
+        $"{Name}: {Scored:N0}" + (Offered > Scored ? $"/{Offered:N0} ({Retention:P0})" : "") +
+        (DistinctCues > 0 ? $" from {DistinctCues} cues" : "");
+}
+
+public static class SampleCheck
+{
+    /// <summary>
+    /// Print both arms' composition and warn when they are not comparable.
+    /// Returns false when the arms differ enough that §6.1 rule 2 is in question.
+    /// </summary>
+    public static bool Report(params ArmSample[] arms)
+    {
+        Console.WriteLine("SAMPLE:       " + string.Join("   |   ", arms.Select(a => a.ToString())));
+        if (arms.Length < 2) return true;
+
+        int minScored = arms.Min(a => a.Scored), maxScored = arms.Max(a => a.Scored);
+        int minCues = arms.Min(a => a.DistinctCues), maxCues = arms.Max(a => a.DistinctCues);
+
+        // A 25% size difference, or any cue-coverage difference, is enough to make
+        // an aggregate comparison suspect — P8a's null spanned 1 cue against 21.
+        bool sizeSkew = maxScored > 0 && (double)minScored / maxScored < 0.75;
+        bool cueSkew = maxCues > 0 && minCues < maxCues;
+
+        if (sizeSkew || cueSkew)
+        {
+            Console.WriteLine("   ⚠️  ARMS NOT COMPARABLE — " +
+                (sizeSkew ? $"sizes differ {minScored:N0} vs {maxScored:N0}. " : "") +
+                (cueSkew ? $"cue coverage differs {minCues} vs {maxCues}. " : "") +
+                "§6.1 rule 2: a null scored on a different sample is not a null.");
+            return false;
+        }
+        return true;
+    }
+}
+
+/// <summary>
 /// plan.md §6.1 — the ground rules as executable checks. The legacy harness's
 /// greatest strength was refusing verdicts it could not support; these are that
 /// refusal, factored out so no experiment can quietly skip one.
