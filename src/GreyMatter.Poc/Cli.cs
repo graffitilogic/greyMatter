@@ -14,8 +14,22 @@ public static class Cli
         if (argv.Length == 0) { Usage(); return 1; }
 
         var args = new Args(argv);
-        var cfg = Config.Load(args.Value("--config", null));
-        cfg.ApplyOverrides(args);
+        Config cfg;
+
+        // Config parsing lives INSIDE the guard. It was outside, so a bad or
+        // unsupported --flag produced an unhandled crash dump instead of a message —
+        // and, worse, a flag the parser rejected could be lost in shell quoting and
+        // never reach it at all, leaving the run silently on defaults.
+        try
+        {
+            cfg = Config.Load(args.Value("--config", null));
+            cfg.ApplyOverrides(args);
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"❌ configuration: {ex.Message}");
+            return 1;
+        }
 
         try
         {
@@ -41,7 +55,7 @@ public static class Cli
 
     private static int Eval(string[] argv, Args args, Config cfg)
     {
-        if (argv.Length < 2) { Console.Error.WriteLine("usage: gm eval <encoder-ceiling|recall|order|scale|attribution|shift|connectivity>"); return 1; }
+        if (argv.Length < 2) { Console.Error.WriteLine("usage: gm eval <encoder-ceiling|recall|order|scale|assoc|attribution|shift|connectivity>"); return 1; }
 
         switch (argv[1])
         {
@@ -73,6 +87,9 @@ public static class Cli
                     && result.LiftVsUntrained.mean >= 0.05
                     && result.Separated ? 0 : 1;
             }
+            case "assoc":
+                AssocEval.Run(cfg, args);
+                return 0;
             case "connectivity":
                 ConnectivityEval.Run(cfg, args);
                 return 0;
@@ -405,7 +422,7 @@ public static class Cli
               gm learn  --dataset tatoeba_small --sentences 500 [--config f.json] [--resume]
               gm probe  --cue <word> [--topk 16]
               gm eval   encoder-ceiling [--train 500] [--vocab 3000]
-              gm eval   recall | order | scale | attribution | shift | connectivity
+              gm eval   recall | order | scale | assoc | attribution | shift | connectivity
               gm bench  substrate [--cycles 10000] [--scope 2000]
               gm stats
               gm audit  --strings

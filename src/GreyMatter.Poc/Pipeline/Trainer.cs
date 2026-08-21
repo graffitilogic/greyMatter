@@ -99,6 +99,18 @@ public sealed class Trainer
         }
 
         _scope.ConsolidateAll();
+
+        // P9.1 arm (iii): coverage-matched prune, after consolidation so recipes are
+        // authoritative. No-op at the default 0.
+        if (_cfg.PostHocPruneFraction > 0)
+        {
+            var (removed, total) = _scope.PostHocCovariancePrune(_cfg.PostHocPruneFraction,
+                                                                 _cfg.PostHocPruneLambda);
+            if (!quiet)
+                Console.WriteLine($"   post-hoc covariance prune: removed {removed:N0} of {total:N0} edges " +
+                                  $"({(total > 0 ? (double)removed / total : 0):P1})");
+        }
+
         sw.Stop();
 
         return new Stats(sentenceCount, tokenCount, skipped, sw.Elapsed.TotalSeconds,

@@ -2142,3 +2142,422 @@ argument to `Path.Combine`, from `args.Value("--sweep-path", …)` returning `st
 this commit and only became visible because earlier builds filtered output to errors. B.3 specifies
 no code changes in the cleanout commit, so it stays; logged here as a known cleanup.
 
+## P9.0 — Registration: `gm eval assoc`, the instrument P7.3 specified and nobody built
+
+**Date:** 2026-08-18
+
+### Why this outranks the mechanism work
+
+Every association verdict since P5 has come from `gm eval order`, which asks the graph to rank a
+cue's **successors against each other** by base-rate-corrected sequence statistics. That is
+syntagmatic order — the hardest association question available, and one the plan adopted because
+the legacy tree had an order harness to port.
+
+Prompt.md asks the easier and more fundamental question: does activating a concept light up related
+material *at all*? P7.3 specified exactly that instrument and made it an **equal-alternative gate**
+— "passing either at full rigor is a P7.3 pass" — and it was never built.
+
+Meanwhile P8a measured, at current defaults, co-occurring pairs **60% connected against a 15% null
+with 418× the edge mass**. That is the raw material an association AUC reads out. It is plausible
+the system already passes the Prompt.md-relevant gate and the only reason nobody knows is that the
+instrument does not exist.
+
+### Hypothesis
+
+**H:** cascade mass from a cue distinguishes words that co-occurred with it from frequency-matched
+words that never did, even though it cannot rank co-occurring successors against each other.
+Discrimination and ranking are different problems; the P8a connectivity gap suggests the first is
+solved and only the second is not.
+
+### Instrument, as P7.3 specified it
+
+For each cue, rank frequency-matched in-vocabulary words that **did** co-occur with it
+(within-sentence, window ±2) against those that **never** did, by cascade mass. AUC over the cue
+set, ≥5 repeats, same-pairs shuffled null.
+
+Controls are frequency-matched (A-R1) and in-vocabulary — the P4.2 lesson. The shuffled null trains
+on word-order-shuffled sentences and is scored on the **same pairs** (rule 2): shuffling preserves
+every unigram frequency and destroys co-occurrence within the ±2 window, so a system encoding only
+frequency scores identically in both arms (A-R2). No readout arithmetic is introduced; if any is
+ever needed, A-R2 polices it.
+
+### Metrics and bar
+
+`ASSOC_AUC` ≥ 0.70, shuffled ≤ 0.55, non-overlapping repeat ranges — **the unchanged P7.3 bar**
+(B-R2). Reported with mean and [min..max] over ≥5 repeats.
+
+### Decision fork, fixed now (B.2)
+
+- **Instrument gate:** runs end-to-end and emits a rule-compliant verdict — any verdict, including a
+  refusal, passes (the P5 precedent).
+- **≥ 0.70 vs ≤ 0.55, separated, at defaults** → P7.3 declared passed on its association arm; skip
+  P9.1/P9.2, go directly to P9.3 closeout.
+- **Below bar** → per-cue diagnostics become P9.1's baseline.
+- **Signal but short** → P9.1 proceeds with `ASSOC_AUC` added to its judgement alongside order.
+
+Run at current defaults (λ=0, `ContestErosion` 0, quota 64, cap 8) and, as a **recorded diagnostic
+arm only**, at λ=0.02 — the P8c-strongest point. The diagnostic arm cannot trigger the fork; only
+defaults can.
+
+## P9.0 — Result: instrument gate PASS, association gate FAIL, fork resolves to P9.1
+
+**Date:** 2026-08-18
+
+### Attempt 1 was invalid, and the instrument was wrong in two ways
+
+The first build emitted `CONFOUNDED` — real 0.574 [0.560..0.593] against shuffled 0.569
+[0.552..0.578]. That reads as a system finding. It was two defects of mine, both arguable from the
+instrument's own printout **without reference to the outcome**, which is the test for whether
+repairing after a failure is legitimate rather than tuning:
+
+**Defect 1 — related partners selected by descending frequency.** Every cue received the same set:
+
+```
+you  related: to, the, is, have      to   related: you, the, is, have
+the  related: you, to, is, have      is   related: you, to, the, have
+```
+
+Not a cue-specific set, and trivially high-mass for any cue, because cascade mass tracks frequency
+at ρ≈0.73. Visible in the output before any AUC is computed.
+
+**Defect 2 — the null preserved what it existed to destroy.** I reused `gm eval order`'s
+within-sentence shuffle. That destroys word order but leaves sentence co-membership nearly intact,
+and "related" here *means* co-occurred within a sentence. A correctly-associating system therefore
+scores identically in both arms — which is exactly the 0.574/0.569 that came out.
+
+**This is a gap in A-R2 as written, not only in my code.** The rule reasons that "shuffling
+preserves every unigram frequency, so *any* mechanism that only encodes frequency scores
+identically in both arms". True, and incomplete: within-sentence shuffling also preserves
+association, so the null cannot isolate it. It is the correct null for **order**, which is where it
+was inherited from, and it does not transfer to **association**.
+
+Repairs: related partners are now sampled **uniformly** from the cue's co-occurrence set (seeded);
+the null now **redistributes every token globally** across the corpus, preserving unigram counts and
+sentence lengths exactly while destroying which words share a sentence.
+
+### Attempt 2 — the valid measurement
+
+```bash
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval assoc --repeats 5 --train 2000 --brain-data-path <scratch>/a2_def
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval assoc --repeats 5 --train 2000 --base-rate-depression 0.02 --brain-data-path <scratch>/a2_l02
+```
+
+| arm | `ASSOC_AUC` | `SHUFFLED_AUC` | `ASSOC_GAP` | separated | related vs unrelated mass |
+|---|---|---|---|---|---|
+| **defaults** (fork-deciding) | **0.508** [0.496..0.528] | 0.511 [0.493..0.534] | **−0.003** | False | 5.6 vs 6.4 |
+| λ=0.02 (diagnostic only) | 0.537 [0.528..0.548] | 0.511 [0.497..0.526] | +0.026 | True | 0.4 vs 0.1 |
+
+**`VERDICT: NO ASSOCIATION` at defaults. `P7.3_ASSOC_GATE: FAIL`** against the unchanged bar
+(≥0.70 vs ≤0.55, separated).
+
+- **Instrument gate: PASS.** It runs end-to-end and emits a rule-compliant verdict (B.2, the P5
+  precedent).
+- **Decision fork: resolves to "below bar" → P9.1 proceeds**, with these per-cue diagnostics as its
+  baseline.
+
+### What this settles
+
+B.0's hopeful reading — that P8a's 60%-vs-15% connectivity with 418× edge mass might already
+constitute a passing association signal that nobody had read out — **is false, and the two
+measurements are not in conflict.** Connectivity says co-occurring pairs are more likely to have
+*an edge at all*. `ASSOC_AUC` says that once a cue is actually run through the cascade, the mass
+arriving on a related word is indistinguishable from the mass arriving on a frequency-matched
+unrelated one (5.6 vs 6.4 — the wrong way round, at chance). Edges exist and are co-occurrence-
+specific; the **readout does not preserve that specificity**.
+
+That is a genuinely new fact, and it narrows P9.1: the defect is not only in the learning rule but
+in the path from edges to cascade mass. P7.0.2 already measured hop-0 at 99.1% of surviving mass
+pre-P7.1 and 7.9% after; the mass that now flows multi-hop evidently spreads without regard to
+which edges carried it.
+
+The λ=0.02 diagnostic arm is consistent with P8c.5's sparsification reading: it separates from its
+null (+0.026, non-overlapping) but at absolute mass levels of 0.4 vs 0.1, i.e. a graph so pruned
+that almost nothing reaches. It clears no bar and cannot trigger the fork.
+
+### Standing correction to A-R2
+
+Recorded for the next phase: **the shuffled-order null is the right judge for order and the wrong
+one for association.** Any P9.1 arm scored on `ASSOC_AUC` must use the global-redistribution null;
+any arm scored on `R_PMI` keeps the within-sentence shuffle. Using one null for both would repeat
+this error in a place where it would be much harder to see.
+
+## P9.1 — Registration: sparsification vs normalisation
+
+**Date:** 2026-08-18
+
+### Question
+
+P8c.5 left one thing open: the project's only positive association signal (λ=0.02, `R_PMI` +0.1801
+vs shuffled +0.0368, non-overlapping) arrived together with a 50% loss of path coverage, and the
+mechanism-correct λ produced nothing. Two incompatible accounts fit:
+
+- **normalisation** — subtracting the target's base rate makes surviving weights measure covariance
+  rather than co-occurrence, and the signal is in the *weights*;
+- **sparsification** — depression drives `delta ≤ 0` on low-covariance pairs, the creation guard
+  declines them, and the signal is in *which edges survive*, not in their values.
+
+### Three arms, differing in exactly one mechanism
+
+All at λ=0.02, the P8c-strongest point, so results are comparable to the recorded +0.18.
+
+| arm | deletes edges? | rescales weights? | mechanism |
+|---|---|---|---|
+| **(i) as-measured** | yes | yes | `BaseRateDepression` 0.02 — the P8c.1 configuration, reproduced |
+| **(ii) rescale-only** | **no** | yes | identical Δw, but the `delta ≤ 0` creation guard is bypassed and weights are floor-clamped at `PruneThreshold` so depression can never delete |
+| **(iii) prune-only** | yes | **no** | λ=0 (pure Hebbian weights, untouched), plus a post-hoc prune of the lowest-covariance edges, removing the **same fraction** arm (i) loses — coverage-matched by construction |
+
+If normalisation carries the signal, (ii) keeps it and (iii) loses it. If sparsification does, the
+reverse. If both fall to chance, the +0.18 needs a third explanation.
+
+### Metrics and nulls
+
+`R_PMI`/`PMI_GAP`, `ASSOC_AUC`, connectivity gap, live-edge coverage, recall lift — ≥5 repeats,
+seeds fixed, arms differing by one factor (rule 8).
+
+**Two different nulls, per the P9.0 standing correction:** `R_PMI` keeps the within-sentence shuffle
+(correct for order); `ASSOC_AUC` uses global token redistribution (correct for association). Using
+one for both is the error P9.0 caught, and it would be far harder to see here.
+
+### Gate and decision rule, fixed now
+
+- **Gate:** the arms *separate* — the +0.18 is attributed to one mechanism, with non-overlapping
+  repeat ranges between the arm that keeps it and the arm that loses it.
+- **Adoption:** only if some arm meets B-R2's unchanged bars in full (weight–freq falls;
+  connectivity gap ≥ +0.30; recall lift ≥ +0.05 separated; `R_PMI` ≥ +0.10 with `PMI_GAP` ≥ +0.15
+  non-overlapping). Otherwise record which mechanism carries the signal and what coverage it costs,
+  and take it to Bill.
+- Two honest attempts, then stop (§A.4). This is a **new hypothesis**, not λ-grid #3 (B-R1).
+
+### Pre-committed reading of the likely outcome
+
+P9.0 measured `ASSOC_AUC` 0.508 at defaults — edges are co-occurrence-specific but the readout does
+not preserve that specificity. If all three arms leave `ASSOC_AUC` at chance while `R_PMI` separates,
+that localises the remaining defect to the **readout** rather than to either learning mechanism, and
+is the finding to carry forward regardless of which arm wins on order.
+
+## P9.1 — Result: GATE PASS. Normalisation carries the signal, not sparsification.
+
+**Date:** 2026-08-18
+
+```bash
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval order --repeats 5 --train 4000 --min-successors 12 <arm flags>
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval assoc --repeats 5 --train 2000 <arm flags>
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval connectivity --train 2000 <arm flags>
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recall --repeats 3 --train 500 --working-set-max 500000 <arm flags>
+```
+
+Arms: **(i)** `--base-rate-depression 0.02`; **(ii)** same `--depression-never-deletes true`;
+**(iii)** `--base-rate-depression 0 --post-hoc-prune-fraction 0.2831`.
+
+| | (i) as-measured | (ii) rescale-only | (iii) prune-only |
+|---|---|---|---|
+| deletes / rescales | yes / yes | partial / yes | yes / **no** |
+| coverage loss vs λ=0 | 28.31% | 19.90% | **28.31%** (matched to (i)) |
+| **`R_PMI`** | **+0.1801** [+0.1666..+0.1942] | **+0.1624** [+0.1351..+0.1833] | **−0.0626** [−0.0881..−0.0372] |
+| shuffled `R_PMI` | +0.0368 | +0.0216 | −0.0855 |
+| `PMI_GAP` | +0.1433 | +0.1408 | +0.0228 |
+| verdict (order) | WEAK ORDER SIGNAL | WEAK ORDER SIGNAL | **NO SIGNAL** |
+| `WEIGHT_VS_TARGETFREQ` | −0.062 | −0.267 | **+0.309** |
+| connectivity gap | +0.275 | +0.275 | +0.475 |
+| `ASSOC_AUC` | 0.537 | 0.543 | 0.507 |
+| recall lift | +0.500, sep | +0.500, sep | +0.500, sep |
+
+### Gate: PASS — the arms separate decisively
+
+Arm (iii) is coverage-matched to arm (i) *by construction* — the same 28.31% of edges removed,
+ranked by the same covariance score — and differs in exactly one thing: surviving weights are not
+rescaled. `R_PMI` collapses from **+0.1801 to −0.0626**, ranges [+0.1666..+0.1942] against
+[−0.0881..−0.0372], nowhere near overlapping. Arm (ii) prunes *less* and rescales fully, and keeps
+almost all the signal (+0.1624).
+
+**The +0.18 is normalisation. Sparsification contributes nothing.** Removing exactly the edges
+depression would remove, without touching the weights, produces no order signal at all.
+
+`WEIGHT_VS_TARGETFREQ` says the same thing mechanistically: arm (iii) retains the frequency defect
+at **+0.309** (baseline is +0.353), while the rescaling arms drive it to −0.062 and −0.267. Pruning
+does not remove the frequency confound; subtracting the base rate does.
+
+### Correction: P8c.5's interpretation was wrong
+
+P8c.5 concluded "**the +0.18 is a sparsification effect, not a normalisation effect**", reasoning
+from the coincidence of the signal with a 50% coverage loss. That is now measured and it is
+backwards. The coverage loss is a *side effect* of depression, not its mechanism of action — arm
+(iii) shows the side effect alone buys nothing, and arm (ii) shows most of the signal survives when
+the side effect is reduced.
+
+Two interpretations of mine have now been overturned by direct measurement in consecutive phases
+(P7.2.8's "lottery", P8c.5's "sparsification"), both times because I reasoned from a correlation in
+the data rather than isolating the variable. The three-arm design is what settled it, and it is the
+pattern to repeat.
+
+### Adoption: none — the unchanged bars are still not met
+
+| criterion (B-R2) | arm (i) | arm (ii) | |
+|---|---|---|---|
+| weight–freq falls materially | −0.062 | −0.267 | PASS |
+| connectivity gap ≥ +0.30 | +0.275 | +0.275 | **FAIL** |
+| recall lift ≥ +0.05 separated | +0.500 | +0.500 | PASS |
+| `R_PMI` ≥ +0.10 | +0.1801 | +0.1624 | PASS |
+| `PMI_GAP` ≥ +0.15 | +0.1433 | +0.1408 | **FAIL** |
+
+The same two criteria as P8c.1, by the same narrow margins. `BaseRateDepression` stays **0**; no
+defaults change. Arm (ii) is worth noting as the better operating point on mechanism (frequency
+defect −0.267 vs −0.062, 8 points less coverage lost) at a negligible order cost, if a future phase
+adopts anything.
+
+### The pre-committed reading fires: the defect is now in the READOUT
+
+P9.1's registration stated in advance: *"If all three arms leave `ASSOC_AUC` at chance while `R_PMI`
+separates, that localises the remaining defect to the readout rather than to either learning
+mechanism."*
+
+That is exactly the outcome. `ASSOC_AUC` is 0.537 / 0.543 / 0.507 — chance in every arm, including
+the two whose order signal separates cleanly from its null. The learning rule can be made to encode
+association in the edges; **the cascade readout does not deliver it.**
+
+Combined with P9.0 (`ASSOC_AUC` 0.508 at defaults, while co-occurring pairs are 60% connected with
+418× the edge mass of matched non-co-occurring pairs), the picture is consistent and specific:
+
+- edges exist, are co-occurrence-specific, and their weights can be made base-rate-corrected;
+- cascade mass arriving at a word is nonetheless independent of whether that word is related to the
+  cue.
+
+### Recommendation for Bill (P9.2 is now questionable)
+
+B.2 makes P9.2 — the event-wise anti-Hebbian rule on a new in-edge index — conditional on P9.0 and
+P9.1 both falling short. They have, on their *bars*. But P9.2 is another **learning-rule** change,
+and P9.1 has just shown the learning rule already produces base-rate-corrected, co-occurrence-
+specific edges. Spending a registered substrate change (CSR-by-target, re-running the P1 bench) to
+improve a component that is no longer the binding constraint looks like the wrong next move.
+
+The measured constraint is the path from edges to cascade mass. That is not on the A.5 ledger and
+has never had a registered phase. My recommendation is to take the readout as the next target
+instead of P9.2 — but B-R1 and A-R4 put that decision with Bill, and P9.2 remains available and
+unrun if he prefers to follow the script as written.
+
+## P9.2R — Registration: readout attribution (replaces P9.2, agreed with Bill)
+
+**Date:** 2026-08-18
+
+**Deviation, recorded.** B.2's P9.2 is the event-wise anti-Hebbian rule on a new in-edge index.
+P9.1 showed the learning rule already produces base-rate-corrected, co-occurrence-specific edges,
+so another learning-rule change would improve a component that is no longer the binding constraint.
+Bill agreed to target the readout instead. P9.2 stays available and unrun; A.5(c)-event-wise remains
+`live` on the B-R1 ledger.
+
+### Hypothesis
+
+The association is **in the edges and lost on the way out**. P9.1 measured, on the same brains:
+`WEIGHT_VS_COOCCUR` +0.089…+0.136 and connectivity gaps of +0.275…+0.475 (edges carry it), against
+`ASSOC_AUC` 0.507…0.543 (the readout does not).
+
+**H:** the loss is **k-WTA truncation**. The readout keeps `ActivationWidth` = 256 winners globally
+across a scope of thousands, so the mass landing on any one 256-neuron target assembly is a tiny,
+high-variance sample of what the edges actually delivered. Supporting observation: absolute masses
+in P9.0/P9.1 are 0.1–10 units per target, i.e. a handful of winner slots.
+
+### Instrument — three readouts, one trained brain, no behaviour change
+
+Scored on identical cue/pair sets with the same global-redistribution null (P9.0 correction):
+
+| readout | what it sums over the target's assembly | role |
+|---|---|---|
+| **winners** | post-k-WTA winner scores (**the current readout**) | the known-failing case |
+| **drive** | total activation *delivered* to each member across all propagation steps, before k-WTA selects | the hypothesis: signal exists here and is discarded by selection |
+| **edge** | direct synapse weight, cue assembly → target assembly | **positive control** — known to carry signal (P8a, P9.1) |
+
+`drive` requires accumulating per-neuron delivered activation during propagation; it changes no
+behaviour, only records what already flows.
+
+### Decision rule, fixed now
+
+- **edge** must show association (`ASSOC_AUC` clearly above its null). If it does not, the premise
+  of the whole phase is wrong and the finding is that the edges do not carry association after all —
+  which would contradict P8a/P9.1 and demand those be re-examined before anything else.
+- **drive ≫ winners** ⇒ hypothesis confirmed: k-WTA discards the association, and the readout is the
+  target. A registered fix follows (per-assembly readout, wider k, or reading drive rather than
+  winners), judged against the **unchanged** P7.3 bar.
+- **drive ≈ winners ≈ chance** while **edge** shows signal ⇒ the loss is in *propagation*, not
+  selection: the cascade spreads mass without regard to which edges carried it. Different fix,
+  different phase.
+- **All three at chance** ⇒ P8a/P9.1's edge measurements and this one disagree, and the discrepancy
+  is the finding.
+
+Instrument gate: runs and emits a rule-compliant verdict. No bar moves; nothing is adopted here.
+
+## P9.2R — Result: instrument gate PASS. All readouts at chance; the P8a discrepancy is unresolved.
+
+**Date:** 2026-08-19
+
+```bash
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval assoc --repeats 5 --train 2000 --readout all --brain-data-path <scratch>/r9_all
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval assoc --repeats 3 --train 2000 --readout all --pairs-from bigram --brain-data-path <scratch>/r9_big
+```
+
+**Uniform ±2 window pairs (5 repeats):**
+
+| readout | `ASSOC_AUC` | shuffled | gap | separated |
+|---|---|---|---|---|
+| winners | 0.508 [0.496..0.528] | 0.511 [0.493..0.534] | −0.003 | False |
+| drive | 0.495 [0.442..0.526] | 0.520 [0.506..0.538] | −0.026 | False |
+| **edge** (positive control) | 0.493 [0.454..0.535] | 0.519 [0.499..0.546] | −0.025 | False |
+
+**P8a-definition adjacent-bigram pairs (3 repeats):**
+
+| readout | `ASSOC_AUC` | shuffled | gap | separated |
+|---|---|---|---|---|
+| winners | 0.559 [0.536..0.584] | 0.552 [0.541..0.569] | +0.007 | False |
+| drive | 0.576 [0.561..0.597] | 0.570 [0.545..0.596] | +0.006 | False |
+| edge | 0.571 [0.550..0.590] | 0.555 [0.521..0.576] | +0.016 | False |
+
+### The hypothesis is not confirmed — and neither is my explanation of why
+
+**k-WTA truncation is not the culprit.** `drive` (everything the edges delivered, before selection)
+scores 0.495 — no better than `winners` at 0.508. Nothing is being discarded by k-WTA that selection
+would otherwise have shown.
+
+**The positive control failed, which invalidates the phase's premise rather than answering it.**
+`edge` — direct synapse weight, cue assembly → target assembly, the exact quantity P8a measured at
+60% vs 15% connectivity with 418× the mass — comes out at 0.493 against a 0.519 null. It was
+supposed to be the arm that *definitely* shows signal. Per the pre-committed decision rule, that
+puts us in the fourth branch: **this measurement and P8a/P9.1 disagree, and the discrepancy is the
+finding.**
+
+**My proposed explanation was tested and refuted.** I suggested the disagreement was pair selection —
+P8a scores frequent *adjacent bigrams*, `gm eval assoc` samples the ±2 window uniformly. Re-running
+with P8a's pair definition raises all three readouts (0.559/0.576/0.571) — **but raises every null
+with them** (0.552/0.570/0.555). Gaps stay ≤ +0.016, none separated. Frequent adjacent pairs
+elevate both arms, which is a property of the pair set involving frequent words, not evidence of
+association. The first repeat alone looked like confirmation (0.584/0.546); three repeats show it
+was noise. Rule 1 earned its place again.
+
+### What is actually inconsistent
+
+The two measurements are not the same comparison, and the difference is the live question:
+
+- **P8a/P9.1** compare, inside one trained brain, co-occurring pairs against frequency-matched
+  **non**-co-occurring pairs, by connectivity and summed edge mass. Result: large, repeatable.
+- **P9.2R `edge`** compares, on the same pairs, a brain trained on the real corpus against one
+  trained on globally-redistributed tokens, by AUC over per-pair edge mass. Result: chance.
+
+Both are legitimate; they cannot both be describing the same property of the edges. Candidate
+explanations, none yet tested: the AUC is dominated by pairs with zero mass in both arms (the P7.2.8
+retention problem in a new place); P8a's non-co-occurring null is not frequency-matched the same way
+`BuildBigramPairs` matches; or the global-redistribution null retains enough incidental co-occurrence
+at ±2 to erase the contrast. **Each is checkable and none should be asserted before it is** — the
+mistake made twice already in P7/P8.
+
+### Status
+
+- Instrument gate: **PASS** (runs, emits rule-compliant verdicts, three readouts on identical brains).
+- Association gate: **FAIL** everywhere. `ASSOC_AUC` has never exceeded 0.58 under any readout, pair
+  definition, or λ.
+- Readout hypothesis: **not supported** — `drive` ≈ `winners`, so selection is not where it is lost.
+- Nothing adopted; no defaults changed; no bar moved.
+
+**Recommendation:** resolve the P8a-vs-P9.2R contradiction before any further mechanism work. Two
+independent instruments disagree about whether the edges carry association, and every remaining
+design decision depends on which is right. That is a bounded diagnostic task — reconcile the two
+comparisons on one brain, with per-pair values printed rather than aggregated — not another phase of
+mechanism changes.
+

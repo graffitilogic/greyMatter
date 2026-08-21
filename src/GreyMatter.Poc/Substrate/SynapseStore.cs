@@ -66,6 +66,9 @@ public sealed class SynapseStore
     /// </summary>
     public float BaseRateDepression { get; init; }
 
+    /// <summary>P9.1 arm (ii). See Config.DepressionNeverDeletes.</summary>
+    public bool DepressionNeverDeletes { get; init; }
+
     /// <summary>P8c accounting: how much weight base-rate depression removed.</summary>
     public double BaseRateSuppressed { get; private set; }
 
@@ -215,10 +218,25 @@ public sealed class SynapseStore
         float delta = hebbian - suppression;
         if (suppression > 0f) BaseRateSuppressed += suppression;
 
+        // Arm (ii) — depression may RESCALE an existing weight but must never be the
+        // reason an edge fails to exist. Two routes had to be closed, not one:
+        //   • it must not block or weaken a birth  → creation uses the undepressed
+        //     Hebbian delta, so birth weight sits above the prune line as it always did;
+        //   • it must not push a live weight under the prune line → the strengthen path
+        //     floors at PruneThreshold.
+        // Closing only the first left arm (ii) with FEWER edges than arm (i)
+        // (1,708,222 vs 1,786,234 against a 2,491,703 baseline): bypassing the
+        // delta ≤ 0 guard created edges born below the prune line, which the next
+        // decay pass removed. Decay itself is untouched and identical in every arm.
+        float creationDelta = DepressionNeverDeletes ? hebbian : delta;
+
         for (int i = start; i < end; i++)
         {
             if (Target[i] != targetVirtualId) continue;
-            Weight[i] = Math.Clamp(Weight[i] + delta, MinWeight, MaxWeight);
+            // Arm (ii): floor at the prune line so depression can never carry an
+            // existing edge below it — the second deletion path.
+            float floor = DepressionNeverDeletes ? PruneThreshold : MinWeight;
+            Weight[i] = Math.Clamp(Weight[i] + delta, floor, MaxWeight);
             Strengthened++;
             StrengthenedBy[pop]++;
             return;
@@ -230,9 +248,13 @@ public sealed class SynapseStore
         // A candidate whose covariance is non-positive has no evidence behind it:
         // the target was no more active than its own base rate predicts. Creating it
         // would add an edge that depression must then remove.
-        if (delta <= 0f) { Declined++; DeclinedBy[pop]++; DeclinedThresholdBy[pop]++; return; }
+        //
+        // Arm (ii) bypasses this: it is one of the two paths by which depression
+        // DELETES rather than rescales, and P9.1 exists to tell those apart.
+        if (delta <= 0f && !DepressionNeverDeletes)
+        { Declined++; DeclinedBy[pop]++; DeclinedThresholdBy[pop]++; return; }
 
-        float birthWeight = Math.Clamp(PruneThreshold + delta, MinWeight, MaxWeight);
+        float birthWeight = Math.Clamp(PruneThreshold + creationDelta, MinWeight, MaxWeight);
 
         // ── Capacity and contest ────────────────────────────────────────────
         //

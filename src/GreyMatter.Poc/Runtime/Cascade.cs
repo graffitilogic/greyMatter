@@ -31,6 +31,20 @@ public sealed class Cascade
     private readonly float[] _driveByPopulation = new float[3];
     private readonly int[] _winnersByHop = new int[3];
 
+    /// <summary>
+    /// P9.2R — total activation delivered to each resident slot during the last Run,
+    /// summed across every propagation step and independent of whether k-WTA later
+    /// selected that neuron.
+    ///
+    /// The readout currently reports post-k-WTA winner scores, which keep only
+    /// ActivationWidth neurons out of a scope of thousands. If association is
+    /// delivered by the edges but discarded by selection, it is visible here and not
+    /// there. Recording only; changes no behaviour.
+    /// </summary>
+    private float[] _delivered = Array.Empty<float>();
+
+    public ReadOnlySpan<float> DeliveredDrive => _delivered;
+
     public long Truncations { get; private set; }
     public long Regenerations { get; private set; }
 
@@ -98,6 +112,9 @@ public sealed class Cascade
         Array.Clear(_driveByPopulation);
         Array.Clear(_winnersByHop);
 
+        if (_delivered.Length < pool.Capacity) _delivered = new float[pool.Capacity];
+        Array.Clear(_delivered, 0, pool.Count);
+
         for (int i = 0; i < memberCount; i++)
         {
             // Ask the pool to make room rather than pre-testing whether it is full.
@@ -164,6 +181,7 @@ public sealed class Cascade
 
                     float contribution = synapses.Weight[s] * share;
                     _driveByPopulation[synapses.Population[s]] += contribution;
+                    _delivered[target] += contribution;
 
                     float v = pool.Potential[target] + contribution;
                     pool.Potential[target] = v > MaxPotential ? MaxPotential : v;

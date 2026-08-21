@@ -51,7 +51,8 @@ public sealed class ActivationScope : IDisposable
         {
             WithinAssemblyCap = cfg.WithinAssemblyCap,
             ContestErosion = (float)cfg.ContestErosion,
-            BaseRateDepression = (float)cfg.BaseRateDepression
+            BaseRateDepression = (float)cfg.BaseRateDepression,
+            DepressionNeverDeletes = cfg.DepressionNeverDeletes
         };
         _codebook = codebook ?? new VqCodebook(cfg.VqCodebookSize, cfg.SurfaceDimensions, cfg.Seed);
 
@@ -190,6 +191,67 @@ public sealed class ActivationScope : IDisposable
     /// deviations and synapses rather than from a fresh prototype.
     /// </summary>
     public void AdoptRecipe(NeuronRecipe recipe) => _recipes[recipe.Id] = recipe;
+
+    /// <summary>
+    /// P9.1 arm (iii) — remove the lowest-covariance <paramref name="fraction"/> of
+    /// edges across the whole store, leaving every surviving weight untouched.
+    ///
+    /// Ranking is by (weight − lambdaRef · targetFamiliarity), the same covariance
+    /// score base-rate depression subtracts, so this deletes what depression would
+    /// have deleted without rescaling anything. That is the whole point: it
+    /// coverage-matches arm (i) while isolating sparsification from normalisation.
+    ///
+    /// Runs after ConsolidateAll, so recipes are authoritative (P5.2).
+    /// </summary>
+    public (int removed, int total) PostHocCovariancePrune(double fraction, double lambdaRef)
+    {
+        if (fraction <= 0) return (0, 0);
+
+        float Rate(uint target) => _recipes.TryGetValue(target, out var r) ? r.Familiarity : 0f;
+
+        var scores = new List<float>();
+        foreach (var r in _recipes.Values)
+            for (int i = 0; i < r.SynapseTargets.Length; i++)
+                scores.Add(r.SynapseWeights[i] - (float)lambdaRef * Rate(r.SynapseTargets[i]));
+
+        int total = scores.Count;
+        if (total == 0) return (0, 0);
+
+        scores.Sort();
+        int cut = Math.Min(total - 1, (int)(total * Math.Clamp(fraction, 0, 1)));
+        float threshold = scores[cut];
+
+        int removed = 0;
+        foreach (var r in _recipes.Values)
+        {
+            int n = r.SynapseTargets.Length;
+            if (n == 0) continue;
+
+            var keepT = new List<uint>(n);
+            var keepW = new List<float>(n);
+            var keepP = new List<byte>(n);
+            for (int i = 0; i < n; i++)
+            {
+                float score = r.SynapseWeights[i] - (float)lambdaRef * Rate(r.SynapseTargets[i]);
+                if (score <= threshold) { removed++; continue; }
+                keepT.Add(r.SynapseTargets[i]);
+                keepW.Add(r.SynapseWeights[i]);
+                keepP.Add(i < r.SynapsePopulations.Length ? r.SynapsePopulations[i] : (byte)0);
+            }
+            r.SynapseTargets = keepT.ToArray();
+            r.SynapseWeights = keepW.ToArray();
+            r.SynapsePopulations = keepP.ToArray();
+        }
+
+        // Resident segments must follow, or the pool and the recipes disagree.
+        for (int slot = 0; slot < _pool.Count; slot++)
+        {
+            var recipe = RecipeFor(_pool.VirtualId[slot]);
+            _synapses.Hydrate(slot, recipe.SynapseTargets, recipe.SynapseWeights, recipe.SynapsePopulations);
+        }
+
+        return (removed, total);
+    }
 
     /// <summary>
     /// Recipes holding something regeneration would not reproduce — deviations OR

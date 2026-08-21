@@ -48,6 +48,27 @@ public sealed class Config
     /// </summary>
     public double BaseRateDepression { get; set; }
 
+    /// <summary>
+    /// P9.1 arm (ii) — depression rescales but never deletes. Bypasses the
+    /// `delta ≤ 0` creation guard and floor-clamps weights at PruneThreshold, so no
+    /// edge is removed as a consequence of base-rate subtraction.
+    ///
+    /// Isolates normalisation from sparsification: P8c.5 could not tell whether the
+    /// +0.18 came from rescaled weights or from which edges survived.
+    /// </summary>
+    public bool DepressionNeverDeletes { get; set; }
+
+    /// <summary>
+    /// P9.1 arm (iii) — after training, prune this fraction of edges by lowest
+    /// covariance score (weight − λref·targetRate), touching no surviving weight.
+    /// Run at λ=0 it isolates sparsification from normalisation, coverage-matched to
+    /// arm (i) by construction.
+    /// </summary>
+    public double PostHocPruneFraction { get; set; }
+
+    /// <summary>λ used only to RANK edges in the post-hoc prune; it never alters a weight.</summary>
+    public double PostHocPruneLambda { get; set; } = 0.02;
+
     // ── Activation scope (§4.4) ──
     public int ActivationDepth { get; set; } = 4;
     public int ActivationWidth { get; set; } = 256;
@@ -149,16 +170,28 @@ public sealed class Config
             var raw = args.Value(flag, null);
             if (raw is null) continue;
 
+            // bool was missing until P9.1, and its absence was not inert: a bool
+            // config could not be set from the command line at all, and the attempt
+            // threw from outside Main's try block. A P9.1 arm silently ran as its own
+            // control because of it.
             object value = prop.PropertyType switch
             {
                 var t when t == typeof(int) => int.Parse(raw),
                 var t when t == typeof(double) => double.Parse(raw),
+                var t when t == typeof(bool) => ParseBool(raw, flag),
                 var t when t == typeof(string) => raw,
                 _ => throw new NotSupportedException($"Config type {prop.PropertyType} not overridable")
             };
             prop.SetValue(this, value);
         }
     }
+
+    private static bool ParseBool(string raw, string flag) => raw.ToLowerInvariant() switch
+    {
+        "true" or "1" or "yes" or "on" => true,
+        "false" or "0" or "no" or "off" => false,
+        _ => throw new ArgumentException($"{flag} expects true/false, got '{raw}'")
+    };
 
     internal static string ToKebab(string name)
     {
