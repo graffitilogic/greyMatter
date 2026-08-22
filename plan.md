@@ -583,3 +583,128 @@ Done is P9.3's gate: Prompt.md's success clause measured on recall that carries 
 scale, on commodity hardware, with nothing readable on disk — plus a repo whose only source tree
 is the POC. The fallback ledger (B-R1) and stop rules bound everything else. When P9.3 passes, or
 when P9.2 fails its two attempts: stop, present to Bill.
+
+---
+
+# Addendum C (2026-08-21) — P10: Convergence. The campaign gets a bound and an ending.
+
+**Occasion.** Bill's assessment of the running session: "starting to feel a little like groundhog's
+day — burning tokens for tokens' sake." This addendum agrees, shows why with the record's own
+numbers, and converts the open-ended program into a two-step endgame with a written verdict.
+
+## C.0 The Groundhog Day diagnosis, measured
+
+P9 was honest work — the discipline never slipped. It also produced almost no new facts about the
+*system*. What it produced:
+
+- `gm eval assoc` finally exists — and reads **chance at every configuration ever tried**:
+  `ASSOC_AUC` has never exceeded 0.58 under any λ, any of three readouts, either pair definition
+  (P9.0, P9.1, P9.2R). That is the one genuinely new system fact in the whole addendum-B campaign.
+- The order signal has been **+0.16–0.18 since P8c.1**. Three phases have since re-measured it from
+  new angles (P9.1's three arms, P9.2R's readouts) without moving it. P9.1 did settle *what* it is
+  (normalisation, not sparsification — a real attribution) — but its bars were missed by the **same
+  two criteria at the same margins as P8c.1**: connectivity gap 0.275 vs 0.30, `PMI_GAP` ~0.143 vs
+  0.15. The same near-miss has now been recorded three times.
+- The last three substantive entries — P9.2R, P9.3D, P9.3E — are **instruments examining
+  instruments**: a positive control failing, a null found unbalanced (P8a's 418× deflating to
+  11.96×), and a meta-check to catch the next unbalanced null. Each was necessary. None taught us
+  anything about the brain being built. Null-construction defects have now consumed more of the
+  P7–P9 token spend than any mechanism result.
+
+The loop has a structural cause, not a behavioral one: **stop rules bound each phase, and nothing
+bounds the campaign.** Every honest near-miss licenses one more registered diagnostic, forever.
+Rule 6 (registration) was designed to prevent undisciplined experiments; it cannot prevent an
+unbounded sequence of disciplined ones. This addendum adds the missing bound.
+
+## C.1 Endgame rules
+
+- **C-R1 (closed list).** The remaining program is exactly P10.1 and P10.2 below. No new
+  registrations, no new instruments, no new mechanism arms, no re-measurement of anything on the
+  settled ledger — without Bill's explicit go-ahead, given in conversation, not inferred from the
+  plan. Rule 6's registration path is suspended for anything outside this list.
+- **C-R2 (settled ledger — closed to re-opening).** Substrate thesis at scale (P6.3). Budget fixed
+  (P7.1). Competition fixed (P7.2). Substrate-not-the-constraint, in its corrected 12× form
+  (P8a + P9.3D). Normalisation-carries-order, sparsification-carries-nothing (P9.1). k-WTA is not
+  where association is lost (P9.2R). The order gate is **spent**: two honest attempts (P8c.1,
+  P8c.5) plus a mechanism attribution (P9.1) all land at WEAK ORDER SIGNAL, +0.16–0.18, bar unmet.
+  It does not get a fourth attempt.
+- **C-R3 (diagnostics are cheap by decree).** A diagnostic runs once, at n=1, on one persisted
+  brain, and claims nothing. Repeats are spent only where a pre-registered bar is being judged.
+  No more 5-repeat multi-arm sweeps in service of a question a printout answers.
+- **C-R4 (instrument hardening is finished).** P9.3E closed it: the sample-composition check exists,
+  is wired into recall/order/assoc, and is tested against the historical defects. No further
+  meta-instrumentation unless two instruments contradict each other again.
+- **C-R5 (the deliverable is the verdict).** P10 ends with the P10.2 capstone entry *regardless of
+  outcome*. A bar not passed is a finished result, not a reason for P11. There is no Addendum D on
+  this campaign: whatever follows the verdict starts as a new directive from Bill.
+
+## C.2 P10.1 — The last diagnostic: read the tie structure of the association AUC
+
+One persisted 2k-sentence brain, one run, no repeats (C-R3). P9.3D already registered the suspect
+and its prediction: at 60% / 38.1% connectivity, roughly a quarter of all AUC comparisons are
+0-vs-0 ties scoring 0.5 by definition, so the AUC may be dominated by empty pairs regardless of
+what the non-empty ones say. Print, from the existing `gm eval assoc --readout edge` path:
+
+1. the measured tie fraction in `Harness.Auc`, both arms;
+2. the AUC restricted to pairs with non-zero mass in at least one arm — **diagnostic only**: the
+   gate number stays the full-sample AUC, because an edgeless related pair is a real recall failure
+   (the P5.6 lesson), and coverage may not be assumed away;
+3. per-pair mass distributions for related and unrelated pairs (the numbers P9.2R aggregated);
+4. the residual ±2 co-occurrence rate of the global-redistribution null corpus — the one P9.2R
+   candidate this printout can close for free.
+
+**Decision rule, fixed now — both branches end in P10.2:**
+
+- **Restricted AUC ≈ chance too** → even where edges exist, per-pair edge mass does not
+  discriminate related from unrelated. The 12× ratio is a diffuse population effect invisible at
+  pair level. The synaptic channel is exhausted *by measurement*, and the verdict says so.
+- **Restricted AUC clearly separated** → the discrimination exists and is masked by coverage: ~40%
+  of related pairs have no edge at all, a direct property of hash-disjoint assemblies. Coverage is
+  representation, representation is the locked A.5(b)/(d) territory, and building it is a new
+  campaign, not a P10 step. The verdict names A.5(b) as the single evidenced lever, with this
+  measurement as its quantified motivation.
+
+If implementing the printout surfaces any defect needing more than a trivial fix: do not fix it —
+record it and proceed to P10.2 with the tie hypothesis marked *untested* (the verdict absorbs an
+unmeasured diagnostic; the campaign does not reopen for it).
+
+**There is no P10.1b.** No conditional mechanism phase hangs off this diagnostic. That is the
+difference between this addendum and both of its predecessors.
+
+## C.3 P10.2 — The verdict (capstone entry in `RESULTS.md`, plus a README truth pass)
+
+One entry, written for a reader who will not read the 2,700 lines above it. Required content:
+
+1. **Prompt.md scorecard.** Letter of the success criteria: met at P6 and still true (scale table,
+   guardrails, nothing readable on disk, commodity hardware). Spirit: partial — the system
+   demonstrably learns *frequency* (ρ→1.00), carries a real but weak *order* signal under
+   base-rate-corrected weights (+0.18 vs null +0.04, bar unmet), and has **no readable pairwise
+   association** (never >0.58, any configuration). The measured causal chain, one line per link,
+   each with its section reference — through to the P10.1 branch that fired.
+2. **The abandoned-not-failed ledger.** Event-wise anti-Hebbian (P9.2 — never run; set aside
+   because P9.1 showed the learning rule is no longer the binding constraint). A.5(b)
+   context-similarity recruitment. A.5(d) SDM addressing. Shift-eval redesign (B-R3). For each:
+   one line on why it stopped and what evidence would justify reviving it.
+3. **What survives any continuation.** The substrate (JIT materialize/evict at 10⁷:260, procedural
+   recipes, determinism through an OS suspend, CUDA-ready SoA layout), the instrument suite with
+   its hard-won rules, and the corrected record (418×→12×; sparsification→normalisation;
+   lottery→specific-but-sparse).
+4. **The options, priced, for Bill** — the fork this campaign returns to its owner rather than
+   deciding: **(a)** declare the POC complete as the substrate deliverable and take association
+   into a representation-redesign v2 (the A.5(b) shape: similarity has to enter the representation,
+   because the one channel that ignores similarity by design was measured unable to carry it);
+   **(b)** write `CUDA-PORT.md` for the substrate now — the port thesis was proven at P6 and does
+   not depend on the association outcome; **(c)** park the project with the verdict as its record.
+
+README updated to the final state in the same commit; §0 rule 5 holds — no new documents. P9.3's
+trade closeout is recorded as **unreached** (its trigger — an association pass — never fired), not
+failed.
+
+**Gate:** Bill reads it. The campaign is over when this entry lands.
+
+## C.4 Cost envelope, stated so it can be held to
+
+P10 in total: one build, one 2k-sentence training run, one diagnostic eval pass, and writing.
+Everything else this addendum forbids is forbidden *because* of what P9 measured: the marginal
+token is currently buying instrument archaeology, not knowledge. Ending a campaign well is the
+last thing it can spend tokens on that returns more than it costs.

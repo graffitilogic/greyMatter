@@ -2688,3 +2688,189 @@ passing (5 added).
 
 This does not fix any past number; it makes the next one visible at the point it is produced.
 
+
+# Addendum C — P10: Convergence
+
+## P10.1 — The last diagnostic: tie structure of the association AUC
+
+**Date:** 2026-08-21. One brain, one run, n=1, no repeats (C-R3). Claims nothing.
+
+```bash
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval assoc --repeats 1 --train 2000 --readout edge --diagnose --brain-data-path <scratch>/p101
+```
+
+### 1. The tie hypothesis is confirmed, and larger than predicted
+
+| arm | AUC | comparisons | ties | tie fraction |
+|---|---|---|---|---|
+| real | 0.504 | 25,600 | 18,095 | **70.7%** |
+| null | 0.501 | 25,600 | 16,133 | 63.0% |
+
+P9.3D predicted ~25% ties from the 60%/38.1% connectivity figures. Measured on the pairs `gm eval
+assoc` actually scores, it is **70.7%** — the AUC is overwhelmingly a comparison of zero against
+zero, each scoring 0.5 by definition.
+
+### 2. Restricted AUC: still chance — the decision rule's first branch
+
+`RESTRICTED_AUC 0.553`, over related 26/160 non-zero and unrelated **25/160**.
+
+Two things, and the second is the one that matters:
+
+- Restricted to pairs where mass exists at all, discrimination is 0.553 — above 0.500, nowhere near
+  separated, and far from the 0.70 bar.
+- **Having an edge at all does not discriminate either: 16% of related pairs and 16% of unrelated
+  pairs are non-zero.** The coverage that survives is not preferentially the related coverage.
+
+Per the pre-committed rule this is the first branch: *even where edges exist, per-pair edge mass does
+not discriminate related from unrelated.* The 12× population ratio is a **diffuse effect invisible at
+pair level**.
+
+### 3. Per-pair mass: the population effect is real and lives in the tail
+
+| set | n | zero | median | p90 | max | mean |
+|---|---|---|---|---|---|---|
+| related (real) | 160 | 134 | 0.00 | 0.15 | **876.36** | **5.66** |
+| unrelated (real) | 160 | 135 | 0.00 | 0.11 | 126.38 | 1.68 |
+| related (null) | 160 | 126 | 0.00 | 0.11 | 134.03 | 1.00 |
+| unrelated (null) | 160 | 128 | 0.00 | 0.28 | 46.70 | 0.89 |
+
+Related mass averages **3.4× unrelated** (5.66 vs 1.68), and **5.7× its own null** (5.66 vs 1.00).
+The signal P8a/P9.1 measured is really there. But the medians are identical at zero, the p90s are
+within noise of each other, and the difference lives entirely in a handful of extreme pairs — max
+876 against 126. A rank-based AUC cannot see a mean carried by three outliers inside a matrix that
+is 84% zeros. **Both instruments were right about their own quantity all along**; they disagreed
+because a population mean and a rank statistic are not the same measurement, and nobody had put the
+distribution on screen.
+
+### 4. Defect found, recorded, not fixed (per C.2)
+
+**The global-redistribution null retains 35.0% of the related pairs' ±2 co-occurrence** (against
+100% in the original corpus, by construction). Redistributing tokens across a corpus of short
+sentences with a ±2 window leaves a third of frequent pairs adjacent again by chance. The null
+built in P9.0 to replace the within-sentence shuffle is therefore itself contaminated — better than
+its predecessor, still not clean.
+
+Per C.2 this is recorded and not repaired. It does not change the P10.1 branch: the real arm reads
+0.504, which is chance on its own terms, and a contaminated null cannot explain a chance *real* arm.
+It does mean every `ASSOC_AUC` null figure in P9.0/P9.2R/P9.1 is optimistic by an unknown amount —
+in the direction of making the system look better, not worse.
+
+### Verdict
+
+**The synaptic channel is exhausted by measurement.** Association exists in the edge population as
+a mean-level effect and does not survive to any per-pair readout, because ~84% of the pairs a cue
+should relate to have no edge at all and the surviving coverage is not preferentially related.
+Coverage is a property of hash-disjoint assemblies — representation, not learning. Proceeding to
+P10.2.
+
+---
+
+# P10.2 — VERDICT
+
+**Date:** 2026-08-21. Written for a reader who will not read the 2,700 lines above it.
+This entry closes the campaign (C-R5).
+
+## 1. Prompt.md scorecard
+
+### To the letter: MET, at P6, and still true
+
+| criterion | status |
+|---|---|
+| train on a random dataset, test recall across neural-network scales | **met** — 14-cell sweep, 10⁴→10⁷ virtual neurons, recall measured and separated at every cell (P6.1) |
+| beyond "hundreds wide, dozens deep" | **met** — 10,000,000 virtual neurons, depth 8, width 1024 |
+| commodity hardware | **met** — 62.8 min, one Mac, ≤312 MB managed heap |
+| no wordlists or concepts on disc | **met** — 0 strings, 0 corpus words across 498 partitions / 340 MB, by structural walk plus a check tested against a planted word list (P5.7) |
+| a concept activates a comparable synaptic graph, JIT | **met mechanically** — 10⁷ virtual neurons served by a 260-slot pool with recall flat to three decimals (P6.3) |
+
+### To the spirit: PARTIAL, and the boundary is precisely located
+
+| what the system learns | evidence |
+|---|---|
+| **frequency — completely** | ρ(mass, corpus frequency) → 1.00 at 10⁷ neurons (P6.2) |
+| **order — weakly, real, bar unmet** | `R_PMI` +0.1801 [+0.1666..+0.1942] vs null +0.0368, non-overlapping; `PMI_GAP` +0.1433 against a +0.15 bar (P9.1) |
+| **pairwise association — not at all** | `ASSOC_AUC` never above 0.58 under any λ, any of three readouts, either pair definition (P9.0, P9.1, P9.2R, P10.1) |
+
+### The causal chain, one line per link
+
+| # | link | evidence |
+|---|---|---|
+| 1 | assembly size == `ActivationWidth`, so only the cue's own assembly won k-WTA | P7.0.4 — 4,064 hop-0 winners vs 32 hop-1 |
+| 2 | so Hebbian pairs were within-assembly, encoding only "I fired" | P7.0.1 — 99.9% of live slots; **0** cross-assembly edges ever created |
+| 3 | unsaturating k-WTA raised proposals 17k → 420M and still created **zero** | P7.1.2 — proposals were never the bottleneck; slots were |
+| 4 | budget quotas fixed it: cross-share 0% → 74.6%, multi-hop mass 0% → 33% | P7.1.3 |
+| 5 | competition was inert; erosion fixed it: displacement 0.000% → 8.472% | P7.2 |
+| 6 | none of that produced order: `R_PMI` stayed ≤ 0, `R_UNIGRAM` rose with `R_BIGRAM` | P7.1.6 — frequency, one level up |
+| 7 | base-rate subtraction produced the only positive signal: `R_PMI` −0.06 → +0.18 | P8c.1 |
+| 8 | and it is **normalisation**, not sparsification — coverage-matched pruning alone gives −0.06 | P9.1 (gate PASS) |
+| 9 | the substrate is not the constraint: co-occurring pairs 60% vs 38.1% connected, **12×** mass | P8a as corrected by P9.3D |
+| 10 | k-WTA is not where association is lost: pre-selection drive scores no better than winners | P9.2R |
+| 11 | **association is a population-mean effect that does not survive to any per-pair readout** | P10.1 — 70.7% ties, restricted AUC 0.553, related non-zero 16% vs unrelated 16% |
+| 12 | because ~84% of pairs a cue should relate to have **no edge at all**, and surviving coverage is not preferentially related | P10.1 §2–3 |
+
+Link 12 is the terminus. Coverage is a property of hash-disjoint assemblies — **representation, not
+learning** — and the P10.1 branch that fired says so by measurement rather than by argument.
+
+## 2. Abandoned, not failed
+
+| line | why it stopped | what would justify reviving it |
+|---|---|---|
+| **Event-wise anti-Hebbian** (P9.2, A.5(c)-event-wise) | never run. P9.1 showed the learning rule already produces base-rate-corrected, co-occurrence-specific edges, so a substrate change (CSR-by-target) would improve a component that is not the binding constraint | evidence that edge *weights*, not edge *coverage*, limit association — the opposite of what P10.1 measured |
+| **A.5(b) context-similarity recruitment** | locked behind design review all campaign | **now the single evidenced lever** — see §4(a) |
+| **A.5(d) SDM content addressing** | locked, never evidenced | a coverage mechanism that beats A.5(b) on the same measurement |
+| **Shift-eval redesign** (B-R3) | parked; its observable was wrong (direct edge mass) and nothing depended on it | a phase that needs a corpus-statistics-shift measurement |
+| **P9.3 trade closeout** | **unreached, not failed** — its trigger was an association pass, which never fired | any future association pass |
+| **LLMTeacher** (P10 legacy) | deleted with the legacy tree, recoverable from git | a curriculum-enrichment phase |
+
+## 3. What survives any continuation
+
+**The substrate, entirely.** JIT materialize/evict serving 10⁷ virtual neurons from a 260-slot pool
+with no measurable recall cost; procedural recipes as the store; determinism that held bit-identical
+through an uncontrolled OS suspend mid-run; checkpoint/resume within 1.25% at 20k sentences; 50k
+sentences unattended in 29.8 minutes with zero truncations; SoA layout with uint indices and no hot-
+path allocation, ready for the CUDA port. Prompt.md's core wager — that this is an algorithmic
+problem, not a resource one, and that JIT lifecycle patterns can emulate massive scale — **is the
+part that came out true.**
+
+**The instrument suite and its rules.** Nine evals under §6.1 discipline, refusing verdicts they
+cannot support, with the sample-composition check now executable and tested against the historical
+defects (P9.3E).
+
+**The corrected record**, which is worth as much as the positive results: 418× → 12× (P9.3D);
+sparsification → normalisation (P9.1 overturning P8c.5); "lottery" → specific-but-sparse (P8a.2
+overturning P7.2.8); "P8a vs P9.2R contradiction" → two right answers to different questions
+(P10.1). Four published conclusions corrected by later measurement, each traceable.
+
+## 4. The options, priced — Bill's call
+
+**(a) Declare the POC complete as the substrate deliverable; take association into a v2
+representation redesign.** The evidence points at exactly one lever: similarity must enter the
+*representation*, because the channel that ignores similarity by design (hash-disjoint assemblies)
+was measured unable to carry it. A.5(b)'s shape — context-similarity recruitment, so related words
+share substrate in proportion to distributional similarity rather than by hash collision. Note the
+caution P8a already bought: naive shared membership destroys specificity (`AssemblyOverlap` ≥ 0.25
+collapsed the connectivity gap to zero and cost 40% of recall lift). A v2 has to make overlap track
+*meaning*, not code-hash accident. **Cost: a new campaign, not a phase.**
+
+**(b) Write `CUDA-PORT.md` now.** The port thesis was proven at P6 and does not depend on the
+association outcome. Every hot loop is already flat `for` over contiguous SoA arrays with
+counter-based RNG. **Cost: one document, no experiments.** This is the cheapest thing on the list
+and the least likely to be regretted.
+
+**(c) Park it.** The verdict is the record. Everything is committed, tested, reproducible from
+seeds, and every number carries its command line.
+
+My own read, offered once and not pressed: **(b) then (a)**. The substrate is the proven asset and
+documenting its port is nearly free while the design is fresh. (a) is real work and should start
+from a clean directive rather than as the tail of this campaign.
+
+## 5. Definition of done
+
+P9.3's trade closeout is recorded **unreached** (trigger never fired), not failed. The campaign ends
+here per C-R5: a bar not passed is a finished result. There is no Addendum D — whatever follows
+starts as a new directive.
+
+**Final state:** 143 tests passing; defaults unchanged by P7–P10 (`BaseRateDepression`,
+`AssemblyOverlap`, `ContestErosion` all 0; `PropagatedWinnerQuota` 64 and `WithinAssemblyCap` 8
+adopted at P7.1 under A-R3); repo is `Prompt.md`, `plan.md`, `README.md`, `RESULTS.md`, `src`,
+`tests`.
+

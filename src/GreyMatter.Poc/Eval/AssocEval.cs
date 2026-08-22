@@ -87,6 +87,12 @@ public static class AssocEval
             _ => new[] { Readout.Winners }
         };
 
+        if (args.Has("--diagnose"))
+        {
+            Diagnose(cfg, sentences, cues, related, unrelated, args);
+            return (0, 0, 0);
+        }
+
         var realAucs = new List<double>();
         var nullAucs = new List<double>();
         ArmScore lastReal = new(0, 0, 0, 0, 0, 0), lastNull = new(0, 0, 0, 0, 0, 0);
@@ -371,6 +377,125 @@ public static class AssocEval
             related[cue] = rel; unrelated[cue] = unrel; chosen.Add(cue);
         }
         return (chosen, related, unrelated, unigram);
+    }
+
+    /// <summary>
+    /// plan.md Addendum C, P10.1 — the last diagnostic. One brain, one run, no
+    /// repeats, claims nothing (C-R3). Prints the four things P9.3D said would close
+    /// the remaining question about why `edge` reads chance while the population-level
+    /// mass ratio is 12×.
+    /// </summary>
+    private static void Diagnose(Config cfg, List<string> sentences, List<string> cues,
+                                 Dictionary<string, List<string>> related,
+                                 Dictionary<string, List<string>> unrelated, Args args)
+    {
+        Console.WriteLine("\n🔬 P10.1 — tie structure of the association AUC (diagnostic, n=1, claims nothing)\n");
+
+        var (relReal, unrelReal) = MassesFor(cfg, sentences, cues, related, unrelated, shuffle: false);
+        var (relNull, unrelNull) = MassesFor(cfg, sentences, cues, related, unrelated, shuffle: true);
+
+        // ── 1. tie fraction, both arms ──────────────────────────────────────
+        var real = Harness.AucWithTies(relReal, unrelReal);
+        var nul  = Harness.AucWithTies(relNull, unrelNull);
+
+        Console.WriteLine("── 1. tie fraction ──");
+        Console.WriteLine("| arm | AUC | comparisons | ties | tie fraction |");
+        Console.WriteLine("|---|---|---|---|---|");
+        Console.WriteLine($"| real | {real.auc:F3} | {real.pairs:N0} | {real.ties:N0} | **{real.tieFraction:P1}** |");
+        Console.WriteLine($"| null | {nul.auc:F3} | {nul.pairs:N0} | {nul.ties:N0} | {nul.tieFraction:P1} |");
+
+        // ── 2. AUC restricted to pairs with mass somewhere ──────────────────
+        //
+        // DIAGNOSTIC ONLY. The gate number stays the full-sample AUC: an edgeless
+        // related pair is a real recall failure, and coverage may not be assumed
+        // away (the P5.6 lesson).
+        var relNz = relReal.Where(x => x > 1e-9).ToList();
+        var unrelNz = unrelReal.Where(x => x > 1e-9).ToList();
+        Console.WriteLine("\n── 2. AUC restricted to non-zero pairs (diagnostic only) ──");
+        if (relNz.Count >= 3 && unrelNz.Count >= 3)
+        {
+            var restricted = Harness.AucWithTies(relNz, unrelNz);
+            Console.WriteLine($"RESTRICTED_AUC: {restricted.auc:F3}   " +
+                              $"(related {relNz.Count}/{relReal.Count} non-zero, " +
+                              $"unrelated {unrelNz.Count}/{unrelReal.Count})");
+            SampleCheck.Report(new ArmSample("related-nz", relNz.Count, relReal.Count, cues.Count),
+                               new ArmSample("unrelated-nz", unrelNz.Count, unrelReal.Count, cues.Count));
+        }
+        else Console.WriteLine($"   too few non-zero pairs to restrict ({relNz.Count} / {unrelNz.Count})");
+
+        // ── 3. per-pair mass distribution ───────────────────────────────────
+        Console.WriteLine("\n── 3. per-pair mass distribution (the numbers P9.2R aggregated) ──");
+        void Dist(string name, List<double> xs)
+        {
+            var s = xs.OrderBy(x => x).ToList();
+            Console.WriteLine($"   {name,-10} n={s.Count,4}  zero={s.Count(x => x <= 1e-9),4}  " +
+                              $"median={s[s.Count / 2]:F2}  p90={s[(int)(s.Count * 0.9)]:F2}  max={s[^1]:F2}  " +
+                              $"mean={Harness.Mean(s):F2}");
+        }
+        Dist("related", relReal); Dist("unrelated", unrelReal);
+        Dist("rel-null", relNull); Dist("unrel-null", unrelNull);
+
+        // ── 4. does the redistribution null actually destroy co-occurrence? ──
+        var shuffled = RedistributeGlobally(sentences, cfg.Seed);
+        var residual = ResidualCooccurrence(shuffled, cues, related);
+        var original = ResidualCooccurrence(sentences, cues, related);
+        Console.WriteLine("\n── 4. residual ±2 co-occurrence in the null corpus ──");
+        Console.WriteLine($"   related pairs still co-occurring: null {residual:P1}  vs  original {original:P1}");
+        Console.WriteLine(residual < 0.10
+            ? "   ✅ the null destroys co-occurrence as intended."
+            : "   ⚠️  the null RETAINS co-occurrence — it cannot isolate association.");
+
+        Console.WriteLine($"\nCOMMAND: {args.CommandLine}");
+    }
+
+    private static double ResidualCooccurrence(List<string> corpus, List<string> cues,
+                                               Dictionary<string, List<string>> related)
+    {
+        var cooc = new HashSet<(string, string)>();
+        foreach (var s in corpus)
+        {
+            var w = Corpus.Tokenize(s);
+            for (int i = 0; i < w.Count; i++)
+                for (int j = Math.Max(0, i - ContextEncoder.Window); j <= Math.Min(w.Count - 1, i + ContextEncoder.Window); j++)
+                    if (j != i) cooc.Add((w[i], w[j]));
+        }
+        int hit = 0, total = 0;
+        foreach (var c in cues)
+            foreach (var t in related[c]) { total++; if (cooc.Contains((c, t))) hit++; }
+        return total > 0 ? (double)hit / total : 0;
+    }
+
+    private static (List<double> rel, List<double> unrel) MassesFor(
+        Config cfg, List<string> sentences, List<string> cues,
+        Dictionary<string, List<string>> related, Dictionary<string, List<string>> unrelated, bool shuffle)
+    {
+        var text = shuffle ? RedistributeGlobally(sentences, cfg.Seed) : sentences;
+        var encoder = new ContextEncoder(cfg);
+        Trainer.AccumulateContext(encoder, text);
+        using var scope = new ActivationScope(cfg);
+        new Trainer(cfg, scope, encoder).Run(text, quiet: true);
+        scope.ConsolidateAll();
+
+        var rel = new List<double>(); var unrel = new List<double>();
+        foreach (var cue in cues)
+        {
+            var from = Assembly.Members(encoder.Encode(cue), cfg.BaselineNeuronCount, cfg.AssemblyOverlap);
+            double EdgeMass(string word)
+            {
+                var to = Assembly.Members(encoder.Encode(word), cfg.BaselineNeuronCount, cfg.AssemblyOverlap).ToHashSet();
+                double m = 0;
+                foreach (var vid in from)
+                {
+                    if (!scope.Recipes.TryGetValue(vid, out var r)) continue;
+                    for (int i = 0; i < r.SynapseTargets.Length; i++)
+                        if (to.Contains(r.SynapseTargets[i])) m += r.SynapseWeights[i];
+                }
+                return m;
+            }
+            foreach (var w in related[cue]) rel.Add(EdgeMass(w));
+            foreach (var w in unrelated[cue]) unrel.Add(EdgeMass(w));
+        }
+        return (rel, unrel);
     }
 
     private static ArmScore ScoreArm(Config cfg, List<string> sentences, List<string> cues,

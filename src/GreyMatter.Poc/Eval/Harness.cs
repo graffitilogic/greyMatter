@@ -69,6 +69,27 @@ public static class Harness
         return pairs > 0 ? (wins + 0.5 * ties) / pairs : 0;
     }
 
+    /// <summary>
+    /// AUC with its tie structure exposed. P10.1: at 60%/38.1% connectivity most
+    /// pairs may have zero mass in both arms, and a 0-vs-0 comparison scores 0.5 by
+    /// definition — so an AUC over a mostly-empty matrix can read chance regardless
+    /// of what the non-empty entries say.
+    /// </summary>
+    public static (double auc, long ties, long pairs, double tieFraction) AucWithTies(
+        IReadOnlyList<double> positive, IReadOnlyList<double> negative)
+    {
+        long wins = 0, ties = 0, pairs = 0;
+        foreach (var t in positive)
+            foreach (var c in negative)
+            {
+                pairs++;
+                if (t > c) wins++;
+                else if (Math.Abs(t - c) < 1e-9) ties++;
+            }
+        return (pairs > 0 ? (wins + 0.5 * ties) / pairs : 0, ties, pairs,
+                pairs > 0 ? (double)ties / pairs : 0);
+    }
+
     public static double DPrime(IReadOnlyList<double> positive, IReadOnlyList<double> negative)
     {
         var sd = Math.Sqrt((Variance(positive) + Variance(negative)) / 2);

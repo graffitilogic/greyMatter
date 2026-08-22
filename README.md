@@ -16,7 +16,7 @@ procedural generation, render-distance lazy loading, vector quantisation.
 |---|---|
 | **`Prompt.md`** | The specification. Short, and the authority the plan answers to. |
 | **`plan.md`** | The implementation plan and its rules of engagement. Phase definitions, component specs, and the evaluation protocol. Start here. |
-| **`RESULTS.md`** | Append-only findings log. Every number carries the command line that produced it. This is the real state of the project. |
+| **`RESULTS.md`** | Append-only findings log. Every number carries the command line that produced it. **Start at the P10.2 VERDICT at the end** — it summarises everything for a reader who will not read the rest. |
 | **`src/GreyMatter.Poc/`** | The proof-of-concept. Deterministic, allocation-free in the hot path, data-oriented for an eventual CUDA port. |
 
 ## Running it
@@ -30,7 +30,8 @@ One binary, no shell scripts:
 ```bash
 gm learn  --dataset tatoeba --sentences 50000 [--resume]
 gm probe  --cue <word> [--topk 16]
-gm eval   encoder-ceiling | recall | order | scale | attribution | connectivity | shift
+gm eval   encoder-ceiling | recall | order | scale | assoc
+          attribution | connectivity | shift
 gm bench  substrate | store
 gm stats
 gm audit  --strings
@@ -58,21 +59,26 @@ The substrate thesis holds, and holds hard:
   insufficient bigram support — because the project's predecessor lost months to results that did
   not survive their own controls.
 
-## What does not, yet
+## What does not
 
-The system reliably knows *what it has seen and how often*. Teaching it *what goes with what* is the
-open problem, and the current work is closing it.
+The system reliably knows *what it has seen and how often*. It does not know *what goes with what*,
+and the campaign to change that has finished with a located boundary rather than a fix.
 
-Measured, in order: the synaptic budget was not the constraint (cross-population share 0% → 74.6%),
-nor competition (displacement 0.000% → 8.472%), nor the substrate (co-occurring words are 60%
-connected against a 15% null, with 418× the edge mass). The constraint is the **learning rule**:
-Hebbian coactivation accumulates weight in proportion to co-occurrence count, with no term for the
-target's base rate, so a frequent word wins every ranking simply by appearing more often.
+- **Frequency: complete.** ρ(mass, corpus frequency) → 1.00.
+- **Order: real but weak.** Base-rate-corrected weights give `R_PMI` +0.18 against a null of +0.04,
+  non-overlapping — short of the +0.15 `PMI_GAP` bar fixed before the experiment ran. The bar was
+  not moved.
+- **Pairwise association: absent.** `ASSOC_AUC` never exceeded 0.58 under any configuration.
 
-Subtracting that base rate moves the order correlation from **−0.06 to +0.18** against a shuffled
-null near zero, non-overlapping across five repeats — the first positive association result in the
-project. It does not yet clear the bar fixed before the experiment ran, and the bar has not been
-moved. See `RESULTS.md` § P8c.
+The constraint was chased down one layer at a time and is *not* the synaptic budget (fixed at P7.1),
+competition (P7.2), the learning rule (P9.1 — normalisation demonstrably carries the order signal),
+or the k-WTA readout (P9.2R). It is **coverage**: ~84% of the pairs a cue should relate to have no
+edge at all, and the coverage that exists is not preferentially related (16% of related pairs
+non-zero against 16% of unrelated). Association is a population-mean effect — related pairs carry
+3.4× the edge mass of unrelated ones — that does not survive to any per-pair readout.
+
+Coverage is a property of hash-disjoint assemblies: **representation, not learning.** That is where
+a v2 would start. See `RESULTS.md` § P10.2 VERDICT.
 
 ## House rules
 
@@ -80,5 +86,9 @@ Three that shape everything else, all in `plan.md` §0 and §6.1:
 
 1. **Honest nulls are deliverables.** A refused verdict is a result.
 2. **Thresholds are fixed before the experiment runs**, and are not adjusted to meet an outcome.
-3. **Every claim needs its own null-controlled measurement** — twice in this project a diagnosis
-   inferred from a handful of examples turned out to be wrong when measured against a population.
+3. **Every claim needs its own null-controlled measurement.** Four published conclusions in this
+   project were later corrected by direct measurement, every one of them inferred from a plausible
+   pattern rather than isolated: a "lottery" that was specific-but-sparse, a 418× ratio that was
+   12×, a sparsification effect that was normalisation, and two instruments "contradicting" each
+   other that turned out to be right about different quantities. Nulls now print their own sample
+   composition so the next one is visible where it is produced.
