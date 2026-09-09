@@ -11,10 +11,9 @@ namespace GreyMatter.Poc.Runtime;
 /// <c>ActivationWidth</c> strongest and silences the rest, expressed as a bounded
 /// partial selection rather than a sort (§7).
 ///
-/// Neurons reachable by synapse but not resident are regenerated on demand; past
-/// the working-set cap the cascade TRUNCATES. That truncation is the
-/// accuracy-for-scale trade the whole project is about, so it is counted and
-/// reported rather than hidden.
+/// Currently only the initial cue is materialized. Propagation skips nonresident
+/// targets; recovery R3 must replace that behavior before this supports paging.
+/// Truncations currently count failed cue materializations, not skipped targets.
 /// </summary>
 public sealed class Cascade
 {
@@ -23,6 +22,7 @@ public sealed class Cascade
 
     private readonly uint[] _members;
     private readonly int[] _active;
+    private readonly float[] _stepDrive;
     private readonly int[] _winners;
     private readonly float[] _winnerScores;
     private readonly byte[] _hop;
@@ -45,6 +45,9 @@ public sealed class Cascade
 
     public ReadOnlySpan<float> DeliveredDrive => _delivered;
 
+    /// <summary>Optional read-only source trace for recovery diagnosis; no observer in normal runs.</summary>
+    public Action<int, uint, float, bool>? SourceObserver { get; set; }
+
     public long Truncations { get; private set; }
     public long Regenerations { get; private set; }
 
@@ -54,6 +57,7 @@ public sealed class Cascade
         _scope = scope;
         _members = new uint[Assembly.Size(cfg.Sparsity)];
         _active = new int[Math.Max(cfg.ActivationWidth * 4, _members.Length * 2)];
+        _stepDrive = new float[_active.Length];
         _winners = new int[cfg.ActivationWidth];
         _winnerScores = new float[cfg.ActivationWidth];
         _hop = new byte[_active.Length];
@@ -152,11 +156,17 @@ public sealed class Cascade
         // ── Propagate ───────────────────────────────────────────────────────
         for (int step = 0; step < _cfg.ActivationDepth; step++)
         {
-            for (int i = 0; i < activeCount; i++)
+            // A logical step reads only its starting state. Appended targets and
+            // newly delivered drive must not propagate again in this same step.
+            int sourceCount = activeCount;
+            for (int i = 0; i < sourceCount; i++) _stepDrive[i] = pool.Potential[_active[i]];
+            for (int i = 0; i < sourceCount; i++)
             {
                 int slot = _active[i];
-                float drive = pool.Potential[slot];
-                if (drive < pool.Threshold[slot] * 0.5f) continue;
+                float drive = _stepDrive[i];
+                bool belowThreshold = drive < pool.Threshold[slot] * 0.5f;
+                SourceObserver?.Invoke(step, pool.VirtualId[slot], drive, belowThreshold);
+                if (belowThreshold) continue;
 
                 int start = synapses.SegmentStart(slot);
                 int degree = synapses.Degree[slot];
@@ -212,8 +222,11 @@ public sealed class Cascade
             {
                 int slot = _winners[i];
                 pool.Potential[slot] = _winnerScores[i];
-                pool.Fatigue[slot] += 0.01f;
-                pool.Familiarity[slot] = MathF.Min(1f, pool.Familiarity[slot] + 0.001f);
+                if (learningMode)
+                {
+                    pool.Fatigue[slot] += 0.01f;
+                    pool.Familiarity[slot] = MathF.Min(1f, pool.Familiarity[slot] + 0.001f);
+                }
                 pool.Touch(slot);
             }
         }

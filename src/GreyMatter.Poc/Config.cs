@@ -126,6 +126,9 @@ public sealed class Config
     /// </summary>
     public double DeviationThreshold { get; set; } = 1.0;
 
+    /// <summary>Recovery R1 experimental temporal credit on observed cue members, not final winners.</summary>
+    public bool SequenceUsesCueMembers { get; set; }
+
     // ── Run control ──
     public int Seed { get; set; } = 12345;
     public string BrainDataPath { get; set; } = "/Volumes/jarvis/brainData_poc";

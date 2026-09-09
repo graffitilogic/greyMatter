@@ -87,6 +87,8 @@ public static class Cli
                     && result.LiftVsUntrained.mean >= 0.05
                     && result.Separated ? 0 : 1;
             }
+            case "recovery":
+                return RecoveryEval.Run(cfg, args);
             case "assoc":
                 AssocEval.Run(cfg, args);
                 return 0;

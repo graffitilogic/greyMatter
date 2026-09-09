@@ -46,7 +46,7 @@ public sealed class Plasticity
     {
         _cfg = cfg;
         _scope = scope;
-        _trace = new uint[cfg.ActivationWidth];
+        _trace = new uint[Math.Max(cfg.ActivationWidth, Assembly.Size(cfg.Sparsity))];
     }
 
     /// <summary>
@@ -70,7 +70,7 @@ public sealed class Plasticity
         // calibrated for that range, and raw cascade mass is unbounded.
         float max = 0f;
         for (int i = 0; i < scores.Length; i++) if (scores[i] > max) max = scores[i];
-        if (max <= 0f) { EndCue(winners, pool); return; }
+        if (max <= 0f) { EndCue(winners, pool, cueMembers); return; }
         float inv = 1f / max;
 
         // Membership lookup for the cue's assembly, rebuilt per cue. Small (256)
@@ -119,6 +119,22 @@ public sealed class Plasticity
             int pre = pool.Find(_trace[p]);
             if (pre < 0) continue;   // evicted since the previous cue
 
+            if (_cfg.SequenceUsesCueMembers && !cueMembers.IsEmpty)
+            {
+                // The input externally drove these members at unit strength before
+                // competition. Credit that observed event, not a decoded answer.
+                foreach (uint targetId in cueMembers)
+                {
+                    int target = pool.Find(targetId);
+                    if (target < 0) continue;
+                    synapses.RecordCoactivation(pre, _trace[p], targetId,
+                        SequenceStrength, 1f, SynapsePopulation.CrossCue,
+                        targetRate: pool.Familiarity[target]);
+                    SequenceUpdates++;
+                }
+                continue;
+            }
+
             for (int i = 0; i < winners.Length; i++)
             {
                 // Directed: previous → current only. The asymmetry IS the order
@@ -131,11 +147,17 @@ public sealed class Plasticity
             }
         }
 
-        EndCue(winners, pool);
+        EndCue(winners, pool, cueMembers);
     }
 
-    private void EndCue(ReadOnlySpan<int> winners, NeuronPool pool)
+    private void EndCue(ReadOnlySpan<int> winners, NeuronPool pool, ReadOnlySpan<uint> cueMembers)
     {
+        if (_cfg.SequenceUsesCueMembers && !cueMembers.IsEmpty)
+        {
+            _traceCount = Math.Min(cueMembers.Length, _trace.Length);
+            cueMembers[.._traceCount].CopyTo(_trace);
+            return;
+        }
         _traceCount = Math.Min(winners.Length, _trace.Length);
         for (int i = 0; i < _traceCount; i++) _trace[i] = pool.VirtualId[winners[i]];
     }
