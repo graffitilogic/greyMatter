@@ -6,7 +6,13 @@ regeneration, compact learned deviations, and loading/eviction driven by synapti
 
 **Status — 2026-09-09:** recovery stopped at R1's composed-retrieval gate after one permitted
 learning correction. R0 passed; 148 tests pass. Memory virtualization is still unproven.
-The next step requires a new design directive; agents must not automatically start R2.
+The subsequent T1 review found delayed threshold crossing and a mismatch between concept
+links and neuronal simulation ticks. T2 then raised four-link retrieval from 3.4% to
+31.5% at 12 ticks on one development seed; shuffled scored 3.4%. This remains below
+the learning gate. Exact-replay numerical snapshots are available for further review.
+T3 additionally found missing routes for 10/32 endpoints within 12 edges, and activation
+loss on other existing routes. The next proposed design is an explicit assembly relay.
+See the T1–T3 findings at the end of RESULTS.md; agents must not automatically start R2.
 
 | Read | Purpose |
 |---|---|

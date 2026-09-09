@@ -10,6 +10,9 @@ public static class RecoveryEval
 
     public static int Run(Config cfg, Args args)
     {
+        if (args.Value("--mode", "fixtures") == "routes") return RouteReview.Run(args);
+        if (args.Value("--mode", "fixtures") == "travel-time") return TravelTimeReview.Run(args);
+        if (args.Value("--mode", "fixtures") == "travel") return TravelReview.Run(args);
         if (args.Value("--mode", "fixtures") == "learning") return RecoveryLearning.Run(cfg,args);
         if (args.Value("--mode", "fixtures") != "fixtures")
             throw new ArgumentException("Implemented recovery modes: fixtures, learning");

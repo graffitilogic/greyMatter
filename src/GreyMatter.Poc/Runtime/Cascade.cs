@@ -48,6 +48,9 @@ public sealed class Cascade
     /// <summary>Optional read-only source trace for recovery diagnosis; no observer in normal runs.</summary>
     public Action<int, uint, float, bool>? SourceObserver { get; set; }
 
+    /// <summary>Optional pre-clear potential and selection observation for travel review.</summary>
+    public Action<int, uint, float, bool>? SelectionObserver { get; set; }
+
     public long Truncations { get; private set; }
     public long Regenerations { get; private set; }
 
@@ -117,7 +120,6 @@ public sealed class Cascade
         Array.Clear(_winnersByHop);
 
         if (_delivered.Length < pool.Capacity) _delivered = new float[pool.Capacity];
-        Array.Clear(_delivered, 0, pool.Count);
 
         for (int i = 0; i < memberCount; i++)
         {
@@ -134,6 +136,18 @@ public sealed class Cascade
             }
             Regenerations++;
         }
+
+        // Clear the delivered-drive readout only after every materialization.
+        //
+        // Clearing it BEFORE was a real defect: materialization can evict a batch,
+        // which COMPACTS the pool and moves survivors to different slots, and it can
+        // then leave Count HIGHER than it was when the clear ran. Slots above that
+        // earlier Count keep whatever a previous query wrote at the same index, for a
+        // different neuron — so DeliveredDrive, the value every recovery evaluator
+        // scores from, could report phantom drive that depends on what was probed
+        // before it. No materialization happens during propagation, so pool.Count
+        // here is the highest slot the rest of Run can reach.
+        Array.Clear(_delivered, 0, pool.Count);
 
         // Resolve slots only after every materialization — eviction compacts the
         // pool and moves survivors, so indices captured earlier are stale.
@@ -172,14 +186,10 @@ public sealed class Cascade
                 int degree = synapses.Degree[slot];
                 int end = start + degree;
 
-                // Activation is CONSERVED, not multiplied: a neuron distributes its
-                // drive across its out-synapses rather than sending the full amount
-                // down each one. Without this a neuron with 32 synapses emits 32×
-                // what it received, mass grows ~32× per step, and by depth 4 every
-                // cue saturates whatever ceiling exists — measured at 3.3e10 for
-                // trained and control alike, AUC exactly 0.500. Dividing by degree
-                // makes retained mass a statement about synaptic STRUCTURE (how much
-                // a scope keeps circulating) rather than about out-degree.
+                // Divide source drive by degree, then weight each delivered share.
+                // Total emitted drive is drive * mean(outgoing weights), not strict
+                // conservation. Sources also retain their potential until selection.
+                // T1 records this timing/amplitude behavior; no numerical change here.
                 float share = drive / degree;
 
                 int sourceHop = _hop[i];
@@ -217,6 +227,13 @@ public sealed class Cascade
             winnerCount = SelectTopK(pool, _active, activeCount, _winners, _winnerScores,
                                      _hop, _cfg.PropagatedWinnerQuota);
 
+            if (SelectionObserver is not null)
+                for (int i = 0; i < activeCount; i++)
+                {
+                    int observed = _active[i];
+                    SelectionObserver(step, pool.VirtualId[observed], pool.Potential[observed],
+                        _winners.AsSpan(0, winnerCount).Contains(observed));
+                }
             for (int i = 0; i < activeCount; i++) pool.Potential[_active[i]] = 0f;
             for (int i = 0; i < winnerCount; i++)
             {
