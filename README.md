@@ -1,81 +1,72 @@
 # greyMatter
 
-A C# experiment in learning and recall with a network whose learned state can exceed its
-resident working memory. The intended mechanisms are sparse activation, procedural
-regeneration, compact learned deviations, and loading/eviction driven by synaptic traversal.
+A C# experiment in learning and recall using sparse activation, procedural neuron
+identities, compact learned state, and eventually connection-driven loading and eviction.
 
-**Status — 2026-09-09:** recovery stopped at R1's composed-retrieval gate after one permitted
-learning correction. R0 passed; 148 tests pass. Memory virtualization is still unproven.
-The subsequent T1 review found delayed threshold crossing and a mismatch between concept
-links and neuronal simulation ticks. T2 then raised four-link retrieval from 3.4% to
-31.5% at 12 ticks on one development seed; shuffled scored 3.4%. This remains below
-the learning gate. Exact-replay numerical snapshots are available for further review.
-T3 additionally found missing routes for 10/32 endpoints within 12 edges, and activation
-loss on other existing routes. The next proposed design is an explicit assembly relay.
-See the T1–T3 findings at the end of RESULTS.md; agents must not automatically start R2.
+**Status — 2026-09-09:** the new protected assembly relay passes its registered synthetic
+learning gates. **155 tests pass.** The next deliverable is a bounded disk-backed store;
+network execution larger than RAM remains unproven.
 
 | Read | Purpose |
 |---|---|
 | [Prompt.md](Prompt.md) | Original purpose and constraints |
-| [plan.md](plan.md) | Active recovery guide, terminal handoff pointer, historical plan below |
-| [RESULTS.md](RESULTS.md) | Evidence log; start at Recovery R1 closeout near the end |
-| [Recovery summary](artifacts/recovery/r1/summary.json) | Machine-readable final metrics |
+| [plan.md](plan.md) | Active agent guide and current phase |
+| [RESULTS.md](RESULTS.md) | Evidence log; start at the A1 closeout near the end |
+| [A1 summary](artifacts/recovery/a1/summary.json) | Final synthetic metrics |
 | `src/GreyMatter.Poc/` | Implementation |
-| `tests/GreyMatter.Poc.Tests/` | Tests, including recovery fixtures |
+| `tests/GreyMatter.Poc.Tests/` | Correctness and regression tests |
 
-## What is measured
+## What works
 
-On a balanced synthetic symbol-sequence task, the experimental cue-member temporal
-learning arm achieved the following mean top-1 retrieval over five fixed seeds:
+The experimental AssemblyRelay uses eight deterministic neurons as an assembly's common
+entry/exit cohort. Observed adjacent training cues learn numerical synaptic weights
+between these cohorts. Relay connection slots are isolated from within-cue reinforcement.
+Each tick distributes source activation by relative outgoing weight into a fresh next
+activation set. Runtime receives codes, never the evaluator's answer labels.
 
-| arm | direct association | composed association |
+On five fresh seeds, each with 128 direct and 128 composed retrieval queries:
+
+| arm | direct top-1 | composed top-1 |
 |---|---:|---:|
-| Learned | 100.0% | 35.6% |
+| Learned protected relay | 100.0% | 100.0% |
 | Untrained | 3.1% | 3.1% |
-| Shuffled training | 2.7% | 2.5% |
+| Shuffled training | 4.1% | 3.1% |
 | Transition-count baseline | 100.0% | 100.0% |
 
-Composed retrieval falls from 69.2% at two hops to 3.2% at three and 0.7% at four.
-The registered mean gate was 80%; it failed. The experimental rule stays off by default.
-The default learner achieved 100% direct retrieval on one development seed only.
-These results establish synthetic direct association, not natural-language understanding.
+All observed links and intermediate relay junctions were connected. All numeric recall
+snapshots replayed scores exactly. Learned graphs contained 1,278–1,280 unique relay
+neurons and 8,192 synapses, representing 128 observed pair relations. This is evidence
+of usable synthetic associative routing, not additional independent neural complexity.
+The simple transition baseline also passes; no advantage over it is claimed.
 
-The recovery also fixed two measured runtime defects: newly reached neurons no longer
-propagate within the same logical step, and recall no longer updates fatigue/familiarity.
+## What remains
 
-## What is not delivered yet
+- The relay is fully resident. Its current backing store retains recipes in RAM.
+- Bounded storage, learned networks larger than RAM, realistic branching, and useful
+  resource/quality tradeoffs are unproven. CUDA is deferred.
+- The existing `learn`/`probe` commands still use the older runtime; `probe` trains a
+  fresh brain. Saved-model related-material retrieval from local data is a later phase.
+- The old R1 failure remains recorded. A1 is a separate experimental model, not a
+  retrospective pass or a default behavior change.
 
-- Propagation still skips connected neurons that are not resident.
-- Recipes remain in an in-memory dictionary; resume loads all stored partitions.
-- Increasing the virtual ID range has not demonstrated additional useful neural capacity.
-- `probe` still trains a fresh brain before showing neuron activations; saved-model
-  related-material retrieval is planned but unimplemented.
-- There is no demonstrated bounded-memory training/recall tradeoff or CUDA benefit.
-
-The historical conclusions that the complete substrate thesis was proven and representation
-was uniquely isolated as the cause of association failure are withdrawn. Historical numbers
-remain in RESULTS.md with their limitations. Recognition/familiarity cannot substitute for
-association, and a no-strings disk audit cannot establish absence of semantic memorization.
+The earlier claim that the complete substrate thesis was proven is withdrawn. Addressable
+neuron IDs are not demonstrated useful capacity. A no-strings audit is not evidence of
+absence of semantic memorization.
 
 ## Build and reproduce
 
-.NET 8; no new dependencies were added during recovery.
+.NET 8; no new dependencies.
 
 ```bash
 dotnet build GreyMatter.sln -c Release
 dotnet test GreyMatter.sln -c Release
-dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode fixtures
+dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode relay --seeds 100 --output /tmp/gm-relay-dev/run.json
 ```
 
-The registered learning evaluator supports development seed 100 or final seeds
-101,102,103,104,105. Use a fresh result path; the evaluator refuses to overwrite artifacts.
-Final reproduction (returns exit 1 when the gate fails):
+Final reproduction uses `--seeds 201,202,203,204,205` and a fresh output directory.
+The evaluator refuses to overwrite snapshots. It generates its synthetic training data
+and does not open a user brain or require the network corpus. JSON records configurations,
+corpus checksums, per-query scores and activation traces. Numerical graph snapshots
+require the AssemblyRelay runtime; they are recall-only, not training-resume checkpoints.
 
-```bash
-dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode learning --seeds 101,102,103,104,105 --sequence-uses-cue-members true --output /tmp/greyMatter-r1-reproduction.json
-```
-
-This synthetic evaluator does not open a user brain or require the network corpus.
-All query scores, effective configurations and corpus checksums are recorded in JSON.
-A manually wired fixture is runtime evidence, never evidence of learning. See the guide's
-stopping rules before launching new experiments.
+Follow the R2 memory-accounting contract in plan.md before extending the implementation.

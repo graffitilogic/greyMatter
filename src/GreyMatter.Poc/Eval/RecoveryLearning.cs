@@ -130,7 +130,7 @@ public static class RecoveryLearning
             stats?.Truncations??0,scope.Pool.Count,unique);
     }
 
-    private static Arm Baseline(Data data)
+    internal static Arm Baseline(Data data)
     {
         var counts=new Dictionary<string,Dictionary<string,double>>();
         foreach(var ep in data.Episodes)

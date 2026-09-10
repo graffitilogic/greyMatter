@@ -2874,3 +2874,520 @@ starts as a new directive.
 adopted at P7.1 under A-R3); repo is `Prompt.md`, `plan.md`, `README.md`, `RESULTS.md`, `src`,
 `tests`.
 
+
+
+# Recovery R0 — correction and prospective protocol (2026-09-09)
+
+The P10 conclusion that the complete paging thesis passed is withdrawn: Cascade skips
+nonresident targets; ActivationScope keeps a dictionary of all recipes; Resume reads all
+partitions. The conclusion that representation is the uniquely established cause of failed
+association is also withdrawn. The old numbers remain historical observations; recognition
+is not associative recall. Probe currently trains a fresh brain rather than opening a saved one.
+
+Baseline source hashes: `artifacts/recovery/r0/source-manifest.json`. Hardware: MacBookPro18,4,
+32 GiB RAM, .NET SDK 8.0.301/runtime 8.0.6, macOS arm64; scratch free space and platform in
+`artifacts/recovery/r0/environment.json`. Commands: `dotnet --info`,
+`sysctl -n hw.memsize hw.model`, `df -h . /tmp`. Only plan.md was modified at entry.
+Build and tests pending; no gate claimed yet.
+
+## Registration before recovery scores
+
+R1 uses 32 independent chains, each with five randomly named symbols (160 symbols).
+Every adjacent pair is presented as its own two-token training episode, repeated 16 times,
+with episode order deterministically shuffled. No nonadjacent endpoint pair appears in a
+training episode. Test queries are separate traversal requests: all 128 adjacent pairs and
+32 paths at each of lengths 2, 3, 4, plus 32 length-2 paths starting at position 1
+(128 composed queries total). Candidates are the 32 symbols at the target chain position;
+all candidates have identical exposure. Correct chain is never supplied to traversal.
+Labels are random alphabetic strings independent of chain membership; RNG seed and corpus
+SHA256 accompany each result. Token-frequency-preserving null globally shuffles the token
+stream and repartitions into two-token episodes. Encoder context sees only training data,
+then freezes. Five evaluation seeds 101–105; development seed 100 only.
+
+Start with Config defaults except seed, WorkingSetMax=50000 (exceeds 160*256 members),
+and ActivationDepth set to the query hop budget during evaluation. No parameter sweep.
+Train through Trainer/Plasticity with existing assembly representation. For scoring use
+Cascade.DeliveredDrive summed over candidate members; no direct training-count lookup.
+Fully resident evaluation preloads every symbol assembly symmetrically, never just the answer.
+Verify unique encoded symbols and no training eviction; otherwise refuse the experiment.
+
+Metrics are query-local top-1 and reciprocal rank. Ties use expected uniform tie credit:
+top-1=1/tie_count when no candidate is strictly higher, otherwise zero; reciprocal rank
+is the average 1/rank across the tied ranks. This is deterministic and does not privilege
+the answer or symbol order. Include all zero scores. Report per-seed, direct and composed
+metrics; gate targets are those fixed in plan.md R1. Transition-count baseline propagates
+normalized outgoing counts for exactly the same query hop budget. It is only a baseline.
+
+First build hand-wired runtime fixtures for directed chains, branches, cycles, distractors,
+reset/order independence and step limits. If the existing runtime fails these, correct
+the smallest execution defect before scientific evaluation and record it separately from
+a learning-rule attempt. Do not silently redefine a hop or tune around a fixture failure.
+
+R2: exact numerical record round-trip and bounded cache tests; no compression changes.
+R3: same snapshot/encoder/readout on both backends; abs 1e-6 + rel 1e-5 score tolerance,
+identical query rankings, immutable persisted state, forced cross-page traversal.
+R4: workload sizes 1x/4x/16x and memory caps 256 MiB/128 MiB; runtime baseline B measured
+separately; peak RSS <= B+1.25M. Largest resident representation >=4M, learned not prewired.
+Five seeds, 100 measured queries each, latency and quality gates unchanged from plan.
+No claim of exceeding physical RAM from merely exceeding configured cache.
+R5: real-data split and support registration deferred until R5 before scores; source not
+needed for R0–R4. Existing plan fixes MRR lift >=.05 and positive paired-bootstrap lower bound.
+
+Planned CLI (NOT IMPLEMENTED): `dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release --
+eval recovery --mode fixtures` and `... eval recovery --mode learning --seed 100`.
+Final learning run will use explicit seeds 101–105. Concrete commands/configs will be
+recorded when the entry point exists. No jobs over one hour without a larger budget.
+
+### R0 baseline completion
+
+`dotnet build GreyMatter.sln -c Release --disable-build-servers` exited 0: one pre-existing
+CS8604 warning in ScaleSweep.cs:65, zero errors. `dotnet test GreyMatter.sln -c Release
+--no-build --logger 'trx;LogFileName=baseline.trx' --results-directory artifacts/recovery/r0`
+exited 0. Raw build/test output and baseline.trx are in artifacts/recovery/r0. Initial
+sandboxed build was silent and terminated; the same build outside the sandbox completed.
+This is an environment issue, not a failed experiment. R0 gate PASS; R1 fixture work next.
+Recovery learning attempts used: 0. No model jobs running.
+
+## R1 fixture failures and bounded execution repair
+
+`dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode fixtures`
+exited 1; raw output `artifacts/recovery/r0/fixtures-before.log`. Five of eight checks failed.
+Depth 1 delivered a=b=c=1 on root→a→b→c. Depth 2 returned 4 units around a two-node cycle.
+Recall also changed familiarity despite learningMode=false. Direction, branching and
+electrical reset passed. These are execution defects before any recovery learning result.
+
+Repair registered: snapshot active sources AND their drive at each propagation step;
+newly reached nodes can propagate only next step. Preserve the existing retained-drive,
+threshold and winner-selection rules. Update fatigue/familiarity only in learning mode.
+This is the single bounded fixture repair, not a learning-rule correction. All later
+results explicitly use this revised synchronous step semantics; old metrics are not comparable.
+Baseline tests: 143/143 passed in 53 seconds (baseline.trx).
+
+### R1 fixture repair verified; development run launched
+
+All 144 tests passed after the runtime repair (51 seconds):
+`dotnet test GreyMatter.sln -c Release --logger 'trx;LogFileName=fixtures-repaired.trx'
+--results-directory artifacts/recovery/r0` → `fixtures-repaired.trx` and test log.
+The three recovery tests then passed, covering fixtures, balanced synthetic data and tie ranking:
+`dotnet test GreyMatter.sln -c Release --filter FullyQualifiedName~RecoveryTests
+--logger 'trx;LogFileName=recovery-instrument.trx' --results-directory artifacts/recovery/r0`.
+CLI fixture output: `artifacts/recovery/r1/fixtures.log` (8/8 pass).
+
+Implemented command: `dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release --
+eval recovery --mode learning --seeds 100 --output artifacts/recovery/r1/dev-initial.json`.
+All effective settings are printed and serialized. This instrument uses resident in-memory
+scopes and does not open the configured default brain path or network corpus. Development
+seed only; no gate verdict. Expected cost based on the existing 51-second regression suite
+is minutes, well below the one-hour ceiling; final-run estimate will use this measured run.
+Current process session: 8800; log dev-initial.log. Initial learning implementation in progress;
+learning corrections used 0/1. Next action: inspect completed development result and trace
+a failure before using the one allowed corrective attempt.
+
+### R1 development initial result (not a gate)
+
+Completed session 8800, exit 0. `dev-initial.json` contains corpus hashes, complete configs,
+all query scores and arm metrics. Learned direct top-1=1.000; composed=.453613.
+Composed by hops: 2=.672363, 3=.312500, 4=.157227. Untrained=.03125 on both;
+shuffled direct=.041504, composed=.017090. Transition baseline=1 on both.
+
+Before selecting a correction, register one read-only trace on development seed 100,
+chain 0/start 0/hops 4: record source drive and how many chain-member sources fail the
+existing 0.5*threshold test at each synchronous step. Observer cannot change execution.
+Repeat the same development run once with this trace, verify identical metrics, and
+use the trace to decide whether the one corrective attempt has a concrete basis.
+No final evaluation seeds have been used.
+
+### R1 one permitted corrective attempt — prospective registration
+
+`... eval recovery --mode learning --seeds 100 --output artifacts/recovery/r1/dev-trace.json`
+completed exit 0. Entire JSON result equals dev-initial.json exactly. Trace is in dev-trace.log.
+At step 2, 24 of 25 first-neighbor member sources clear the threshold; second-neighbor
+sources carry zero surviving drive through step 4. This does not isolate a unique cause.
+Source inspection shows temporal credit is restricted to final winners, which can exclude
+actual cue members and include propagated members from other cues. The next hypothesis is
+that recording the observed sequence on cue members provides a more reliable bridge.
+
+The ONE learning correction is an explicit `--sequence-uses-cue-members true` arm (default
+false). Preserve within-cue learning, inhibition, thresholds, capacity, and learning rates.
+For sequence updates only, previous and current externally driven cue members receive the
+same fixed observation credit (previous strength .5, current 1), independent of final winner
+selection. This is a local observed-sequence learning rule, not a transition-table readout.
+Existing hashed assemblies and learned numerical synapses remain the model.
+
+Prediction: improve composed retrieval by making input members eligible for onward sequence
+learning. No normalization, threshold changes, or second correction if this fails. Run one
+development smoke, then the fixed five-seed gate with this arm. Initial development was
+roughly one minute including all arms; expect five-seed run under ten minutes.
+
+### Corrective development result and final evaluation registration
+
+`dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode learning
+--seeds 100 --sequence-uses-cue-members true --output artifacts/recovery/r1/dev-cue-trace.json`
+completed exit 0. Learned direct=1.000, composed=.376709: no development improvement.
+The correction remains experimental/default false. No second mechanism correction is allowed.
+
+Final gate command (after tests): `dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj
+-c Release -- eval recovery --mode learning --seeds 101,102,103,104,105
+--sequence-uses-cue-members true --output artifacts/recovery/r1/final-cue-trace.json`.
+This is the only full five-seed gate run of this recovery attempt; initial and trace runs
+were development-only. Raw log final-cue-trace.log. Estimated duration <10 minutes,
+extrapolated from the completed single-seed run. If the gate fails, R2–R6 are not started.
+The failure applies to this registered learner/runtime/task combination, not to all
+neural association methods or the paging hypothesis. Correction budget consumed 1/1.
+
+Final pre-gate regression: 148/148 tests passed in 51 seconds, exit 0. Command:
+`dotnet test GreyMatter.sln -c Release --logger 'trx;LogFileName=r1-final-tests.trx'
+--results-directory artifacts/recovery/r1`. Evidence: r1-final-tests.trx and tests.log.
+Final evaluation launched in session 73308, no other jobs running. Learning correction
+consumed 1/1; source checksums in artifacts/recovery/r1/source-manifest.json.
+
+# Recovery R1 closeout — direct association works; composed gate unmet (2026-09-09)
+
+**R0 PASS. R1 FAIL. Recovery campaign stopped at its prerequisite gate. R2–R6 unstarted.**
+One bounded execution repair and the one permitted learning correction were completed.
+No additional sweep or mechanism attempt is authorized by this plan.
+
+Final command: `dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release --
+eval recovery --mode learning --seeds 101,102,103,104,105 --sequence-uses-cue-members true
+--output artifacts/recovery/r1/final-cue-trace.json`. Process session 73308 completed with
+exit code **1**, the expected CLI signal for a failed gate, not a crash. About 4.21 minutes
+from log creation to final JSON write (filesystem timestamps; approximate wall time).
+
+| arm | direct top-1 | composed top-1 |
+|---|---:|---:|
+| learned | 100.0000% | 35.5811% |
+| untrained | 3.1250% | 3.1250% |
+| shuffled | 2.7246% | 2.4805% |
+| transition-baseline | 100.0000% | 100.0000% |
+
+Learned composed accuracy by seed: 101=.360352, 102=.337158, 103=.391602,
+104=.375244, 105=.314697. Across all five: two hops=.691699, three=.032422,
+four=.007422. Composed queries weight hop 2 twice (64 queries) and hops 3/4 once each
+(32 each), as registered. The aggregate cannot conceal the loss at longer distances.
+
+**What this establishes:** on the registered balanced synthetic task, the experimental
+cue-member temporal rule reliably retrieves immediate neighbors against equally exposed
+candidates. Direct top-1 is 100% in all five seeds; shuffled and untrained controls are
+near chance. The default winner-based rule also reached 100% direct retrieval on the
+single development seed, but was NOT evaluated over these five seeds. These are separate
+claims. No natural-language or open-ended retrieval success is inferred.
+
+**What failed:** the corrected learner/runtime combination did not meet the fixed composed
+bar (mean >=80%, every seed >=70%). Its single development comparison was worse than the
+initial implementation (.376709 versus .453613 composed). The experiment is retained for
+reproducibility, with SequenceUsesCueMembers=false by default; it is not adopted as a fix.
+A transition-count traversal solves all queries. That shows the task is learnable, not that
+we have reproduced its mechanism in this neural implementation.
+
+**What remains unresolved:** weak/absent onward drive may involve connectivity, selection,
+thresholding and recurrent retention together. The one-query trace does not identify a
+unique cause. Paging, bounded training memory, larger learned capacity, real-data recall,
+and GPU benefit are all untested in this recovery campaign. Do not claim a paging failure
+or a universal learning-rule failure from this gate.
+
+**Retained changes:** Cascade reads a step-start snapshot so one step cannot traverse an
+entire chain; recall no longer updates fatigue/familiarity. Eight directed runtime
+fixtures pass. Recovery CLI, balanced task generator, query-local ranking with unbiased
+tie credit, controls, and optional source trace are available. Existing commands and
+experiments retain their implementation except those explicit runtime corrections, so
+old numerical results must not be assumed equivalent. No saved user brain was opened or
+modified. No commits were created.
+
+**Validation:** 148/148 tests pass (r1-final-tests.trx; 51 seconds); one pre-existing CS8604
+warning in ScaleSweep.cs:65. Source checksums match the final-run manifest. Git diff
+whitespace check passed. Numeric results are in final-cue-trace.json and summary.json;
+all logs have identical .txt mirrors because the repository ignores *.log. The .txt
+files and .trx reports preserve raw evidence when this work is later committed.
+
+## Recovery handoff — terminal checkpoint
+
+- Current phase: **R1 stopped, gate unmet; campaign ended under its bounded failure policy.**
+- Passed gates: R0 only. Fixture/test success is not an R1 learning pass.
+- Attempts: initial development learner, one observation-only trace with identical output,
+  one corrective development learner, one final five-seed corrective gate run. No final
+  seeds were used to select another configuration. Learning correction budget 1/1 consumed.
+- Code: Config.cs, Cli.cs, Runtime/Cascade.cs, Runtime/Plasticity.cs; new
+  Eval/RecoveryEval.cs, Eval/RecoveryLearning.cs and tests/RecoveryTests.cs.
+- Documentation: plan.md active pointer, README.md, append-only RESULTS.md.
+- Evidence: artifacts/recovery/r0 (baseline); artifacts/recovery/r1 (fixtures, three
+  development JSON runs, final JSON, summary, logs, tests and source hashes).
+- Effective configuration and exact dataset checksums: each seed in final-cue-trace.json.
+- Jobs: none running; final process exit 1 is accounted for above.
+- Next action: read this closeout and present the design decision to Bill. **Do not start R2.**
+- Decision needed: whether to authorize a separate bounded review of the resident
+  learning/propagation design before resuming the memory-virtualization experiment.
+  Preserve the direct-association result and comparison with the simple baseline.
+
+# T1 activation-travel review — registration (2026-09-09)
+
+Bill authorizes a review of learned activation travel and allows brainData resets.
+No deletion is necessary; use a fresh resident scratch brain. R1 gate remains failed.
+Train only seed 100, existing registered corpus/config, SequenceUsesCueMembers=true.
+For all 32 four-hop queries record the intended chain's five assembly positions at each
+step: positive pre-selection nodes/mass, selected positive nodes/mass, and next-step
+threshold-eligible selected nodes. Count learned positive edges along each chain link,
+and how many members receiving a previous-link edge also own a next-link edge.
+This can distinguish absent bridges, selection loss, and below-threshold survivors
+without changing any runtime rule. Selection is observed, never modified.
+Verify observer-on/off equality and unchanged familiarity/fatigue, and reproduce the
+32 matching fourth-hop scores in dev-cue-trace.json before interpreting telemetry.
+One development training run, no sweeps, no new scientific gate. Expected under two
+minutes based on previous one-seed runs. Planned command (until implemented):
+`gm eval recovery --mode travel --output artifacts/recovery/t1/travel.json`.
+
+# T1 review findings — link distance and simulation time are different
+
+Command: `dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release --
+eval recovery --mode travel --output artifacts/recovery/t1/travel.json`. Session 35083
+completed exit 0. No stored brain was read/reset. One fresh seed-100 scratch model,
+cue-member temporal arm, unchanged training/propagation. All 32 fourth-hop score vectors
+reproduce dev-cue-trace.json EXACTLY. Observer-on/off scores and familiarity/fatigue agree.
+Evidence: travel.json, travel.txt, summary.json and source-manifest.json in t1.
+
+Targeted validation: `dotnet test GreyMatter.sln -c Release --filter
+FullyQualifiedName~RecoveryTests --logger 'trx;LogFileName=travel-tests.trx'
+--results-directory artifacts/recovery/t1` passed 6/6 recovery cases in 37 ms.
+The preceding full suite remains 148/148; the new observer test makes 149 total tests
+available, but the full 149-test suite was not rerun for this optional observation hook.
+Git whitespace check passed. No dependency or numerical rule changed.
+
+## 1. Real learned edges exist, but concept links are not single-neuron relays
+
+Each of 128 adjacent assembly pairs has 5,376–6,608 positive learned edges. Nevertheless,
+four of 96 intermediate junctions (chains 5,6,10,16) have no member neuron that both
+receives a previous-assembly edge and owns a next-assembly edge. This is NOT proof of
+disconnection: a lateral connection inside the assembly could complete the route, at
+the cost of another neuronal step. Even positive bridge counts do not prove that those
+specific bridging members fire; source selection and thresholds still matter.
+
+This exposes a limitation in the R1 interpretation: its generator calls a transition
+between symbolic concepts a “hop,” and gives the neuronal runtime exactly that many
+synchronous updates. A concept-to-concept path can require internal relay steps AND
+time to accumulate enough potential. The transition-count baseline has one symbol per
+node and does not pay those costs. The fixed R1 bar still failed; do not retrospectively
+change it or declare a pass. Its failure establishes insufficient retrieval under that
+particular update budget, not the impossibility of longer-path retrieval at any budget.
+
+## 2. At the second assembly, threshold delay is visible before competition loss
+
+Means across the 32 four-link queries (positions are relative to the cue):
+
+| after simulation step | chain position | positive nodes before selection | selected | selected eligible to emit next step |
+|---|---:|---:|---:|---:|
+| 1 | 1 | 31.875 | 31.844 | 24.094 |
+| 2 | 2 | 18.312 | 18.062 | 0.062 |
+| 3 | 2 | 18.312 | 18.312 | 18.062 |
+| 4 | 3 | 9.906 | 9.844 | 0.094 |
+
+At step 2, second-position pre-selection mass averages 6.362 and selected mass 6.361: almost
+all observed mass survives selection, but virtually none can cross the .5 firing cutoff
+on the next step. By step 3 that position has accumulated enough mass to make ~18 members
+eligible; its third-position descendants then arrive weakly at step 4. This is observed
+latency, not evidence that the second position received no signal. These means include
+collisions/side routes; they do not establish exclusive causal paths for every query.
+
+Thus removing competition alone is not a well-supported first repair for this observed
+second-position loss. It does not follow that competition is globally harmless.
+
+## 3. The update retains activity; its edge weighting does not conserve total drive
+
+The actual recurrence is selection applied to retained potentials PLUS incoming weighted
+drive. Sources are not consumed when they emit. Step 4 still selects ~153 cue members
+and retains ~150 mass units in the first related position on average. This favors activity
+already established, but the review does not prove it is the sole limiting mechanism.
+
+For a positive-degree source, total emitted drive is
+`sourceDrive * sum(outgoingWeights) / outDegree`, before residency losses. It equals input
+drive only when mean outgoing weight is 1. The comment claiming conservation was too
+strong. Fix the description, not the numerical rule during this review. Both weight
+scale and accumulation cadence influence the number of steps required to travel.
+
+## Recommendation — test travel time before changing the learning rule again
+
+The next bounded experiment should separate conceptual path length from simulation ticks.
+Keep the recorded learner, weights, encoder, candidate sets and original four-step results.
+Use ONE preregistered alternate budget of 12 ticks for the same four-link queries, with
+untrained/shuffled controls at the same budget; report accuracy AND latency. This is a
+new latency diagnostic, not a replacement R1 pass and not a tick-count sweep. Persist the
+scratch numeric snapshot and diagnostic numeric codes at that point to avoid repeated
+training for future read-only comparisons.
+
+If useful retrieval appears at the longer budget, an explicit latency/accuracy contract
+should precede any redesign or paging resumption. If it does not, inspect the actual
+relay paths on that frozen snapshot before proposing separate changes to edge allocation
+and propagation (e.g. genuinely normalized transient propagation). Do not combine those
+changes into a new learner and attribute any improvement to one of them. No parameter
+sweep, threshold reduction, or automatic R2 advance follows this review.
+
+## T1 handoff
+
+Review complete; R1 remains failed, R2 unstarted. Changed code only adds an optional
+selection observer, the `travel` recovery mode and one observer test. No training or
+propagation behavior changed. All raw observations and exact reproduction checks are
+recorded above. No jobs running. Bill permits brainData resets; none was necessary.
+Next proposed action is the single longer-budget frozen-model diagnostic, to be authorized
+as the next experiment. This replaces the earlier vague “review needed” handoff with a
+concrete question: is the apparent failure principally insufficient simulation time?
+
+# T2 travel-time diagnostic — registration (2026-09-09)
+
+Bill's continuation instruction resumes the proposed bounded diagnostic. Train seed 100
+once per learned/shuffled arm; untrained uses the real training encoder only. Compare
+4 and 12 neuronal ticks for the SAME 32 four-concept-link queries on each frozen model.
+No other tick counts, learning changes or threshold changes. Preserve all-zero/tied
+queries; report query-local top-1, MRR and measured runtime without a gate verdict.
+Reproduce all 4-tick score vectors from dev-cue-trace.json before interpretation.
+Save numerical recall-only graph snapshots plus numerical sparse query codes (no text
+labels or answer index in the snapshot). These preserve synaptic weights, resident IDs,
+threshold/familiarity/fatigue, but are NOT resumable training checkpoints or proof of
+paging. Round-trip replay must match both budgets exactly.
+Planned command: `gm eval recovery --mode travel-time --output
+artifacts/recovery/t2/time.json`. Budget: one development run, expected <3 minutes.
+A 12-tick improvement demonstrates a latency effect, not R1 success, natural-language
+recall, or a reason to start R2 automatically.
+
+T2 implementation validated by 7/7 recovery test cases (47 ms). Command:
+`dotnet test GreyMatter.sln -c Release --filter FullyQualifiedName~RecoveryTests
+--logger 'trx;LogFileName=time-tests.trx' --results-directory artifacts/recovery/t2`.
+Observer remains optional; no propagation or learning rule changed. Snapshot format
+is recall-only, not a training-resume format. Numerical evaluation codes live separately
+from the model snapshot and are not consulted by propagation. Source manifest saved.
+T2 process started; expected <3 minutes. Output time.json and raw output time.txt.
+
+# T2 result — more simulation time helps, but does not resolve retrieval
+
+`dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery
+--mode travel-time --output artifacts/recovery/t2/time.json` completed exit 0, session 57630.
+One seed, 32 four-concept-link queries, three frozen arms, exactly two tick budgets.
+All 96 original four-tick score vectors reproduce dev-cue-trace.json exactly. Numerical
+snapshot reload reproduces ALL score vectors at BOTH budgets exactly, for every arm.
+No training changes, no old brain reset, no paging or gate-pass claim.
+
+| arm | ticks | top-1 | MRR | mean query ms |
+|---|---:|---:|---:|---:|
+| untrained | 4 | 3.1250% | 0.126828 | 0.914 |
+| untrained | 12 | 3.1250% | 0.126828 | 0.886 |
+| learned | 4 | 3.4180% | 0.143175 | 3.170 |
+| learned | 12 | 31.5430% | 0.395215 | 8.510 |
+| shuffled | 4 | 0.2930% | 0.118835 | 2.958 |
+| shuffled | 12 | 3.4180% | 0.127582 | 9.030 |
+
+Timings are one sequential development run, including candidate score aggregation, without
+a dedicated benchmark warmup or controlled machine load. They describe this run only.
+Do not claim an established speed/quality tradeoff from these timings.
+
+The learned arm gains 28.125 percentage points; shuffled gains 3.125 points. Longer time
+therefore reveals learned association that the four-tick budget misses on this seed.
+But 31.54% is far below the original 80% requirement, and most queries remain incorrect.
+The source of the remaining failures is not uniquely isolated. No additional time budget
+was tested, and no threshold was lowered. R1 remains failed as originally registered.
+
+Recommendation: retain the distinction between conceptual path length and simulation
+time in the eventual utility contract. Before another learning-rule change, use the
+saved numerical graph to inspect whether correct candidates have viable relay routes
+and where those routes lose activation. Such a follow-up can now avoid retraining.
+Do not assume that more ticks, more edge slots, or normalized weights will solve it.
+Do not start R2 before a newly authorized resident-learning validation passes.
+
+T2 handoff: complete, no running jobs. Evidence in artifacts/recovery/t2 includes time.json,
+time.txt, summary.json, numerical *-recall.bin snapshots, checksums, and separate
+*-evaluation-codes.json diagnostic inputs/candidates. Snapshots are RECALL-ONLY and store
+no word labels; they omit training state such as receptive-field deviations and encoder
+accumulators. Do not use them to resume learning or claim they implement a pageable store.
+Snapshot loader uses the same current baseline recipe generator, but recall scores come
+from the restored operative synapses/thresholds, whose exact replay is verified.
+Tests: seven targeted recovery cases pass; previous full regression suite passed 148/148.
+No full 150-case regression run was claimed. Runtime numerical behavior remains unchanged
+by T1/T2; only optional telemetry and diagnostic modes were added.
+
+# T3 frozen-route audit — registration (2026-09-09)
+
+Bill authorizes continuing the failed-route review. Use only the three T2 snapshots and
+separate numerical evaluation codes. No training or new tick budget. For each of the
+32 queries per arm, run breadth-first search over positive learned edges (12-edge cap),
+report endpoint-member coverage for ALL 32 candidate assemblies, and retain one shortest
+positive route to the correct candidate as a witness, explicitly not a causal explanation.
+Report cue/endpoint overlaps separately. Observe the unchanged 12-tick runtime and trace
+witness nodes' first positive, selected and threshold-eligible steps. Exact score vectors
+must reproduce T2. Rank summaries may diagnose structural ambiguity but are not learning
+gates. Expected seconds to a minute; targeted BFS tests plus replay verification.
+This audit ends with a design recommendation, not an automatic new learner or R2.
+Planned CLI: `gm eval recovery --mode routes --snapshot-directory artifacts/recovery/t2
+--output artifacts/recovery/t3/routes.json`.
+
+# T3 closeout — connectivity, relay activation, and discrimination all matter
+
+`dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery
+--mode routes --snapshot-directory artifacts/recovery/t2 --output artifacts/recovery/t3/routes.json`
+completed exit 0, session 44410. No training. All 96 twelve-tick score vectors exactly
+reproduce T2. Snapshot checksums remain unchanged. Evidence: routes.json, routes.txt,
+summary.json, source-manifest.json.
+
+Targeted tests: `dotnet test GreyMatter.sln -c Release --filter
+FullyQualifiedName~RecoveryTests --logger 'trx;LogFileName=routes-tests.trx'
+--results-directory artifacts/recovery/t3` passed 8/8 cases in 47 ms. Tests include directed
+BFS, finite-depth refusal, cycles, duplicate roots and unreachable nodes. No full-suite
+rerun is claimed; previous full regression result remains 148/148.
+
+## Findings from the learned snapshot, 32 queries
+
+- **10 correct endpoint assemblies have no reachable member within 12 positive edges.**
+  These failures cannot be repaired by changing activation thresholds alone at this
+  fixed path-length budget. This is not a proof of unreachability at arbitrary depth.
+- **21 have a positive-length shortest witness** to a non-root endpoint member. One
+  additional query has only zero-length cue/endpoint overlap in this BFS result.
+  The BFS does not revisit roots to find positive cycles; do not count that overlap
+  as proof of a learned path or describe all 11 witness-free cases as disconnected.
+- Reachable endpoint-member coverage averages **5.73% for correct candidates** versus
+  **3.80% for other candidates**. Over 55% of other candidate assemblies have some
+  reachable member (including initial overlaps). Reachability alone is not recall.
+- Query 0 has a four-edge witness, but its first relay neuron (172691) is selected
+  from step 1 onward and never emits during the 12 ticks; its maximum potential is
+  .348758, below .5. Query 19's first relay (551456) reaches only .003691 and is never
+  selected. These are observed witness failures, not proofs about every alternate path.
+- Some failed queries deliver positive mass to the correct candidate but rank another
+  candidate higher; query 31 delivers 47.507 units to the correct endpoint. The problem
+  therefore includes discrimination, not only missing paths or complete silence.
+- Some successful queries have structural shortcuts shorter than the four conceptual
+  links. A shortest witness is NOT necessarily the path that produced the score: even
+  successful query 1 has a shortest witness whose relay never emits. This audit does
+  not certify that successful queries followed the intended conceptual chain.
+
+Controls reinforce the limits: untrained has no positive witnesses (four initial
+cue/endpoint overlaps); shuffled has 11 positive witnesses and mean correct/other
+coverage 1.79%/1.74%. Learning creates some selective structure, but most endpoint
+members remain unreachable and usable activation is a further constraint.
+
+## Design recommendation — define an assembly relay contract
+
+The current implementation can learn A→B and B→C as separate sets of neuronal edges
+without guaranteeing that activity arriving from A can engage B's outgoing association.
+The intended unit of association is an assembly, while routing succeeds or fails at
+individual, independently budgeted neurons. More ticks helped, but did not resolve
+that mismatch; moving a single threshold would not fix missing routes.
+
+The next implementation proposal should be a bounded **assembly-relay experiment**:
+learned incoming activity must have a defined local route to the assembly's outgoing
+learned associations. Candidate mechanisms are a protected common relay cohort or
+local completion within the assembly. Choose ONE after specifying its entry/exit
+contract; do not combine both or conceal an answer lookup behind completion. Assembly
+identity and membership must be numerical, learned associations must still come from
+training, and the evaluator's chain labels must never enter runtime routing.
+
+Validate separately: (1) intended entry/exit connectivity is learned, (2) activation
+actually traverses it, (3) correct targets beat frequency-matched distractors and shuffled
+controls. Measure ticks and latency separately from conceptual distance. Retain the
+transition-count baseline. No claim of additional effective neurons follows merely
+from using an assembly as the routing unit. This is a design hypothesis, not a proven fix.
+
+T3 ends here with no new learner, no changed propagation/defaults, and no R2 advance.
+The next decision is the concrete relay mechanism and its bounded implementation
+protocol, not another timing/threshold grid. Existing snapshots make future read-only
+comparisons possible without retraining.
+
+## T3 handoff
+
+Complete; no jobs running; R1 remains failed. New RouteReview.cs, recovery CLI dispatch
+and BFS test only. No snapshot or stored user brain changed. Next proposed work:
+register and implement one explicit assembly-relay contract, then validate connectivity,
+transmission and discrimination independently. Do not infer a pass from this audit.
