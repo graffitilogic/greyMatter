@@ -30,6 +30,13 @@ public sealed class DiskRelayRecords : IRelayRecords
     public long DirtyWrites { get; private set; }
     public long BytesRead { get; private set; }
     public long BytesWritten { get; private set; }
+    public readonly record struct Access(uint Id, bool Hit, bool Loaded, bool Unseen, uint? EvictedId);
+    // Optional observer; the caller owns and bounds its trace buffer.
+    public Action<Access>? ObserveRead { get; set; }
+    public void ClearCache()
+    {
+        Flush(); Array.Clear(_used); Array.Clear(_ages); _clock = 0;
+    }
 
     public DiskRelayRecords(string directory, uint idLimit, long budgetBytes) : this(directory, idLimit, budgetBytes, false) { }
     internal DiskRelayRecords(string directory, uint idLimit, long budgetBytes, bool existing)
@@ -103,13 +110,17 @@ public sealed class DiskRelayRecords : IRelayRecords
     {
         if (record.Length != RelayRecord.Bytes) throw new ArgumentException("Record buffer length");
         int slot = Find(id);
-        if (slot >= 0) { At(slot).CopyTo(record); return true; }
+        if (slot >= 0) { At(slot).CopyTo(record); ObserveRead?.Invoke(new(id, true, false, false, null)); return true; }
         Span<byte> marker = stackalloc byte[1]; ReadExactly(_index, marker, id); BytesRead++;
-        if (marker[0] == 0) { record.Clear(); return false; }
+        if (marker[0] == 0) { record.Clear(); ObserveRead?.Invoke(new(id, false, false, true, null)); return false; }
         if (marker[0] != 1) throw new InvalidDataException("Corrupt presence index");
         ReadExactly(_data, record, (long)id * RelayRecord.Bytes); BytesRead += RelayRecord.Bytes;
         RelayRecord.Validate(id, record);
-        slot = Allocate(id); record.CopyTo(At(slot)); return true;
+        long before = Evictions;
+        uint victim = _ids[0]; long oldest = _ages[0];
+        for (int i = 1; i < Slots; i++) if (_ages[i] < oldest) { oldest = _ages[i]; victim = _ids[i]; }
+        slot = Allocate(id); record.CopyTo(At(slot));
+        ObserveRead?.Invoke(new(id, false, true, false, Evictions > before ? victim : null)); return true;
     }
     public void Write(uint id, ReadOnlySpan<byte> record)
     {

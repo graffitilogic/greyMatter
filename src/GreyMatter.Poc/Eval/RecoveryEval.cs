@@ -10,6 +10,7 @@ public static class RecoveryEval
 
     public static int Run(Config cfg, Args args)
     {
+        if (args.Value("--mode", "fixtures") == "paging") return RelayPagingEval.Run(args);
         if (args.Value("--mode", "fixtures") == "storage") return RelayStorageEval.Run(args);
         if (args.Value("--mode", "fixtures") == "relay") return RelayEval.Run(args);
         if (args.Value("--mode", "fixtures") == "routes") return RouteReview.Run(args);
