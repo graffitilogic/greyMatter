@@ -15,13 +15,14 @@ public static class RelayCheckpoint
     // v1: model 1 = protected AssemblyRelay, input 1 = caller-supplied frozen numeric code.
     public const int StateBytes = 128, CopyBufferBytes = 4096;
     public enum Stage { DuringGenerationCopy, GenerationFlushed, BeforeManifestReplace, ManifestReplaced }
-    private static byte[] State(uint limit, RelayTrainingState state, byte[] indexHash)
+    internal static byte[] State(uint limit, RelayTrainingState state, byte[] indexHash, int version = 1, ulong epoch = 0)
     {
         if (state.Previous.Length > 8 || state.Previous.Any(id => id >= limit) ||
             state.Updates < 0 || state.Episodes < 0 || state.Observations < 0)
             throw new ArgumentException("Invalid learning continuation");
         var b = new byte[StateBytes];
-        BinaryPrimitives.WriteInt32LittleEndian(b, 1);
+        BinaryPrimitives.WriteInt32LittleEndian(b, version);
+        if (version == 2) BinaryPrimitives.WriteUInt64LittleEndian(b.AsSpan(112), epoch);
         BinaryPrimitives.WriteInt32LittleEndian(b.AsSpan(4), 1);
         BinaryPrimitives.WriteInt32LittleEndian(b.AsSpan(8), 1);
         BinaryPrimitives.WriteUInt32LittleEndian(b.AsSpan(12), limit);
@@ -33,7 +34,7 @@ public static class RelayCheckpoint
         indexHash.CopyTo(b, 80);
         return b;
     }
-    private static byte[] HashFile(string path)
+    internal static byte[] HashFile(string path)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1);
@@ -41,13 +42,13 @@ public static class RelayCheckpoint
         while ((n = file.Read(buffer)) != 0) hash.AppendData(buffer[..n]);
         return hash.GetHashAndReset();
     }
-    private static byte[] SmallFile(string path, int length)
+    internal static byte[] SmallFile(string path, int length)
     {
         using var file = File.OpenRead(path);
         if (file.Length != length) throw new InvalidDataException("Invalid manifest/metadata size");
         var b = new byte[length]; file.ReadExactly(b); return b;
     }
-    private static void DurableWrite(string path, byte[] bytes)
+    internal static void DurableWrite(string path, byte[] bytes)
     {
         using var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1);
         file.Write(bytes); file.Flush(true);
@@ -55,7 +56,7 @@ public static class RelayCheckpoint
     [DllImport("libc", SetLastError = true)] private static extern int open(string path, int flags);
     [DllImport("libc", SetLastError = true)] private static extern int fsync(int fd);
     [DllImport("libc")] private static extern int close(int fd);
-    private static void SyncDirectory(string directory)
+    internal static void SyncDirectory(string directory)
     {
         if (!OperatingSystem.IsLinux() && !OperatingSystem.IsMacOS())
             throw new PlatformNotSupportedException("Durable checkpoint publication requires POSIX directory fsync");
@@ -64,7 +65,7 @@ public static class RelayCheckpoint
         try { if (fsync(fd) != 0) throw new IOException("Cannot sync checkpoint directory"); }
         finally { close(fd); }
     }
-    private static string Generation(string root, ulong generation) => Path.Combine(root, $"{generation:D20}");
+    internal static string Generation(string root, ulong generation) => Path.Combine(root, $"{generation:D20}");
 
     // Sequential direct-offset scan: fixed 4 KiB presence buffer, one record, no list of IDs.
     private static void Copy(DiskRelayRecords source, DiskRelayRecords destination, Action<Stage>? fault = null)

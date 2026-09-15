@@ -16,6 +16,9 @@ public sealed class StoredRelayLearning
     private readonly byte[] _buffer = new byte[RelayRecord.Bytes];
     private uint[] _previous;
     public long Updates { get; private set; }
+    public long DecayVisits { get; private set; }
+    public long DecayElapsedTicks { get; private set; }
+    public long DecayRecordTicks { get; private set; }
     public long Episodes { get; private set; }
     public long Observations { get; private set; }
     public StoredRelayLearning(IRelayRecords records, RelayTrainingState? state = null)
@@ -54,12 +57,21 @@ public sealed class StoredRelayLearning
     }
     public void Decay()
     {
-        // Exact eager decay, in-place and bounded. Scans address space, not an in-RAM ID list.
-        for (uint id = 0; id < _records.IdLimit; id++)
-            if (_records.Read(id, _buffer))
-            {
-                RelayRecord.Decode(id, _buffer, _scratch);
-                _scratch.ApplyDecay(1, .99f); Save(id);
-            }
+        long start = System.Diagnostics.Stopwatch.GetTimestamp();
+        if (_records is DeferredRelayRecords deferred)
+        {
+            deferred.AdvanceDecay();
+            DecayElapsedTicks += System.Diagnostics.Stopwatch.GetTimestamp() - start;
+            return;
+        }
+        _records.VisitPresent(id =>
+        {
+            long recordStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            if (!_records.Read(id, _buffer)) throw new InvalidDataException("Enumerated record missing");
+            RelayRecord.Decode(id, _buffer, _scratch);
+            _scratch.ApplyDecay(1, .99f); Save(id); DecayVisits++;
+            DecayRecordTicks += System.Diagnostics.Stopwatch.GetTimestamp() - recordStart;
+        });
+        DecayElapsedTicks += System.Diagnostics.Stopwatch.GetTimestamp() - start;
     }
 }

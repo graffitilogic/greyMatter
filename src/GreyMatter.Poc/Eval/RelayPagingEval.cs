@@ -22,7 +22,7 @@ public static class RelayPagingEval
     private static string Hash(string path)
     { using var f = File.OpenRead(path); return Convert.ToHexString(SHA256.HashData(f)); }
     private static Dictionary<string,string> HashStore(string directory) =>
-        new[] { "records.bin", "presence.bin" }.ToDictionary(n => n, n => Hash(Path.Combine(directory, n)));
+        Directory.GetFiles(directory, "*.bin", SearchOption.AllDirectories).ToDictionary(n => Path.GetRelativePath(directory, n), Hash);
     private static bool Close(double[] a, double[] b) => a.Zip(b).All(p =>
         Math.Abs(p.First - p.Second) <= 1e-6 + 1e-5 * Math.Abs(p.Second));
     private static bool Ranking(double[] a, double[] b)
@@ -62,6 +62,7 @@ public static class RelayPagingEval
 
     public static int Run(Args args)
     {
+        bool deferredMode = args.Value("--decay", "eager") == "deferred";
         var seeds = args.Value("--seeds", "100")!.Split(',').Select(int.Parse).ToArray();
         bool final = seeds.SequenceEqual(new[] { 201, 202, 203, 204, 205 });
         if (!final && !seeds.SequenceEqual(new[] { 100 })) throw new ArgumentException("Registered seeds only");
@@ -91,7 +92,9 @@ public static class RelayPagingEval
             string modelDir = Path.Combine(seedDir, "records");
             using var resident = new ResidentRelayRecords(limit);
             (Config Config, int Count) imported;
-            using (var writer = new DiskRelayRecords(modelDir, limit, DiskRelayRecords.FixedCharge + 8 * DiskRelayRecords.SlotCharge))
+            using (IRelayRecords writer = deferredMode
+                ? new DeferredRelayRecords(modelDir, limit, DeferredRelayRecords.ExtraReservedBytes + DiskRelayRecords.FixedCharge + 8 * DiskRelayRecords.SlotCharge)
+                : new DiskRelayRecords(modelDir, limit, DiskRelayRecords.FixedCharge + 8 * DiskRelayRecords.SlotCharge))
                 imported = Import(snapshot, resident, writer);
             var cfg = imported.Config;
             var members = codes.Select(c => c.Select(code => AssemblyRelay.Members(code, cfg.BaselineNeuronCount)).ToArray()).ToArray();
@@ -114,19 +117,23 @@ public static class RelayPagingEval
             var before = HashStore(modelDir); var cells = new List<Cell>();
             foreach (int slots in new[] { 1, 8 }) foreach (bool reverse in new[] { false, true })
             {
-                using var disk = new DiskRelayRecords(modelDir, limit, DiskRelayRecords.FixedCharge + slots * DiskRelayRecords.SlotCharge, existing: true);
-                var runtime = new StoredRelayRecall(disk, cfg.ActivationWidth, 4, ScratchBudget); var rows = new List<Query>();
+                using IRelayRecords store = deferredMode
+                    ? new DeferredRelayRecords(modelDir, limit, DeferredRelayRecords.ExtraReservedBytes + DiskRelayRecords.FixedCharge + slots * DiskRelayRecords.SlotCharge, true)
+                    : new DiskRelayRecords(modelDir, limit, DiskRelayRecords.FixedCharge + slots * DiskRelayRecords.SlotCharge, existing: true);
+                var deferred = store as DeferredRelayRecords; var disk = deferred?.Cache ?? (DiskRelayRecords)store;
+                long ReadBytes() => disk.BytesRead + (deferred?.EpochBytesRead ?? 0);
+                var runtime = new StoredRelayRecall(store, cfg.ActivationWidth, 4, ScratchBudget); var rows = new List<Query>();
                 foreach (var q in reverse ? queries.Reverse() : queries)
                 {
-                    long hits = disk.Hits, loads = disk.Misses, evictions = disk.Evictions, read = disk.BytesRead;
+                    long hits = disk.Hits, loads = disk.Misses, evictions = disk.Evictions, read = ReadBytes();
                     runtime.Run(members[q.Chain][q.Start], q.Hops); var scores = Scores(runtime, members, q);
                     var row = new Query(q.Chain, q.Start, q.Hops, scores, RecoveryLearning.ScoreRank(scores, q.Chain),
                         scores.SequenceEqual(q.Scores), Close(scores, q.Scores), Ranking(scores, q.Scores),
-                        disk.Hits - hits, disk.Misses - loads, disk.Evictions - evictions, disk.BytesRead - read, runtime.DeliveredCount, Steps(runtime));
+                        disk.Hits - hits, disk.Misses - loads, disk.Evictions - evictions, ReadBytes() - read, runtime.DeliveredCount, Steps(runtime));
                     rows.Add(row); pass &= row.WithinTolerance && row.SameRanking;
                 }
-                cells.Add(new(slots, reverse ? "reverse" : "forward", disk.ReservedBytes, runtime.ReservedBytes,
-                    disk.Hits, disk.Misses, disk.Evictions, disk.BytesRead, disk.BytesWritten, runtime.Truncations, rows.ToArray()));
+                cells.Add(new(slots, reverse ? "reverse" : "forward", deferred?.ReservedBytes ?? disk.ReservedBytes, runtime.ReservedBytes,
+                    disk.Hits, disk.Misses, disk.Evictions, ReadBytes(), disk.BytesWritten, runtime.Truncations, rows.ToArray()));
                 pass &= disk.Evictions > 0 && disk.Misses > 0 && disk.BytesWritten == 0;
                 if (seed == seeds[0] && slots == 1 && !reverse)
                 {
@@ -148,7 +155,7 @@ public static class RelayPagingEval
             Console.WriteLine($"seed={seed} originalExact={originalExact} residentExact={residentExact} immutable={immutable} pagedQueries={cells.Sum(c => c.Queries.Length)} exact={cells.All(c => c.Queries.All(q => q.Exact))} loads={cells.Sum(c => c.Loads)} evictions={cells.Sum(c => c.Evictions)}");
         }
         string verdict = pass ? (final ? "R3_PASS" : "R3_DEVELOPMENT_PASS") : "R3_FAIL";
-        File.WriteAllText(output, JsonSerializer.Serialize(new { Verdict = verdict, Runtime = "StoredRelayRecall", ScratchBudgetBytes = ScratchBudget,
+        File.WriteAllText(output, JsonSerializer.Serialize(new { Verdict = verdict, StorageVersion = deferredMode ? 2 : 1, Runtime = "StoredRelayRecall", ScratchBudgetBytes = ScratchBudget,
             ComparisonAbsTolerance = 1e-6, ComparisonRelTolerance = 1e-5, Results = results }, new JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine(verdict); return pass ? 0 : 1;
     }

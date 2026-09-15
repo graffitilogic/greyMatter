@@ -3,16 +3,22 @@
 A C# experiment in learning and recall using sparse activation, procedural neuron
 identities, compact learned state, and eventually connection-driven loading and eviction.
 
-**Status — 2026-09-09:** the new protected assembly relay passes its registered synthetic
-learning gates. **155 tests pass.** The next deliverable is a bounded disk-backed store;
-network execution larger than RAM remains unproven.
+**Status — 2026-09-14:** exact deferred decay and paged recall are verified;
+**180 tests pass**. The first R4 scale cell trained in 148 seconds and reproduced
+resident scores exactly, but paged p95 was 27.4x resident (target <=10x).
+R4 stopped at that target. Larger-than-memory capacity and real-data utility remain
+unproven; only one of seven supported queries had a nonzero candidate response.
 
 | Read | Purpose |
 |---|---|
 | [Prompt.md](Prompt.md) | Original purpose and constraints |
 | [plan.md](plan.md) | Active agent guide and current phase |
-| [RESULTS.md](RESULTS.md) | Evidence log; start at the A1 closeout near the end |
+| [RESULTS.md](RESULTS.md) | Evidence log; start at the R4 development checkpoint near the end |
 | [A1 summary](artifacts/recovery/a1/summary.json) | Final synthetic metrics |
+| [R2 summary](artifacts/recovery/r2/summary.json) | Storage and restart correctness |
+| [R3 summary](artifacts/recovery/r3/summary.json) | Exact paged recall and traversal trace |
+| [R4 checkpoint](artifacts/recovery/r4/summary.json) | Development measurements and runtime blocker |
+| [R4 deferred correction](artifacts/recovery/r4-deferred/summary.json) | Exactness checks and first scale-cell stop |
 | `src/GreyMatter.Poc/` | Implementation |
 | `tests/GreyMatter.Poc.Tests/` | Correctness and regression tests |
 
@@ -39,10 +45,22 @@ neurons and 8,192 synapses, representing 128 observed pair relations. This is ev
 of usable synthetic associative routing, not additional independent neural complexity.
 The simple transition baseline also passes; no advantage over it is claimed.
 
+The new numeric storage path reproduced resident learning exactly with 2,048 records
+and an eight-record cache, including a mid-sequence checkpoint resumed in a fresh
+process. Its 6,976-byte cache reservation excludes learner/checkpoint scratch, the
+external encoder, runtime overhead and OS file caching. This is storage correctness,
+not a whole-process memory or large-network recall result.
+
+Paged recall now reproduces all frozen A1 scores with one- and eight-record caches,
+in both query orders, without modifying model files. A four-hop query performed 287
+loads through a one-record cache and retained its answer. Traversal separately reserves
+530,944 bytes of scratch; the small record cache is not the entire application memory.
+
 ## What remains
 
-- The relay is fully resident. Its current backing store retains recipes in RAM.
-- Bounded storage, learned networks larger than RAM, realistic branching, and useful
+- Exact paged recall is an experimental evaluation path. The existing default CLI
+  utility has not yet been connected to it.
+- Whole-process memory bounds, learned networks larger than RAM, realistic branching, and useful
   resource/quality tradeoffs are unproven. CUDA is deferred.
 - The existing `learn`/`probe` commands still use the older runtime; `probe` trains a
   fresh brain. Saved-model related-material retrieval from local data is a later phase.
@@ -69,4 +87,9 @@ and does not open a user brain or require the network corpus. JSON records confi
 corpus checksums, per-query scores and activation traces. Numerical graph snapshots
 require the AssemblyRelay runtime; they are recall-only, not training-resume checkpoints.
 
-Follow the R2 memory-accounting contract in plan.md before extending the implementation.
+Reproduce R2 with `eval recovery --mode storage --records 128 --output /tmp/gm-r2-dev/result.json`
+and a fresh directory. The R2 closeout in RESULTS.md provides the separate-process
+resume command and storage/encoder limitations. Reproduce R3 with
+`eval recovery --mode paging --seeds 100 --output /tmp/gm-r3-dev/result.json`; it reads
+the frozen A1 artifacts. Follow the R4 contract in plan.md before making resource or
+capacity claims; the default learn/probe utility is still unchanged.

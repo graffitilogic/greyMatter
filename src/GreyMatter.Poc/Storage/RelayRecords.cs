@@ -59,6 +59,7 @@ public interface IRelayRecords : IDisposable
     bool Read(uint id, Span<byte> record);
     void Write(uint id, ReadOnlySpan<byte> record);
     void Flush();
+    void VisitPresent(Action<uint> visit);
 }
 
 /// <summary>Deliberately unbounded reference backend, never hidden inside disk mode.</summary>
@@ -80,6 +81,8 @@ public sealed class ResidentRelayRecords(uint idLimit) : IRelayRecords
         if (!_records.TryGetValue(id, out var bytes)) _records[id] = bytes = new byte[RelayRecord.Bytes];
         record.CopyTo(bytes);
     }
+    public void VisitPresent(Action<uint> visit)
+    { foreach (uint id in _records.Keys.OrderBy(id => id)) visit(id); }
     public void Flush() { }
     public void Dispose() { }
 }

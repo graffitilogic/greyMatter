@@ -3391,3 +3391,776 @@ Complete; no jobs running; R1 remains failed. New RouteReview.cs, recovery CLI d
 and BFS test only. No snapshot or stored user brain changed. Next proposed work:
 register and implement one explicit assembly-relay contract, then validate connectivity,
 transmission and discrimination independently. Do not infer a pass from this audit.
+
+# A1 protected relay — prospective registration
+
+Bill authorizes the next implementation deliverable. Contract and gates are now in the
+active plan. Cohort=first 8 deterministic assembly members; isolated relay synapse store;
+existing RecordCoactivation(.5,1,CrossCue) learning, degree cap32 and periodic .99 decay
+every500 episodes. No within-cue relay reinforcement. Positive outgoing weights normalize
+each source's transmitted drive; next tick is fresh incoming activation, with .5 firing
+threshold and top256 selection. Candidate scores sum delivered drive across ticks.
+This is a new protected routing model, not a single-variable causal experiment on R1.
+
+Use unchanged synthetic generator and encoder (context learned on each arm's training
+corpus). One development seed100, then final201–205. No parameter grid. Original R1
+results/gate remain unchanged. Connectivity and discrimination gates as in plan A1;
+record learned edge existence, intermediate overlap, actual relay member collisions,
+zero scores, per-query ranks and four-hop emission diagnostics. Include untrained,
+global-shuffle and transition-count controls. Persist recall-only numeric graph and
+separate numeric evaluation codes; exact replay required. No wordlist in model snapshots.
+
+Planned CLI: `gm eval recovery --mode relay --seeds 100 --output
+artifacts/recovery/a1/dev.json`, then `--seeds 201,202,203,204,205 --output
+artifacts/recovery/a1/final.json`. Final runs only after targeted/full tests and smoke.
+Expected runtime below ten minutes, bounded by measured smoke. All existing user
+changes and brains preserved; no commit or reset needed.
+
+### A1 implementation and development result
+
+New Runtime/AssemblyRelay.cs implements the protected cohort contract as a separate
+fully resident model. Eval/RelayEval.cs uses the existing generator, rank metric,
+ContextEncoder and transition baseline. Existing Cascade/Plasticity behavior is unchanged.
+Three new AssemblyRelayTests pass (14 ms), covering learned composition, sequence
+boundaries/untrained silence, conservation, relative weights and read-only queries.
+Command: `dotnet test GreyMatter.sln -c Release --filter FullyQualifiedName~AssemblyRelayTests
+--logger 'trx;LogFileName=relay-tests.trx' --results-directory artifacts/recovery/a1`.
+
+`dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery
+--mode relay --seeds 100 --output artifacts/recovery/a1/dev.json` completed exit 0.
+Learned direct/composed top-1=1.000/1.000; 128/128 links and 96/96 junctions have relay
+connections; every composed endpoint receives activation with emission at every tick.
+Untrained=.03125/.03125; shuffled=.031169/.027344. The transition baseline remains
+1.000/1.000. Actual learned neurons=1,278 (two overlapping relay IDs), synapses=8,192.
+All arm snapshots replay all query scores exactly. These are development results only.
+
+No tuning followed. Final command will use fresh seeds 201–205 and identical settings:
+`dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery
+--mode relay --seeds 201,202,203,204,205 --output artifacts/recovery/a1/final.json`.
+Smoke completed in seconds; final expected below one minute. Full regressions in progress
+(session 44750); no other jobs running. Final evaluation starts after those tests pass.
+
+# A1 closeout — protected relay passes the registered synthetic gates
+
+**A1 PASS**, distinct from the historical R1 failure. All three acceptance checks passed
+without a corrective arm or parameter tuning. Existing default Cascade/Plasticity and
+legacy learn/probe commands remain unchanged by A1. The new model is explicitly selected
+with `eval recovery --mode relay`.
+
+Final command: `dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release --
+eval recovery --mode relay --seeds 201,202,203,204,205 --output artifacts/recovery/a1/final.json`.
+Session 94546 completed exit 0. Full effective configs, corpus/null hashes, all query
+scores and tick traces are in final.json. Raw stdout final.txt; aggregate summary.json.
+
+| model | direct top-1, mean | composed top-1, mean |
+|---|---:|---:|
+| protected relay, learned | 100.0000% | 100.0000% |
+| untrained | 3.1250% | 3.1250% |
+| shuffled training | 4.1455% | 3.0745% |
+| transition-count baseline | 100.0000% | 100.0000% |
+
+- Every learned seed individually scored 100% on 128 direct and 128 composed queries.
+- Every seed had all 128 observed adjacent links and all 96 intermediate relay junctions
+  connected. Every composed endpoint received positive drive, with emission at every
+  simulation tick. Numerical fixtures additionally establish directed step-by-step
+  transmission without a directly trained endpoint pair.
+- Learned networks contain 8,192 positive synapses and 1,278–1,280 unique relay neurons
+  (0–2 shared IDs among cohorts). Eight members per code are procedural; the other
+  potential assembly members are not instantiated by this model.
+- All 15 final arm snapshots replay all query scores exactly through AssemblyRelay.
+  Numeric recall snapshots and separate evaluation codes are under a1/seed-201 through
+  seed-205. Snapshot checksums and source hashes are recorded. These snapshots use
+  the existing diagnostic graph container but require the **AssemblyRelay runtime**,
+  not the old Cascade; final.json explicitly identifies Runtime=AssemblyRelay. They
+  remain recall-only and are not the R2 durable/pageable training store.
+
+Validation: `dotnet test GreyMatter.sln -c Release --no-build --logger
+ 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/a1` passed
+**155/155**, 51 seconds, exit 0. A preceding build/targeted test passed 3/3 relay tests;
+only the pre-existing CS8604 warning in ScaleSweep.cs:65 remains. Source manifest matches
+the evaluated implementation; whitespace check passed. No resets, commits, dependency
+changes or user snapshot modifications were needed.
+
+## Interpretation and limits
+
+This supplies a working resident associative-routing reference for the original memory
+experiment. It does NOT establish emergent behavior, biological equivalence, natural-
+language retrieval, or an advantage over the transition-count baseline. Eight parallel
+relay members are a routing design, not eight independent learned concepts; there are
+128 trained pair relations in this task. Do not report the million-ID address range
+as a million useful neurons.
+
+The protected cohort, isolated temporal learning and normalized transient execution
+are one deliberate new architecture contract. This experiment does not isolate which
+change caused improvement over R1. Its passing score must not rewrite the old result.
+The network is fully resident and uses allocation-heavy dictionaries for this reference
+implementation. Memory scaling, realistic branching, and local-data utility remain
+future requirements. No CUDA work is justified by this synthetic result alone.
+
+## R2 boundary recommendation
+
+Preserve AssemblyRelay's learning and query semantics while separating its storage:
+lookup/iterate outgoing learned edges by stable virtual ID, apply the existing local
+coactivation update, flush dirty records, and restore unseen baseline state versus
+missing learned state explicitly. Implement one resident backend and one byte-budgeted
+disk backend against that boundary. Do not make cohort membership or candidate labels
+part of the storage lookup algorithm.
+
+Account for learned records, numeric indexes, encoder state, active/frontier buffers,
+writeback buffers and scratch allocations. The current ActivationScope recipe dictionary
+must not remain as a hidden full copy behind a new cache. The current recall snapshots
+are reference artifacts, not a crash-safe store or training checkpoint. Version the new
+store and specify its runtime model kind. R3 must compare EXACT same learned state and
+query semantics across resident and paged modes; do not retrain separate brains and
+attribute differences to paging. Larger useful learned capacity is a later R4 question.
+
+## A1 terminal handoff
+
+A1 complete/pass; original R1 remains failed; R2 ready as the next deliverable but not
+started in this turn. No jobs running. New runtime AssemblyRelay.cs, new evaluator
+RelayEval.cs, three AssemblyRelayTests, CLI dispatch and shared baseline visibility.
+No changes to default numerical learning or propagation. Evidence in artifacts/recovery/a1.
+One development seed100 and one final fresh-seed run201–205; no sweeps/corrections.
+Next action: implement the bounded resident/disk storage boundary under R2, preserving
+this model's semantics and the full memory-accounting contract.
+
+# R2 registration — bounded numeric relay storage (2026-09-10)
+
+Bill authorized R2. Preserve A1/default degree-32 Hebbian semantics. Introduce a
+resident record backend and directly addressed disk backend, with the same fixed
+numeric adjacency records (ordered targets, float weights, provenance, checksum).
+Disk cache has a byte-derived fixed capacity; dirty eviction writes synchronously
+(no unbounded queue). A separate on-disk presence index distinguishes unseen IDs
+from missing/corrupt learned records. No ActivationScope/Resume on this path.
+Checkpoint publication writes a complete immutable generation and then replaces a
+small numeric manifest atomically; reopening clones only the committed generation
+into a new scratch workspace. Interrupted publication must preserve the old snapshot.
+
+R2 correctness protocol, registered before results: targeted tests for exact records,
+cache refusal/bounds, dirty eviction, corruption versus unseen, interrupted publication,
+and mid-sequence restart. Development storage fixture: 128 source records; final:
+1,024 source records, eight-record cache, repeated updates/decay compared bit-for-bit
+with resident and interrupted/resumed execution. Use numeric generated cohorts (a
+storage/learning correctness fixture, not a new association result), existing Hebbian
+implementation, and preserve previous cohort/update/episode state. Verify against
+legacy resident A1 updates in a separate regression. No learning sweeps.
+Planned CLI (not yet implemented): `eval recovery --mode storage --records 128|1024
+--output <fresh-directory>/result.json`. Gate: all comparisons exact, repeated dirty
+eviction, restart exact, bounded buffers, errors on corrupt learned state. Full suite
+after targeted checks. Encoder remains an explicitly external frozen-code input for
+this storage gate; document its bounds/required persistence before any end-to-end
+claim. R3 traversal and R4 RSS/capacity gates are not passed by these fixtures.
+
+R2 command detail before measurement: `--checkpoint <snapshot-root>` restores the
+registered mid-sequence checkpoint in a fresh process and finishes the same six-pass
+fixture, comparing every numeric record and continuation counter with an independently
+executed resident reference. Test both normal and fresh-process runs at each registered
+size. This is the restart check, not an additional mechanism arm.
+
+# R2 closeout — numeric learned state survives bounded-cache eviction and restart
+
+**R2 storage gate PASS** (2026-09-10). This supplies storage correctness for the
+validated relay; it does not pass R3 activation travel, R4 resource scaling, or R5
+local-text utility. Original R1 remains failed; A1 remains the learned reference.
+
+## Implementation and compatibility
+
+`Storage/RelayRecords.cs` defines the shared copying boundary and deliberately fully
+resident reference. `DiskRelayRecords.cs` uses fixed arrays and virtual-ID offsets,
+with a separate one-byte-per-address presence file on disk. `StoredRelayLearning.cs`
+uses the existing `SynapseStore.RecordCoactivation` and decay code through a one-slot
+scratch segment. A regression compares ordered targets, weights, provenance and update
+counts with original A1, including eight-member cohorts, degree pressure and decay.
+Existing AssemblyRelay/Cascade/ActivationScope/Checkpoint.Resume are unchanged.
+
+Version 1 stores 328 bytes per address: source ID, degree, 32 ordered numeric synapse
+slots (uint target, float weight, byte provenance), then SHA-256. Empty learned terminal
+records are distinct from unseen addresses. No words or labels are persisted. The
+128-byte continuation record identifies version 1, protected-relay model 1, external
+frozen-code input kind 1, address limit, update/episode/observation counters, previous
+cohort (at most eight IDs), and presence-index checksum. Default degree-32 A1 learning
+constants are fixed by this version; configurable alternative rules are not supported.
+
+Snapshots consist of completed numeric generations and a 40-byte manifest (generation
+number plus metadata checksum). Publication flushes completed files, syncs directories,
+then atomically replaces the manifest and syncs the root. Restore validates metadata,
+presence checksum and every occupied record while streaming into a fresh workspace.
+Committed generations open read-only. Working files are not restartable checkpoints;
+unpublished dirty work is intentionally discarded on disposal. An incomplete generation
+is an orphan, never a baseline. Old generations are retained, not automatically deleted.
+Single writer, no concurrent checkpoint mutation; POSIX directory fsync required.
+Interrupted-copy and pre/post-manifest fault injection passed. These are process-failure
+simulations, not physical power-cut tests or guarantees about SMB/controller durability.
+The caller must provide a durable parent directory; initial ancestor-directory creation
+is not a separately power-failure-tested operation.
+
+## Bounds and costs — cache budget is not total RSS
+
+| component | bound / policy |
+|---|---|
+| Record cache | fixed flat byte array; slots=floor((budget-4096)/360) |
+| Cache metadata | fixed uint IDs, long ages, two bool arrays, no full-model dictionary; 32 bytes/slot charged conservatively |
+| Fixed store overhead | 4096-byte reservation for array/object/handle overhead; not an RSS measurement |
+| Dirty writeback | synchronous from cached record; no queue or second growing record collection |
+| Lookup index | on disk, one marker read per miss; zero in-memory full index entries |
+| Learning scratch | one 32-edge SynapseStore, one 328-byte record buffer, old/current cohorts <=8 IDs; fixed counters |
+| Checkpoint/restore | one additional one-slot store (4456 reserved bytes), 4096-byte marker/hash chunks, one record, fixed 128/40-byte metadata, fixed stream/crypto overhead |
+| Enumeration | sequential address scan; no array/list of all learned IDs |
+| Encoder | zero owned by this API: caller supplies frozen numeric codes; this is an explicit model input kind |
+| Recall frontier | not implemented in this path yet; R3 must budget it separately |
+
+The live application-owned structures above are independent of learned-record count.
+The 4096-byte fixed reserve and per-slot charge are conservative engineering accounting,
+not managed-heap/RSS measurements. Temporary allocations and garbage collection are
+still present; no R4 process-memory gate is claimed. The fixture itself keeps a full
+resident reference, so its process memory cannot establish a bounded end-to-end run.
+File buffering in the OS, filesystem sparse allocation, page cache, and managed-runtime
+baseline are outside the cache reservation and must be measured separately in R4.
+Checkpoint I/O counters in result.json describe the primary working record cache only;
+copy-side stores, sequential presence scans, metadata and fsync are additional traffic.
+
+Logical file length is addressLimit*328 plus addressLimit presence bytes. Holes may be
+sparse at the filesystem level; that is not learned capacity. Eager decay scans the
+address range, and snapshot copy scans the presence index. Both are bounded in RAM,
+but their latency and disk amplification are not optimized or certified practical.
+
+Encoder design boundary: the text ContextEncoder remains outside this R2 numeric API.
+Its current nominal 50,000 accumulators alone can consume 50,000*2048*4=409,600,000
+payload bytes plus dictionaries, last-seen values and temporary sentence allocations;
+that is emphatically not included in 6976 bytes. R3 can use A1's frozen evaluation
+codes outside traversal. Before R4 end-to-end claims and R5 text restart, budget the
+encoder explicitly, persist numerical accumulators/settings (or freeze an explicitly
+bounded numerical encoder), bound tokenization/eviction scratch and verify encoding
+round trips. Do not smuggle a vocabulary/code lookup table into the model or describe
+this storage fixture as a saved-text-model utility.
+
+## Validation and reproducible evidence
+
+Targeted command: `dotnet test GreyMatter.sln -c Release --filter
+FullyQualifiedName~RelayStorageTests --logger 'trx;LogFileName=storage-tests-final.trx'
+--results-directory artifacts/recovery/r2` — **11/11**, exit 0 (session 50804).
+Full command: `dotnet test GreyMatter.sln -c Release --no-build --logger
+ 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/r2` — **166/166**,
+51 seconds, exit 0 (session 7993). Build had only the pre-existing ScaleSweep.cs:65
+CS8604 warning. Initial sandbox build/test attempts could not create MSBuild sockets;
+the blocked commands were stopped and tests ran with local IPC permission. This was
+an environment issue, not a gate failure. Initial targeted tests had three mistaken
+exception-type assertions (InvalidDataException does not derive from IOException);
+corrected before any registered run. All corruption cases were already rejected.
+
+Commands (each fresh process, each exit 0):
+
+```bash
+dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode storage --records 128 --output artifacts/recovery/r2/dev/result.json
+dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode storage --records 128 --checkpoint artifacts/recovery/r2/dev/checkpoint --output artifacts/recovery/r2/dev-resume/result.json
+dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode storage --records 1024 --output artifacts/recovery/r2/final/result.json
+dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode storage --records 1024 --checkpoint artifacts/recovery/r2/final/checkpoint --output artifacts/recovery/r2/final-resume/result.json
+```
+
+Use fresh output directories for reproduction. Development took below one second;
+final cells likewise completed below one second (not a latency benchmark).
+
+| run | numerical records | live edges | cache slots | evictions | dirty writes | exact resident match |
+|---|---:|---:|---:|---:|---:|---|
+| development | 256 | 384 | 8 | 2297 | 1793 | yes |
+| development fresh resume | 256 | 384 | 8 | 1400 | 1152 | yes |
+| final | 2048 | 2144 | 8 | 39857 | 35769 | yes |
+| final fresh resume | 2048 | 2144 | 8 | 19448 | 17408 | yes |
+
+Each cache reserves 6976 bytes (2624 record bytes plus metadata/fixed reservation).
+Final fixture contains 1024 source and 1024 terminal records; terminal records count
+as numerical state, not extra learned associations. Six passes produce 6144 episodes,
+6144 update proposals and 12288 observations. Different live-edge counts across sizes
+reflect the registered decay cadence, not a quality comparison. All final records and
+continuation counters match uninterrupted resident execution exactly, including decay
+across restart. Final record SHA-256:
+`5DF0BFDCE9437B97168E5F1F7C4F3111F4A876F8BF2DA0F7B200D401238859B7`.
+Fixture stream hashes and complete effective settings are in fixture-manifest.json;
+source checksums are in source-manifest.json. Raw result JSON, numeric checkpoints,
+TRX test results and summary.json live under artifacts/recovery/r2. Post-run manifest
+inspection counted live edges directly from the committed numeric layout; it did not
+alter or score the fixture. No association evaluation or parameter search was run.
+
+## R2 handoff
+
+R2 complete/pass for numeric relay storage, one implementation, no corrective mechanism
+arm. New files: Storage/{RelayRecords,DiskRelayRecords,RelayCheckpoint}.cs,
+Runtime/StoredRelayLearning.cs, Eval/RelayStorageEval.cs, tests/RelayStorageTests.cs;
+RecoveryEval dispatch adds `--mode storage`. Default runtimes remain unchanged.
+No jobs running, no user brain resets, no commits/staging. Existing user documentation
+changes preserved. R3 next: load the same frozen A1 graph through this boundary, retain
+stable IDs, aggregate each logical step before selection, explicitly budget frontiers
+and cumulative readout, and demonstrate multi-load queries with a cache smaller than
+the path. Keep the A1 resident scores fixed; no retraining or learning changes to hide
+a paging mismatch. R2's exact record match is a prerequisite, not a substitute for R3.
+
+# R3 registration — exact activation travel through bounded record caches
+
+Bill authorized continuation after R2 (2026-09-10). No training or learning changes.
+Use frozen A1 learned snapshots and their existing scores: development seed 100, then
+seeds 201–205, all 256 registered queries per seed, unchanged 32 candidates and 1–4
+synchronous ticks. Check recorded snapshot hashes before import. Stream adjacency into
+R2 records without using all-partitions Resume; retain ordered synapses exactly.
+Compare original A1 resident replay, new resident-record traversal and disk traversal.
+Disk cells: one-record and eight-record caches, each normal and reverse query order,
+cold application cache at the start of each pass. Reuse the same model, no retraining.
+Require every candidate score within abs 1e-6 + rel 1e-5, identical query-local ranking
+and tie groups, unchanged persistent checksums, and positive load/eviction evidence.
+
+Traversal uses bounded preallocated step accumulation and cumulative delivered-drive
+buffers. Compute the conservative maximum from width, degree cap and tick limit;
+refuse insufficient scratch budget before execution rather than dropping work. No
+spill algorithm needed if the registered workload fits; this is an explicitly bounded
+exact mode, not permission for growing dictionaries. Keep accumulation in source-ID
+order and stored edge order, then select globally by drive descending / ID ascending.
+Copy each source record before target loading can evict it. Targets must be loaded and
+validated; no resident-slot identifier crosses the storage boundary. Fixed-size optional
+I/O event trace for one four-hop query, with explicit overflow failure, never a growing
+trace list. Record requests/loads/evictions, bytes, frontier counts and zero truncations.
+
+Fixtures: chain longer than cache, cycle, cross-page fan-in, branch/distractor, threshold
+and winner-boundary ties, query reset/order, missing target errors, insufficient-budget
+refusal. Gate requires fixtures AND frozen learned queries. Scratch budget fixed at
+2 MiB, width 256, max ticks 4 for learned runs; caches 4456/6976 reserved bytes. These
+are separate budgets, not total process RAM. Evaluator/reference/labels remain external
+and fully resident for this comparison; R4 resource claims are not made here.
+Planned command (not yet implemented): `eval recovery --mode paging --seeds 100` or
+`--seeds 201,202,203,204,205 --output <fresh-dir>/result.json`. One development and one
+final evaluation, no tuning. R3 failure means execution/storage defect, not learning loss.
+
+R3 development completed exit 0 (session 30821): seed100, 1024 paged query
+executions across 1/8-slot caches and forward/reverse orders. Every score was exactly
+equal to frozen A1; original and new resident replays were exact, file hashes unchanged.
+138050 cache-miss loads / 138032 evictions across the four measured cells. Seventeen
+targeted traversal/storage tests passed (session 64821). No corrective arm or tuning.
+Final five-seed command follows unchanged; development finished in seconds, so the
+final comparison is expected well below one minute and under 100 MiB physically
+allocated model files on this filesystem (logical sparse extents are larger). This is
+a scheduling estimate, not a resource result. Full regressions run alongside final.
+
+# R3 closeout — learned activation crosses pages without changing the answer
+
+**R3 PASS**, 2026-09-10. Frozen A1 learned graphs, unchanged learning/encoding/readout
+contract, no retraining, no corrective arm or parameter adjustment. This establishes
+exact paged execution on the small learned synthetic networks. It does not establish
+R4 memory/capacity/latency performance or R5 text utility.
+
+## Reproducible commands and results
+
+```bash
+dotnet test GreyMatter.sln -c Release --filter 'FullyQualifiedName~RelayPagingTests|FullyQualifiedName~RelayStorageTests' --logger 'trx;LogFileName=targeted-final.trx' --results-directory artifacts/recovery/r3
+dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode paging --seeds 100 --output artifacts/recovery/r3/dev/result.json
+dotnet run --no-build --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode paging --seeds 201,202,203,204,205 --output artifacts/recovery/r3/final/result.json
+dotnet test GreyMatter.sln -c Release --no-build --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/r3
+```
+
+All commands exited 0. Targeted traversal/storage tests **17/17** (session 64821),
+including six new paging cases. Full suite **172/172**, 52 seconds (session 54895).
+Build: no new warning; existing ScaleSweep.cs:65 CS8604 remains. Development session
+30821 passed; final session 24698 passed. Fresh output directories are mandatory.
+No SMB corpus, user brain reset, dependencies, commits or publication were needed.
+
+| frozen seed | original A1 replay | new resident replay | paged executions | score equality | cache loads | evictions |
+|---|---|---|---:|---|---:|---:|
+| 201 | exact | exact | 1024 | exact | 137639 | 137621 |
+| 202 | exact | exact | 1024 | exact | 137748 | 137730 |
+| 203 | exact | exact | 1024 | exact | 137611 | 137593 |
+| 204 | exact | exact | 1024 | exact | 137642 | 137624 |
+| 205 | exact | exact | 1024 | exact | 137649 | 137631 |
+
+The 1280 distinct registered learned queries were each executed with one/eight cache
+slots and forward/reverse order: **5120 executions**. Every candidate score was
+bit-exact, stronger than the registered abs 1e-6 + rel 1e-5 tolerance; every ranking
+and tie group was unchanged. Direct and composed top-1 remain 100%. These repeated
+executions are equivalence checks, not 5120 independent learning trials. Historical
+untrained/shuffled and transition-baseline results are unchanged and were not retrained.
+
+Across measured cells: **688289 loads, 688199 evictions, 226447081 record/index bytes
+read, zero bytes written, zero truncations**. Here all cache misses found existing
+records, so misses equal loads. Each pass starts with a fresh application record cache;
+this is not cold physical storage. SHA-256 of both complete imported data/index files
+before/after recall matched for every seed; source A1 snapshot hashes also stayed fixed.
+The snapshot import preserves ordered targets, float weights and provenance. A1's
+threshold/familiarity/fatigue fields are retained in the authority snapshot but not
+used by AssemblyRelay; original-runtime replay verifies that no needed state was lost.
+
+## How the runtime crosses pages
+
+`StoredRelayRecall` reads each source's numeric record into a private one-segment copy
+before loading targets. Therefore a target load can evict the source immediately without
+invalidating any pending work. Scheduling and all pending contributions use virtual
+IDs, never resident slots. Learned targets are loaded/validated even at the final tick;
+a missing target raises an error. Genuinely unseen cue IDs have an empty baseline.
+The runtime never calls Write or the legacy all-partitions Resume path.
+
+Sources emit in ascending ID order, outgoing edges retain their stored order, float
+incoming sums and double cumulative contributions match A1. Selection happens after
+all contributions for the logical step, by descending drive then ascending ID. Fixed
+arrays hold active, incoming, selection and cumulative delivered state. The implementation
+uses linear searches in these bounded arrays; this is simple exact reference scheduling,
+not a claim of efficient high-fan-out execution. The default A1 runtime is unchanged.
+
+For width 256, cap 32 and four ticks, conservative bounds are 256 active entries,
+8192 incoming and selection entries, and 32768 cumulative target entries. Charged
+scratch is **530944 bytes**, under the registered 2 MiB allowance. One/eight record
+caches separately reserve **4456/6976 bytes**. Insufficient scratch or excess depth
+fails explicitly; there is no silent truncation or growing dictionary. This version
+reserves the worst-case cumulative readout up front rather than spilling it. A deeper
+query must supply sufficient budget or be refused. Local fixed record/synapse buffers,
+array headers and step objects are included in a conservative fixed reservation;
+these charges are not measured managed-heap or RSS peaks.
+
+The evaluator retains frozen codes, candidate lists, results and resident reference
+models outside the runtime and streams one frozen snapshot into the two record stores.
+That instrumentation makes its process memory unsuitable for an R4 bound. Hash scanning,
+JSON output and imports are setup/verification I/O outside the measured query counters.
+OS file cache and fixed-offset sparse extents remain explicit R2 limitations. Text
+encoder persistence remains outstanding; these queries consume frozen numeric codes.
+
+## One observable learned four-hop query
+
+`artifacts/recovery/r3/final/seed-201/four-hop-trace.json` records chain0, position0 to
+position4, with one record slot and a cold application cache. Its optional event buffer
+has a fixed 4096-event capacity and throws if exhausted; trace data belongs to the
+external evaluator, not the model. It records every requested ID, hit/load/unseen flag,
+and evicted ID. Trace-only events are excluded from the aggregate query counters above.
+
+The first source is neuron273642. Loading its target530347 immediately evicts273642;
+the next target590810 evicts530347. Nevertheless the copied source adjacency continues
+to deliver all eight contributions, and later sources reload their own records safely.
+
+| logical tick | emitting sources | reached/winning targets | input mass | delivered mass |
+|---|---:|---:|---:|---:|
+| 1 | 8 | 8/8 | 8 | 8 |
+| 2 | 8 | 8/8 | 8 | 8 |
+| 3 | 8 | 8/8 | 8 | 8 |
+| 4 | 8 | 8/8 | 8 | 8 |
+
+This one query performed 288 requests, 287 loads and 286 evictions; the endpoint
+ranking remained correct. Eight firing neurons per step are an algorithmic property,
+not eight resident record slots: only one record fits in this cache. The numerical
+frontier/scratch lives separately and must remain in the total memory budget.
+
+## R3 handoff
+
+R3 complete/pass; R4 next. One implementation, no corrective mechanism arm; no running
+jobs. Added Runtime/StoredRelayRecall.cs, Eval/RelayPagingEval.cs and RelayPagingTests.cs.
+DiskRelayRecords adds cold-cache reset and an optional read-event observer; existing
+storage tests pass. RecoveryEval dispatch adds `--mode paging`. Evidence and source
+hashes: artifacts/recovery/r3/summary.json, source-manifest.json, dev/final result JSON,
+TRX files and the four-hop trace. Source hashes match the tested implementation.
+README and active plan pointer updated; prior user documentation changes preserved.
+
+Next action: register R4 actual learned workload sizes, M and baseline B before scoring.
+Include the 530944-byte traversal reservation, record cache, training/encoder scratch,
+indexes and output adapter in that accounting. Freeze the learner and prove the largest
+complete resident representation actually exceeds 4M. Do not present sparse file length,
+large ID range or small cache alone as useful learned capacity. Global decay's cost
+and the new scheduler's linear lookup/extra target loads need measurement, not a silent
+learning-rule change or an assumed speedup. R3 exactness is now the fixed reference.
+
+# R4 registration — fixed-budget useful capacity, before measurements
+
+Bill authorized R4, 2026-09-10. Retain R0's M=256 MiB and M/2=128 MiB;
+do not lower the >=4M (1 GiB) resident-state requirement to fit an easy run. Register
+1x/4x/16x as 8192/32768/131072 independent five-concept chains, four observed adjacent
+relations per chain, sixteen presentations per relation. Numeric synthetic input,
+not a text encoder: a stateless seeded k=32/n=2048 code generator; same A1 eight-member
+code-hash assemblies and Hebbian/decay constants, same R3 width256/four-tick readout.
+Fix address space at 16 million for ALL sizes so actual learned content, not a changed
+address range, is the independent variable. No code/label table in the model.
+
+Development seed100, 32 chains/2048 episodes only, at the registered M budget. Final
+seeds201–205. Train the real local coactivation learner, with globally interleaved
+pair episodes generated by a deterministic permutation (no list proportional to corpus).
+Evaluate 100 fixed queries per seed, 50 direct/50 composed, frequency-matched 32-way
+candidate sets. Use the same queries from the largest workload on all model sizes;
+unavailable answers remain failures, and report supported-query accuracy separately.
+Freeze candidate sets, include zeros/ties, and compare resident/paged scores from the
+same trained snapshot. Two total budgets M/M2 include traversal and input/output scratch;
+record cache receives the remainder. Record actual learned nodes/edges and resident
+payload/index accounting; file holes/virtual IDs cannot satisfy >=4M.
+
+Before a full run, measure a fresh-process empty-runtime baseline B separately and
+record RSS/managed heap, startup, learning/decay time, cache I/O, and a conservative
+full-grid estimate from the development smoke. No projected >=1-hour experiment may
+be launched without Bill's larger time-budget authorization (active plan effort bound).
+If this constraint blocks the grid, report R4 incomplete with the measured cost and
+retain every quality/memory bar, rather than shrinking workloads or claiming a pass.
+
+Initial implementation may optimize exact storage access: replace linear cache lookup/
+victim scans with a fixed-size hash index and LRU links, and stream present IDs from
+bounded index chunks for decay. Same numerical update/order within records, same eager
+.99 decay every500 episodes, no learning-rule change or lazy-decay approximation.
+Regression-check eviction, checkpoints, A1 learning and R3 traversal before measurement.
+No quality sweep or new learning arm. Planned CLI: `eval recovery --mode capacity`
+with baseline/development actions; final cells only if the measured runtime budget permits.
+
+R4 worker implementation ready. Targeted cache-collision/eviction, storage continuation
+and paging tests passed 18/18 (session49664). One compile-only multiple-variable `var`
+error was corrected before any measurement. R4 keeps the 256/128 MiB TOTAL budgets;
+4 MiB of each is reserved for traversal/input/output/sampler overhead, the remainder
+for the record cache. Cache metadata now conservatively charges 64 bytes per slot
+(hash buckets, ID, LRU links, dirty flag) in addition to the unchanged 328-byte record;
+this supersedes the older implementation's 32-byte metadata charge, not its result.
+Use direct `dotnet .../gm.dll` workers under `/usr/bin/time -l` so the measured process
+is the utility, not a `dotnet run` build/launcher. macOS time peak RSS includes output
+serialization and teardown; worker managed-heap peaks are sampled every10ms. Keep
+scratch model files in /private/tmp, outside the Dropbox artifact tree.
+
+R4 timing-instrument refinement before forecasting the full grid: initial development
+training took .871338s, of which .747359s was decay including index scan/flush overhead.
+It would be misleading to scale that entire time per learned record. Split per-record
+decay callback time from per-pass overhead and repeat the SAME registered smoke once
+with identical data/settings, preserving initial raw artifacts. This is the single
+bounded timing-instrument repair; no quality result, workload or acceptance bar changes.
+
+# R4 development checkpoint — runtime budget prevents the full gate (2026-09-14)
+
+**R4 incomplete; no capacity pass or failure has been declared.** Work resumed after
+a usage interruption. The saved refined training run had completed successfully and
+was reused. The full 1x/4x/16x five-seed experiment was NOT launched. The registered
+256/128 MiB budgets and >=1 GiB resident requirement remain unchanged.
+
+## What changed and what remains equivalent
+
+DiskRelayRecords now uses a preallocated open-address hash index with backward-shift
+deletion and fixed LRU links. No tombstone accumulation, growing index or linear victim
+scan. Hash capacity is a power of two >=2*slots; metadata charge is conservatively
+64 bytes/slot plus the fixed overhead. Readout and persistent record bytes are unchanged.
+`VisitPresent` streams a 4096-byte chunk of the on-disk presence index after flushing
+pending markers. Decay visits each present record once, in ascending ID order, including
+empty terminal records. It still performs the original eager .99 float decay/prune
+operation every500 episodes. No deferred/lazy decay has been implemented.
+
+CapacityEval provides isolated baseline, training, query and assessment workers. The
+numeric generator owns 32 dimensions and eight member IDs, with no vocabulary table.
+It selects one dimension per 64-dimension bin using the seeded existing RNG, then uses
+Assembly.Members unchanged. Episode order is a fixed affine permutation of the power-of-
+two episode count; this is reproducible but structurally more regular than A1's shuffled
+text episodes. No result here establishes invariance to training order or text encoding.
+Same 100 queries/candidates are generated on demand for resident/paged workers; the
+full-size query universe remains fixed across registered final sizes. Unsupported
+answers receive zero metric credit. Raw rankings and support are reported separately.
+
+Targeted storage/paging/cache-collision tests passed **18/18**; full suite passed
+**173/173**, 53s, session36108, exit0. Frozen R3 seed100 regression passed all1024
+paged executions exactly (session30061, exit0), with identical 138050 loads/138032
+evictions to its earlier trace and unchanged files. Cache metadata reservations changed;
+those historical cache-byte numbers are not restated as current allocations. No new
+warning; pre-existing ScaleSweep.cs:65 CS8604 remains. No running jobs or commits.
+
+## Actual development measurements
+
+One development configuration: seed100, 32 chains, 2048 episodes, address limit16 million,
+256 MiB TOTAL allowance (252 MiB cache budget +4 MiB non-cache allowance). Same degree32,
+width256, maximum4 ticks, eight-member cohorts and sixteen presentations per relation.
+The timing-only rerun produced the exact same corpus and record hashes as the initial
+run. It separates per-record update work from fixed per-pass scan/flush overhead.
+
+| quantity | measured result |
+|---|---:|
+| numerical records / live edges | 1280 / 8192 |
+| record payload | 419840 bytes |
+| resident managed-heap increase after loading | 826536 bytes |
+| training / decay time | .8406562s / .703118708s |
+| time inside decay's record callbacks | .008268891s across5120 visits |
+| warmed empty-runtime B, macOS peak RSS | 53166080 bytes |
+| training peak RSS | 64176128 bytes |
+| paged query process peak RSS | 65388544 bytes |
+| resident / paged p95 | .1685ms / .1890ms |
+| resident / paged startup | .0280109s / .2115261s |
+| direct / composed top1 | 100% / 100% |
+| resident-paged candidate scores | all100 queries exact |
+| recall bytes read / written, paged | 294784 / 0 |
+
+Peak RSS uses `/usr/bin/time -l` on the DIRECT gm process, including output serialization
+and teardown. Worker-managed heap is sampled every10ms: training238888232 bytes,
+paged239207328 bytes. The large mostly unused preallocated cache explains why managed
+heap exceeds resident physical memory. Tiny learned state fitting a large cache does
+not prove scalable capacity. The 1 GiB resident gate is emphatically NOT met by this
+419840-byte payload. OS pages/cache are warm or unspecified; no cold physical I/O claim.
+The development latency ratio is1.122x, not a prediction for the full workload.
+
+Raw source/corpus evidence is in artifacts/recovery/r4. Initial and refined training
+JSON are preserved as train-initial.json and train-final.json. Both have corpus SHA256
+`7EB4298A0FFCFE1141942E7355B6E50F1EE4373BF8C79E4297B15B865A6C0097` and record SHA256
+`07577256D362F2F1A9D6DBA211C8DEE89986409D6C8901F5E23A2DA64D16A67B`.
+Model files stay in /private/tmp/gm-r4-20260910-refined/model; their sparse logical
+extent is not copied into Dropbox and does not count as learned state. Temporary
+models may be lost at reboot; commands can reproduce them in fresh directories.
+
+## Budget decision — extrapolation, not a scale finding
+
+The registered largest cell has8388608 episodes and16777 decay passes. A uniform-ID
+occupancy estimate predicts about4.47 million records; using HALF that final occupancy
+on average predicts37.50 billion record visits. Multiplying by measured cached callback
+cost1.615 microseconds/record, then separately adding per-pass overhead and episode
+work, gives **17.79 hours for one largest training run**. This estimate uses a tiny
+cached model; actual disk pressure could increase it, and extrapolation uncertainty is
+large. It is neither a hardware lower bound nor evidence that the large model exists,
+meets recall quality, or meets the 1 GiB gate. Full-grid cost was not measured.
+
+Active plan effort bound: "No unattended experiment expected to exceed one hour without
+reporting the estimate and receiving an explicit larger run budget." That is why the
+full grid remains unstarted. We did not lower M, reduce final learned workloads, disable
+decay, substitute hand-wired edges, or quietly run a multi-day job after a general
+continuation request. R4 is pending this decision; R5 remains gated.
+
+## Concrete next alternatives
+
+Recommended bounded correction: design and validate **exact deferred decay** before
+another full-scale estimate. Track a global decay epoch and each record's last-applied
+epoch in a NEW numeric store version. Before learning from or reading a record, apply
+all outstanding .99 float decay/prune steps in the ORIGINAL order; do not replace
+repeated float operations with a power approximation. New records start at the current
+epoch. Stop replay when degree becomes zero. Recall must compute the aged view in
+scratch without writing persistent state; checkpoint/restore must preserve epochs.
+No old snapshot is overwritten or silently reinterpreted. Compare eager/deferred
+records and all R3 scores across skipped epochs, pruning, creation/displacement and
+mid-sequence restart before using the correction in R4. This changes when independent
+record work is performed, not the registered learning rule—but exactness is a testable
+requirement, not an assumption. It requires a versioned persistence decision, so this
+proposal is not yet implemented or counted as a successful corrective attempt.
+
+Alternative: explicitly authorize a longer run with a wall-clock ceiling and scratch-disk
+budget, retaining the eager implementation and all existing R4 acceptance thresholds.
+The 18-hour estimate covers only one largest training cell, not the complete campaign.
+
+## Commands and handoff
+
+Workers use `dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity`.
+Exact measured commands (redirect stdout/stderr to the corresponding .stdout.json and
+.time.txt artifacts; fresh output/model directories required):
+
+```bash
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action baseline --output artifacts/recovery/r4/baseline.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action development --seed 100 --chains 32 --budget-mib 256 --output /private/tmp/gm-r4-20260910-refined/train.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --backend paged --model /private/tmp/gm-r4-20260910-refined/model --seed 100 --chains 32 --budget-mib 256 --output artifacts/recovery/r4/paged-final.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --backend resident --model /private/tmp/gm-r4-20260910-refined/model --seed 100 --chains 32 --budget-mib 256 --output artifacts/recovery/r4/resident-final.json
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action assess --training /private/tmp/gm-r4-20260910-refined/train.json --resident artifacts/recovery/r4/resident-final.json --paged artifacts/recovery/r4/paged-final.json --baseline artifacts/recovery/r4/baseline.json --baseline-time artifacts/recovery/r4/baseline.time.txt --training-time artifacts/recovery/r4/train-refined.time.txt --paged-time artifacts/recovery/r4/paged-final.time.txt --output artifacts/recovery/r4/assessment.json
+dotnet test GreyMatter.sln -c Release --no-build --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/r4
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode paging --seeds 100 --output artifacts/recovery/r4/paging-regression/result.json
+```
+
+All listed commands exited0. Initial smoke used the same flags with the first model
+at /private/tmp/gm-r4-20260910-dev and paged.json/resident.json; its artifacts are retained.
+One timing-instrument refinement used, no scientific corrective arm used. Changed files:
+CapacityEval.cs, RecoveryEval dispatch, DiskRelayRecords/RelayRecords, StoredRelayLearning
+(timing counters plus present-ID enumeration), CapacityStorageTests.cs, docs. Source
+manifest and summary.json capture the handoff. No jobs running, no user data resets,
+no commits/staging. Next action is Bill's decision on the concrete alternatives above;
+do not mark R4 complete, shrink the registered gate, or launch the long grid implicitly.
+
+# R4 authorized correction — exact deferred decay (2026-09-14)
+
+Bill approved the bounded correction. New version-2 store, never reinterpret or overwrite
+v1 snapshots. Store a global epoch and per-record epoch bound by checksum to that record.
+Advance the global epoch every500 episodes, without scanning the model. Read/update
+computes outstanding .99 float decay/prune steps in the original order; stop once degree
+is zero. Recall returns an aged scratch view and never persists it. Checkpoint publication
+may materialize aged views into a new generation; restore preserves the global epoch and
+learning continuation. Keep the existing numeric record boundary and frozen A1 runtime.
+
+Gate before performance use: bit-exact eager/deferred records across skipped epochs,
+pruning, births/displacement, repeated reads, dirty eviction, checkpoint/restart and
+interrupted publication; old v1 snapshot support unchanged. Frozen A1 paging regression
+must remain exact. Then repeat the SAME R4 seed100/32-chain/256 MiB smoke and paired
+queries with only --decay deferred changed. All memory/quality/capacity bars remain.
+Count aging work done on reads as well as cheap epoch advances; do not report the moved
+work as eliminated. One correction, no parameter sweep. Full runs still require an
+estimate below one hour or explicit larger-budget authorization.
+
+Deferred correction gate passed: 180/180 full tests; all5120 frozen A1 paged-query
+executions bit-exact through version2, files unchanged. Same R4 development corpus/
+logical-record hashes and all100 query scores match eager. Small training was1.0172761s
+versus prior eager .8406562s; do NOT claim a smoke speedup. Aging replay during training
+was .003577822s /3536 record-decay steps; epoch advances took .000059s. Added sidecar
+I/O is real overhead. The global scan was removed, not all aging work.
+
+Advance to the FIRST already-registered final-size cell: seed201,8192 chains (1x),
+524288 episodes,256 MiB. Linear smoke estimate ~4.34min, comfortably below one hour;
+use this actual cell to inform any larger run, not the tiny smoke alone. Same generator,
+query universe and acceptance bars. No automatic >=one-hour job. Evaluate gates
+incrementally: a decisive violation of a required per-seed largest-cell condition can
+stop unneeded later cells, but missing measurements must remain explicitly unmeasured.
+This does not redefine small-workload accuracy as a largest-workload verdict.
+
+# R4 deferred correction and first scale cell — bounded stop (2026-09-14)
+
+**Correction passed; R4 did not pass.** Version2 defers decay exactly, including
+float operation order, deletion, restart and interrupted checkpoint publication.
+It adds a checksum-bound 48-byte epoch sidecar per occupied record and 8 KiB reserved
+scratch. It does not eliminate aging work: reads catch up in scratch, writes stamp the
+current epoch, and checkpoint copies materialize aged views. Recall never writes these
+views back. V1 remains supported separately. Working stores are not transactional;
+only completed-generation publication has the checkpoint guarantee. Interruption tests
+are injected failures, not physical power-cut tests.
+
+Validation: 180/180 full tests, including seven new deferred-decay cases; 5,120 frozen
+A1 paged executions exactly match their reference and preserve physical model files.
+The frozen fixtures use epoch0; skipped-epoch learning equivalence is tested separately
+and the unchanged development workload matches eager logical hashes and scores.
+The source-manifest hashes were rechecked after all runs. Raw outputs and TRX files
+are retained in artifacts/recovery/r4-deferred; summary.json indexes the outcome.
+
+## First registered cell: seed201, 8192 chains, 256 MiB
+
+524,288 episodes produced 324,350 occupied records, 146,424 surviving edges and
+106,386,800 bytes of record payload (plus 15,568,800 occupied epoch bytes).
+Training took 148.162244s; full process 151.91s. Epoch1048, 33,554,176 updates;
+20,375,432 decay replay steps consumed 3.93724738s during training. Epoch advances
+consumed .000155632s. No global decay scans and no training cache evictions occurred.
+This model still fits the cache: neither file extent nor the 16-million-ID address
+space is evidence for the registered >=1 GiB resident-state requirement.
+
+| measurement | paged | resident |
+|---|---:|---:|
+| query p95, ms | 1.4981 | .0547 |
+| startup, seconds | 33.9921 | 34.3942 |
+| external peak RSS, bytes | 182108160 | 191627264 |
+| direct top-1, all 50 queries | 2.375% | 2.375% |
+| composed top-1, all 50 queries | 0% | 0% |
+| supported queries, of 100 | 7 | 7 |
+| top-1 among supported | 16.9643% | 16.9643% |
+
+All100 score vectors and logical model hashes match exactly; both workers report
+immutable models. Paged query writes0 bytes. Fixed baseline B=53,166,080 bytes;
+paged peak is below B+1.25M=388,710,400. This is a small-cell memory result only.
+The paged process includes a post-query immutability census, so its 67.77s full runtime
+must not be presented as query latency or solely as startup.
+
+The registered practical target applies to paired cells: measured ratio **27.3876x**
+misses <=10x despite easily meeting <=2 seconds. This is one measured cell, not a claim
+that every larger workload would fail. With the bounded correction consumed, stop here
+instead of tuning the ratio away or spending the remaining grid. 4x/16x, other seeds,
+128 MiB cells, the largest-state requirement and R5 remain **unmeasured**.
+
+The fixed largest-workload query universe supplies only seven supported queries here,
+all direct. Six of those seven returned entirely zero candidate scores; one selected
+the correct candidate. Thus low aggregate recall is not solely missing support, but
+this is not the largest-workload quality verdict. Composed zero has no supported
+composed queries behind it. Exact paging faithfully reproduces this weak result;
+it cannot repair learned retention. No new learning mechanism or sweep was attempted.
+
+## Reproduction
+
+All commands below exited0. Timing commands used /usr/bin/time -l with stderr saved
+as the corresponding *.time.txt; stdout is also retained separately. Scratch model
+files stay outside Dropbox; training JSON is copied into the artifact directory.
+
+```bash
+dotnet test GreyMatter.sln -c Release --filter 'FullyQualifiedName~DeferredDecayTests|FullyQualifiedName~RelayStorageTests|FullyQualifiedName~RelayPagingTests' --logger 'trx;LogFileName=targeted-final.trx' --results-directory artifacts/recovery/r4-deferred
+dotnet test GreyMatter.sln -c Release --no-build --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/r4-deferred
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode paging --decay deferred --seeds 201,202,203,204,205 --output artifacts/recovery/r4-deferred/frozen/result.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action development --decay deferred --seed 100 --chains 32 --budget-mib 256 --output /private/tmp/gm-r4-deferred-20260914-dev/train.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --decay deferred --backend paged --model /private/tmp/gm-r4-deferred-20260914-dev/model --seed 100 --chains 32 --budget-mib 256 --output artifacts/recovery/r4-deferred/paged.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --decay deferred --backend resident --model /private/tmp/gm-r4-deferred-20260914-dev/model --seed 100 --chains 32 --budget-mib 256 --output artifacts/recovery/r4-deferred/resident.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action train --decay deferred --seed 201 --chains 8192 --budget-mib 256 --output /private/tmp/gm-r4-deferred-201-1x/train.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --decay deferred --backend paged --model /private/tmp/gm-r4-deferred-201-1x/model --seed 201 --chains 8192 --budget-mib 256 --output artifacts/recovery/r4-deferred/1x-paged.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --decay deferred --backend resident --model /private/tmp/gm-r4-deferred-201-1x/model --seed 201 --chains 8192 --budget-mib 256 --output artifacts/recovery/r4-deferred/1x-resident.json
+```
+
+No workers remain running. No commits, staging, history consultation or user-data resets.
+The phase's correction is complete; subsequent work requires a new design directive
+under the bounded failure policy. Existing thresholds and earlier results are retained.
