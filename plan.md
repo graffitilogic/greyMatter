@@ -1,3 +1,242 @@
+# greyMatter — active recovery plan and agent guide
+
+**Directive:** Bill, 2026-09-09. Build the proof of concept originally requested: learn from local data, recall related material through a learned network, and execute that network with substantially less resident memory than its complete learned state requires.
+
+**Status:** Exact deferred-decay correction PASSED (180 tests; 5,120 frozen checks). R4 stopped after first 1x paired cell missed the registered 10x latency target (27.39x). Full capacity remains unmeasured; no larger run or R5 started.
+
+## Authorized continuation — activation-travel review (2026-09-09)
+
+Bill authorized this bounded review after the R1 stop, and permits brain-data resets.
+Use fresh scratch state; deletion is unnecessary for this review. R1 remains failed;
+this directive does not silently authorize new learning sweeps or R2.
+
+Review T1: train the registered seed-100 cue-member arm once, freeze it, and inspect
+all 32 four-hop chain queries. Record per-step activation before selection, selection
+survival, and threshold eligibility at each chain position. Also count actual learned
+edges between successive assemblies. Observers must not alter query scores or learned
+state. Distinguish edge existence from usable activation; no new pass bar or success
+claim is allowed from this diagnostic. Bound: one development run, targeted observer
+correctness tests, one written design recommendation and handoff. No parameter tuning.
+
+**Current work:** Approved correction and first registered 1x cell completed. Preserve the measured latency miss and low supported recall; corrective attempt consumed. Follow the bounded failure policy; do not silently tune or launch the remaining grid.
+
+## A1 — protected assembly relay (authorized by Bill)
+
+One explicit experimental model: the first eight deterministic members of a code's
+assembly are both its entry and exit cohort. Only observed adjacent training cues create
+relay-to-relay synapses, using the existing bounded Hebbian update and degree cap.
+Relay storage is isolated from within-cue reinforcement. No answer labels, candidate
+sets, corpus lookup, or completion oracle enter runtime learning or propagation.
+
+Each source distributes its current drive in proportion to its positive outgoing
+weights; the next tick uses fresh incoming potentials, not retained old potentials.
+Keep the existing .5 source firing threshold and 256 winner cap. Sum delivered drive
+for candidate scoring, including zeros and ties. This coherent relay contract changes
+both topology and execution from R1; do NOT attribute outcomes to one scalar change.
+Default legacy runtime remains unchanged. Eight members is fixed, not a sweep.
+
+Use existing seed-100 development task, then fresh seeds 201–205 (R1 final seeds were
+already examined). Same 32 candidates, 128 direct/128 composed queries, same episodes,
+frequency matching and nulls. Report learned, untrained, shuffled, and transition-count
+baseline. Connectivity: every observed adjacent pair has positive relay edges, and all
+96 intermediate junctions share at least one receiving/outgoing relay member per seed.
+Transmission: hand-built correctness fixtures plus observed four-hop emission traces;
+a fixture cannot pass learning. Discrimination: mean direct/composed top-1 >=80%, each
+seed >=70%, mean lift >=20 points over both untrained and shuffled, unchanged quality
+requirements. Simulation ticks equal query path length for this relay contract.
+
+Do not claim 256 active neurons per concept: only eight participate here. Report actual
+learned nodes/edges and relay collisions. This may behave similarly to the transition
+baseline; report that plainly. It is a routing substrate candidate, not a demonstrated
+new theory of learning. It remains fully resident; no paging or CUDA claim.
+
+One development smoke, one five-seed evaluation, no parameter tuning. Persist numeric
+recall snapshots plus separate evaluation codes, and verify exact round-trip replay.
+Deliver working code, tests, results and limitations. If it passes, close A1 with a
+concrete R2 storage boundary recommendation; do not silently treat the historical R1
+as passed or restart the whole old campaign. If it fails, report that failure without
+another automatic mechanism arm.
+
+## Read this first — every agent, every handoff
+
+1. Read `Prompt.md`, this active guide through the historical boundary, and the latest recovery entry in `RESULTS.md`. Inspect the current code and working-tree changes before acting. Do not consult git history for design.
+2. `Prompt.md` remains the authority for purpose. This new directive supersedes conflicting execution rules and settled-ledger claims in the historical plan below. The old P0–P10 campaign stays closed. This is a new campaign, not Addendum D or P11.
+3. Work only on the current phase. Advance automatically after its gate passes; do not repeatedly ask Bill to authorize already specified work. A failed gate follows the bounded failure policy below.
+4. Treat comments, README assertions, old verdicts, and another agent's summaries as claims to check. Never translate “tests pass” into “scientific hypothesis proven.”
+5. Keep this as the single plan and `RESULTS.md` as the append-only evidence log. Update README orientation where specified. Do not create competing roadmaps. Small machine-readable run manifests and raw result artifacts are evidence, not new plans.
+6. Preserve user changes. Bill authorizes resetting inconsequential brainData; prefer uniquely named scratch stores and never reset unrelated data. No automatic commits, publication, dependency changes, or new external services are needed for this plan.
+
+**North-star demonstration:** a cue retrieves learned related material by following connections through repeated loading and eviction, while total application memory is bounded independently of the amount of learned state on disk. Increasing actual learned capacity must be measured separately from increasing the available ID range.
+
+**Not promised:** biological equivalence, general intelligence, language generation, or replacing frontier training clusters. A useful resource/quality tradeoff is sufficient; a well-isolated negative result is also a finished outcome.
+
+## What the review established, and what remains open
+
+Verified by source inspection, not a fresh benchmark:
+
+- `Runtime/Cascade.cs` follows a synapse only if its target is already in `NeuronPool`; it skips nonresident targets. Its header claims otherwise.
+- `Runtime/ActivationScope.cs` retains recipes in an unbounded dictionary; `Pipeline/Checkpoint.cs` reloads all partitions into it. Bounded active slots do not bound total learned-state RAM.
+- `Eval/RecallEval.cs` measures trained-versus-withheld activation mass. This is recognition/familiarity, not retrieval of associated knowledge.
+- `Runtime/Assembly.cs` hashes codes into virtual IDs. Address range is not a count of independently learned, useful neurons.
+- `Cli.cs` currently implements `probe` by training a fresh brain before probing, not by querying the saved brain. It prints neuron IDs, not related material.
+
+The historical association failures are evidence about the tested system. They do not prove that representation is the sole cause, that learning is exonerated, or that the complete substrate thesis passed. Keep compression, deterministic IDs, sparse storage, and lifecycle components as candidates for reuse, not certified solutions.
+
+## Contracts that must not drift
+
+### Learning and evaluation
+
+- Recognition asks “have I seen this?” Association asks “what belongs with this cue?” Report them separately; recognition cannot pass an association gate.
+- A manually wired graph is a runtime correctness fixture, never evidence of learning. A transition-count baseline is explicitly a baseline; do not rename it a biologically inspired learning success.
+- Evaluate query-local rankings over fixed candidate sets, then aggregate over queries. Never compare positives from one cue with negatives from another as the primary retrieval metric.
+- Include zero scores, unreachable targets, ties, and failed queries. Specify deterministic tie handling. Do not filter nonzero cases to rescue a gate.
+- Keep test labels, candidate lists, and answer decoding outside the brain. Evaluation must not expose the correct target to traversal or add an answer edge.
+- Freeze the encoder, learned snapshot, readout, candidate definition, and configuration for a resident-versus-paged comparison. Only the storage/execution policy changes.
+- Persistent model state is immutable during recall, including familiarity and fatigue that otherwise affect later queries. Query-local scratch may change. Query order must not silently train the brain.
+
+### Memory, storage, and execution
+
+- Budget recipes, indexes, encoder state, synapses, active/frontier buffers, writeback buffers, and temporary allocations. A hidden full-store dictionary invalidates a bounded-memory claim.
+- Report peak process RSS and managed heap separately from owned-buffer accounting. Report operating-system file caching and memory mapping limitations explicitly. A fresh process is not proof of cold physical storage.
+- Use a stable virtual ID for pending work; resident slot numbers may change during eviction/compaction. Never retain an unpinned slot across operations that can evict it.
+- For exact mode, process a logical propagation step deterministically across pages. Aggregate contributions before selection; paging order must not change the numerical algorithm. Spill intermediate state if necessary or refuse an insufficient budget explicitly.
+- Count missing/corrupt learned records as errors. Only genuinely unseen IDs may regenerate baseline state. Capacity loss, deferred work, and deliberate approximate pruning must be observable.
+- Persist learned numerical state and necessary numerical addressing metadata. Do not persist wordlists, source passages, answer tables, or vocabulary disguised as bytes. Numeric weights inevitably encode learned information; the no-strings audit is not proof that memorization cannot occur.
+- Human-readable results and an external evaluation/display vocabulary are allowed outside model storage. Construct display mappings from user-supplied source data; never let that mapping compute the association score. Include its memory in end-to-end utility measurements.
+
+## R0 — establish an honest baseline and freeze the experiment contract
+
+**Question:** what does the current executable do, and exactly what will count as recovery?
+
+**Work:**
+- Inspect repository instructions and working-tree changes. Record environment, runtime, hardware memory, available scratch space, and source-file checksums. Do not reinstall the toolchain without need.
+- Build and run the existing test suite once. Classify failures as pre-existing, environmental, or introduced; a missing SMB corpus is not a model result. Use local synthetic fixtures until real data is needed.
+- Append a recovery correction to RESULTS and add a short README status banner linking this guide. Preserve historical numbers; explicitly withdraw the conclusions that the complete paging thesis and uniquely located representation cause were proven.
+- Register the R1–R5 protocol before seeing recovery outcomes: generators/splits, seeds, candidate counts, metric formulas, tie handling, budgets, and exact commands as implemented. Planned commands must be labelled unimplemented until they exist.
+- Default synthetic evaluation: five fixed seeds 101–105, 32 frequency-balanced candidates/query, at least 100 test queries/seed. Train on random symbol sequences with deterministic generation and disjoint train/test episodes. Include one-step associations and 2–4-hop paths whose endpoint pair never occurs directly in training. Use distractors with matched exposure. Give every test endpoint training exposure; this tests relational composition, not unseen-symbol encoding.
+- Before final evaluation, use a separate development seed (100). Fix real-data split and support criteria in R0 if data is available; otherwise register them at R5 before inspecting scores.
+
+**Gate:** build/test status recorded; corrected claims visible; implementer can state the task, baseline, metric, and stopping rule without consulting old phase prose. An environment block prevents dependent work, not independent source review.
+
+**Steering:** do not rerun old lambda sweeps, shift diagnostics, or the full P6 grid. Do not spend R0 repairing every historical instrument.
+
+## R1 — demonstrate useful learning with the whole small network resident
+
+**Question:** can this learning system retrieve an associated target before memory virtualization complicates it?
+
+**Work:**
+- Add one named recovery evaluation entry point in the existing CLI, with fixture/learning/paging/scale modes only as needed. Reuse trustworthy math, not historical verdict text.
+- First implement small manually wired chain, branch, cycle, and distractor fixtures. Verify direction, hop limits, ties, readout, and reset behavior. These establish only execution correctness.
+- Train the synthetic sequence task through the actual learning pipeline. Score candidate assemblies from propagated activation; do not score by consulting training pairs. Report direct and composed retrieval separately.
+- Compare with an untrained model, a globally shuffled training-sequence control, and a simple transition-count graph with the same traversal budget. Chance co-occurrences in a shuffle are expected, not automatically a defective null. Print actual cue/candidate coverage.
+- Begin with the existing representation and learning rule. If it fails, allow exactly one documented, local correction motivated by traced learning events: e.g. ensuring sequential coactivation can create the intended cross-cue edge. Do not replace the learner with the baseline or open a representation search.
+
+**Gate:** on both direct and composed tasks, mean top-1 accuracy >= 80%, every seed >= 70%, and mean improvement >= 20 percentage points over both untrained and shuffled controls. These are new engineering acceptance targets, not biologically derived thresholds. Report MRR and transition-baseline performance too; beating that baseline is not required for the paging experiment.
+
+**Failure:** after the initial implementation and one bounded corrective attempt, stop the campaign at “learning prerequisite unmet.” Preserve the runtime fixtures. Propose a separate learning-design decision, not another grid.
+
+**Steering:** a higher familiarity AUC cannot pass R1. Larger virtual ID ranges cannot pass R1. A hand-wired chain cannot pass R1.
+
+## R2 — make learned state genuinely pageable
+
+**Question:** can loading, updating, and evicting state operate without retaining the entire store in RAM?
+
+**Work:**
+- Introduce the smallest storage boundary shared by two concrete backends: a fully resident reference and a disk-backed implementation. Use the same numerical record representation initially; compression is not an experimental variable yet.
+- Support lookup by virtual ID without loading every recipe or every index entry. Prefer deterministic ID-to-page partitioning with bounded pages; do not rely on mutable VQ/LSH placement alone to locate a synaptic target.
+- Bound the record cache and dirty writeback queue by bytes, not just record count. Separate persistent state from resident execution slots. Include encoder and metadata storage in the design.
+- Keep any resident-only legacy path explicit; the new paged mode must not call the all-partitions Resume path.
+- Define versioned snapshots and crash-safe publication: write completed page generations, then atomically publish the manifest. Never treat partial writes as baseline recipes. Old stores remain untouched.
+- Prove round-trip fidelity, bounded cache behavior, dirty eviction/reload, missing-versus-unseen handling, and interrupted publication with targeted tests. Checkpoint/resume learning must match uninterrupted learning under the registered exact settings.
+
+**Gate:** a store larger than its cache is read and updated correctly under repeated eviction; no full-store materialization exists on the paged path; all buffers/indexes have documented bounds; restart reconstructs learned state exactly. This is storage correctness, not yet large-network recall.
+
+**Steering:** reuse numeric record formats where practical. Do not rewrite all storage code, add a database framework by default, or assume SoA implies CUDA readiness.
+
+## R3 — move the activation frontier across pages without changing the answer
+
+**Question:** does a cue follow learned connections into currently unloaded state?
+
+**Work:**
+- Replace the nonresident-target skip with stable-ID scheduling and actual loading. Define step boundaries explicitly; the existing loop can append active nodes while iterating, so do not assume its old “depth” means synchronous hops.
+- Make the same step semantics run in both backends. Capture source contributions before eviction; pin only the necessary batch. Aggregate target contributions and perform global step selection consistently, using bounded spill storage if required.
+- Keep algorithmic activation width separate from resident cache size. In exact mode, smaller memory means more scheduling/I/O, not fewer eligible targets. Approximation is a later named mode.
+- Run fixtures with memory too small to hold an entire path simultaneously, then run the R1 learned snapshot in both modes. Include cold application-cache start, reload after eviction, changed query order, cycles, fan-in from multiple pages, and ties at the selection boundary.
+- Report requested/loaded/evicted IDs, bytes read/written, cache hits, frontier size, and explicit truncations. Capture one understandable learned multi-load query trace as evidence.
+
+**Gate:** all fixture outputs agree; all registered learned-query rankings agree between resident and paged exact modes; scores agree within abs 1e-6 + rel 1e-5 with tie policy fixed in R0. Persistent-state checksums remain unchanged during recall. Nonresident targets are demonstrably loaded and used. No hidden drops or unexplained order effects.
+
+**Failure interpretation:** divergence is an execution/storage defect, not evidence that associations disappear at scale.
+
+## R4 — measure useful capacity under a fixed memory budget
+
+**Question:** what memory/latency tradeoff does paging buy for actual learned content?
+
+**Work:**
+- Freeze the R1-passing learner and R3 semantics. Use three increasing learned workloads (1x, 4x, 16x episodes/independent relationships), not merely increasing BaselineNeuronCount. Report learned nodes, edges, bytes, and task coverage.
+- Choose an initial memory cap M from R0 hardware information before measurement (target <= 25% physical RAM, with safe headroom). Measure an empty-process/runtime baseline B separately. Account for all application-owned memory; require peak RSS <= B + 1.25M on paged runs. Do not redefine M or B after seeing failures.
+- Ensure the largest complete resident representation requires at least 4M by actual accounting, including indexes, not extrapolation from virtual IDs. Compare resident and paged execution of that same snapshot where it safely fits physical RAM; otherwise use smaller paired cells for equivalence and mark large-cell equivalence unverified.
+- Run five seeds, 100 fixed measured queries/seed, at most the three workload sizes and two cache budgets (M and M/2). Report p50/p95 latency, throughput, peak RSS, managed heap, store bytes, disk traffic, cache state, and exact recall metrics. Separate startup/indexing from query time.
+- Show added independently learned relations remain retrievable as content grows. Compare a small-capacity model on the full fixed query set with the expanded model; include unavailable answers as failures. Do not present reduced hash collisions as proof of richer reasoning.
+- Train the largest workload through the bounded storage path too. If only inference passes, label the result inference-only. Synthetic construction of a giant store is a stress fixture, not scalable learning.
+
+**Gate:** largest paged workload meets the memory bound and R1 quality gate; exact paging retains R3 equivalence on paired cells; learned capacity actually grows. Practical utility target: p95 <= 2 seconds/query and <= 10x resident p95 on paired cells, excluding separately reported startup. These are prototype targets, not universal performance claims.
+
+**Verdict distinctions:** memory/quality pass but latency fail = functional paging, impractical at this workload; bounded inference but unbounded training = inference-only; more available IDs alone = no capacity result. Never infer a network larger than physical RAM unless that condition was actually tested.
+
+## R5 — deliver the local-data learning and recall utility
+
+**Question:** can Bill train once, restart, and retrieve related material from his own data?
+
+**Work:**
+- Make learn accept an explicit local source and write a named model snapshot. Make probe load that snapshot without training or scanning the training corpus to compute answers. Provide top related candidate IDs/scores plus a concise traversal/resource report.
+- Offer readable labels through a separately supplied display/candidate source or caller-provided candidates. Model storage remains numeric. Label this closed-candidate retrieval if candidates must be supplied; do not claim open-ended recall or generation.
+- Register a deterministic held-out real-data task before scoring: at least 100 supported cues, fixed candidate selection/frequency matching, document/sentence split, duplicates policy, source checksum, and no train/test context leakage. Freeze the encoder after training.
+- Use query-level MRR and Recall@10; compare with untrained and frequency-only controls and a transparent co-occurrence retrieval baseline. Keep broad natural-language reasoning out of scope.
+- Acceptance: mean MRR lift >= 0.05 over both untrained and frequency-only controls, with a positive 95% paired bootstrap lower bound over queries. Report seed variation separately; queries sharing data are not independent training replicas. Report the co-occurrence baseline even if it wins.
+- Run learn, shutdown, fresh-process probe, exact resident/paged comparison, and model-string audit. Include query quality and total memory with the display adapter present. Audit numerical schema and planted wordlist rejection; do not assert that a clean byte scan establishes semantic non-memorization.
+
+**Gate:** persisted-model querying works, real association gate passes, and the R4 memory claim survives the real-data path. If synthetic succeeds but real data fails, finish with exactly that limited result. No representation redesign inside R5.
+
+## R6 — close the campaign and decide whether GPU work is justified
+
+Deliver one RESULTS capstone and README truth pass with four separate verdicts: learning, exact paging, resource tradeoff, and real-data utility. Publish reproducible commands/configurations and known limitations. No “letter met” substitution for a failed original requirement.
+
+Profile the successful end-to-end path once. Report CPU compute, storage wait, serialization, scheduling, and allocation costs. CUDA becomes a proposed next directive only if useful recall works and substantial parallel compute remains after accounting for I/O. Do not port in this campaign. If a simple baseline gives comparable quality more cheaply, say so: any claimed advantage must be identified rather than implied.
+
+The campaign ends at R6 or at its first exhausted prerequisite gate. No R7, new lambda grid, or automatic extra diagnostic phase. Emergent behavior remains untested unless an explicitly defined held-out compositional task supports that narrower claim.
+
+## Effort bounds and failure handling
+
+- Per phase: one initial implementation and one corrective attempt for a measured defect or failed gate. A corrective attempt must name the cause it tests and expected observable change. No multi-parameter search.
+- Unit-test fixes before a scientific run are ordinary implementation work, but do not use that label to hide an architecture rewrite. If a phase needs more than two substantive redesigns, stop and explain the design decision required.
+- One development smoke configuration before any registered full run. Estimate runtime/disk usage from it. No unattended experiment expected to exceed one hour without reporting the estimate and receiving an explicit larger run budget. Do useful independent work while a permitted run proceeds.
+- An instrument bug invalidates affected results; it is not a failed model attempt. Permit one bounded repair and rerun with the unchanged protocol. A second material instrument defect ends the phase as inconclusive instead of launching instrument archaeology.
+- Environmental interruptions do not consume scientific attempts. Check process status and artifacts before restarting. Record exit code and completion evidence; notifications alone are not results.
+- If a gate fails, say what failed, what remains established, and what single decision would unblock progress. Do not move a threshold or invent approval requirements from historical prose.
+
+## Handoff protocol — especially for a smaller or fresh agent
+
+At every phase boundary, before a long run, and before a context/usage handoff, append a compact recovery checkpoint to RESULTS. Keep the following active pointer current in this guide:
+
+- **Current phase:** R4 stopped at measured paired latency target; exact deferred correction passed.
+- **Passed gates:** R0, A1, R2 storage, R3 exact paged traversal; original R1 remains failed. Evidence: artifacts/recovery/a1, r2 and r3.
+- **Next action:** Review R4 result and decide on a new directive. No automatic extra correction, larger grid or R5.
+- **Open decision:** none for deferred-decay implementation (approved); runtime budget remains a gate for projected long jobs.
+- **Running jobs/artifacts:** None. artifacts/recovery/r4-deferred/summary.json; scratch model /private/tmp/gm-r4-deferred-201-1x/model. All workers completed; do not restart them.
+
+Each checkpoint must contain: exact current phase and gate status; changed files; completed test commands and outcomes; full effective configuration and dataset checksum; raw artifact paths; process/session IDs and completion state; attempts used; unresolved defects; and one concrete next command/action. Never copy a prior agent's PASS without an artifact reference.
+
+If you cannot explain why the next change advances the north-star demonstration, stop editing and reread the current phase. If an unexpected result occurs, first inspect the execution trace and metric definition; do not invent a biological explanation. If uncertain about a design choice affecting learning semantics, disk compatibility, or numerical equivalence, prepare the smallest concrete alternatives for Bill instead of silently choosing a new architecture.
+
+**Forbidden shortcuts:** inflating virtual neuron count; relabelling familiarity as recall; scoring only nonzero pairs; loading the whole model behind a small pool; silently dropping unloaded targets; reconstructing answers from the source corpus; changing the resident reference to hide paging errors; claiming fixtures learned; claiming CUDA speedups without measurement; promoting an inconclusive result to success because time or tokens ran short.
+
+---
+
+# Historical plan — closed P0–P10 campaign
+
+The material below is retained for provenance and component context. Its execution instructions and claims of settled proof do not override the active recovery guide above. Do not resume these phases.
+
 # greyMatter — Implementation Plan
 
 **Audience:** Implementing Agent
