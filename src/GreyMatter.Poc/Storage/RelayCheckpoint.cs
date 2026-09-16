@@ -5,7 +5,9 @@ using System.Security.Cryptography;
 namespace GreyMatter.Poc.Storage;
 
 /// <summary>Numeric, versioned, recall + learning continuation metadata; frozen-code input model.</summary>
-public sealed record RelayTrainingState(long Updates, long Episodes, long Observations, uint[] Previous)
+public enum RelayLearningPolicy { Global = 0, SourceLocal = 1, NoDecayDiagnostic = 2 }
+
+public sealed record RelayTrainingState(long Updates, long Episodes, long Observations, uint[] Previous, RelayLearningPolicy Policy = RelayLearningPolicy.Global)
 {
     public static RelayTrainingState Empty => new(0, 0, 0, Array.Empty<uint>());
 }
@@ -17,11 +19,14 @@ public static class RelayCheckpoint
     public enum Stage { DuringGenerationCopy, GenerationFlushed, BeforeManifestReplace, ManifestReplaced }
     internal static byte[] State(uint limit, RelayTrainingState state, byte[] indexHash, int version = 1, ulong epoch = 0)
     {
+        if (!Enum.IsDefined(state.Policy) || (version != 3 && version != 4 && state.Policy != RelayLearningPolicy.Global))
+            throw new ArgumentException("Unsupported checkpoint learning policy");
         if (state.Previous.Length > 8 || state.Previous.Any(id => id >= limit) ||
             state.Updates < 0 || state.Episodes < 0 || state.Observations < 0)
             throw new ArgumentException("Invalid learning continuation");
         var b = new byte[StateBytes];
         BinaryPrimitives.WriteInt32LittleEndian(b, version);
+        if (version == 3 || version == 4) BinaryPrimitives.WriteInt32LittleEndian(b.AsSpan(112), (int)state.Policy);
         if (version == 2) BinaryPrimitives.WriteUInt64LittleEndian(b.AsSpan(112), epoch);
         BinaryPrimitives.WriteInt32LittleEndian(b.AsSpan(4), 1);
         BinaryPrimitives.WriteInt32LittleEndian(b.AsSpan(8), 1);
@@ -93,6 +98,8 @@ public static class RelayCheckpoint
     }
     public static void Publish(DiskRelayRecords source, string root, RelayTrainingState state, Action<Stage>? fault = null)
     {
+        int version = state.Policy == RelayLearningPolicy.Global ? 1 : 3;
+        _ = State(source.IdLimit, state, new byte[32], version);
         Directory.CreateDirectory(root);
         string manifest = Path.Combine(root, "manifest.bin");
         ulong generation = File.Exists(manifest) ? BinaryPrimitives.ReadUInt64LittleEndian(SmallFile(manifest, 40)) + 1 : 1;
@@ -100,7 +107,7 @@ public static class RelayCheckpoint
         string directory = Generation(root, generation);
         using (var target = new DiskRelayRecords(directory, source.IdLimit, DiskRelayRecords.FixedCharge + DiskRelayRecords.SlotCharge))
             Copy(source, target, fault);
-        byte[] metadata = State(source.IdLimit, state, HashFile(Path.Combine(directory, "presence.bin")));
+        byte[] metadata = State(source.IdLimit, state, HashFile(Path.Combine(directory, "presence.bin")), version);
         DurableWrite(Path.Combine(directory, "state.bin"), metadata);
         SyncDirectory(directory); SyncDirectory(root);
         fault?.Invoke(Stage.GenerationFlushed);
@@ -113,13 +120,14 @@ public static class RelayCheckpoint
         SyncDirectory(root);
         fault?.Invoke(Stage.ManifestReplaced);
     }
-    public static (DiskRelayRecords Store, RelayTrainingState State) Restore(string root, string workspace, long budgetBytes)
+    public static (DiskRelayRecords Store, RelayTrainingState State) OpenReadOnly(string root, long budgetBytes)
     {
         byte[] pointer = SmallFile(Path.Combine(root, "manifest.bin"), 40);
         string directory = Generation(root, BinaryPrimitives.ReadUInt64LittleEndian(pointer));
         byte[] b = SmallFile(Path.Combine(directory, "state.bin"), StateBytes);
         if (!SHA256.HashData(b).AsSpan().SequenceEqual(pointer.AsSpan(8))) throw new InvalidDataException("Metadata checksum");
-        if (BinaryPrimitives.ReadInt32LittleEndian(b) != 1 || BinaryPrimitives.ReadInt32LittleEndian(b.AsSpan(4)) != 1 ||
+        int version = BinaryPrimitives.ReadInt32LittleEndian(b);
+        if ((version != 1 && version != 3) || BinaryPrimitives.ReadInt32LittleEndian(b.AsSpan(4)) != 1 ||
             BinaryPrimitives.ReadInt32LittleEndian(b.AsSpan(8)) != 1) throw new InvalidDataException("Unsupported model/version/input kind");
         if (!HashFile(Path.Combine(directory, "presence.bin")).AsSpan().SequenceEqual(b.AsSpan(80, 32)))
             throw new InvalidDataException("Missing/corrupt presence index");
@@ -129,10 +137,16 @@ public static class RelayCheckpoint
         var previous = new uint[count];
         for (int i = 0; i < count; i++) previous[i] = BinaryPrimitives.ReadUInt32LittleEndian(b.AsSpan(44 + 4 * i));
         var state = new RelayTrainingState(BinaryPrimitives.ReadInt64LittleEndian(b.AsSpan(16)),
-            BinaryPrimitives.ReadInt64LittleEndian(b.AsSpan(24)), BinaryPrimitives.ReadInt64LittleEndian(b.AsSpan(32)), previous);
-        _ = State(limit, state, b.AsSpan(80, 32).ToArray()); // validate numeric continuation too
-        using var source = new DiskRelayRecords(directory, limit, DiskRelayRecords.FixedCharge + DiskRelayRecords.SlotCharge, existing: true);
-        var target = new DiskRelayRecords(workspace, limit, budgetBytes);
+            BinaryPrimitives.ReadInt64LittleEndian(b.AsSpan(24)), BinaryPrimitives.ReadInt64LittleEndian(b.AsSpan(32)), previous,
+            version == 3 ? (RelayLearningPolicy)BinaryPrimitives.ReadInt32LittleEndian(b.AsSpan(112)) : RelayLearningPolicy.Global);
+        _ = State(limit, state, b.AsSpan(80, 32).ToArray(), version); // validate numeric continuation too
+        return (new DiskRelayRecords(directory, limit, budgetBytes, existing: true), state);
+    }
+    public static (DiskRelayRecords Store, RelayTrainingState State) Restore(string root, string workspace, long budgetBytes)
+    {
+        var saved = OpenReadOnly(root, DiskRelayRecords.FixedCharge + DiskRelayRecords.SlotCharge);
+        using var source = saved.Store; var state = saved.State;
+        var target = new DiskRelayRecords(workspace, source.IdLimit, budgetBytes);
         try { Copy(source, target); return (target, state); }
         catch { target.Dispose(); throw; }
     }

@@ -20,6 +20,7 @@ public static class DeferredRelayCheckpoint
     }
     public static void Publish(DeferredRelayRecords source, string root, RelayTrainingState state, Action<RelayCheckpoint.Stage>? fault = null)
     {
+        _ = RelayCheckpoint.State(source.IdLimit, state, new byte[32], 2, source.Epoch);
         source.Flush(); Directory.CreateDirectory(root);
         string manifest = Path.Combine(root, "manifest.bin");
         ulong generation = File.Exists(manifest) ? BinaryPrimitives.ReadUInt64LittleEndian(RelayCheckpoint.SmallFile(manifest, 40)) + 1 : 1;

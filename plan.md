@@ -2,7 +2,7 @@
 
 **Directive:** Bill, 2026-09-09. Build the proof of concept originally requested: learn from local data, recall related material through a learned network, and execute that network with substantially less resident memory than its complete learned state requires.
 
-**Status:** Exact deferred-decay correction PASSED (180 tests; 5,120 frozen checks). R4 stopped after first 1x paired cell missed the registered 10x latency target (27.39x). Full capacity remains unmeasured; no larger run or R5 started.
+**Status:** Packed storage PASS (2026-09-16):203 tests, exact8192-chain learning/restart/recall; snapshot allocation3.19GiB ->120.71MiB (96.31% reduction). Warm query p95 unchanged; logical read traffic~10x higher. R4 remains stopped.
 
 ## Authorized continuation — activation-travel review (2026-09-09)
 
@@ -18,7 +18,7 @@ state. Distinguish edge existence from usable activation; no new pass bar or suc
 claim is allowed from this diagnostic. Bound: one development run, targeted observer
 correctness tests, one written design recommendation and handoff. No parameter tuning.
 
-**Current work:** Approved correction and first registered 1x cell completed. Preserve the measured latency miss and low supported recall; corrective attempt consumed. Follow the bounded failure policy; do not silently tune or launch the remaining grid.
+**Current work:** Authorized fixed-record packing complete. Records/learning unchanged; bounded disk index and version4 checkpoints verified. No tuning or variable-length compression attempted.
 
 ## A1 — protected assembly relay (authorized by Bill)
 
@@ -219,11 +219,11 @@ The campaign ends at R6 or at its first exhausted prerequisite gate. No R7, new 
 
 At every phase boundary, before a long run, and before a context/usage handoff, append a compact recovery checkpoint to RESULTS. Keep the following active pointer current in this guide:
 
-- **Current phase:** R4 stopped at measured paired latency target; exact deferred correction passed.
+- **Current phase:** Packed fixed-record integration complete: PASS.
 - **Passed gates:** R0, A1, R2 storage, R3 exact paged traversal; original R1 remains failed. Evidence: artifacts/recovery/a1, r2 and r3.
-- **Next action:** Review R4 result and decide on a new directive. No automatic extra correction, larger grid or R5.
+- **Next action:** Register a bounded memory-pressure/resource follow-up, explicitly measuring index read amplification and OS-cache effects. Do not silently claim R4 passed or launch a long grid.
 - **Open decision:** none for deferred-decay implementation (approved); runtime budget remains a gate for projected long jobs.
-- **Running jobs/artifacts:** None. artifacts/recovery/r4-deferred/summary.json; scratch model /private/tmp/gm-r4-deferred-201-1x/model. All workers completed; do not restart them.
+- **Running jobs/artifacts:** None. artifacts/recovery/packed/summary.json, source-manifest.json, command ledgers and full-tests.trx (203/203). Models /private/tmp/gm-packed-20260916-seed100 and -seed201. All workers completed.
 
 Each checkpoint must contain: exact current phase and gate status; changed files; completed test commands and outcomes; full effective configuration and dataset checksum; raw artifact paths; process/session IDs and completion state; attempts used; unresolved defects; and one concrete next command/action. Never copy a prior agent's PASS without an artifact reference.
 

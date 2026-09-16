@@ -4164,3 +4164,528 @@ dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode paging 
 No workers remain running. No commits, staging, history consultation or user-data resets.
 The phase's correction is complete; subsequent work requires a new design directive
 under the bounded failure policy. Existing thresholds and earlier results are retained.
+
+# Retention diagnostic registration — Bill authorized 2026-09-15
+
+New bounded directive, not an R4 pass or revised threshold. Hypothesis: global decay
+removes a newly taught edge before its next presentation at 8192 chains. Trace the
+first member-to-first member edge of the first relation in each of the seven supported
+query chains, before and after all16 presentations. Compare one traced unchanged
+seed201/8192-chain/256 MiB deferred run with one identical run that suppresses scheduled
+decay. Encoding, episode order, updates, degree cap and all100 queries stay fixed.
+Trace reads never write logical model state. Verify baseline final hash against the
+existing run; report diagnostic overhead separately from R4 timings. If no-decay
+recovers supported recall, propose retention design; do not adopt no forgetting as
+production policy or launch a sweep. No supported composed queries in this cell:
+composition at scale remains untested. Keep all original R4 failures in place.
+
+## Retention diagnostic outcome — 2026-09-15
+
+**Scheduled global forgetting explains the sampled direct-recall loss.** The traced
+baseline reproduced the earlier final logical model hash exactly. Across seven sampled
+first-member edges and16 presentations each (112 observations), every pre-teaching
+edge was absent and every post-teaching weight was .105000004. Return intervals were
+exactly32768 episodes. In the no-decay arm, only the seven first presentations lacked
+edges; all105 later presentations reinforced existing edges, finishing near .17999996.
+The focused test independently shows five scheduled .99 decays deleting a .105 birth
+below .1, while the diagnostic preserves it with equal episode and update counts.
+
+Both arms have identical corpus SHA256 and33,554,176 learning updates. Baseline retained
+146424 synapses; no-decay retained2097136. Occupied records remain324350 and fixed-record
+payload remains106386800 bytes (+15568800 occupied epoch bytes). More surviving edges
+fill already allocated slots: this is not a demonstrated compression improvement.
+Baseline training152.1154s; no-decay158.8355s. These traced runs are diagnostics, not
+replacement R4 performance measurements. No speedup is claimed.
+
+On the identical100-query set, no-decay retrieves all7 supported answers at rank1;
+baseline had one rank1 and six all-zero vectors, tie-adjusted supported top1=16.9643%.
+No-decay supported top1=100%; all-query direct top1=14%, composed=0%, MRR=.07. The latter
+scores retain zero credit for unsupported queries. All7 supported queries are direct;
+there is no supported composition claim, new seed replication, real-text result or
+larger-than-memory result. Paged no-decay query performs0 writes and its logical hash
+is unchanged. R4 latency stop remains in force; disabling decay is not its repair.
+
+### Recommended next design, not implemented
+
+Keep encoding and eight-member cohorts fixed. Test source-local opportunities as the
+clock for forgetting: unrelated episodes must not age an untouched source's relations.
+On teaching a source, observed targets reinforce; competing outgoing targets can age
+under a separately registered rule. Repeated evidence can consolidate links into a
+slower-changing state, but a new link first needs to survive until a relevant return
+opportunity. Simply protecting links only after their second observation does not fix
+the current failure if global decay still deletes them before that observation.
+
+This trades indefinite retention of dormant associations against bounded per-source
+capacity. It must be tested with both repeated useful relationships and obsolete or
+contradictory relationships; otherwise “never forget” wins a stationary test trivially.
+Register one policy and fresh held-out evaluation before implementation, including
+supported direct AND composed queries and interference/forgetting behavior. Do not
+choose a decay constant from the final dataset size or start a sparsity sweep.
+No biological fidelity claim follows from this engineering proposal.
+
+### Reproduction and boundaries
+
+Source manifest and JSON/TRX outputs: artifacts/recovery/retention. Full existing suite
+180/180 plus the new focused test1/1 passed. The no-decay switch is explicit evaluator
+instrumentation, off by default; it is not encoded as a new checkpoint learning policy.
+A diagnostic continuation would need the flag re-supplied. Working models are scratch
+artifacts, not a promoted production brain. No data reset, staging or commit performed.
+
+```bash
+dotnet test GreyMatter.sln -c Release --logger 'trx;LogFileName=tests.trx' --results-directory artifacts/recovery/retention
+dotnet test GreyMatter.sln -c Release --filter FullyQualifiedName~RetentionDiagnosticTests --logger 'trx;LogFileName=retention-test.trx' --results-directory artifacts/recovery/retention
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action train --decay deferred --retention-diagnostic --seed 201 --chains 8192 --budget-mib 256 --output /private/tmp/gm-retention-baseline-20260915/train.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action train --decay deferred --retention-diagnostic --disable-decay --seed 201 --chains 8192 --budget-mib 256 --output /private/tmp/gm-retention-nodecay-20260915/train.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --decay deferred --backend paged --model /private/tmp/gm-retention-nodecay-20260915/model --seed 201 --chains 8192 --budget-mib 256 --output artifacts/recovery/retention/nodecay-paged.json
+/usr/bin/time -l dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode capacity --action query --decay deferred --backend resident --model /private/tmp/gm-retention-nodecay-20260915/model --seed 201 --chains 8192 --budget-mib 256 --output artifacts/recovery/retention/nodecay-resident.json
+```
+
+Final paired check: all100 no-decay paged/resident score vectors are exactly equal;
+both models remain logically immutable. Every listed worker exited0, source manifest
+verified, no jobs remain running. Diagnostic complete; proposed retention policy awaits
+a new directive and registration.
+
+# Source-local retention policy registration — 2026-09-15
+
+Bill authorized the proposed retention design. One policy, no sweep: on each observed
+source->target-cohort event, multiply that source's outgoing weights to targets NOT
+in the observed cohort by .99 and prune below .1. Reinforce observed targets with the
+unchanged .005 update / .105 birth. No global scheduled decay. An untouched source
+never ages merely because unrelated data is processed. No consolidation tier yet.
+Encoding, eight-member cohorts, degree32 and readout remain unchanged. This is an
+explicit experimental learning policy, not a change to default learning or old models.
+
+Bounded evaluation: seed100/32-chain smoke, then fresh seeds301–305 with1024 five-concept
+chains,4096 distinct adjacent relations,16 presentations/relation,65536 episodes.
+Reuse CapacityEval's numeric encoder and affine episode ordering. Return interval4096
+exceeds the measured new-edge lifetime2500; this intermediate workload tests retention
+without claiming to repeat the8192-chain or R4 capacity test. Compare global, no-decay,
+and local policies on identical streams. Resident reference storage only: no memory
+bound or paging performance claim. All64 query chains are supported, chosen by
+(seed+17*q)%chains. Test direct and2–4 hops separately with32 distinct candidates;
+the final1024-chain selection has64 distinct cues (smoke uses32 distinct cues). No answer labels
+enter training. Save scores, counters, corpus hash and numeric final models.
+
+Smoke uses8 replacement/8 both-valid/16 anchors; final uses16/16/32.
+After stationary scoring, select first16 queried chains for replacement: teach each
+root a fresh target64 times. Next16 queried chains get an alternative target16 times,
+alternating with their original target16 times (both remain valid). Remaining queried
+chains are untouched anchors. Compare before/after old-edge coverage, new-target rank
+against old plus30 distractors, both-valid edge coverage, and untouched direct/composed
+recall. Interventions explicitly declare the task's old relation obsolete; absent such
+a task declaration, a new successor need not make an old successor false.
+
+Gate for local policy: stationary direct/composed mean>=80%, every seed>=70%; each mean
+within2 percentage points of no-decay; untouched direct/composed each seed>=70%;
+replacement new-target mean rank1>=80%, each seed>=70%; obsolete edge coverage<=10%
+per seed; both-valid old and new edge coverage>=90% per seed. Coverage measures all
+8x8 potential edges, excluding self edges, not just the traced first member. Report
+no-decay obsolete coverage as the retention/adaptation contrast. Global is a measured
+control, not required to fail. If a bar fails, stop and record it; no automatic new rule.
+No real-text, biological-fidelity, semantic-generalization or full-scale claim.
+
+Development seed100 passed the registered per-seed checks. Local removed obsolete
+edges (coverage0), retained both valid successors (coverage1), and selected new targets
+at rank1. Global/no-decay retained obsolete edges (coverage1). Three arms took .37s
+combined and exported about1.4 MiB. A conservative scaling by32x records and32x decay
+passes puts a fresh seed below3min; five sequential seeds below15min, below the one-hour
+run bound. Advance unchanged to301–305; no policy or threshold edits after this smoke.
+
+## Source-local retention result — PASS (2026-09-15)
+
+All five fresh seeds301–305 pass every registered aggregate and per-seed gate. The
+encoding and eight-neuron relay cohorts were unchanged. This supplies supported
+multi-hop evidence at1024 chains, not an8192-chain rerun or R4 capacity pass.
+
+| mean across5 seeds | global decay | no decay | source-local |
+|---|---:|---:|---:|
+| stationary direct top1 | 51.5625% | 100% | 100% |
+| stationary2–4-hop top1 | 24.0137% | 100% | 100% |
+| untouched direct after intervention | 17.0508% | 100% | 100% |
+| untouched composed after intervention | 3.7305% | 100% | 100% |
+| replacement target top1 | 100% | 100% | 100% |
+| obsolete edge coverage after replacement | 16.25% | 100% | 0% |
+| both-valid old/new edge coverage | 100% /100% | 100% /100% | 100% /100% |
+
+Every local seed individually scored100% on recall and both-valid coverage, and0%
+on obsolete coverage. Across seeds the stationary task contains320 supported direct
+and320 supported composed queries; the untouched post-intervention subset contains
+160 of each. Replacement has80 queries, branches80 pairs of coverage measurements.
+These are five independent training seeds, not640 independent training runs. Global
+and no-decay both choose the new target correctly; local's measured advantage over
+no-decay is removal of obsolete links while retaining useful alternatives, not superior
+rank1 on this stationary corpus. A high new-target score alone would have missed that.
+
+Each seed starts with5120 synthetic concepts and4096 unique adjacent relations,
+65536 training episodes, then1536 intervention episodes and32 new target concepts.
+Final local models contain41160–41168 actual neuron records and263168 synapses.
+No-decay has264192 synapses (the1024 obsolete relay edges remain); global has
+37184–37376. Each final numeric export occupies13500480–13503104 bytes (~12.88 MiB),
+identical across policies within a seed because fixed records reserve all32 slots.
+This is an actual compact sequential evaluation export, not the earlier direct-address
+working-store allocation. It has no live paging index, epoch sidecar or resumable
+checkpoint metadata. Do not substitute its size for R4 working-store costs or infer
+bytes per sentence: this workload still contains no text.
+
+Resident arm times: global7.33–7.60s, no-decay1.41–1.46s, local1.43–1.45s per seed,
+including export. These are observational evaluator timings, not a fresh-process
+performance/RSS comparison. No resource gate is asserted. The original R4 latency miss
+and unmeasured larger-than-memory capacity remain unchanged.
+
+### Implementation and validation
+
+SynapseStore.DecayUnobserved applies one .99 decay to unobserved outgoing targets,
+with the same .1 prune threshold and swap deletion. StoredRelayLearning enables this
+only with explicit SourceLocalForgetting; observed targets reinforce normally and
+global scheduling is disabled. Explicit global decay is refused in this mode, as are
+mixing the no-decay diagnostic flag or using a nonzero deferred global epoch. Existing
+learning defaults remain unchanged. No new consolidation tier or swept constant.
+
+The new RetentionPolicyEval reuses CapacityEval.Input (visibility change only). It
+registers three arms, fixed numeric streams and supported candidate sets, reports raw
+scores and coverage, and exports checksummed numeric adjacency records. No candidate
+labels or answer oracle enter learning. Source-local continuation is tested with the
+policy explicitly re-supplied; it is NOT yet encoded in persistent checkpoint metadata.
+These exports are evaluation evidence, not production snapshots to resume implicitly.
+
+Full suite184/184 passed; three new tests cover dormant retention, obsolete deletion,
+both-valid branching, selective pruning/population alignment and exact explicit
+continuation. Existing181 tests include deferred-decay and paged-storage regression.
+The summarizer verifies all15 final numeric exports against their whole-file hashes,
+every328-byte record checksum, IDs, degree, weight/population schema and uniqueness.
+It also verifies corpus/update equality across arms, sample counts, frozen source
+hashes and all registered gates. This is a numeric-schema audit, not a claim of semantic
+non-memorization. All smoke/final/test/summarizer commands exited0; no jobs remain.
+
+Artifacts: artifacts/recovery/retention-policy/{smoke,seed301..seed305}.json, individual
+arm JSON and .records exports, summary.json, source-manifest.json, TRX files and stdout.
+One rule and one development configuration used; no corrective attempt or tuning.
+
+```bash
+dotnet test GreyMatter.sln -c Release --filter FullyQualifiedName~SourceLocalRetentionTests --logger 'trx;LogFileName=local-tests.trx' --results-directory artifacts/recovery/retention-policy
+dotnet test GreyMatter.sln -c Release --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/retention-policy
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode retention-policy --seed 100 --output artifacts/recovery/retention-policy/smoke.json
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode retention-policy --seed 301 --output artifacts/recovery/retention-policy/seed301.json
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode retention-policy --seed 302 --output artifacts/recovery/retention-policy/seed302.json
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode retention-policy --seed 303 --output artifacts/recovery/retention-policy/seed303.json
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode retention-policy --seed 304 --output artifacts/recovery/retention-policy/seed304.json
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll eval recovery --mode retention-policy --seed 305 --output artifacts/recovery/retention-policy/seed305.json
+python3 artifacts/recovery/retention-policy/summarize.py
+```
+
+### Interpretation and next deliverable
+
+Retain this rule as the candidate for integration. First persist its learning-policy
+identity so restart cannot silently revert to global forgetting; verify exact
+resident/paged learning and checkpoint continuation. Then repeat an explicitly
+registered8192-chain retention test with supported direct/composed queries. Keep R4's
+original capacity and latency ledger separate; this result does not erase its stop.
+No automatic CUDA port, encoding redesign, consolidation tier or larger grid.
+
+The source here is a neuron ID, not a perfectly isolated concept: hash-cohort collisions
+can still cause interference, especially at larger scale. Dormant associations can
+persist indefinitely; storage remains bounded per source, not globally compacted.
+Replacement was deliberately declared obsolete by the synthetic task. Natural data
+may require context to distinguish contradiction from valid alternatives. This is
+learned traversal of trained links, not evidence of biological fidelity or general
+reasoning. Real-data utility and whole-process resource tradeoffs remain open.
+
+# Persisted source-local integration registration — 2026-09-15
+
+Bill authorized continuing. Save learning-policy identity in a new numeric checkpoint
+metadata version3; keep v1 eager-global and v2 deferred-global readers compatible.
+Restore must choose the saved policy without caller flags and reject conflicting
+policy overrides and unknown identifiers. Source-local uses the existing base record
+store (no global-epoch sidecar). No learning constants or encoding changes.
+
+Integration gate: exact resident/paged learning under dirty eviction; mid-sequence
+checkpoint/restart without policy flags; interrupted publication leaves a complete old
+or new policy/model; corrupt/unknown policy refused; unchanged v1/v2 tests. Numeric
+record and metadata audit. One32-chain seed100 smoke before the larger cell.
+
+Larger follow-up: one8192-chain seed201 paired integration cell, same524288 training
+presentations, encoder, affine order and source-local rule. This deliberately revisits
+the earlier seed; it is not a fresh five-seed claim. Resident reference and bounded
+paged training receive identical input; page cache at256 MiB total allowance. Stop
+mid-sequence halfway through, publish, dispose, restore into a new workspace and finish
+without supplying a policy flag. Compare final record hashes and counters with resident.
+Publish completed model and query in a fresh process through an8-record cache.
+
+Freeze128 supported queries:64 distinct chains (201+127*q)%8192, each tested at1 hop
+and2+q%3 hops,32 distinct candidate chains, rotated correct position. Smoke uses32
+chains/64queries. Direct/composed top1 each>=80%; every score must match resident,
+recall must write0 bytes and preserve model hashes. These supported queries are a new
+follow-up instrument, NOT replacement R4 queries. Timing/storage are reported, not an
+R4 capacity/latency gate. Existing R4 stop remains. No larger grid or CUDA implicit.
+
+Integration smoke passed all191 tests and separate-process resident/prepare/resume/query
+workers. Seed100 final hashes, policy1, counters and64 query vectors match exactly;
+midpoint state retains8 previous members; query writes0 bytes and physical files match.
+Workers took .18/1.57/2.37/7.18s. Even multiplying the entire11.3s smoke by256 gives
+~48.2min for the larger cell, below one hour; fixed-extent hash time does not actually
+scale with occupied records, and earlier8192 training took~150s. Plan scratch <=16GiB
+for four base-store copies, with90GiB available. Launch seed201 unchanged; no long grid.
+
+## Persisted source-local integration — PASS (2026-09-15)
+
+The larger cell completed before the usage interruption; no experiment was restarted.
+Final regression run also completed:191/191 tests pass. All four separate-process
+workers and the numeric audit exited0. No jobs remain running.
+
+At8192 chains (40960 synthetic concepts,32768 distinct adjacent relations,
+524288 presentations), all64 supported direct queries and64 supported2–4-hop queries
+rank the correct candidate first. The same resident, resumed paged, and fresh-process
+checkpoint-read scores are bit-exact. Final graph hash, updates33554176, episodes524288,
+observations1048576, empty previous cohort and policy1 all match. This is one revisited
+seed201 and a newly registered supported query set; it does not replace the old R4
+query set, erase its failure or constitute a new five-seed scale evaluation.
+
+Training stopped halfway with a live8-member source cohort, published a checkpoint,
+exited, restored into a new workspace in another process, and finished with no policy
+flags supplied. The restored policy controls continuation automatically. The completed
+checkpoint then loaded in another fresh process using an8-record cache; query writes
+were0 and full physical-file hashes before/after matched. The larger training cache
+still fits this model (0 training evictions); small-cache dirty eviction/continuation
+is established separately by the focused tests, not claimed from this large training
+cell. Query/census evictions were342873 in total, including the full pre-query census;
+that total must not be described as query-only disk misses.
+
+| larger-cell measurement | result |
+|---|---:|
+| occupied neuron records | 324350 |
+| live synapses | 2097136 |
+| occupied record payload | 106386800 bytes (101.46 MiB) |
+| completed snapshot, filesystem-reported allocation | 3429994496 bytes (3.19 GiB) |
+| all four scratch copies, reported allocation | 14132420608 bytes (13.16 GiB) |
+| recall cache reservation alone | 7232 bytes (8 records plus index/accounting) |
+| fresh-process recall peak RSS | 51691520 bytes (49.30 MiB) |
+| resident training/reference peak RSS | 193986560 bytes (185.00 MiB) |
+| paged prepare / resume peak RSS | 174571520 /174276608 bytes |
+| query p95, excluding setup/audit | .5323 ms |
+| resident / prepare / resume / query worker wall time | 12.58 /130.07 /136.27 /12.37 seconds |
+
+The recall cache reservation excludes530944 bytes of runtime traversal scratch,
+.NET/process overhead and OS file cache. Query timing follows a full record census and
+physical-file hash, so the OS cache is warm; it is not cold-disk latency. Worker time
+includes setup/copy/publication/census/audit as applicable. No R4 memory/latency gate
+is asserted here. The occupied state is below the registered1 GiB minimum and the
+training cache fits it. These are measured prototype resource observations only.
+
+Removing the global-epoch sidecar does not solve disk compactness. The completed model
+still has a5,248,000,000-byte logical records file plus16,000,000-byte presence index,
+128-byte numeric state and40-byte manifest. Allocated blocks are much larger than the
+useful payload. Even the32-chain smoke checkpoint reports~2.63 GiB allocated for only
+419840 occupied record bytes. Report filesystem allocation separately from logical
+extent and useful payload; filesystem sharing can also affect physical ownership.
+All large model files remain under /private/tmp, not copied into the repository.
+
+### Saved-policy contract and validation
+
+Checkpoint metadata version3 stores a numeric RelayLearningPolicy at byte112:
+0=global,1=source-local,2=no-decay diagnostic. Versions1 and2 retain their original
+global semantics; version2 still stores its epoch in that location and cannot be
+silently reinterpreted as version3. The manifest SHA256 binds the metadata. Unknown
+policy IDs, invalid metadata and conflicting caller overrides are rejected. Captured
+continuation carries policy, previous cohort and learning counters. Version3 uses
+ordinary numeric adjacency without the deferred epoch sidecar. Working stores alone
+are not committed snapshots; completed-generation publication remains the boundary.
+
+Seven focused test cases cover one-record dirty eviction, flag-free mid-sequence
+restoration, conflicting policy overrides, three interruption points, corrupt/unknown
+policy and legacy behavior. Existing deferred/global tests remain passing. Tests inject
+publication failures; no physical power-cut guarantee is inferred. Source-local policy
+identity fixes the current .99 unobserved-target decay, .1 pruning and existing Hebbian
+rule: future rule changes require an explicit policy/version decision.
+
+Final review tightened the API to reject explicitly disabling a saved policy with a
+false flag too, rather than silently ignoring that request. Scientific workers ran
+before that guard-only change; their source hashes remain in source-manifest.json.
+Final-source-manifest.json records the final guard and added assertion, followed by a
+second191/191 full regression run. Learning operations and all measured worker call
+paths are unchanged; no scientific retuning or data rerun was performed.
+
+The audit verified metadata and presence checksums, every occupied328-byte record's
+checksum and numeric schema, ID ranges, weights/populations, record counts and graph
+hashes for both completed models. It also checked paired scores, saved counters,
+query immutability and source provenance. This structural numeric audit is not a
+semantic non-memorization claim. Summary and raw results are in
+artifacts/recovery/policy-integration/; exact individual worker argument arrays,
+exit codes and wall times are in seed100-commands.json and seed201-commands.json.
+
+```bash
+dotnet test GreyMatter.sln -c Release --filter FullyQualifiedName~PolicyCheckpointTests --logger 'trx;LogFileName=policy-tests.trx' --results-directory artifacts/recovery/policy-integration
+dotnet test GreyMatter.sln -c Release --no-build --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/policy-integration
+python3 artifacts/recovery/policy-integration/run_workers.py --seed 100 --workspace-root /private/tmp/gm-local-integration-20260915-seed100
+python3 artifacts/recovery/policy-integration/run_workers.py --seed 201 --workspace-root /private/tmp/gm-local-integration-20260915-seed201
+dotnet test GreyMatter.sln -c Release --logger 'trx;LogFileName=final-tests.trx' --results-directory artifacts/recovery/policy-integration
+python3 artifacts/recovery/policy-integration/summarize.py
+```
+
+No commits, staging, history reads or user-data resets. One registered integration
+smoke and one larger paired cell completed, no changed gate or learning rule.
+
+### Next decision
+
+Learned retention now survives saved-policy restart and exact paged recall at the
+larger synthetic size. The next useful deliverable is a bounded storage/resource
+pass: compact addressing/indexing while preserving exact learned state, explicit
+policy identity and crash-safe publication, then reassess the original resource
+tradeoffs. The current multi-gigabyte disk allocation for~101 MiB of useful records
+should be addressed before increasing the workload again. This is a proposed next
+scope, not a silently authorized architecture rewrite or declaration that R4 passed.
+Real-text learn/restart/probe utility remains unbuilt on this recovered path; CUDA
+and general-reasoning claims remain out of scope.
+
+# Packed fixed-record storage registration — 2026-09-16
+
+Bill authorized packing unchanged328-byte records and adding a bounded disk index.
+No variable-length records, weight quantization, changed learning rule or shared-page
+checkpoint scheme in this deliverable. Implement dense append-assigned record ordinals
+and an on-disk open-addressed ID->ordinal hash table, growing by doubling at70% load.
+Index entries16 bytes; initial64 entries. Cache index pages in a fixed8x4096-byte cache,
+with no in-memory full map. Record cache retains the existing bounded LRU algorithm.
+Charge64 KiB fixed overhead and400 bytes/record slot, including index cache, scratch,
+ordinal and LRU/hash metadata. Temporary rehash uses bounded buffers and a second disk
+index; working stores remain disposable until completed-generation publication.
+
+Version4 checkpoint metadata binds numeric packed format/index hashes and saved policy.
+Old versions remain untouched. Grow/collision/update/missing-ID/zero-ID tests, dirty
+one-record eviction, unknown/corrupt pointer rejection, exact mid-sequence restart and
+interrupted publication must pass. Learning/record bytes remain bit-exact.
+
+Evaluation: same seed100/32-chain smoke, then the registered seed201/8192-chain,
+524288-presentation source-local integration workload. Same supported128 queries as
+the prior integration, no scientific retuning. Compare every final record, counters
+and score vector to the existing direct-address checkpoint/reference. Train packed,
+checkpoint mid-sequence, restart in a fresh process, finish and publish; query in a
+fresh process with8 record slots and the fixed index cache. Disk allocation target:
+completed larger snapshot <=2x occupied record bytes, all recall exact and immutable.
+This is a storage-efficiency gate, not R4's >=1GiB capacity gate. Report record and index
+cache separately, actual allocation, lookup traffic and p95. Repeat old direct lookup
+on the same supported queries for a contemporaneous observational comparison; do not
+sweep caches to meet a latency target. One smoke then one larger cell, <1h estimate
+required as before. Preserve existing model files; no commits or user-data resets.
+
+Packed smoke PASS:203/203 full tests; all midpoint/final records, saved counters and
+scores exactly match the prior direct-address model, and fresh query writes0 data/index
+bytes with identical physical hashes. Packed prepare/resume/query workers took
+.48/.52/.15s; direct query worker7.21s includes full-extent integrity scan and is not
+query latency. Scaling packed worker cost256x gives~5min; allow a conservative~20min
+for larger out-of-cache index traffic (smoke index fits32KiB; larger one will not).
+Scratch forecast <1GiB for four packed copies plus transient rehash, no direct retraining.
+Launch registered seed201 unchanged; no cache or learning-parameter sweep.
+
+## Packed fixed-record storage — PASS (2026-09-16)
+
+All203 tests pass. The seed100 smoke and registered seed201/8192-chain comparison
+completed successfully. Every midpoint and final record was compared byte-for-byte
+with the existing direct-address checkpoint, using its sorted enumeration and bounded
+read buffers; no complete runtime ID map was materialized. Saved policies, previous
+cohorts, counters, input hashes and all recall score vectors agree. The larger128
+supported direct/composed queries remain100% rank1. Separate-process midpoint restart
+and fresh8-record-cache recall succeeded; completed model files and data/index writes
+remained unchanged during queries. Existing direct-address files were only read.
+
+| larger-cell storage measurement | direct address | packed |
+|---|---:|---:|
+| occupied records / live edges | 324350 /2097136 | identical |
+| occupied record payload | 106386800 bytes | identical |
+| completed snapshot allocated bytes | 3429994496 | 126578688 |
+| completed snapshot allocated size | 3.19 GiB | 120.71 MiB |
+| packed logical files, including index and metadata | — | 114775640 bytes |
+| all packed working/checkpoint copies allocated | — | 504832000 bytes |
+
+Allocated snapshot storage is reduced96.31% (~27.1x smaller), at1.190x occupied record
+bytes, passing the registered<=2x bar. Logical packed records are exactly count*328;
+the index has524288 slots x16 bytes =8 MiB at61.87% occupancy. Physical allocation
+includes filesystem overhead/preallocation and is larger than logical length. The
+smoke snapshot uses466944 allocated bytes (456 KiB) for419840 record bytes, instead
+of the old snapshot's current~2.63 GiB allocation. These are filesystem-reported
+allocations, not an assertion of exclusive physical block ownership.
+
+### Lookup tradeoff — keep both sides of the measurement
+
+| fresh-process, warm-OS-cache query measurement | direct | packed |
+|---|---:|---:|
+| query count | 128 | 128 |
+| p95 query milliseconds | .5354 | .5324 |
+| record-cache evictions during queries | 18531 | 18531 |
+| logical data/presence read bytes | 6099331 | 6080792 data |
+| additional logical index read bytes | included above | 54628352 |
+| index page misses | not applicable | 13337 |
+| cache reservation, excluding traversal/process | 7232 bytes | 68736 bytes |
+| whole query-worker peak RSS | 51757056 bytes | 52002816 bytes |
+
+Latency is effectively unchanged in this single observational comparison; the tiny
+p95 difference is not evidence of a speedup. Packed lookup reads~10x more logical bytes
+in total because a miss fetches a4096-byte index page instead of a1-byte presence
+marker. These counters are application I/O, not physical disk traffic: the OS cache
+is warm from integrity/record comparison work. Slower storage or different locality
+could expose that read amplification. Do not call the packed index an unqualified
+performance improvement or tune cache sizes after this result.
+
+Both paths have8 record slots. Packed additionally caches8 index pages (32 KiB);
+its64 KiB fixed reservation conservatively includes those pages, metadata and bounded
+scratch. Both traversal engines separately reserve530944 bytes. No full-map runtime
+cache, learned-ID list or corpus lookup was introduced. The offline audit does use a
+full map for verification; that Python verifier is not part of the runtime measurement.
+
+Packed prepare/resume/query workers took32.87/32.87/20.45s, and the contemporaneous
+direct query worker11.61s. Full query-worker time includes integrity scans and, for
+packed, exhaustive paired comparison against the old model; it is not ordinary probe
+startup or query latency. The old training workers were not rerun, so no controlled
+training-speedup claim follows from comparing their historical130/136s measurements.
+All final workers together completed in~98s, below the registered run budget.
+
+### Implementation and guarantees
+
+PackedRelayRecords assigns dense ordinal positions on first write. A growing disk
+hash table maps virtual IDs to those positions (zero ordinal sentinel; virtual ID0
+is valid). Growth doubles capacity before70% load; bounded page buffers stream old
+entries into a new disk table. Transient growth needs a second index file. Per-record
+bytes and the fixed-array LRU algorithm are unchanged. Packed enumeration follows
+birth order, not sorted IDs; the comparison instrument explicitly obtains canonical
+ID order from the old reference without sorting a full list in runtime RAM.
+
+PackedRelayCheckpoint publishes version4 generations atomically using the existing
+flush/directory-sync/manifest sequence. State records the saved learning policy and
+binds the packed format and index hashes; records retain their own checksums. Older
+readers reject version4 and existing versions remain available. No automatic rewrite
+of old models or change to default learning occurred. Working files remain disposable;
+only a completed published generation is a restart guarantee. Tests inject publication
+interruptions; no physical power-cut experiment was performed.
+
+Twelve new test cases cover adversarial hash collisions, ID0/missing IDs, repeated
+updates, index growth beyond its cache, bounded allocation with a uint.MaxValue ID
+space, dirty eviction, exact continuation for all three learning policies, legacy
+format rejection, three publication interruption points, format/index/data corruption,
+and out-of-range/aliased pointers even after their metadata checksum is recomputed.
+
+The standalone audit verified all index entries, probe-chain reachability, unique IDs
+and ordinals, dense file length, every record checksum/schema, canonical graph hashes,
+metadata policy/format binding, counters, source hashes and exact query vectors.
+Source remained unchanged after measurement. Full structural verification is not a
+claim that numeric storage cannot encode semantic information.
+
+### Reproduction and handoff
+
+Artifacts: artifacts/recovery/packed/summary.json, source-manifest.json, raw JSON,
+stdout/time files, full-tests.trx and audit.stdout.json. Exact worker argument arrays,
+exit codes and wall times are in seed100-commands.json and seed201-commands.json.
+Raw models remain at /private/tmp/gm-packed-20260916-seed100 and -seed201. Old source
+models are retained at the policy-integration scratch roots; no user data reset,
+commits, staging or history consultation occurred. No workers remain running.
+
+```bash
+dotnet test GreyMatter.sln -c Release --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/packed
+python3 artifacts/recovery/packed/run_workers.py --seed 100
+python3 artifacts/recovery/packed/run_workers.py --seed 201
+python3 artifacts/recovery/packed/summarize.py
+```
+
+This deliverable completes fixed-record packing. Variable-length records, lossy
+compression, shared-page checkpoints and cache tuning were not attempted. The useful
+next step is a registered memory-pressure/resource follow-up with this layout,
+including index traffic and OS-cache limitations, before pursuing further compression.
+R4's original stop and its unmeasured>=1GiB capacity condition remain intact. No claim
+of natural-language utility, biological fidelity or general reasoning is added.

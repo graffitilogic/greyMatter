@@ -346,6 +346,25 @@ public sealed class SynapseStore
             }
     }
 
+    /// <summary>One source-local learning opportunity: age only unobserved targets.</summary>
+    public int DecayUnobserved(int slot, ReadOnlySpan<uint> observed, float factor = .99f)
+    {
+        int start = SegmentStart(slot), degree = Degree[slot], removed = 0;
+        for (int i = start + degree - 1; i >= start; i--)
+        {
+            if (observed.Contains(Target[i])) continue;
+            float w = Weight[i] * factor;
+            if (w < PruneThreshold)
+            {
+                int last = start + --degree;
+                Target[i] = Target[last]; Weight[i] = Weight[last]; Population[i] = Population[last];
+                removed++;
+            }
+            else Weight[i] = w;
+        }
+        Degree[slot] = degree; Pruned += removed; return removed;
+    }
+
     /// <summary>
     /// Decay every synapse of every resident slot, removing those that fall below
     /// the prune line. One flat pass; compaction within a segment is a swap with

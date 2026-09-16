@@ -35,7 +35,7 @@ public static class CapacityEval
         public void Dispose() { lock (_sync) { _closed = true; _timer.Dispose(); _process.Dispose(); } }
     }
     // One dimension from each of 32 disjoint bins: sorted unique, stateless, no vocabulary cache.
-    private sealed class Input(int seed)
+    internal sealed class Input(int seed)
     {
         private readonly int[] _dims = new int[32]; private readonly uint[] _members = new uint[8];
         public ReadOnlySpan<uint> Members(int concept)
@@ -88,6 +88,8 @@ public static class CapacityEval
         string decayMode = args.Value("--decay", "eager")!;
         if (decayMode != "eager" && decayMode != "deferred") throw new ArgumentException("Decay mode");
         bool deferredMode = decayMode == "deferred";
+        bool retentionDiagnostic = args.Has("--retention-diagnostic"), disableDecay = args.Has("--disable-decay");
+        if (disableDecay && !retentionDiagnostic) throw new ArgumentException("--disable-decay requires --retention-diagnostic");
         long budget = (long)mib * 1024 * 1024, cacheBudget = budget - ScratchAllowance;
         using var watch = new Watch(); Warm();
         if (action == "baseline")
@@ -100,7 +102,19 @@ public static class CapacityEval
             string model = Path.Combine(Path.GetDirectoryName(output)!, "model");
             using IRelayRecords records = deferredMode ? new DeferredRelayRecords(model, Space, cacheBudget) : new DiskRelayRecords(model, Space, cacheBudget);
             var deferred = records as DeferredRelayRecords; var disk = deferred?.Cache ?? (DiskRelayRecords)records;
-            var input = new Input(seed); var learner = new StoredRelayLearning(records);
+            var input = new Input(seed); var learner = new StoredRelayLearning(records) { DisableDecayForDiagnostic = disableDecay };
+            var trace = new List<object>();
+            var tracked = new HashSet<int>(Enumerable.Range(0, 7).Select(q => (int)(((long)q * MaximumChains / 100 + seed) % MaximumChains) * 4));
+            var traceBuffer = new byte[RelayRecord.Bytes];
+            float? Weight(uint source, uint target)
+            {
+                if (!records.Read(source, traceBuffer)) return null;
+                int degree = BinaryPrimitives.ReadInt32LittleEndian(traceBuffer.AsSpan(4));
+                for (int e = 0; e < degree; e++)
+                    if (BinaryPrimitives.ReadUInt32LittleEndian(traceBuffer.AsSpan(8 + 9 * e)) == target)
+                        return BinaryPrimitives.ReadSingleLittleEndian(traceBuffer.AsSpan(12 + 9 * e));
+                return null;
+            }
             int episodes = checked(chains * 4 * Repeats), mask = episodes - 1;
             uint odd = (uint)Substrate.Rng.Mix((uint)seed) | 1u;
             uint offset = (uint)Substrate.Rng.Mix((uint)seed ^ 0xb519u);
@@ -111,14 +125,21 @@ public static class CapacityEval
                 int index = (int)(unchecked((uint)i * odd + offset) & (uint)mask), relation = index % (chains * 4);
                 int concept = relation / 4 * 5 + relation % 4;
                 BinaryPrimitives.WriteInt32LittleEndian(pair, concept); BinaryPrimitives.WriteInt32LittleEndian(pair[4..], concept + 1); hash.AppendData(pair);
+                bool observe = retentionDiagnostic && tracked.Contains(relation);
+                uint sourceId = 0, targetId = 0; float? beforeWeight = null;
+                if (observe) { sourceId = input.Members(concept)[0]; targetId = input.Members(concept + 1)[0]; beforeWeight = Weight(sourceId, targetId); }
                 learner.ObserveMembers(input.Members(concept)); learner.ObserveMembers(input.Members(concept + 1)); learner.EndSequence();
+                if (observe) trace.Add(new { Episode = i + 1, Relation = relation, Source = sourceId, Target = targetId,
+                    Epoch = deferred?.Epoch ?? 0, Before = beforeWeight, After = Weight(sourceId, targetId) });
             }
             records.Flush(); elapsed.Stop();
+            if (retentionDiagnostic) File.WriteAllText(Path.Combine(Path.GetDirectoryName(output)!, "retention-trace.json"), JsonSerializer.Serialize(new { DisableDecay = disableDecay, Rows = trace }, Json));
             long read = disk.BytesRead + (deferred?.EpochBytesRead ?? 0), written = disk.BytesWritten + (deferred?.EpochBytesWritten ?? 0);
             long agingTicks = deferred?.AgingTicks ?? 0, replaySteps = deferred?.ReplaySteps ?? 0;
             var census = Census(records);
             Write(output, new { Action = "train", Seed = seed, Chains = chains, Episodes = episodes, Model = model,
                 IdLimit = Space, DegreeCap = 32, Width = 256, MaxTicks = 4, Repeats, BudgetBytes = budget, CacheBudgetBytes = cacheBudget,
+                RetentionDiagnostic = retentionDiagnostic, DisableDecay = disableDecay,
                 StorageVersion = deferredMode ? 2 : 1, Decay = decayMode, Epoch = deferred?.Epoch ?? 0,
                 ReservedBytes = deferred?.ReservedBytes ?? disk.ReservedBytes, ScratchAllowance, ActualRecords = census.Records, ActualEdges = census.Edges,
                 RecordPayloadBytes = census.Records * RelayRecord.Bytes, RecordSha256 = census.Hash,

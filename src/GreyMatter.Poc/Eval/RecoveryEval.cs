@@ -10,6 +10,9 @@ public static class RecoveryEval
 
     public static int Run(Config cfg, Args args)
     {
+        if (args.Value("--mode", "fixtures") == "packed-integration") return PackedIntegrationEval.Run(args);
+        if (args.Value("--mode", "fixtures") == "policy-integration") return PolicyIntegrationEval.Run(args);
+        if (args.Value("--mode", "fixtures") == "retention-policy") return RetentionPolicyEval.Run(args);
         if (args.Value("--mode", "fixtures") == "capacity") return CapacityEval.Run(args);
         if (args.Value("--mode", "fixtures") == "paging") return RelayPagingEval.Run(args);
         if (args.Value("--mode", "fixtures") == "storage") return RelayStorageEval.Run(args);

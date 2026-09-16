@@ -1,13 +1,14 @@
 # greyMatter
 
 A C# experiment in learning and recall using sparse activation, procedural neuron
-identities, compact learned state, and eventually connection-driven loading and eviction.
+identities, compact learned state, and connection-driven loading and eviction.
 
-**Status — 2026-09-14:** exact deferred decay and paged recall are verified;
-**180 tests pass**. The first R4 scale cell trained in 148 seconds and reproduced
-resident scores exactly, but paged p95 was 27.4x resident (target <=10x).
-R4 stopped at that target. Larger-than-memory capacity and real-data utility remain
-unproven; only one of seven supported queries had a nonzero candidate response.
+**Status — 2026-09-16:** packed storage preserves exact learning, saved-policy
+restart and recall. The same 8,192-chain model now occupies **120.7 MiB instead of
+3.19 GiB** on disk—a 96.3% reduction—with all 128 supported recall queries correct.
+**203 tests pass.** Warm-cache query p95 is effectively unchanged, but index lookup
+increases logical read traffic. R4 remains stopped; larger-than-memory capacity
+and real-data utility are unproven.
 
 | Read | Purpose |
 |---|---|
@@ -19,6 +20,10 @@ unproven; only one of seven supported queries had a nonzero candidate response.
 | [R3 summary](artifacts/recovery/r3/summary.json) | Exact paged recall and traversal trace |
 | [R4 checkpoint](artifacts/recovery/r4/summary.json) | Development measurements and runtime blocker |
 | [R4 deferred correction](artifacts/recovery/r4-deferred/summary.json) | Exactness checks and first scale-cell stop |
+| [Retention diagnostic](artifacts/recovery/retention/summary.json) | Forgetting trace and unchanged-encoding recall comparison |
+| [Source-local retention](artifacts/recovery/retention-policy/summary.json) | Five-seed recall, replacement and branching evaluation |
+| [Persisted-policy integration](artifacts/recovery/policy-integration/summary.json) | Saved policy, separate-process continuation and larger recall test |
+| [Packed storage](artifacts/recovery/packed/summary.json) | Exactness, disk allocation and paired lookup costs |
 | `src/GreyMatter.Poc/` | Implementation |
 | `tests/GreyMatter.Poc.Tests/` | Correctness and regression tests |
 

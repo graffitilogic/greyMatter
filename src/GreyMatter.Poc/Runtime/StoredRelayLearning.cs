@@ -19,15 +19,34 @@ public sealed class StoredRelayLearning
     public long DecayVisits { get; private set; }
     public long DecayElapsedTicks { get; private set; }
     public long DecayRecordTicks { get; private set; }
+    private RelayLearningPolicy _policy;
+    private readonly bool _policyLocked;
+    public RelayLearningPolicy Policy => _policy;
+    public bool DisableDecayForDiagnostic { get => _policy == RelayLearningPolicy.NoDecayDiagnostic; init { SelectFlag(RelayLearningPolicy.NoDecayDiagnostic, value); } }
+    public bool SourceLocalForgetting { get => _policy == RelayLearningPolicy.SourceLocal; init { SelectFlag(RelayLearningPolicy.SourceLocal, value); } }
+    private void SelectFlag(RelayLearningPolicy policy, bool enabled)
+    {
+        if (enabled) Select(policy);
+        else if (_policy == policy) throw new InvalidOperationException("Cannot disable the saved learning policy");
+    }
+    private void Select(RelayLearningPolicy policy)
+    {
+        if ((_policyLocked || _policy != RelayLearningPolicy.Global) && policy != _policy)
+            throw new InvalidOperationException("Cannot override the saved learning policy");
+        _policy = policy;
+    }
+    public long LocallyPruned { get; private set; }
     public long Episodes { get; private set; }
     public long Observations { get; private set; }
     public StoredRelayLearning(IRelayRecords records, RelayTrainingState? state = null)
     {
-        _records = records; state ??= RelayTrainingState.Empty;
+        _records = records; _policyLocked = state != null; state ??= RelayTrainingState.Empty;
+        if (!Enum.IsDefined(state.Policy)) throw new ArgumentException("Unknown learning policy");
+        _policy = state.Policy;
         if (state.Previous.Length > 8 || state.Previous.Any(id => id >= records.IdLimit)) throw new ArgumentException("Invalid cohort");
         _previous = state.Previous.ToArray(); Updates = state.Updates; Episodes = state.Episodes; Observations = state.Observations;
     }
-    public RelayTrainingState Capture() => new(Updates, Episodes, Observations, _previous.ToArray());
+    public RelayTrainingState Capture() => new(Updates, Episodes, Observations, _previous.ToArray(), _policy);
     private void Load(uint id)
     {
         if (_records.Read(id, _buffer)) RelayRecord.Decode(id, _buffer, _scratch);
@@ -37,6 +56,8 @@ public sealed class StoredRelayLearning
     public void Observe(in SparseCode code) => ObserveMembers(AssemblyRelay.Members(code, checked((int)_records.IdLimit)));
     public void ObserveMembers(ReadOnlySpan<uint> current)
     {
+        if (SourceLocalForgetting && (DisableDecayForDiagnostic || (_records is DeferredRelayRecords d && d.Epoch != 0)))
+            throw new InvalidOperationException("Source-local policy requires a separate model with no global decay history");
         if (current.Length > 8 || current.IsEmpty) throw new ArgumentException("Cohort size");
         foreach (uint id in current) if (id >= _records.IdLimit) throw new ArgumentOutOfRangeException(nameof(current));
         // Preparing all targets, including degree-zero terminals, is persistent numeric state.
@@ -44,6 +65,7 @@ public sealed class StoredRelayLearning
         foreach (uint source in _previous)
         {
             Load(source);
+            if (SourceLocalForgetting) LocallyPruned += _scratch.DecayUnobserved(0, current);
             foreach (uint target in current)
             { _scratch.RecordCoactivation(0, source, target, .5f, 1f, SynapsePopulation.CrossCue); Updates++; }
             Save(source);
@@ -53,10 +75,11 @@ public sealed class StoredRelayLearning
     public void EndSequence()
     {
         _previous = Array.Empty<uint>(); Episodes++;
-        if (Episodes % 500 == 0) Decay();
+        if (!SourceLocalForgetting && !DisableDecayForDiagnostic && Episodes % 500 == 0) Decay();
     }
     public void Decay()
     {
+        if (SourceLocalForgetting) throw new InvalidOperationException("Global decay is not part of source-local learning");
         long start = System.Diagnostics.Stopwatch.GetTimestamp();
         if (_records is DeferredRelayRecords deferred)
         {
