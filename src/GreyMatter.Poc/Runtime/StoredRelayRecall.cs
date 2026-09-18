@@ -68,6 +68,7 @@ public sealed class StoredRelayRecall
 
     public void Run(ReadOnlySpan<uint> roots, int ticks)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Traversal);
         if (ticks < 1 || ticks > _maxTicks || roots.IsEmpty || roots.Length > 8)
             throw new ArgumentOutOfRangeException(nameof(ticks));
         // Validate before touching prior result; actual failed traversal invalidates its result.

@@ -19,6 +19,30 @@ public sealed class PackedRelayTests : IDisposable
         var bytes = new byte[RelayRecord.Bytes]; RelayRecord.Encode(id, syn, bytes); return bytes;
     }
     [Fact]
+    public void NativeReadPolicyPreservesFrozenRecordsAndReportsResources()
+    {
+        if (!OperatingSystem.IsMacOS()) return;
+        var before = MacFileIo.Sample(); Assert.True(before.ResidentBytes > 0);
+        using (var store = new PackedRelayRecords(P("native-work"), 1024, Budget))
+        {
+            Assert.Throws<InvalidOperationException>(() => store.SetReadNoCache(true));
+            for (uint id = 0; id < 100; id++) store.Write(id, Record(id, .2f));
+            PackedRelayCheckpoint.Publish(store, P("native-snapshot"), RelayTrainingState.Empty);
+        }
+        string hash = GreyMatter.Poc.Eval.PolicyIntegrationEval.PhysicalHash(P("native-snapshot"));
+        var saved = PackedRelayCheckpoint.OpenReadOnly(P("native-snapshot"), Budget);
+        using var read = saved.Store; var bytes = new byte[RelayRecord.Bytes];
+        foreach (bool enabled in new[] { true, false })
+        {
+            read.SetReadNoCache(enabled); read.ClearCache();
+            for (uint id = 0; id < 100; id++) { Assert.True(read.Read(id, bytes)); Assert.Equal(Record(id, .2f), bytes); }
+        }
+        Assert.Equal(0, read.BytesWritten); Assert.Equal(0, read.IndexBytesWritten);
+        Assert.Equal(hash, GreyMatter.Poc.Eval.PolicyIntegrationEval.PhysicalHash(P("native-snapshot")));
+        var after = MacFileIo.Sample(); Assert.True(after.DiskReadBytes >= before.DiskReadBytes);
+        Assert.True(after.DiskWrittenBytes >= before.DiskWrittenBytes);
+    }
+    [Fact]
     public void CollisionsGrowthZeroIdAndUpdatesUseOnlyOccupiedRecords()
     {
         using var store = new PackedRelayRecords(P("work"), uint.MaxValue, Budget);

@@ -56,6 +56,7 @@ public sealed class StoredRelayLearning
     public void Observe(in SparseCode code) => ObserveMembers(AssemblyRelay.Members(code, checked((int)_records.IdLimit)));
     public void ObserveMembers(ReadOnlySpan<uint> current)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Learning);
         if (SourceLocalForgetting && (DisableDecayForDiagnostic || (_records is DeferredRelayRecords d && d.Epoch != 0)))
             throw new InvalidOperationException("Source-local policy requires a separate model with no global decay history");
         if (current.Length > 8 || current.IsEmpty) throw new ArgumentException("Cohort size");

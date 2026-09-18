@@ -10,6 +10,9 @@ public static class RecoveryEval
 
     public static int Run(Config cfg, Args args)
     {
+        if (args.Value("--mode", "fixtures") == "closeout-profile") return CloseoutProfileEval.Run(args);
+        if (args.Value("--mode", "fixtures") == "local-data") return LocalDataEval.Run(args);
+        if (args.Value("--mode", "fixtures") == "packed-resource") return PackedResourceEval.Run(args);
         if (args.Value("--mode", "fixtures") == "packed-integration") return PackedIntegrationEval.Run(args);
         if (args.Value("--mode", "fixtures") == "policy-integration") return PolicyIntegrationEval.Run(args);
         if (args.Value("--mode", "fixtures") == "retention-policy") return RetentionPolicyEval.Run(args);

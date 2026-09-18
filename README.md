@@ -1,100 +1,98 @@
 # greyMatter
 
-A C# experiment in learning and recall using sparse activation, procedural neuron
-identities, compact learned state, and connection-driven loading and eviction.
+A C# experiment in learning and recall through sparse activation, procedural neuron
+identities, numeric learned state, and connection-driven loading and eviction.
 
-**Status — 2026-09-16:** packed storage preserves exact learning, saved-policy
-restart and recall. The same 8,192-chain model now occupies **120.7 MiB instead of
-3.19 GiB** on disk—a 96.3% reduction—with all 128 supported recall queries correct.
-**203 tests pass.** Warm-cache query p95 is effectively unchanged, but index lookup
-increases logical read traffic. R4 remains stopped; larger-than-memory capacity
-and real-data utility are unproven.
+**Status — 2026-09-18: recovery campaign complete.** Local-text learn/probe/audit
+works, and exact paging plus bounded training are demonstrated on learned state.
+Real-data MRR was **0.570**, above frequency **0.173** and untrained **0.127**, but
+below co-occurrence **0.983**; **61/128 cues produced no output**. This is qualified
+engineering progress, not a demonstrated learning advantage. **210 tests pass.**
 
-| Read | Purpose |
-|---|---|
-| [Prompt.md](Prompt.md) | Original purpose and constraints |
-| [plan.md](plan.md) | Active agent guide and current phase |
-| [RESULTS.md](RESULTS.md) | Evidence log; start at the R4 development checkpoint near the end |
-| [A1 summary](artifacts/recovery/a1/summary.json) | Final synthetic metrics |
-| [R2 summary](artifacts/recovery/r2/summary.json) | Storage and restart correctness |
-| [R3 summary](artifacts/recovery/r3/summary.json) | Exact paged recall and traversal trace |
-| [R4 checkpoint](artifacts/recovery/r4/summary.json) | Development measurements and runtime blocker |
-| [R4 deferred correction](artifacts/recovery/r4-deferred/summary.json) | Exactness checks and first scale-cell stop |
-| [Retention diagnostic](artifacts/recovery/retention/summary.json) | Forgetting trace and unchanged-encoding recall comparison |
-| [Source-local retention](artifacts/recovery/retention-policy/summary.json) | Five-seed recall, replacement and branching evaluation |
-| [Persisted-policy integration](artifacts/recovery/policy-integration/summary.json) | Saved policy, separate-process continuation and larger recall test |
-| [Packed storage](artifacts/recovery/packed/summary.json) | Exactness, disk allocation and paired lookup costs |
-| `src/GreyMatter.Poc/` | Implementation |
-| `tests/GreyMatter.Poc.Tests/` | Correctness and regression tests |
+The closeout profile attributes about **54% of training scope time to record
+serialization/checksum work**, 21% to file calls and 13% to learning. File-call time
+is not pure disk wait; instrumentation and OS caching limit interpretation. Current
+evidence does **not justify a CUDA port**. Further research requires a new directive.
 
-## What works
+## Use the saved-model utility
 
-The experimental AssemblyRelay uses eight deterministic neurons as an assembly's common
-entry/exit cohort. Observed adjacent training cues learn numerical synaptic weights
-between these cohorts. Relay connection slots are isolated from within-cue reinforcement.
-Each tick distributes source activation by relative outgoing weight into a fresh next
-activation set. Runtime receives codes, never the evaluator's answer labels.
-
-On five fresh seeds, each with 128 direct and 128 composed retrieval queries:
-
-| arm | direct top-1 | composed top-1 |
-|---|---:|---:|
-| Learned protected relay | 100.0% | 100.0% |
-| Untrained | 3.1% | 3.1% |
-| Shuffled training | 4.1% | 3.1% |
-| Transition-count baseline | 100.0% | 100.0% |
-
-All observed links and intermediate relay junctions were connected. All numeric recall
-snapshots replayed scores exactly. Learned graphs contained 1,278–1,280 unique relay
-neurons and 8,192 synapses, representing 128 observed pair relations. This is evidence
-of usable synthetic associative routing, not additional independent neural complexity.
-The simple transition baseline also passes; no advantage over it is claimed.
-
-The new numeric storage path reproduced resident learning exactly with 2,048 records
-and an eight-record cache, including a mid-sequence checkpoint resumed in a fresh
-process. Its 6,976-byte cache reservation excludes learner/checkpoint scratch, the
-external encoder, runtime overhead and OS file caching. This is storage correctness,
-not a whole-process memory or large-network recall result.
-
-Paged recall now reproduces all frozen A1 scores with one- and eight-record caches,
-in both query orders, without modifying model files. A four-hop query performed 287
-loads through a one-record cache and retained its answer. Traversal separately reserves
-530,944 bytes of scratch; the small record cache is not the entire application memory.
-
-## What remains
-
-- Exact paged recall is an experimental evaluation path. The existing default CLI
-  utility has not yet been connected to it.
-- Whole-process memory bounds, learned networks larger than RAM, realistic branching, and useful
-  resource/quality tradeoffs are unproven. CUDA is deferred.
-- The existing `learn`/`probe` commands still use the older runtime; `probe` trains a
-  fresh brain. Saved-model related-material retrieval from local data is a later phase.
-- The old R1 failure remains recorded. A1 is a separate experimental model, not a
-  retrospective pass or a default behavior change.
-
-The earlier claim that the complete substrate thesis was proven is withdrawn. Addressable
-neuron IDs are not demonstrated useful capacity. A no-strings audit is not evidence of
-absence of semantic memorization.
-
-## Build and reproduce
-
-.NET 8; no new dependencies.
+.NET 8; no new dependencies. Plain text expects one sentence per line. Tatoeba format
+expects `id<TAB>language<TAB>text` and accepts English rows. Learning makes one pass;
+model directories are immutable and existing paths are refused.
 
 ```bash
 dotnet build GreyMatter.sln -c Release
 dotnet test GreyMatter.sln -c Release
-dotnet run --project src/GreyMatter.Poc/Poc.csproj -c Release -- eval recovery --mode relay --seeds 100 --output /tmp/gm-relay-dev/run.json
+
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll learn \
+  --model ./my-model --source ./sentences.txt --format text --seed 201 --budget-mib 128
+
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll probe \
+  --model ./my-model --cue coffee --candidates ./candidates.txt --hops 1
+
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll audit --model ./my-model
 ```
 
-Final reproduction uses `--seeds 201,202,203,204,205` and a fresh output directory.
-The evaluator refuses to overwrite snapshots. It generates its synthetic training data
-and does not open a user brain or require the network corpus. JSON records configurations,
-corpus checksums, per-query scores and activation traces. Numerical graph snapshots
-require the AssemblyRelay runtime; they are recall-only, not training-resume checkpoints.
+Candidates are an external file with one token per line, at most 4096 unique tokens.
+Probe uses saved encoder settings, requires no training source, and performs no
+learning. It reports every candidate's activation score, ties and a `NoOutput` flag.
+This is closed-candidate retrieval, not generation; ordinal ordering of zero scores
+is not an answer. Hops 1–4 and memory budgets 128/256 MiB are supported. Peak RSS may
+be unavailable through .NET on macOS (reported null); experiments use native timing.
 
-Reproduce R2 with `eval recovery --mode storage --records 128 --output /tmp/gm-r2-dev/result.json`
-and a fresh directory. The R2 closeout in RESULTS.md provides the separate-process
-resume command and storage/encoder limitations. Reproduce R3 with
-`eval recovery --mode paging --seeds 100 --output /tmp/gm-r3-dev/result.json`; it reads
-the frozen A1 artifacts. Follow the R4 contract in plan.md before making resource or
-capacity claims; the default learn/probe utility is still unchanged.
+Tokenization is versioned NFKC/lowercase letter/digit runs. A stable hash supplies
+numeric identities; eight deterministic neurons carry each token's relay signal.
+Observed adjacent tokens update source-local synapses. Sentence boundaries reset
+learning context. Text labels, candidate lists and source passages stay outside the
+numeric model. The audit validates schema/checksums and rejects extra model files;
+it cannot establish absence of semantic memorization in numerical weights.
+
+Commands without `--model` retain the older experimental runtime, including its
+train-before-probe behavior. Use the explicit named-model commands above for this
+utility. Append/resume training for these text models is not implemented.
+
+## What has been measured
+
+| Check | Result |
+|---|---|
+| Real text |40,006 training sentences, 327,074 tokens; roughly 37 MiB model storage |
+| Runtime memory |Training peak below 97 MiB; paged evaluation below 71 MiB |
+| Real-data recall |128 fixed supported cues, 32 candidates; three fixed encoder seeds |
+| Larger synthetic state |4.47 million records, 33.55 million edges; 1.50 GiB snapshot |
+| Capacity comparison |288 MiB training peak vs 1.71 GiB resident reference; exact paged scores |
+| Synthetic quality at that size |Direct 100%, multi-hop 92.4%, including zero-output ties |
+
+Graph storage is larger than raw source text; the 37 MiB figure is not a compression
+ratio or a linear forecast. The real-data task deliberately selects supported
+next-token associations and excludes normalized duplicate sentences across its split.
+It does not measure open-ended meaning or unseen-relation reasoning. Seeds share
+the same corpus; they are not independent data replications.
+
+Earlier correctness tests demonstrate exact recall through repeated eviction with
+one- and eight-record caches. The larger synthetic workload demonstrates bounded
+training with actual eviction. Current real-data query working sets fit the cache.
+OS caching assists measured latency; neither cold-storage performance nor a network
+larger than physical RAM has been demonstrated. The historical full R4 grid remains
+incomplete; later bounded passes do not rewrite its recorded failures. CUDA is deferred.
+
+## Evidence and continuation
+
+| Read | Purpose |
+|---|---|
+| [Prompt.md](Prompt.md) | Original purpose and constraints |
+| [plan.md](plan.md) | Agent guide and closed-campaign boundary |
+| [RESULTS.md](RESULTS.md) | Append-only evidence; latest R6 four-part verdict |
+| [R6 closeout](artifacts/recovery/r6/summary.json) | Profile, exact replay, four verdicts and GPU decision |
+| [R5 summary](artifacts/recovery/r5/summary.json) | Real-data scores, controls, intervals, storage and memory |
+| [Capacity check](artifacts/recovery/capacity16/summary.json) | Measured  >1 GiB resident model and exact paging |
+| [Resource follow-up](artifacts/recovery/resource-pressure/summary.json) | Cache pressure and index-I/O costs |
+| [Packed storage](artifacts/recovery/packed/summary.json) | Storage allocation reduction and restart exactness |
+| [Source-local retention](artifacts/recovery/retention-policy/summary.json) | Retention, replacement and branching tests |
+| [R3](artifacts/recovery/r3/summary.json) | Exact recall under repeated eviction |
+| `src/GreyMatter.Poc/Utility/` | Saved-model text boundary and commands |
+| `tests/GreyMatter.Poc.Tests/` | Correctness and regression tests |
+
+R5 scripts and exact command ledgers live in `artifacts/recovery/r5/`. They refuse
+result/model overwrite. The three measured models remain at
+`/private/tmp/gm-r5-20260917/model-201` (also 202/203); these are scratch locations.
+Use a chosen persistent directory when training a model you intend to retain.

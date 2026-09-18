@@ -37,10 +37,10 @@ public static class Cli
             {
                 "eval" => Eval(argv, args, cfg),
                 "bench" => Bench(argv, args, cfg),
-                "learn" => Learn(args, cfg),
-                "probe" => Probe(args, cfg),
+                "learn" => args.Has("--model") ? Utility.LocalModelCli.Run(argv) : Learn(args, cfg),
+                "probe" => args.Has("--model") ? Utility.LocalModelCli.Run(argv) : Probe(args, cfg),
                 "stats" => Stats(args, cfg),
-                "audit" => Audit(args, cfg),
+                "audit" => args.Has("--model") ? Utility.LocalModelCli.Run(argv) : Audit(args, cfg),
                 "config" => Dump(cfg),
                 "-h" or "--help" or "help" => Usage(),
                 _ => Unknown(argv[0])
@@ -421,6 +421,11 @@ public static class Cli
         Console.WriteLine("""
             gm — greyMatter proof-of-concept
 
+              gm learn  --model <new-directory> --source <file> [--format text|tatoeba] [--budget-mib 128|256]
+              gm probe  --model <directory> --cue <token> --candidates <one-token-per-line-file> [--hops 1..4]
+              gm audit  --model <directory>
+
+            Legacy commands (separate experimental runtime):
               gm learn  --dataset tatoeba_small --sentences 500 [--config f.json] [--resume]
               gm probe  --cue <word> [--topk 16]
               gm eval   encoder-ceiling [--train 500] [--vocab 3000]

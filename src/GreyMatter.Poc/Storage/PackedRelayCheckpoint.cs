@@ -26,6 +26,7 @@ public static class PackedRelayCheckpoint
     }
     public static void Publish(PackedRelayRecords source, string root, RelayTrainingState state, Action<RelayCheckpoint.Stage>? fault = null)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Publication);
         _ = RelayCheckpoint.State(source.IdLimit, state, new byte[32], 4);
         source.Flush(); Directory.CreateDirectory(root); string manifest = Path.Combine(root, "manifest.bin");
         ulong generation = File.Exists(manifest) ? BinaryPrimitives.ReadUInt64LittleEndian(RelayCheckpoint.SmallFile(manifest, 40)) + 1 : 1;

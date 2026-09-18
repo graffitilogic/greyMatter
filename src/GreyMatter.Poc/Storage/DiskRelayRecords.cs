@@ -149,6 +149,7 @@ public sealed class DiskRelayRecords : IRelayRecords
     }
     internal static void ReadExactly(SafeFileHandle file, Span<byte> bytes, long offset)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.FileApi);
         while (!bytes.IsEmpty)
         {
             int n = RandomAccess.Read(file, bytes, offset);

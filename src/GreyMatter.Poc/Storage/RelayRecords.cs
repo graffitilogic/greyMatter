@@ -10,6 +10,7 @@ public static class RelayRecord
     public const int Cap = 32, PayloadBytes = 8 + 9 * Cap, Bytes = PayloadBytes + 32;
     public static void Encode(uint id, SynapseStore synapses, Span<byte> record)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Serialization);
         record.Clear();
         BinaryPrimitives.WriteUInt32LittleEndian(record, id);
         BinaryPrimitives.WriteInt32LittleEndian(record[4..], synapses.Degree[0]);
@@ -24,6 +25,7 @@ public static class RelayRecord
     }
     public static void Validate(uint id, ReadOnlySpan<byte> record)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Serialization);
         if (record.Length != Bytes) throw new InvalidDataException("Record length");
         Span<byte> hash = stackalloc byte[32];
         SHA256.HashData(record[..PayloadBytes], hash);
@@ -40,6 +42,7 @@ public static class RelayRecord
     }
     public static void Decode(uint id, ReadOnlySpan<byte> record, SynapseStore synapses)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Serialization);
         Validate(id, record);
         synapses.Degree[0] = BinaryPrimitives.ReadInt32LittleEndian(record[4..]);
         for (int e = 0; e < synapses.Degree[0]; e++)

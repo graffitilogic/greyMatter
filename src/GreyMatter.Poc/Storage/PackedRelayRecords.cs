@@ -92,7 +92,7 @@ public sealed class PackedRelayRecords : IRelayRecords
         if (!_pageDirty[slot]) return;
         long offset = _pageIds[slot] * PageBytes;
         int n = (int)Math.Min(PageBytes, checked((long)_capacity * EntryBytes) - offset);
-        RandomAccess.Write(_index, _pages.AsSpan(slot * PageBytes, n), offset);
+        GreyMatter.Poc.Eval.CostProfile.Write(_index, _pages.AsSpan(slot * PageBytes, n), offset);
         IndexBytesWritten += n; _pageDirty[slot] = false;
     }
     private Span<byte> Entry(ulong bucket)
@@ -158,10 +158,10 @@ public sealed class PackedRelayRecords : IRelayRecords
                         if (BinaryPrimitives.ReadUInt64LittleEndian(probe[8..]) == 0) break;
                         slot = (slot + 1) & (capacity - 1);
                     }
-                    RandomAccess.Write(target, entry, checked((long)slot * EntryBytes)); IndexBytesWritten += EntryBytes;
+                    GreyMatter.Poc.Eval.CostProfile.Write(target, entry, checked((long)slot * EntryBytes)); IndexBytesWritten += EntryBytes;
                 }
             }
-            RandomAccess.FlushToDisk(target);
+            GreyMatter.Poc.Eval.CostProfile.Flush(target);
         }
         _index.Dispose(); File.Move(pending, Path.Combine(DirectoryPath, "index.bin"), true);
         _index = File.OpenHandle(Path.Combine(DirectoryPath, "index.bin"), FileMode.Open, FileAccess.ReadWrite, FileShare.Read, FileOptions.RandomAccess);
@@ -239,11 +239,12 @@ public sealed class PackedRelayRecords : IRelayRecords
     private void Writeback(int slot)
     {
         if (!_dirty[slot]) return;
-        RandomAccess.Write(_data, At(slot), checked((long)_ordinals[slot] * RelayRecord.Bytes));
+        GreyMatter.Poc.Eval.CostProfile.Write(_data, At(slot), checked((long)_ordinals[slot] * RelayRecord.Bytes));
         _dirty[slot] = false; DirtyWrites++; BytesWritten += RelayRecord.Bytes;
     }
     public bool Read(uint id, Span<byte> record)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.CacheIndex);
         if (record.Length != RelayRecord.Bytes) throw new ArgumentException("Record buffer length");
         int slot = Find(id);
         if (slot >= 0) { At(slot).CopyTo(record); return true; }
@@ -255,10 +256,18 @@ public sealed class PackedRelayRecords : IRelayRecords
     }
     public void Write(uint id, ReadOnlySpan<byte> record)
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.CacheIndex);
         if (_readOnly) throw new InvalidOperationException("Committed packed generations are immutable");
         RelayRecord.Validate(id, record); int slot = Find(id);
         if (slot < 0) { ulong address = Address(id, true); slot = Allocate(id, out _); _ordinals[slot] = address - 1; }
         record.CopyTo(At(slot)); _dirty[slot] = true;
+    }
+    /// <summary>Read-only experiment: request per-descriptor no-cache I/O; not a cold-disk guarantee.</summary>
+    public void SetReadNoCache(bool enabled)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (!_readOnly) throw new InvalidOperationException("Cache-policy experiment requires a frozen snapshot");
+        MacFileIo.SetNoCache(_data, enabled); MacFileIo.SetNoCache(_index, enabled);
     }
     public void ClearCache()
     {
@@ -267,10 +276,11 @@ public sealed class PackedRelayRecords : IRelayRecords
     }
     public void Flush()
     {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.CacheIndex);
         ObjectDisposedException.ThrowIf(_disposed, this); if (_readOnly) return;
         for (int i = 0; i < _occupied; i++) Writeback(i);
         for (int i = 0; i < IndexPages; i++) FlushPage(i);
-        RandomAccess.FlushToDisk(_data); RandomAccess.FlushToDisk(_index); WriteFormat();
+        GreyMatter.Poc.Eval.CostProfile.Flush(_data); GreyMatter.Poc.Eval.CostProfile.Flush(_index); WriteFormat();
     }
     public void VisitPresent(Action<uint> visit)
     {

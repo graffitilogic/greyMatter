@@ -4689,3 +4689,707 @@ next step is a registered memory-pressure/resource follow-up with this layout,
 including index traffic and OS-cache limitations, before pursuing further compression.
 R4's original stop and its unmeasured>=1GiB capacity condition remain intact. No claim
 of natural-language utility, biological fidelity or general reasoning is added.
+
+# Memory-pressure/resource follow-up registration — 2026-09-17
+
+Bill authorized the next bounded resource experiment. Keep source-local learning,
+packed fixed records, index growth/page cache, encoder and query semantics unchanged.
+First use a32-chain seed100 smoke; then one4x workload: seed201,32768 five-concept
+chains,131072 relations,2097152 presentations. This is a resource follow-up, not a
+retroactive R4 pass, new five-seed claim or test beyond physical RAM.
+
+Train independently through packed storage at the original M=256MiB and M/2=128MiB
+budgets (4MiB reserved outside the record store). Require actual dirty evictions in
+training, exact final snapshot bytes/counters across budgets, and peak RSS <= original
+B(53166080)+1.25*budget. Report actual occupied bytes and resident-reference managed
+size; keep R4's >=1GiB resident requirement unproven unless actually measured. No
+shrinking the registered budgets or changing index-cache size after results.
+
+Fresh-process queries at both budgets compare normal buffered file access with
+macOS per-descriptor F_NOCACHE. This is an advisory no-cache condition, NOT a guaranteed
+cold disk or global cache purge. Do not change workstation-wide caching or manufacture
+system-wide RAM pressure. Read kernel proc_pid_rusage v2 disk-I/O and physical-footprint
+counters alongside logical record/index bytes. Native constants/ABI are checked against
+the installed macOS SDK; unsupported/error cases fail explicitly, not as zero I/O.
+Checksum validation may warm OS pages. Mark the first pass cold APPLICATION cache;
+repeat in reverse order with application caches retained. Neither pass is advertised
+as cold hardware storage. Source/header/hash audit runs outside timed query loops.
+
+Freeze128 supported queries (smoke64): q=0..63, chain=(seed+q*(chains/64+1))%chains,
+hops1 and2+q%3,32 distinct candidate chains with rotating correct position. This spreads
+cues through the4x corpus. Require every vector equal to the separate resident import
+of the same learned snapshot, >=80% direct/composed top1, no writes and immutable
+snapshot hashes. Report first/repeat p50/p95, throughput, cache/OS-I/O counters, peak
+RSS and managed sampling. Compare <=2s and<=10x resident p95 as practical targets;
+misses remain misses. A warm-pass gain does not establish cold-storage performance.
+
+One smoke configuration (seed100,128MiB training) then estimate4x run costs before
+launch. Execute256MiB training first and use its actual timing before128MiB; projected
+>=1h jobs remain unauthorized. No16x workload, cache sweep, learning repair, variable
+records, CUDA or real-text redesign in this follow-up.
+
+Resource follow-up preflight:204/204 tests pass, including macOS native sampling
+and exact immutable reads with F_NOCACHE toggled. Frozen source manifest and full
+TRX are in artifacts/recovery/resource-pressure. The seed100 smoke passes exact
+resident/buffered/no-cache vectors and100% direct/composed recall. Training took
+0.168s; a linear4x-workload estimate is172s before cache-pressure overhead. Seed201
+256MiB training launched first, with a3500s worker timeout and process-group cleanup.
+No final run results existed when this estimate was recorded. Query kernel-delta
+objects contain disk-byte differences but absolute end-of-pass RSS/footprint fields.
+
+First full cell completed: seed201/256MiB training142.932s, publication14.168s,
+whole worker161.228s;1,258,407 records/8,388,592 edges;19,596,980 record evictions.
+Native peak RSS301531136 <388710400-byte original limit. Logical index reads
+83154573040 bytes vs native training disk reads192512 bytes: OS cache dominates.
+The128MiB cell is authorized within the same registration; estimated several minutes
+from this measured cell, with the same3500s timeout. No model/cache changes between
+cells. Snapshot hash6157EFADB39B35000081EC778FCF9C460DC5E0F3FCE0096727FC2DDE658705A5.
+
+# Memory-pressure/resource follow-up result — 2026-09-17
+
+**Bounded training and exact sampled recall PASS at this workload. R4 remains
+stopped/uncompleted; its original failure is not rewritten.** Both independent
+training budgets produced byte-identical snapshots, including the saved policy and
+all learning counters. Every one of the128 fixed supported queries (64 direct,
+64 composed) scored100% top1. All2,048 paged query vectors across two models, two
+budgets, two I/O conditions and two passes matched the resident reference exactly.
+No learning, encoding, index sizing or cache tuning changed during measurement.
+
+### Actual learned content and memory
+
+Seed201,32,768 five-concept chains,131,072 relations,2,097,152 adjacent-pair training
+episodes (4,194,304 observations):1,258,407 learned records and8,388,592 directed
+synapses. Numeric payload412,757,496 bytes (393.64MiB); index33,554,432 bytes;
+complete snapshot446,312,160 logical bytes. Allocated snapshot space432.67MiB
+(256MiB-trained copy) and432.87MiB (128MiB copy); filesystem allocation differs,
+file contents do not. This is synthetic symbol learning, not a sentence-size estimate.
+Two independent working stores and completed checkpoints occupy additional space;
+the snapshot figure is not the experiment directory's total footprint.
+
+| Training budget | Train seconds | Publish seconds | Peak RSS MiB | Original RSS limit MiB | Record evictions | Dirty record writes |
+|---|---:|---:|---:|---:|---:|---:|
+|256MiB|142.932|14.168|287.56|370.70|19,596,980|20,257,419|
+|128MiB|198.725|13.800|171.27|210.70|32,552,553|32,877,447|
+
+External /usr/bin/time -l peaks include startup, publication and post-training audit.
+Both satisfy original B=53,166,080 +1.25*budget:388,710,400 and220,938,240 bytes.
+Training cache reservations were264,241,136 and130,023,136 bytes; a4MiB allowance
+was withheld from each budget. Sampled managed peaks245,400,816/124,103,880 bytes;
+sampled footprint277,758,768/155,681,464 bytes. Sampling can miss short peaks.
+The new empty-runtime diagnostic did not replace B. Halving cache increased measured
+training time39.0%, with no loss or numerical drift.
+
+Resident import took4.751s; measured managed-heap increase657,066,096 bytes
+(626.63MiB), native peak RSS567,296,000 bytes (541.02MiB). Therefore the original
+>=1GiB complete-resident requirement is **not met by this workload**. No
+beyond-physical-RAM claim: the workstation has32GiB RAM and caches these files.
+
+### Recall latency and I/O
+
+Times below are milliseconds/query, nearest-rank p95. Training budget identifies
+which independently built, identical snapshot was queried. First pass starts with
+empty application record/index caches; repeat reverses query order and retains them.
+Resident p95 was0.1994ms first /0.1625ms repeat. All rows meet the practical <=2s and
+<=10x paired resident target in these observed conditions; this is one reused seed,
+not five-seed evidence or a statistically resolved performance ranking.
+
+| Model training MiB | Query MiB | I/O | First p95 ms | Repeat p95 ms | First / resident | First native disk read bytes |
+|---|---|---|---:|---:|---:|---:|
+| 128 | 128 | buffered | 0.3006 | 0.1494 | 1.51 | 0 |
+| 128 | 128 | nocache | 0.3029 | 0.1449 | 1.52 | 0 |
+| 256 | 128 | buffered | 0.2944 | 0.1807 | 1.48 | 0 |
+| 256 | 128 | nocache | 0.2960 | 0.1430 | 1.48 | 0 |
+| 128 | 256 | buffered | 1.5903 | 0.1465 | 7.98 | 6,955,008 |
+| 128 | 256 | nocache | 0.3077 | 0.1496 | 1.54 | 0 |
+| 256 | 256 | buffered | 0.2820 | 0.1387 | 1.41 | 0 |
+| 256 | 256 | nocache | 0.3017 | 0.1437 | 1.51 | 0 |
+
+Every first paged pass read928,896 record bytes and11,616,256 index bytes logically;
+index reads are12.5x record reads. All repeat passes read zero bytes logically.
+All query writes were zero and snapshots stayed immutable. Query peak RSS ranged
+59,604,992–64,159,744 bytes (56.84–61.19MiB); reserving cache arrays does not mean
+all reserved pages are physically touched. Traversal-owned scratch530,944 bytes is
+reported separately from the store cache. Raw artifacts include p50, throughput,
+startup, managed peaks, native footprint and per-query timings.
+
+There were **zero record evictions during these128-query recall passes**: their
+working set fits either cache. Training demonstrates pressure and dirty eviction;
+R3 and the earlier8-record recall experiment remain the evidence for exact recall
+through repeated eviction. Do not conflate the two experiments.
+
+The native disk counters mostly read zero. One buffered first pass read6,955,008
+bytes and had the largest p95 (1.5903ms). Advisory F_NOCACHE runs read zero native
+bytes; they followed buffered reads, and snapshot validation can warm OS caches.
+Thus these conditions do not identify a causal no-cache benefit or cold-disk cost.
+F_NOCACHE success is not proof of bypassing existing OS or device caching. No
+workstation-wide purge or artificial physical-RAM exhaustion was performed.
+
+Training's logical record/index reads were6.232/83.155GB at256MiB and
+10.371/134.904GB at128MiB (decimal GB). Native training disk reads were only192,512
+and135,757,824 bytes, respectively. Native disk writes were516,579,328 bytes each;
+logical writes were much larger. Packing fixed persistent allocation, but many small
+index probes still create substantial syscall/cache traffic. These measurements do
+not establish throughput when the complete working files exceed OS cache capacity.
+
+### Verification, reproduction and handoff
+
+204/204 regression tests pass. A new test verifies native sampling plus byte-exact,
+immutable reads with per-file no-cache enabled and disabled. The post-measurement
+standalone audit streamed every record in both full snapshots, checked checksums,
+numeric schema/zero padding, format/count/length consistency and immutable hashes.
+It is a structural audit, not proof of absence of semantic memorization. Source
+manifest verification passed: measured source did not change. All16 workers exited0;
+no workers remain. Existing brains and old snapshots are retained; no commits,
+staging, history consultation or dependency changes occurred.
+
+Artifacts: artifacts/recovery/resource-pressure/summary.json, source-manifest.json,
+full-tests.trx, audit.json, raw worker JSON, .time.txt and exact -command.json ledgers.
+Model roots: /private/tmp/gm-pressure-20260917-seed100-m128 and
+/private/tmp/gm-pressure-20260917-seed201-m256/-m128. Reproduction scripts refuse
+result overwrite; use fresh paths for an intentional rerun.
+
+```bash
+dotnet test GreyMatter.sln -c Release --no-restore --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/resource-pressure
+python3 artifacts/recovery/resource-pressure/run_worker.py baseline
+python3 artifacts/recovery/resource-pressure/run_worker.py train
+python3 artifacts/recovery/resource-pressure/run_worker.py query
+python3 artifacts/recovery/resource-pressure/run_worker.py query --io nocache
+python3 artifacts/recovery/resource-pressure/run_worker.py query --backend resident
+python3 artifacts/recovery/resource-pressure/run_worker.py train --seed 201 --budget 256
+python3 artifacts/recovery/resource-pressure/run_worker.py train --seed 201 --budget 128
+python3 artifacts/recovery/resource-pressure/run_queries.py
+python3 artifacts/recovery/resource-pressure/summarize.py
+python3 artifacts/recovery/resource-pressure/audit.py
+```
+
+**Next decision:** further compression is not the immediate prerequisite. A separately
+registered16x capacity cell could test the missing >=1GiB resident condition before
+returning to R5's local-data utility; this follow-up explicitly did not authorize that
+cell. Four times the slower measured training time is about13.25minutes, before
+additional eviction/publication costs—not a measured runtime or permission for a
+long grid. Preserve the original bars, measure rather than extrapolate its resident
+size, and avoid an index/cache tuning campaign unless a required resource gate fails.
+Real-data recall, larger-than-physical-memory performance and emerging behavior
+remain untested. This bounded follow-up is complete.
+
+# 16x capacity check registration — 2026-09-17
+
+Bill approved the proposed larger-capacity check. One seed201 model,131072 chains
+(655360 concepts,524288 relations,8388608 adjacent-pair episodes), trained at256MiB
+with the unchanged source-local rule and packed store. This is one bounded cell,
+not the historical full R4 grid. Existing default workloads remain unchanged;
+--chains explicitly selects the registered larger workload.
+
+One seed100 smoke verifies the new command path. Then train through bounded storage
+with the original4MiB scratch allowance; require actual dirty eviction and original
+RSS <=53166080+1.25*268435456=388710400 bytes. Prior smaller run suggests about
+10–20minutes including pressure/publication; enforce a3500s timeout, no automatic
+retry on a measured failure. Estimate snapshot~1.7GiB plus working copy; physical
+RAM32GiB, free disk~77GiB. No physical-RAM-exhaustion or cold-disk claim.
+
+Import the same frozen snapshot into a separate resident process and measure actual
+managed-state increase and native RSS. The missing capacity condition is >=1GiB
+complete resident representation, not an extrapolation from file size or IDs.
+Query the same snapshot at256/128MiB, buffered and advisory F_NOCACHE, first-forward
+then retained-cache reverse. Use unchanged128-query formula with the new chains:
+q0..63, chain=(seed+q*(chains/64+1))%chains, direct1 and composed2+q%3 hops,32 rotated
+candidate chains. Require exact scores against resident, >=80% direct/composed,
+zero writes, immutable snapshot, original RSS bars, p95<=2s and<=10x resident.
+Report zero-eviction query working sets honestly if they again fit both caches.
+No cache sweep, index redesign, learning repair or second large training budget.
+
+Artifacts: artifacts/recovery/capacity16; models in fresh
+/private/tmp/gm-capacity16-20260917-seed{seed}-m{training_budget}. Freeze source and
+record full commands/native peaks. On any failed gate stop with the measured result;
+on success close this capacity check and register the local-data R5 task before
+scoring it. No CUDA or broad language claims follow from a synthetic pass.
+
+16x preflight:204/204 tests pass; the only evaluator change is an explicit bounded
+--chains option, preserving previous defaults. Source frozen before the smoke.
+run_registered.py (exec session86210) runs smoke assertions before large training,
+checks original training RSS/evictions before recall, and logs each process exit.
+No parameter changes or corrections have been made after measurement began.
+
+# 16x capacity result — 2026-09-17
+
+**PASS for this registered single cell.** The complete resident model exceeds1GiB
+by measurement; bounded training and exact paged recall satisfy the unchanged bars.
+This does not retroactively pass the historical R4 five-seed/grid campaign. No
+beyond-physical-RAM, cold-storage, natural-language or emerging-behavior claim.
+
+### Learned state and resource result
+
+Seed201,131072 chains,524288 independent generated relations,8388608 training
+episodes/16777216 observations:4,470,045 distinct learned records and33,553,072
+stored directed synapses. Numeric payload1,466,174,760 bytes; index134,217,728 bytes.
+Snapshot1,600,392,720 logical bytes /1,611,362,304 allocated bytes (1.501GiB).
+Working copy and completed checkpoint are separate allocations. These are synthetic
+symbols, not a measurement of sentence compression or usable language knowledge.
+
+Training664.160s, publication48.950s, complete worker728.789s (~12min9s).
+79,913,625 cache evictions and80,574,064 dirty record writes establish actual
+training pressure. Native peak RSS301,875,200 bytes (287.89MiB), below the original
+388,710,400-byte bound. Cache reservation264,241,136 bytes;4MiB scratch allowance
+withheld. Sampled managed peak245,435,176 bytes, footprint279,462,728 bytes; total
+allocation1,185,423,640 bytes is cumulative traffic, not concurrent resident usage.
+
+Resident import20.131s. Measured managed-state increase1,974,041,096 bytes (1.838GiB)
+and native peak RSS1,835,384,832 bytes (1.709GiB): the >=1GiB resident condition is
+now met at this cell. The paged path did not construct this full resident dictionary;
+it exists only in the separately measured reference process. Hardware RAM remains
+32GiB; this test is application-budget pressure, not physical-RAM exhaustion.
+
+### Recall result, including failures
+
+Direct top1:64/64=100%. Composed top1 with registered fractional tie credit:
+59.15625/64=92.4316%, above80%. There are59 unambiguous composed successes and
+five all-zero32-way ties, each credited1/32. Every failed case is4-hop: query indices
+11,59,89,95,119, chains10446,59622,90357,96504,121092. None were excluded.
+
+All1,024 paged vectors (4 conditions ×2 passes ×128 queries) match the resident
+reference exactly. Zero query writes; full snapshot hashes remain unchanged. Thus
+paging does not explain these five recall failures. Their learning/propagation cause
+was not diagnosed or repaired in this bounded resource test. The earlier smaller
+model scored100%, but its formula selects different chains: this is not a paired
+causal estimate of scale-induced accuracy loss.
+
+Resident p95 first0.3337ms /repeat0.2597ms. Nearest-rank paged p95 below:
+
+| Query budget MiB | I/O | First p95 ms | Repeat p95 ms | First/resident | Peak RSS MiB |
+|---|---|---:|---:|---:|---:|
+|128|buffered|0.5017|0.2383|1.50|60.39|
+|128|nocache|0.5149|0.2352|1.54|60.03|
+|256|buffered|0.5171|0.2379|1.55|64.34|
+|256|nocache|0.5945|0.2469|1.78|64.45|
+
+All conditions pass <=2s and<=10x resident, and both original RSS bars. First passes
+read1,786,616 record bytes plus22,335,488 index bytes logically; repeats read zero.
+No query record evictions: this fixed query working set fits either cache. R3 and
+the previous8-record-cache evaluation supply the evidence for eviction during recall;
+this larger run adds bounded training pressure and measured model capacity.
+
+Kernel-reported query disk reads were zero in every condition, including advisory
+F_NOCACHE. These timings remain OS-cache-assisted; no cold-storage inference.
+Training did cause10,366,382,080 native disk-read bytes and1,804,869,632 disk-write
+bytes. Logical reads were24,962,118,232 record bytes and330,569,223,360 index bytes;
+logical writes26,428,293,120 record /18,364,764,736 index bytes. Index traffic remains
+a resource cost even though it did not fail this cell's acceptance criteria.
+
+### Verification and reproduction
+
+204/204 tests passed. Seed100 smoke exactness passed before full training. All10
+workers exited0; no active workers remain. Source manifest unchanged throughout.
+Standalone post-measurement audit verified every record checksum/numeric schema/zero
+padding, format/count/length consistency and immutable full-snapshot hash. No code
+correction, tuning or rerun after results; no commits, history access or brain resets.
+
+Input hash195A83CB4CA4B1262209683A3D74E1F991C18AF934F626319393542C7896C3A4.
+Snapshot hash5F4473A1E72E6DFF5A61EE9076D2FAC79553F5E7F045894D4BD71E65FD362A19.
+Artifacts: artifacts/recovery/capacity16/summary.json, source-manifest.json,
+full-tests.trx, audit.json, raw JSON/time logs and exact per-worker command ledgers.
+Scratch: /private/tmp/gm-capacity16-20260917-seed201-m256 (full) and
+/private/tmp/gm-capacity16-20260917-seed100-m128 (smoke). Existing models retained.
+
+```bash
+dotnet test GreyMatter.sln -c Release --no-restore --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/capacity16
+python3 artifacts/recovery/capacity16/run_registered.py
+python3 artifacts/recovery/capacity16/summarize.py
+python3 artifacts/recovery/capacity16/audit.py
+```
+
+Workers refuse overwrites. run_registered.py invokes packed-resource with explicit
+--chains131072 --seed201 --budget-mib256 for training, then resident and paged
+128/256MiB queries; exact argv is recorded in each command ledger. Reproduction needs
+fresh paths, not deletion of an existing result. Native instrumentation is macOS-only.
+
+### Next deliverable and agent steering
+
+Return to R5 local-data utility rather than another synthetic scale or cache sweep.
+Implement named-model learn and fresh-process probe over the proven packed relay
+path. Keep source-local learning, eight-member cohorts, degree cap, propagation and
+numeric-only snapshots fixed; keep readable candidate labels outside the model.
+Do not route the new utility through the legacy all-in-memory checkpoint path or
+quietly train while probing. Record source identity, frozen encoder configuration,
+training-policy metadata and total display/candidate-adapter memory.
+
+Before scoring real data, append a concrete R5 protocol: available local source and
+checksum, sentence/document deduplication and split, at least100 supported held-out
+cues, frozen candidates, untrained/frequency/co-occurrence controls, query-level MRR
+and Recall@10, paired bootstrap, and original >=.05 MRR lift with positive95% lower
+bound. If source/support is unavailable, report an environmental/support block; do
+not substitute synthetic success. Do not infer real-data utility from this capacity
+pass or open a learning/encoding redesign to recover a failed language metric.
+The historical full R4 grid remains uncompleted; this bounded continuation establishes
+only the explicitly measured capacity/quality/resource conditions above.
+
+# R5 local-data utility registration — 2026-09-17
+
+Bill authorized the next phase. Jarvis was initially unmounted, then restored by Bill.
+Source: /Volumes/jarvis/trainData/Tatoeba/sentences_eng_small.csv,50000 rows,
+2605071 bytes,SHA256311c619dd0b8c7ca3b61f0fd91643721d827245eba16fa1bd2b8ddfe540a9e09.
+No real-data scores have been inspected. No fallback to built-in sentences.
+
+Utility: explicit learn --model NEW --source FILE --format text|tatoeba and
+probe --model MODEL --cue TOKEN --candidates FILE; audit --model MODEL. Existing
+legacy runtime remains separate. Fixed source-local policy,8-member relay,degree32,
+width256,hops1..4 (primary real-data evaluation1). Stateless version1 token adapter:
+NFKC/lowercase, Unicode letter/digit runs including one-character words; token cap256,
+line cap16384; English Tatoeba rows only. SHA256 UTF8 token's first little-endian
+uint supplies the existing32-of2048 identity encoder (32 disjoint64-wide bins), then
+unchanged assembly generation. Report identity collisions, never exclude them to
+improve scores. No semantic encoder/table, stopword tuning or vocabulary in model.
+This is an explicit text-to-numeric input boundary, not learned language semantics.
+
+Preparation, outside runtime memory claim: normalize/deduplicate all source sentences
+by normalized token sequence; original order retained. SHA256(normalized sentence),
+first little-endian uint modulo5==0 gives held-out, remainder training. One training
+pass with sentence resets, no transitions across sentence boundaries. Both split
+files and their checksums recorded; no held-out text in model training. Same split
+and128 query limit for representation seeds201,202,203; no seed selection.
+
+Eligible cue has a held-out adjacent successor observed >=3 times in training;
+cue and target training counts >=5. Choose positive by ordinal SHA256(cue+"|"+target).
+Choose31 distractors from training vocabulary with count>=5 in the positive's
+floor(log2 frequency) bin, excluding cue and all its held-out successors; hash order
+by cue+"|"+candidate. Skip unsupported candidate sets before scoring and report counts.
+Select first128 eligible cues by ordinal SHA256(cue); require at least100. Candidate
+presentation sorted by ordinal SHA256("candidate|"+cue+"|"+candidate). One positive
+per32 candidates. This is supported, closed-candidate next-token association on
+held-out sentences, not open-ended semantic retrieval or language generation.
+
+Freeze queries/labels before training/scoring. Main metric query MRR; Recall@10 also.
+Ties receive expected reciprocal rank over tied positions and fractional top10 credit;
+include zeros, unreachable answers and all ties. Untrained baseline all-zero scores;
+frequency baseline train unigram counts; co-occurrence baseline directed train bigram
+counts. Labels/counts stay in evaluator, never learning or activation traversal.
+For each baseline compute per-query MRR lift averaged across the3 fixed seeds;
+10000 paired query bootstraps with seed915 report95% percentile bounds. Pass requires
+mean MRR lift>=.05 over BOTH untrained and frequency and BOTH lower bounds>0.
+Report each seed separately; shared corpus/query resamples are not independent
+training datasets. Co-occurrence baseline can win without being hidden.
+
+Each model trains at128MiB (8MiB allowance for text/candidate adapter and scratch),
+fresh-process paged scoring at128MiB plus exact resident reference. Original paged
+RSS limit220938240 bytes, immutable hashes and zero writes required. Candidate cap4096
+for utility; all evaluator labels/JSON and their memory included in measured process.
+Freeze source after tests, one synthetic correctness smoke, then these3 real-data
+arms; estimated minutes, no jobs expected>=1h. On failure, report the specific limited
+result; no representation/policy rescue or new grid inside R5. Numeric schema audit
+and planted-wordlist rejection required, not semantic non-memorization claims.
+
+R5 pre-score clarification: self-successors (target==cue) are excluded from positive
+eligibility, because this task measures retrieval of related material rather than
+self-activation. This is fixed before preparation or model scores. Text input bounds
+fail explicitly; the model directory is published only after all numeric files are
+complete. Query adapters preserve all candidate scores including zero-output cases.
+
+R5 primary workers completed and analyzed before any source change: all gates pass;
+source-manifest verification passed during primary analysis. One reporting correction
+now follows: macOS .NET PeakWorkingSet64 returns0 (unavailable), so public JSON must
+emit null rather than imply zero process memory. Original native /usr/bin/time -l
+measurements were valid and supply every reported memory bound. Only two reporting
+sites change (LocalModelCli and LocalDataEval); learning, data, snapshots, queries and
+scores are untouched. Preserve primary artifacts; replay scores after this correction
+and compare every vector. No scientific arm or bar is changed.
+
+# R5 result — saved-model local-data utility — 2026-09-17
+
+**Registered gate PASS, with substantial quality limitations.** Named-model learn,
+shutdown, source-free probe and numeric audit now work through packed relay storage.
+The held-out supported association test passes against untrained/frequency controls;
+the co-occurrence baseline is substantially better. This is closed-candidate directed
+next-token association, not general semantic recall, text reconstruction or generation.
+
+### Frozen data and selection
+
+Restored source50000 English sentences; normalization removed38 exact duplicates.
+Train40006 sentences/327074 tokens/12897 distinct words; held-out9956 sentences.
+No32-bit input-identity collision groups in training vocabulary. Train text1635259
+bytes; source/split/query hashes are in prepared/manifest.json. All source sentences
+were split before training; normalized duplicates cannot cross the split. Near-
+duplicates/paraphrases were not detected. Relation overlap is deliberate support,
+not an unseen-relation generalization claim.
+
+441 cues satisfied all support/candidate conditions;1223 other supported cues lacked
+31 same-frequency-bin distractors and were excluded before scoring. First128 eligible
+cues by registered hash order were scored. This selection excludes many high-frequency
+cases and is not representative of every possible user cue. All128 scored queries,
+including every zero and tie, remain in the denominator. One positive among32 fixed
+candidates, labels and counts confined to evaluator files outside model storage.
+
+### Quality and exactness
+
+| Arm | Mean reciprocal rank | Recall@10 |
+|---|---:|---:|
+|Learned, mean of201/202/203|0.569796|0.661275|
+|Untrained all-zero|0.126828|0.312500|
+|Training unigram frequency|0.173092|0.353516|
+|Training directed co-occurrence|0.982639|1.000000|
+
+Paired MRR lift over untrained+0.442968,95% bootstrap interval[0.367929,0.518226].
+Over frequency+0.396704,[0.318371,0.475421]. Both exceed+.05 with lower bound>0.
+Against co-occurrence−0.412843,[−0.487441,−0.338890]. These are query resamples on
+one shared corpus/split; three encoder seeds are not three independent datasets.
+All three seeds had identical aggregate quality, although their learned graphs differ.
+
+**61/128 cues produced all-zero candidate scores in every seed.** They receive only
+the preregistered chance-level tie credit (MRR harmonic(32)/32,Recall@10=10/32).
+No zero-output case was repaired or excluded. The utility explicitly reports NoOutput;
+its ordinal display order for tied scores is not evidence of a preferred answer.
+The first frozen cue,express, is a zero-output example retained in example-probe.json.
+The learner is therefore useful for some supported associations but far from reliable
+across this constrained set. No superiority over a count-based association system.
+
+Every one of384 primary paged query vectors matches its separate resident reference
+exactly. Frozen snapshots remain unchanged and both data/index writes are zero.
+Reporting-fix replay also matches all384 original vectors exactly. No learning or
+representation adjustment was made after viewing outcomes.
+
+### Storage, time and memory
+
+| Seed | MRR | Recall@10 | All-zero cues | Allocated model MiB | Train peak RSS MiB | Paged peak RSS MiB |
+|---|---:|---:|---:|---:|---:|---:|
+|201|0.569796|0.661275|61/128|37.02|96.66|70.22|
+|202|0.569796|0.661275|61/128|36.55|96.12|70.05|
+|203|0.569796|0.661275|61/128|37.09|92.89|69.91|
+
+Seed201 has102851 records and1598264 synapses,37929856 logical bytes and38817792
+allocated bytes. Thus these40006 training sentences occupy37.02MiB allocated, roughly
+970 bytes/sentence on average for THIS run (~0.97MB per1000 sentences); that average
+is not a growth forecast. Model bytes are about23 times normalized source-text bytes:
+this is learned graph storage, not text compression. Earlier fixed-record packing
+removed sparse-file allocation overhead; it did not make graph state smaller than text.
+
+Training7.73–8.95s, paged query p95 0.371–0.512ms under OS-cache-assisted conditions.
+Original128MiB resource limit220938240 bytes passed for all learning, paged scoring
+and audit processes. Training peaks97,402,880–101,351,424 bytes, paged peaks
+73,302,016–73,629,696 bytes. These include labels/query-adapter memory and evaluator
+JSON; source split preparation is explicitly outside the runtime memory claim.
+Model data fits this cache: this real-data run does not itself demonstrate eviction
+or exceed physical RAM. Prior synthetic checks provide the independent large-state
+capacity evidence. Read timing includes candidate encoding/scoring; startup and full
+snapshot hashing are outside the per-query timer and warm OS pages.
+
+### Utility contract and verification
+
+learn --model refuses overwrite and atomically publishes a fresh named model after
+complete training/checkpoint/descriptor writes. One pass, sentence boundaries reset,
+no resume/append implementation. Versioned192-byte numeric descriptor stores seed,
+encoder/tokenizer/policy versions, counts, source hash and checkpoint binding. No
+word list or source path in the model. Individual records and metadata are checksummed;
+checksums detect corruption, not malicious tampering/authentication.
+
+probe loads saved configuration and numeric state, never reads the training source
+or trains. External candidates are capped at4096 unique canonical tokens; all scores
+are returned. Source lines/tokens are bounded, malformed inputs fail explicitly.
+The8MiB allowance covers adapter/traversal work separately from cache reservation;
+whole-process memory was measured rather than inferred from that allowance.
+
+208/208 tests pass before and after the single reporting correction. Tests cover
+source deletion before recall, exact resident/paged multi-hop scores, sentence
+boundary isolation, unseen zeros, corrupt descriptor, overwrite refusal, oversized
+inputs, no partial publication and planted wordlist rejection. Structural audit walks
+all model records and rejects extra model files. It is not proof that numeric weights
+cannot encode semantic information. One separate-process synthetic smoke passed
+before real data. All16 primary workers and4 reporting/example workers exited0.
+No jobs remain. No commits, staging, history consultation or old-brain changes.
+
+Original JSON PeakRss=0 was macOS .NET's unavailable value, not a measurement of
+zero memory. Every gate used valid external /usr/bin/time -l peaks. Public reporting
+now emits null with an explanation; no training or scoring behavior changed. Primary
+source manifest was verified before correction; post-report-source-manifest.json
+records exactly the two reporting-file changes and their replay verification.
+
+### Reproduction and next boundary
+
+Artifacts: artifacts/recovery/r5/summary.json, prepared/manifest.json and queries.json,
+source.json, commands.json, raw results/native logs, both source manifests, both TRX
+files and reporting-replay-commands.json. Models:
+/private/tmp/gm-r5-20260917/model-201,model-202,model-203. These scratch models are
+retained; the utility accepts any explicitly chosen new model directory.
+
+```bash
+dotnet test GreyMatter.sln -c Release --no-restore --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/r5
+python3 artifacts/recovery/r5/run.py
+python3 artifacts/recovery/r5/replay_reporting_fix.py
+python3 artifacts/recovery/r5/summarize.py
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll probe --model /private/tmp/gm-r5-20260917/model-201 --cue express --candidates artifacts/recovery/r5/example-candidates.txt
+dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll audit --model /private/tmp/gm-r5-20260917/model-201
+```
+
+The exact initial commands are in commands.json. Scripts refuse overwrites: use fresh
+artifact/model paths for reruns. Current code reports null for unsupported peak RSS;
+original raw output with0 is retained and explained. Real-data protocol/metric scripts
+are fully local; no external API or new dependency.
+
+R5 is complete as this limited supported-association utility. Next is R6: one profile
+of the successful path and the campaign capstone separating learning, exact paging,
+resource tradeoff and real-data utility. Preserve the61-zero result and stronger
+co-occurrence baseline; do not turn closeout into a learning rescue or CUDA port.
+The original full R4 grid remains incomplete, and the single16x follow-up is not a
+retroactive rewrite of its failure. No broad emergent-behavior claim is justified.
+
+# R6 profile and closeout registration — 2026-09-18
+
+Bill authorized next steps: one bounded profile of the successful R5 path, then the
+four-part capstone. No quality rescue, cache sweep, new seed grid or CUDA work.
+Reuse frozen R5 train/query files and seed201,128MiB. Train one new scratch model,
+verify its complete numeric snapshot hash equals the existing R5 model, then score
+all128 queries in a separate process and require exact original vectors/immutability.
+One tiny synthetic smoke precedes this profile. Expected duration under a minute.
+
+Opt-in thread-local timing/allocated-byte instrumentation partitions nested scopes
+into exclusive costs: text normalization, encoding, learning, traversal/scheduling,
+record serialization/checksum, cache/index, file API calls, source hash and publication.
+Timing/allocation scopes use fixed arrays and do not change state or numerical order.
+Report uncovered orchestration separately. Native /usr/bin/time provides user/system
+CPU, peak RSS and context-switch counts; native kernel counters provide disk bytes.
+File-API wall time includes kernel CPU, page-cache service and wait; it is an upper
+bound on storage wait, not a measured pure disk-wait fraction. CPU scheduling wait
+cannot be uniquely recovered from wall-minus-CPU with runtime background threads.
+Instrumentation overhead means this run is attribution, not a new latency benchmark.
+No baseline storage/speed advantage will be invented: only its existing quality was
+compared. Freeze source after tests and preserve command/raw profiles before verdict.
+
+# R6 capstone — recovery campaign closed — 2026-09-18
+
+The implementation now supports local-text learning into a named numeric model and
+fresh-process, read-only, closed-candidate recall through learned connections. The
+bounded storage/execution mechanism is demonstrated on actual learned state, rather
+than an inflated address range. The larger research proposition—competitive, broadly
+useful intelligence emerging from effective neural scale—is **not demonstrated**.
+This campaign closes here. No R7, automatic rescue experiment or CUDA port follows.
+
+## Four separate verdicts
+
+| Question | Verdict | Evidence and boundary |
+|---|---|---|
+| Learning | Qualified pass for the registered tasks | Synthetic relay tasks pass. Real supported next-token MRR0.570 exceeds untrained0.127 and frequency0.173 with positive paired confidence bounds.61/128 real cues have zero output; co-occurrence MRR0.983 is substantially stronger. No general semantic or unseen-relation claim. |
+| Exact paging | Pass on tested states | Resident/paged vectors match exactly; earlier one/eight-record caches force repeated eviction; restart reproduces learning; frozen recall does not write model state. Later large-budget query sets fit their caches and must not be presented as new recall-eviction tests. |
+| Resource tradeoff | Bounded engineering result; broader claims open | Single16x synthetic cell stores4.47million records/33.55million edges in1.50GiB, trains at288MiB peak RSS versus1.71GiB resident reference, with real training eviction. Real-text processes also satisfy the original memory bar. Original full R4 grid remains incomplete; no beyond-physical-RAM or cold-storage result. |
+| Real-data utility | Delivered, limited | Explicit named-model learn/probe/audit works; probe requires no training source.40006 training sentences produce roughly37MiB. Caller supplies candidates; no free-form generation, automatic vocabulary output, or reliable broad retrieval. |
+
+These are separate conclusions: exact paging does not validate the learner, and a
+quality gate against weak controls does not establish an advantage over the stronger
+baseline. The simple co-occurrence baseline's **quality** advantage was measured;
+its end-to-end runtime/storage cost was not benchmarked, so no measured cost advantage
+is claimed. Historical R1 and R4 failures remain in the ledger; later explicitly
+bounded follow-ups are not retrospective passes of those original campaigns.
+
+## One profile of the delivered path
+
+Opt-in, fixed-stack, thread-local instrumentation partitions nested scopes into
+exclusive wall time and current-thread allocated bytes. It covers text boundary,
+learning, record serialization/checksums, cache/index operations, synchronous file
+calls, traversal, file hashing and publication. Disabled scopes do not allocate;
+small instrumentation hooks remain in the source. This is an attributed run, not
+an uninstrumented speed benchmark or CPU sampling profile.
+
+Protocol: unchanged R5 prepared training file (SHA256
+A07B2D3693C5BB10BF1A85B1B573DDF7DD487CD7AE838FDD4914565E9477CF2C),seed201,
+128MiB budget,one new model at /private/tmp/gm-r6-20260918/model-201; then separate-
+process scoring of all128 frozen R5 queries. Smoke first; no parameter changes.
+Profiled model hash F4EB315BBE3B93CD4156F45E8F520E8D31BFD32EE5E377AC477F41D963FC4601
+matches the existing R5 model exactly. All128 scores also match; querying preserves
+that full snapshot hash. No learning/encoding/persistence changes were needed.
+
+### Training attribution
+
+Instrumented training/publication8.6112s. Exclusive categories below sum with0.0669s
+unattributed orchestration to the measured scope (no nested double-counting).
+
+| Category | Calls | Exclusive seconds | Scope wall share | Allocated bytes |
+|---|---:|---:|---:|---:|
+|Tokenization|40,006|0.0206|0.24%|27,942,848|
+|Encoding|327,074|0.2136|2.48%|243,446,176|
+|Learning|327,074|1.1461|13.31%|18,316,144|
+|Serialization|19,652,544|4.6303|53.77%|0|
+|CacheIndex|10,031,977|0.6622|7.69%|36,008|
+|FileApi|1,633,664|1.8217|21.16%|0|
+|SourceHash|3|0.0071|0.08%|11,472|
+|Publication|1|0.0426|0.50%|46,896|
+
+Native process lifetime:8.70s wall,7.00s user CPU,1.46s system CPU; peak RSS98,795,520
+bytes (94.22MiB). These process totals include startup and final verification that
+are outside the8.6112s scope, so they are not an additive breakdown of that scope.
+Kernel-reported training reads2,015,232 bytes/writes101,097,472 bytes.
+
+Serialization/checksum work accounts for53.77% of scoped wall time versus13.31% in
+learning updates. This is numeric-record handling, not evidence that synaptic math
+requires massive parallel compute. File calls account for21.16%: their1.8217s includes
+kernel CPU, cached service and wait. Pure disk waiting cannot be separated by this
+instrument;1.8217s bounds waiting inside those instrumented calls, not all filesystem
+work (e.g. directory/checkpoint operations also occur in publication/orchestration).
+
+Allocated407,987,648 bytes on the profiled thread, including243,446,176 bytes in
+encoding (~60%) and118,188,104 unattributed bytes. These are cumulative allocations,
+not live state. The cache constructor and adapter/orchestration allocations are among
+the unattributed work; they were not separately timed. GC collections47/1/1 for
+generations0/1/2. Background-thread allocations are not included in per-thread totals.
+
+### Recall attribution and scheduling limits
+
+Model-open plus128-query profiled scope0.06159s; separate native process0.16s wall,
+0.13s user/0.02s system CPU,67,731,456-byte peak RSS (64.59MiB). Scoped exclusive
+traversal/frontier scheduling10.32ms (16.76%),encoding10.00ms (16.23%),cache/index
+6.18ms (10.04%),file APIs4.98ms (8.08%),serialization1.87ms (3.04%). Remaining
+categories and26.78ms uninstrumented orchestration complete the total. File checksum
+validation and OS caching are part of the environment; no cold-disk claim.
+
+Allocated186,417,024 bytes over the scoring scope,182,152,224 unattributed. Source
+inspection places cache construction and repeated per-query traversal-buffer creation
+in this bucket; this is an attribution limit, not a separately measured allocation
+split. GC collections4/2/1. Kernel reads188,416 bytes, writes0.
+
+Native context switches: training280 voluntary/2796 involuntary, scoring8/101.
+Counts do not provide scheduler-wait durations. Traversal scope combines scheduling
+and propagation computation. Wall-minus-user/system CPU is not a clean scheduler or
+storage-wait estimate because runtime threads can overlap. These unresolved fractions
+are recorded rather than replaced with an invented precise breakdown.
+
+## CUDA decision and what survives
+
+**A CUDA port is not justified by the present evidence.** The demonstrably stronger
+quality baseline,61 zero-output cues, record/checksum overhead and cache-assisted
+measurements matter more than speculative GPU arithmetic throughput. This does not
+prove GPUs could never help; it means their benefit has not been established here.
+No GPU implementation, architecture redesign or tuning sweep was performed.
+
+The reusable deliverable is a deterministic learned-graph lifecycle: bounded caches,
+connection-driven reads, exact traversal, local learning, compact numeric addressing,
+checksummed immutable snapshots and explicit external candidate decoding. It executes
+actual learned models substantially larger than its application memory allocation.
+Packing removes avoidable sparse-file allocation; the learned graph still occupies
+more bytes than the original text. Its resource advantage over simpler retrieval
+systems remains unmeasured.
+
+Millions of stored records are not millions of simultaneously active neurons or
+additional demonstrated reasoning layers. Tested propagation remains width256 and
+at most4 hops. Biological fidelity, general reasoning, emergent behavior, a network
+larger than physical RAM and competing with frontier systems remain untested.
+
+## Verification and handoff
+
+210/210 tests pass, including allocation/time partition accounting and exact profiled
+versus unprofiled learning. One smoke and one full train/score pair: all4 processes
+exited0. Source manifest unchanged through measurement; no workers remain. Native
+memory stays within the original128MiB RSS allowance. No model resets, commits,
+staging, dependency additions, history consultation or external services.
+
+Artifacts: artifacts/recovery/r6/summary.json, train.json, score.json, native .time.txt
+files, commands.json, source-manifest.json and full-tests.trx. The command ledger
+records exact arguments and exit codes; scripts refuse overwrites. Prior R5 data,
+models and results remain intact. Reproduction needs new artifact/model paths.
+
+```bash
+dotnet test GreyMatter.sln -c Release --no-restore --logger 'trx;LogFileName=full-tests.trx' --results-directory artifacts/recovery/r6
+python3 artifacts/recovery/r6/run.py
+python3 artifacts/recovery/r6/summarize.py
+```
+
+The saved-model utility and commands in README remain usable. The campaign is
+finished, with qualified engineering success and an unresolved learning advantage.
+Any continuation starts with Bill's new directive: use/maintain this utility, undertake
+a separately bounded recall-quality design against the co-occurrence baseline, or
+park the research. Recommendation: keep the working substrate as a reference and
+address that quality/utility comparison before further scale or GPU investment.
