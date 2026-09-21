@@ -5393,3 +5393,229 @@ Any continuation starts with Bill's new directive: use/maintain this utility, un
 a separately bounded recall-quality design against the co-occurrence baseline, or
 park the research. Recommendation: keep the working substrate as a reference and
 address that quality/utility comparison before further scale or GPU investment.
+
+# Post-closeout diagnostic — R5 zero-output cues have a structural cause (2026-09-20)
+
+Bill authorized a bounded post-closeout continuation on 2026-09-20 after a review of
+the R6 capstone: (1) diagnose the 61 zero-output R5 cues, (2) one registered
+connectivity experiment against the same frozen R5 task, (3) an equal-budget
+co-occurrence baseline through the same record store, (4) a memory-limited container
+run of the 16x model, (5) per-page checksums if the utility is retained. The campaign's
+verdicts are not reopened; this appends to the closed ledger. No model, artifact or
+score from R5/R6 was modified.
+
+R6 stated the zero-output cause "was not diagnosed." It is diagnosable from the frozen
+artifacts alone. `artifacts/recovery/fanout/diagnose.py` re-tokenizes the frozen R5
+training split (reproducing the manifest exactly: 40,006 sentences, 327,074 tokens,
+12,897 distinct, SHA256 `A07B2D36…9477CF2C`), joins each of the 128 frozen queries to
+its per-seed paged scores, and probes the retained seed-201 model with each cue's OWN
+training successors as candidates. Read-only; probes performed zero writes. Output:
+`artifacts/recovery/fanout/fanout.json` (SHA256 `36e12730…14f4be7f1`).
+
+| cues (seed 201; 202/203 identical) | n | training fan-out, median (min) | cue count, median |
+|---|---:|---:|---:|
+| zero output | 61 | **51** (9) | 167 |
+| any output | 67 | **14** (1) | 31 |
+
+- Every zero-output cue has fan-out > 8; 45/61 exceed 32. Among the 67 cues with any
+  output, the answer ranks first in **65** (all three seeds). Recall failure is
+  retention, not discrimination: when the answer's edge exists, ranking is near-perfect.
+- Live successors per cue in the model: 1:3, 2:7, 3:13, **4:104**, 5:1 — never more
+  than 5. This is the arithmetic ceiling: degree cap 32 ÷ 8-member target cohort = 4
+  successor tokens per source neuron, and all eight source members receive identical
+  updates, so a token stores at most ~4 successors regardless of corpus.
+- All 61 zero cues DO retain live edges; in **0/61** is the answer among them.
+  Survivors are recency-dominated: the answer's rank by last observation is median
+  **16** for zero cues (min 3) versus median **2** for non-zero cues; no surviving
+  successor was observed later than the 20th most recent. Example: `of` has 1,306
+  successors; `gas` (11 training occurrences) was the 218th most recently observed
+  and is gone; `my → head` was the most recent and survives.
+
+Mechanism, from the registered rule: a successor edge is born at .105, gains .005 per
+observation, and every observation of a DIFFERENT successor of the same source
+multiplies it by .99 with pruning below .1. An answer seen 3–4 times (≈.12) survives
+about 15–18 other-successor observations; cues with tens of successors and hundreds
+of occurrences cannot hold it. The co-occurrence baseline keeps all successors; that
+difference is the whole 0.983 vs 0.570 MRR gap. This reframes the R6 "qualified
+learning pass" precisely: per-token successor capacity is ~4 and forgetting is
+driven by other-successor count, not time or evidence.
+
+Boundaries: one corpus, one task, hops=1; the same three seeds are confirmed to
+produce bit-identical zero sets (Assembly membership deliberately excludes the seed),
+so they are not replication. This diagnostic proposes no new pass and changes no rule.
+
+## D1 registration — sparse relay connectivity (before any result)
+
+Hypothesis: slot capacity, not the learning rule, limits retained successors. Test
+one connectivity change only, as a new persisted learning-policy identity (never a
+default change; old models unaffected): on each source→target cohort observation,
+each source member records edges to a deterministic **2-of-8 subset** of the target
+cohort, selected by hashing (source member ID, target cohort's first member ID). A
+target cohort then costs 2 slots per source member instead of 8, raising the per-token
+successor ceiling from 4 to **16** at identical record bytes and unchanged degree cap,
+birth/reinforce/decay constants, source-local forgetting, encoder and readout. Fan-in
+per target member falls from 8 to ~2 sources; hop-1 ranking is by weight and unaffected
+in expectation, and multi-hop is reported but not gated (R5 primary was hops=1).
+
+Protocol: identical R5 prepared split, 128 frozen queries, candidates, seeds 201–203,
+128 MiB budget, fresh-process paged scoring, exact resident/paged equality, zero
+writes, immutable hashes, native RSS within the original R5 bound. Same summarizer
+metrics: MRR, Recall@10, paired bootstrap vs untrained/frequency/co-occurrence.
+Predictions fixed now: zero-output cues fall from 61 to roughly 30 (those whose
+answer is within the last ~16 observed successors), MRR rises accordingly, and the
+co-occurrence baseline still wins because count-driven forgetting is untouched.
+Gate for "connectivity was the limit": zero-output cues ≤ 35 on every seed and no
+regression among the 65 currently-correct cues beyond 3. If the zero count does not
+fall, the hypothesis is rejected and forgetting is the next registered single change.
+One development smoke on synthetic data, one real-data run, no tuning, no sweep.
+Planned command (until implemented): `gm learn --model <new> --source
+artifacts/recovery/r5/prepared/train.txt --format text --seed 201 --budget-mib 128
+--policy sparse-relay`, then the unchanged R5 `run.py`/`summarize.py` path.
+
+### D1 prediction amendment — recorded before the real-data run (2026-09-20)
+
+While writing the D1 capacity test, the forgetting arithmetic showed the registered
+prediction was wrong. Under the unchanged source-local rule an edge gains .005 per
+reinforcement and loses ×.99 on every observation of a different successor of the same
+source. With m equal-frequency successors interleaved, steady-state weight is
+`.005 / (1 − .99^(m−1))`, which falls below the .1 prune line at **m ≈ 7**. Forgetting
+alone therefore caps a token near six coexisting successors; sparse wiring frees slots
+but cannot raise that ceiling. A focused test (`ForgettingNotSlotsBindsAboveSix…`)
+encodes this: with 16 interleaved successors both policies retain ≤ 6.
+
+Corrected prediction, fixed before scoring: D1's zero-output count will NOT fall to
+~30. It can only help cues whose answer competes with about 5–6 other successors,
+where the 4-cohort slot ceiling bound before decay did. Expect a small change
+(zeros roughly 55–61), no regression among the 65 correct cues, and exact paged/
+resident equality. The registered gate (≤ 35 zeros) is therefore expected to FAIL;
+the run proceeds anyway because it was registered, it costs about a minute, and its
+measured result decides the next single change: a forgetting rule whose clock is not
+"other-successor count" (e.g. decay proportional to evidence share). No parameter
+was tuned; the slot-cost test (`SparseWiringSpendsTwoSlots…`) verifies the wiring
+change itself: four successors cost 8 slots per source member instead of 32.
+
+## D1 result — sparse relay: registered gate FAIL, corrected prediction confirmed (2026-09-20)
+
+Command ledger: `artifacts/recovery/d1/commands.json` (16 workers, all exit 0; smoke
+learn/probe/audit first, then seeds 201–203: learn `--policy sparse-relay`, paged and
+resident scoring on the FROZEN R5 `prepared/queries.json`, audit). Models:
+`/private/tmp/gm-d1-20260920/model-20{1,2,3}`. Summary `d1/summary.json` (SHA256
+`9a6c8242…`), fan-out probe `d1/fanout-d1.json` (`8310ede2…`; its per-seed zero flags
+are read from R5, its live-successor probes hit the D1 model). Tests **215/215**.
+
+| | R5 (source-local) | D1 (sparse relay) |
+|---|---:|---:|
+| MRR, each seed | 0.569796 | **0.610175** |
+| Recall@10 | 0.661275 | 0.699219 |
+| zero-output cues | 61 | **56** |
+| answer top-1 | 65 | **70** |
+| regressions among the 65 | — | **0** |
+| paired MRR lift vs untrained / frequency | +0.443 / +0.397 | +0.483 [0.408, 0.558] / +0.437 [0.359, 0.516] |
+| vs co-occurrence | −0.413 | −0.372 [−0.446, −0.299] |
+| paged == resident, zero writes, immutable | yes | yes |
+| peak RSS within original 128 MiB bound | yes | yes |
+| training time, seconds | 7.7–9.0 | 6.5–6.6 |
+
+Registered gate (≤ 35 zeros on every seed): **FAIL** (56/56/56). Regression gate (≤ 3):
+pass (0). The amended prediction (55–61 zeros, no regressions) is confirmed. Live
+successors per cue moved from a hard wall at 4 (R5: 104 of 128 cues at exactly 4,
+max 5) to a soft ceiling at 5–6 (D1: 4:29, 5:32, **6:36**, 7:7, 8:2). The five
+recovered cues (`everybody→knows`, `exactly→alike`, `he→may`, `six→people`,
+`sad→story`) all had answer recency ranks 3–9: exactly the band where slots bound
+before forgetting did. Cues whose answer competes with more than ~6 other successors
+remain at zero; `of→gas` (1,306 successors) is untouched.
+
+Interpretation: the wiring change works as specified (2 slots per successor; verified
+by test) and is a strict improvement at identical bytes, but the R6 learning verdict
+stands because the source-local forgetting rule caps coexisting successors near six.
+The three seeds are again bit-identical: under the identity encoder the seed only
+relabels member IDs, producing isomorphic graphs. No tuning, one run, no rescue.
+
+The next single learning-rule change, if authorized, is a forgetting clock that is
+not "other-successor count" — e.g. unobserved-target decay scaled by the observed
+target's share of the source's evidence, so a rare successor of a common word is not
+erased by the common word's other successors. It is NOT registered here; item 3
+(equal-budget count baseline) runs first because its outcome decides whether a
+learning-rule change is worth making at all.
+
+# CB registration — count baseline through the same record store (before any result)
+
+Purpose: R6 compared the learner against an in-evaluator co-occurrence table with no
+cost. This measures the same directed-count idea *inside the delivered substrate*:
+same 328-byte records, degree cap 32, packed store, paging, checksums, traversal,
+paged/resident exactness, memory bound, and R5 protocol. Only the learning policy
+and the per-token footprint differ. It is a baseline, not a pass/fail gate.
+
+Policy identity 4, `--policy count-baseline`, persisted in checkpoint metadata like
+policies 1–3; never a default. One record per token: its first deterministic cohort
+member (`LocalText.Members(word, seed)[0]`), so a token costs 328 bytes instead of
+8 × 328. On observing prev→cur: if the edge exists, weight += 1 (a count); else if
+degree < 32, append with weight 1; else displace the lowest-count incumbent only if
+that count is 1 (ties: lowest index); otherwise decline. No decay of any kind.
+Recall is the unchanged `StoredRelayRecall`: a source emits `drive × w / Σw`, i.e.
+the transition probability — the R1 transition-count baseline, now paged. Roots are
+the cue's single record; a candidate's score is the delivered value at its single
+record. Hops as R5 (primary 1).
+
+Protocol: identical frozen R5 split/queries/seeds/budget/workers; scripts are copies
+of D1's with the policy name and paths changed. Report MRR, Recall@10, zero-output
+count, paired lifts, allocated model bytes, training time, paged/resident exactness,
+peak RSS. Predictions fixed now: MRR between 0.85 and 0.95 (below the 0.983 table
+because cues with more than 32 successors lose low-count answers), zero-output cues
+roughly 10–25 (mostly the 45 cues with fan-out > 32), model allocation roughly
+one-eighth of R5's 37 MiB. If the count baseline meets or beats the learner on MRR
+at lower bytes, the honest conclusion is that the neural learning layer adds no
+measured value on this task and the substrate is the deliverable.
+
+## CB result — the paged count baseline beats the learner at one-eighth the bytes (2026-09-20)
+
+Command ledger `artifacts/recovery/count-baseline/commands.json` (16 workers, all
+exit 0; an earlier attempt failed at seed201-learn because the record validator
+bounds relay weights to [0,1] — its partial outputs were removed and the schema was
+extended before the registered run: count edges carry provenance byte 3 and must be
+float-exact integers ≤ 2^24; relay edges (0–2) keep the original [0,1] check, with a
+test for each case). Models `/private/tmp/gm-count-20260920/model-20{1,2,3}`; summary
+`count-baseline/summary.json` (SHA256 `4e2e1d52…`). Tests **219/219**. Same frozen
+R5 split, queries, seeds, budget, workers and summarizer; only `--policy count-baseline`.
+
+| | R5 learner | D1 sparse relay | **CB count baseline** | in-evaluator table |
+|---|---:|---:|---:|---:|
+| MRR | 0.5698 | 0.6102 | **0.9066** | 0.9826 |
+| Recall@10 | 0.6613 | 0.6992 | **0.9295** | 1.0000 |
+| zero-output cues | 61 | 56 | **10** | 0 |
+| answer top-1 | 65 | 70 | **114** | — |
+| paired MRR lift vs untrained | +0.443 | +0.483 | **+0.780 [0.731, 0.825]** | — |
+| vs co-occurrence table | −0.413 | −0.372 | **−0.076 [−0.120, −0.037]** | 0 |
+| records / edges | 102,851 / 1,598,264 | 102,851 / 442,261 | **12,893 / 55,525** | — |
+| allocated model | 37.02 MiB | 36.19 MiB | **4.55 MiB** | (no cost measured) |
+| training, seconds | 7.73 | 6.39 | **1.49** | — |
+| paged query p95, ms | 0.512 | 0.393 | **0.220** | — |
+| learn / paged peak RSS, MiB | 96.7 / 70.2 | 94.3 / 70.1 | **63.9 / 69.5** | — |
+| paged == resident; zero writes; immutable | yes | yes | yes | — |
+
+Both registered predictions held (MRR 0.85–0.95; zeros 10–25; ≈1/8 bytes). The
+remaining gap to the free table (−0.076) is the 32-successor record cap: the ten
+zero cues are high-fan-out words whose low-count answer lost least-count displacement.
+One cue regressed from top-1 relative to R5 (same cause). Record count is 12,893 for
+12,897 distinct tokens; the four missing are consistent with first-member identity
+collisions and were not investigated. Seeds remain bit-identical.
+
+**Conclusion.** Inside the same substrate — same 328-byte records, packed store,
+bounded cache, exact paging, checksums, traversal, memory bound — a directed count
+with no decay retrieves far more (MRR 0.907 vs 0.610), at one-eighth the storage,
+one-quarter the training time, and half the query latency, than the relay learner
+at its best (D1). On this task family the neural learning layer (8-member cohorts,
+Hebbian birth/reinforce, source-local forgetting) adds no measured value; it
+subtracts. The deliverable that survives is the numeric learned-graph substrate:
+deterministic addressing, bounded caches, exact paged traversal, immutable
+checksummed snapshots, external decoding. The R6 "qualified learning pass" should be
+read with this comparison attached: the learner passed weak controls, and a trivial
+policy through the identical machinery beats it decisively.
+
+This does not show that no learning rule could beat counts — only that the two tried
+here (source-local and sparse) do not, and that the mechanism (count-driven
+forgetting) is understood. A forgetting-rule change (D2) is therefore a research
+choice, not a defect fix, and needs Bill's decision. Items 4 (container memory-limit
+run of the 16x model; no container runtime is installed on this machine) and 5
+(per-page checksums instead of per-record SHA-256, which R6 measured at 54% of
+training time) remain open; item 5 now applies equally to the count baseline.

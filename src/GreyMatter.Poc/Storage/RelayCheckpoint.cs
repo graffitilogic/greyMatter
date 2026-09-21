@@ -5,7 +5,14 @@ using System.Security.Cryptography;
 namespace GreyMatter.Poc.Storage;
 
 /// <summary>Numeric, versioned, recall + learning continuation metadata; frozen-code input model.</summary>
-public enum RelayLearningPolicy { Global = 0, SourceLocal = 1, NoDecayDiagnostic = 2 }
+/// <summary>
+/// Persisted learning-policy identity. SparseRelay (D1, 2026-09-20) is source-local
+/// forgetting plus 2-of-8 target-subset connectivity; it is never a default and never
+/// reinterprets an older model.
+/// CountBaseline (CB, 2026-09-20) stores directed counts in one record per token with
+/// least-count displacement and no decay: the transition-count baseline, paged.
+/// </summary>
+public enum RelayLearningPolicy { Global = 0, SourceLocal = 1, NoDecayDiagnostic = 2, SparseRelay = 3, CountBaseline = 4 }
 
 public sealed record RelayTrainingState(long Updates, long Episodes, long Observations, uint[] Previous, RelayLearningPolicy Policy = RelayLearningPolicy.Global)
 {

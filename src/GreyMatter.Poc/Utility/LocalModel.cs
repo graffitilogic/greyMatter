@@ -18,8 +18,16 @@ public static class LocalModel
         if (mib != 128 && mib != 256) throw new ArgumentException("Memory budget must be 128 or 256 MiB");
         return (long)mib*1024*1024-AdapterAndScratch;
     }
-    public static Description Train(string source, string format, string model, int seed, int budgetMiB)
+    public static RelayLearningPolicy ParsePolicy(string policy) => policy switch
     {
+        "source-local" => RelayLearningPolicy.SourceLocal,
+        "sparse-relay" => RelayLearningPolicy.SparseRelay,   // D1 experiment; explicit, never default
+        "count-baseline" => RelayLearningPolicy.CountBaseline, // CB baseline; one record per token, counts, no decay
+        _ => throw new ArgumentException("Learning policy must be source-local, sparse-relay or count-baseline")
+    };
+    public static Description Train(string source, string format, string model, int seed, int budgetMiB, string policy = "source-local")
+    {
+        var learningPolicy = ParsePolicy(policy);
         long budget = CacheBudget(budgetMiB); model = Path.GetFullPath(model);
         if (Directory.Exists(model) || File.Exists(model)) throw new IOException("Refusing to overwrite a model");
         byte[] before = Hash(source); long sourceBytes = new FileInfo(source).Length;
@@ -29,10 +37,11 @@ public static class LocalModel
             long sentences = 0, tokens = 0;
             using (var store = new PackedRelayRecords(Path.Combine(staging,"working"),LocalText.Space,budget))
             {
-                var learner = new StoredRelayLearning(store) { SourceLocalForgetting = true };
+                var learner = new StoredRelayLearning(store) { SourceLocalForgetting = learningPolicy == RelayLearningPolicy.SourceLocal,
+                    SparseRelayConnectivity = learningPolicy == RelayLearningPolicy.SparseRelay, CountBaseline = learningPolicy == RelayLearningPolicy.CountBaseline };
                 foreach (var words in LocalText.Sentences(source,format))
                 {
-                    foreach (string word in words) { learner.ObserveMembers(LocalText.Members(word,seed)); tokens++; }
+                    foreach (string word in words) { learner.ObserveMembers(Cohort(word,seed,learningPolicy)); tokens++; }
                     learner.EndSequence(); sentences++;
                 }
                 if (tokens == 0) throw new InvalidDataException("Source has no supported text");
@@ -73,22 +82,30 @@ public static class LocalModel
             BinaryPrimitives.ReadInt64LittleEndian(b.AsSpan(40)),BinaryPrimitives.ReadInt64LittleEndian(b.AsSpan(48)),Convert.ToHexString(b.AsSpan(56,32)));
         if (d.Sentences<1 || d.Tokens<d.Sentences || d.SourceBytes<1) throw new InvalidDataException("Text model counts"); return d;
     }
-    public static (PackedRelayRecords Store, Description Description) Open(string root, int budgetMiB)
+    /// <summary>Policy identity comes from the checkpoint metadata, never from a caller flag; probe reports it.</summary>
+    public static (PackedRelayRecords Store, Description Description, RelayLearningPolicy Policy) Open(string root, int budgetMiB)
     {
         var description=Describe(root); var saved=PackedRelayCheckpoint.OpenReadOnly(Path.Combine(root,"snapshot"),CacheBudget(budgetMiB));
-        if (saved.Store.IdLimit!=LocalText.Space || saved.State.Policy!=RelayLearningPolicy.SourceLocal || saved.State.Previous.Length!=0 ||
+        bool textPolicy = saved.State.Policy is RelayLearningPolicy.SourceLocal or RelayLearningPolicy.SparseRelay or RelayLearningPolicy.CountBaseline;
+        if (saved.Store.IdLimit!=LocalText.Space || !textPolicy || saved.State.Previous.Length!=0 ||
             saved.State.Episodes!=description.Sentences || saved.State.Observations!=description.Tokens)
         { saved.Store.Dispose(); throw new InvalidDataException("Text model training contract mismatch"); }
-        return (saved.Store,description);
+        return (saved.Store,description,saved.State.Policy);
     }
-    public static Recall Query(IRelayRecords records, int seed, string cue, string[] candidates, int hops)
+    /// <summary>CB uses one record per token (its first cohort member); relay policies use the whole cohort.</summary>
+    internal static uint[] Cohort(string canonical, int seed, RelayLearningPolicy policy)
+    {
+        var members = LocalText.Members(canonical, seed);
+        return policy == RelayLearningPolicy.CountBaseline ? members[..1] : members;
+    }
+    public static Recall Query(IRelayRecords records, int seed, string cue, string[] candidates, int hops, RelayLearningPolicy policy = RelayLearningPolicy.SourceLocal)
     {
         if (hops<1 || hops>4 || candidates.Length<1 || candidates.Length>LocalText.MaxCandidates) throw new ArgumentException("Query bounds");
         cue=LocalText.Token(cue); candidates=candidates.Select(LocalText.Token).ToArray();
         if (candidates.Distinct(StringComparer.Ordinal).Count()!=candidates.Length) throw new ArgumentException("Duplicate candidates");
         var store=records as PackedRelayRecords; long reads=store?.BytesRead??0,index=store?.IndexBytesRead??0,evictions=store?.Evictions??0;
-        var runtime=new StoredRelayRecall(records,256,4,4L*1024*1024); runtime.Run(LocalText.Members(cue,seed),hops);
-        var hits=candidates.Select(c=>new Hit(c,LocalText.Members(c,seed).Sum(id=>runtime.Value(id)))).ToArray();
+        var runtime=new StoredRelayRecall(records,256,4,4L*1024*1024); runtime.Run(Cohort(cue,seed,policy),hops);
+        var hits=candidates.Select(c=>new Hit(c,Cohort(c,seed,policy).Sum(id=>runtime.Value(id)))).ToArray();
         return new(hits,store?.ReservedBytes??0,runtime.ReservedBytes,(store?.BytesRead??0)-reads,(store?.IndexBytesRead??0)-index,
             (store?.Evictions??0)-evictions,runtime.StepCount,runtime.DeliveredCount,"Equal scores remain ties; display uses ordinal label order");
     }
@@ -107,7 +124,7 @@ public static class LocalModel
             if (b.AsSpan(8+9*degree,RelayRecord.PayloadBytes-8-9*degree).IndexOfAnyExcept((byte)0)>=0) throw new InvalidDataException("Nonzero record padding");
             count++;edges+=degree;
         });
-        return new { NumericSchema=true, Records=count, Edges=edges, Saved=saved.Description,
+        return new { NumericSchema=true, Records=count, Edges=edges, Saved=saved.Description, Policy=saved.Policy.ToString(),
             Note="Structural audit; not proof that learned numeric state cannot encode semantic information" };
     }
 }

@@ -23,6 +23,13 @@ public static class RelayRecord
         }
         SHA256.HashData(record[..PayloadBytes], record[PayloadBytes..]);
     }
+    /// <summary>
+    /// Provenance byte for CB count edges. Relay edges (0–2) must stay within [0,1];
+    /// a count edge is an exact integer up to 2^24 (float-exact). The byte makes a
+    /// record self-describing, so relay records keep their original validation.
+    /// </summary>
+    public const byte CountPopulation = 3;
+    public const float MaxCount = 16777216f;
     public static void Validate(uint id, ReadOnlySpan<byte> record)
     {
         using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Serialization);
@@ -36,7 +43,9 @@ public static class RelayRecord
         for (int e = 0; e < degree; e++)
         {
             float w = BinaryPrimitives.ReadSingleLittleEndian(record[(12 + 9 * e)..]);
-            if (!float.IsFinite(w) || w < 0 || w > 1 || record[16 + 9 * e] > 2)
+            byte population = record[16 + 9 * e];
+            bool count = population == CountPopulation;
+            if (!float.IsFinite(w) || w < 0 || population > CountPopulation || (count ? w > MaxCount || w != MathF.Floor(w) : w > 1))
                 throw new InvalidDataException("Invalid synapse");
         }
     }

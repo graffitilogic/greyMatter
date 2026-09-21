@@ -3,11 +3,15 @@
 A C# experiment in learning and recall through sparse activation, procedural neuron
 identities, numeric learned state, and connection-driven loading and eviction.
 
-**Status — 2026-09-18: recovery campaign complete.** Local-text learn/probe/audit
-works, and exact paging plus bounded training are demonstrated on learned state.
-Real-data MRR was **0.570**, above frequency **0.173** and untrained **0.127**, but
-below co-occurrence **0.983**; **61/128 cues produced no output**. This is qualified
-engineering progress, not a demonstrated learning advantage. **210 tests pass.**
+**Status — 2026-09-20: recovery campaign closed at R6; post-closeout comparison complete.**
+Local-text learn/probe/audit works, and exact paging plus bounded training are demonstrated
+on learned state. The R5 relay learner scored MRR **0.570** with **61/128** zero-output
+cues; a diagnostic showed each token keeps only ~4 successors (slot cost) and forgetting
+is clocked by other-successor count. Sparse wiring (D1) lifted it to **0.610 / 56 zeros**.
+A decay-free **count policy through the identical substrate** (same records, packed store,
+bounded cache, exact paging) scores **0.907 / 10 zeros at 4.55 MiB versus 37 MiB**. On this
+task the neural learning layer subtracts value; the substrate is the deliverable. The
+three "seeds" are isomorphic relabelings, not replication. **219 tests pass.**
 
 The closeout profile attributes about **54% of training scope time to record
 serialization/checksum work**, 21% to file calls and 13% to learning. File-call time
@@ -33,7 +37,8 @@ dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll probe \
 dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll audit --model ./my-model
 ```
 
-Candidates are an external file with one token per line, at most 4096 unique tokens.
+`learn` accepts `--policy source-local` (default), `sparse-relay`, or `count-baseline`; the
+policy is persisted in the model and reported by `probe`/`audit`. Candidates are an external file with one token per line, at most 4096 unique tokens.
 Probe uses saved encoder settings, requires no training source, and performs no
 learning. It reports every candidate's activation score, ties and a `NoOutput` flag.
 This is closed-candidate retrieval, not generation; ordinal ordering of zero scores
@@ -57,7 +62,8 @@ utility. Append/resume training for these text models is not implemented.
 |---|---|
 | Real text |40,006 training sentences, 327,074 tokens; roughly 37 MiB model storage |
 | Runtime memory |Training peak below 97 MiB; paged evaluation below 71 MiB |
-| Real-data recall |128 fixed supported cues, 32 candidates; three fixed encoder seeds |
+| Real-data recall |128 fixed supported cues, 32 candidates; three fixed encoder seeds (isomorphic) |
+| Post-closeout comparison |relay 0.570 → sparse relay 0.610 → **count policy 0.907** MRR on the same frozen task; 37 → 4.55 MiB |
 | Larger synthetic state |4.47 million records, 33.55 million edges; 1.50 GiB snapshot |
 | Capacity comparison |288 MiB training peak vs 1.71 GiB resident reference; exact paged scores |
 | Synthetic quality at that size |Direct 100%, multi-hop 92.4%, including zero-output ties |

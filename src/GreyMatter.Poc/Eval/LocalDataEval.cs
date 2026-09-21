@@ -31,7 +31,7 @@ public static class LocalDataEval
         foreach(var q in set.Questions)
         {
             if(q.Candidates.Length!=32||q.Answer<0||q.Answer>=32)throw new InvalidDataException("Query shape");
-            var clock=Stopwatch.StartNew();var result=LocalModel.Query(records,saved.Description.Seed,q.Cue,q.Candidates,1);clock.Stop();
+            var clock=Stopwatch.StartNew();var result=LocalModel.Query(records,saved.Description.Seed,q.Cue,q.Candidates,1,saved.Policy);clock.Stop();
             rows.Add(new {q.Cue,Scores=result.Results.Select(h=>h.Score).ToArray(),Milliseconds=clock.Elapsed.TotalMilliseconds,
                 result.DataRead,result.IndexRead,result.Evictions,result.Steps,result.Delivered});
         }
