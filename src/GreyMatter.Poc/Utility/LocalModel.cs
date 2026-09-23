@@ -25,7 +25,7 @@ public static class LocalModel
         "count-baseline" => RelayLearningPolicy.CountBaseline, // CB baseline; one record per token, counts, no decay
         _ => throw new ArgumentException("Learning policy must be source-local, sparse-relay or count-baseline")
     };
-    public static Description Train(string source, string format, string model, int seed, int budgetMiB, string policy = "source-local")
+    public static Description Train(string source, string format, string model, int seed, int budgetMiB, string policy = "count-baseline")
     {
         var learningPolicy = ParsePolicy(policy);
         long budget = CacheBudget(budgetMiB); model = Path.GetFullPath(model);

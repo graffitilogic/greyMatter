@@ -22,7 +22,7 @@ public static class PackedResourceEval
         {
             lock (_sync)
             {
-                try { var u = MacFileIo.Sample(); _rss = Math.Max(_rss, u.ResidentBytes); _footprint = Math.Max(_footprint, u.PhysicalFootprintBytes); _managed = Math.Max(_managed, GC.GetTotalMemory(false)); }
+                try { var u = NativeIo.Sample(); _rss = Math.Max(_rss, u.ResidentBytes); _footprint = Math.Max(_footprint, u.PhysicalFootprintBytes); _managed = Math.Max(_managed, GC.GetTotalMemory(false)); }
                 catch (Exception e) { _error = e; }
             }
         }
@@ -72,9 +72,9 @@ public static class PackedResourceEval
         {
             using var store = new PackedRelayRecords(Path.Combine(root, "working"), CapacityEval.Space, cacheBudget);
             var learner = new StoredRelayLearning(store) { SourceLocalForgetting = true };
-            var nativeBefore = MacFileIo.Sample(); var clock = System.Diagnostics.Stopwatch.StartNew();
+            var nativeBefore = NativeIo.Sample(); var clock = System.Diagnostics.Stopwatch.StartNew();
             PolicyIntegrationEval.Train(store, learner, seed, chains, false); clock.Stop();
-            Traffic trainingIo = Counters(store); var trainingNative = Difference(MacFileIo.Sample(),nativeBefore);
+            Traffic trainingIo = Counters(store); var trainingNative = Difference(NativeIo.Sample(),nativeBefore);
             double trainingSeconds = clock.Elapsed.TotalSeconds;
             clock.Restart(); PackedRelayCheckpoint.Publish(store, Path.Combine(root,"complete"), learner.Capture()); clock.Stop();
             double publicationSeconds = clock.Elapsed.TotalSeconds; long edges = 0; var bytes = new byte[RelayRecord.Bytes];
@@ -105,7 +105,7 @@ public static class PackedResourceEval
         var passes = new List<Pass>();
         foreach (bool reverse in new[] { false,true })
         {
-            var trafficBefore = Counters(resident == null ? source : null); var nativeBefore = MacFileIo.Sample();
+            var trafficBefore = Counters(resident == null ? source : null); var nativeBefore = NativeIo.Sample();
             var timer = System.Diagnostics.Stopwatch.StartNew(); var queries = new List<Probe>();
             int count = Math.Min(64,chains)*2;
             for (int at = 0; at < count; at++)
@@ -121,7 +121,7 @@ public static class PackedResourceEval
                 }
                 elapsed.Stop(); queries.Add(new(index,chain,hops,correct,scores,RecoveryLearning.ScoreRank(scores,correct).Top1,elapsed.Elapsed.TotalMilliseconds));
             }
-            timer.Stop(); var nativeAfter=MacFileIo.Sample();
+            timer.Stop(); var nativeAfter=NativeIo.Sample();
             passes.Add(new(reverse ? "repeat-reverse" : "first-forward",queries.ToArray(),timer.Elapsed.TotalSeconds,
                 Subtract(Counters(resident == null ? source : null),trafficBefore),Difference(nativeAfter,nativeBefore)));
         }
@@ -130,7 +130,7 @@ public static class PackedResourceEval
             StoreReservedBytes=source.ReservedBytes, TraversalReservedBytes=runtime.ReservedBytes, ResidentManagedDeltaBytes=residentBytes,
             Records=source.Count, PayloadBytes=source.Count*RelayRecord.Bytes, InputHash=inputHash, State=saved.State,
             StartupSeconds=startupSeconds, Passes=passes, Immutable=immutable, SnapshotHash=expected,
-            Memory=memory.Finish(), TotalSeconds=total.Elapsed.TotalSeconds,
+            Memory=memory.Finish(), TotalSeconds=total.Elapsed.TotalSeconds, Kernel=Environment.OSVersion.Platform.ToString(), Cgroup=NativeIo.Cgroup(),
             CacheNote="First: empty application cache (resident preloaded); repeat: retained caches. OS/hardware not purged. F_NOCACHE advisory only." });
         return immutable && passes.All(p=>p.Logical.DataWritten==0 && p.Logical.IndexWritten==0) ? 0 : 1;
         void Save(object result) { File.WriteAllText(output,JsonSerializer.Serialize(result,new JsonSerializerOptions { WriteIndented=true })); Console.WriteLine($"{action} seed{seed} {mib}MiB {backend}/{io} complete"); }

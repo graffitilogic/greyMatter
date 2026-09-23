@@ -19,7 +19,7 @@ public static class LocalModelCli
         string Required(string key)=>args.Value(key,null)??throw new ArgumentException(key+" required");
         int budget=int.Parse(args.Value("--budget-mib","128")!); _=LocalModel.CacheBudget(budget);
         string model=Required("--model"); var clock=Stopwatch.StartNew(); object result;
-        if(command=="learn") result=LocalModel.Train(Required("--source"),args.Value("--format","text")!,model,int.Parse(args.Value("--seed","201")!),budget,args.Value("--policy","source-local")!);
+        if(command=="learn") result=LocalModel.Train(Required("--source"),args.Value("--format","text")!,model,int.Parse(args.Value("--seed","201")!),budget,args.Value("--policy","count-baseline")!);
         else if(command=="audit") result=LocalModel.Audit(model,budget);
         else
         {

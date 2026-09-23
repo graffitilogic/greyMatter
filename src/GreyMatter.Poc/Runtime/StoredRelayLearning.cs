@@ -80,10 +80,10 @@ public sealed class StoredRelayLearning
     public RelayTrainingState Capture() => new(Updates, Episodes, Observations, _previous.ToArray(), _policy);
     private void Load(uint id)
     {
-        if (_records.Read(id, _buffer)) RelayRecord.Decode(id, _buffer, _scratch);
+        if (_records.Read(id, _buffer)) RelayRecord.Decode(id, _buffer, _scratch, validate: !_records.SealsAtDiskBoundary);
         else _scratch.Degree[0] = 0;
     }
-    private void Save(uint id) { RelayRecord.Encode(id, _scratch, _buffer); _records.Write(id, _buffer); }
+    private void Save(uint id) { RelayRecord.Encode(id, _scratch, _buffer, seal: !_records.SealsAtDiskBoundary); _records.Write(id, _buffer); }
     public void Observe(in SparseCode code) => ObserveMembers(AssemblyRelay.Members(code, checked((int)_records.IdLimit)));
     public void ObserveMembers(ReadOnlySpan<uint> current)
     {
@@ -153,7 +153,7 @@ public sealed class StoredRelayLearning
         {
             long recordStart = System.Diagnostics.Stopwatch.GetTimestamp();
             if (!_records.Read(id, _buffer)) throw new InvalidDataException("Enumerated record missing");
-            RelayRecord.Decode(id, _buffer, _scratch);
+            RelayRecord.Decode(id, _buffer, _scratch, validate: !_records.SealsAtDiskBoundary);
             _scratch.ApplyDecay(1, .99f); Save(id); DecayVisits++;
             DecayRecordTicks += System.Diagnostics.Stopwatch.GetTimestamp() - recordStart;
         });

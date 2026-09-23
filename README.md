@@ -10,11 +10,16 @@ cues; a diagnostic showed each token keeps only ~4 successors (slot cost) and fo
 is clocked by other-successor count. Sparse wiring (D1) lifted it to **0.610 / 56 zeros**.
 A decay-free **count policy through the identical substrate** (same records, packed store,
 bounded cache, exact paging) scores **0.907 / 10 zeros at 4.55 MiB versus 37 MiB**. On this
-task the neural learning layer subtracts value; the substrate is the deliverable. The
-three "seeds" are isomorphic relabelings, not replication. **219 tests pass.**
+task the neural learning layer subtracts value; the substrate is the deliverable, and the
+count policy is now the default. Moving record checksums to the disk boundary halved relay
+training time bit-exactly. Inside a Linux guest with a 128 MiB cgroup, the 1.5 GiB synthetic
+model is queried exactly by a ~46 MB process with real block-layer reads (host cache still
+underneath, so not device-cold). The three "seeds" are isomorphic relabelings, not
+replication. **224 tests pass.**
 
-The closeout profile attributes about **54% of training scope time to record
-serialization/checksum work**, 21% to file calls and 13% to learning. File-call time
+The R6 closeout profile attributed about **54% of training scope time to record
+serialization/checksum work**; hashing once per disk write/load instead of per access
+cut that to 19% and training wall time from 8.6 s to 4.6 s with identical output. File-call time
 is not pure disk wait; instrumentation and OS caching limit interpretation. Current
 evidence does **not justify a CUDA port**. Further research requires a new directive.
 
@@ -37,7 +42,8 @@ dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll probe \
 dotnet src/GreyMatter.Poc/bin/Release/net8.0/gm.dll audit --model ./my-model
 ```
 
-`learn` accepts `--policy source-local` (default), `sparse-relay`, or `count-baseline`; the
+`learn` accepts `--policy count-baseline` (default since 2026-09-21: one record per token,
+directed counts, no decay), `source-local` (the R5 relay learner) or `sparse-relay` (D1); the
 policy is persisted in the model and reported by `probe`/`audit`. Candidates are an external file with one token per line, at most 4096 unique tokens.
 Probe uses saved encoder settings, requires no training source, and performs no
 learning. It reports every candidate's activation score, ties and a `NoOutput` flag.
@@ -46,8 +52,9 @@ is not an answer. Hops 1–4 and memory budgets 128/256 MiB are supported. Peak 
 be unavailable through .NET on macOS (reported null); experiments use native timing.
 
 Tokenization is versioned NFKC/lowercase letter/digit runs. A stable hash supplies
-numeric identities; eight deterministic neurons carry each token's relay signal.
-Observed adjacent tokens update source-local synapses. Sentence boundaries reset
+numeric identities. Under the default count policy each token is one numeric record
+holding up to 32 successor counts; under the relay policies eight deterministic neurons
+carry each token's signal and observed adjacent tokens update source-local synapses. Sentence boundaries reset
 learning context. Text labels, candidate lists and source passages stay outside the
 numeric model. The audit validates schema/checksums and rejects extra model files;
 it cannot establish absence of semantic memorization in numerical weights.
@@ -77,8 +84,9 @@ the same corpus; they are not independent data replications.
 Earlier correctness tests demonstrate exact recall through repeated eviction with
 one- and eight-record caches. The larger synthetic workload demonstrates bounded
 training with actual eviction. Current real-data query working sets fit the cache.
-OS caching assists measured latency; neither cold-storage performance nor a network
-larger than physical RAM has been demonstrated. The historical full R4 grid remains
+OS caching assists measured latency on the host; a memory-capped guest run demonstrates
+exact recall with the model far larger than the OS can cache, but cold-device latency
+remains unmeasured on this machine. The historical full R4 grid remains
 incomplete; later bounded passes do not rewrite its recorded failures. CUDA is deferred.
 
 ## Evidence and continuation

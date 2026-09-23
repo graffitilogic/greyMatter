@@ -5619,3 +5619,166 @@ choice, not a defect fix, and needs Bill's decision. Items 4 (container memory-l
 run of the 16x model; no container runtime is installed on this machine) and 5
 (per-page checksums instead of per-record SHA-256, which R6 measured at 54% of
 training time) remain open; item 5 now applies equally to the count baseline.
+
+# Post-closeout decisions and item 5 registration (2026-09-21)
+
+Bill's decisions on 2026-09-21: adopt the count policy as the utility's default; keep
+the relay policies as explicit experimental options; proceed with item 5; install a
+container runtime (colima) for item 4. `learn` now defaults to `--policy count-baseline`;
+existing models are unaffected because policy identity is read from the checkpoint.
+R5/D1/CB models and results are unchanged; the R5 scripts remain historical.
+
+## Item 5 registration — checksums at the storage boundary, not per access
+
+R6 measured record serialization/checksum at 53.77% of training scope time. Cause:
+`RelayRecord.Encode` computes SHA-256 on every save and `Decode` re-verifies it on
+every read — including cache hits, which are the vast majority (repeat passes read
+zero logical bytes). Integrity is a property of storage, so the registered change is:
+verify a record's checksum once when it is loaded from disk into the packed cache,
+compute it once when a dirty record is flushed to disk, and never on a cache hit.
+On-disk format (328-byte records with SHA-256), checkpoints, audit and all existing
+models are unchanged; `audit` still validates every record. Per-page CRC (a format
+change) is the fallback only if this is insufficient. `Read` of a target during
+recall, which only needs existence, stops copying and validating the whole record.
+
+Protocol: the R6 profile harness unchanged (frozen R5 train file, seed 201, 128 MiB,
+one model, separate-process scoring of the 128 frozen queries), run for BOTH the
+relay policy (to compare with R6's numbers) and the new default count policy. Gate:
+bit-identical model snapshot hashes and all 128 score vectors versus the pre-change
+runs (R6 model `F4EB315B…` for relay; CB model for count); all corruption tests
+still fail closed; full suite green. Report the new Serialization share; expected
+well under 20% for relay. No numerical rule changes. One implementation attempt.
+
+## Item 5 result — checksums at the disk boundary halve training time, bit-exact (2026-09-21)
+
+Implementation: `RelayRecord.Encode(…, seal)` / `Decode(…, validate)` flags;
+`IRelayRecords.SealsAtDiskBoundary` (default false) and `Contains` (existence without
+a copy); `PackedRelayRecords` seals in `Writeback` (one SHA-256 per disk write, in
+place so the cache copy is valid too), verifies on cache-miss load and in
+`VisitPresent`, and no longer hashes on `Write`; `StoredRelayLearning` /
+`StoredRelayRecall` trust a sealing store's copies and write unsealed to it; recall's
+target-existence check no longer copies and validates a whole record. Reference,
+legacy and deferred stores keep per-write validation. On-disk format, checkpoints,
+`audit` and all existing models are unchanged. Three new tests: unsealed write →
+sealed at writeback and valid after reopen; a flipped bit on disk still fails closed
+on load; the reference store still rejects unsealed writes and both stores produce
+identical sealed records from identical learning. The profile eval gained `--policy`
+and policy-aware scoring (it had queried with relay cohorts regardless of policy).
+
+One process note: the first profile run happened while the test project failed to
+compile (an interface default member accessed on the concrete type); `gm.dll` was
+current, so the profile is valid, but the "219 passed" printed alongside it was a
+stale binary. After the one-line fix the genuine suite is **222/222**.
+
+Protocol as registered (R6 harness, frozen R5 train file, seed 201, 128 MiB, separate-
+process scoring of the 128 frozen queries), run for both policies. Ledger
+`artifacts/recovery/item5/commands.json` (8 workers, exit 0), `summary.json`.
+Relay snapshot hash equals the R6/R5 model (`F4EB315B…`) and all 128 score vectors
+match; count snapshot hash equals the CB seed-201 model and all 128 vectors match.
+
+| training scope, exclusive seconds (share) | R6 relay, before | item 5 relay | item 5 count |
+|---|---:|---:|---:|
+| wall | 8.6112 | **4.6388** | 1.1285 |
+| Serialization | 4.630 (53.8%) | **0.874 (18.8%)** | 0.166 (14.7%) |
+| FileApi | 1.822 (21.2%) | 1.814 (39.1%) | 0.320 (28.3%) |
+| Learning | 1.146 (13.3%) | 1.136 (24.5%) | 0.103 (9.1%) |
+| CacheIndex | 0.662 (7.7%) | 0.469 (10.1%) | 0.110 (9.7%) |
+| Encoding | 0.214 (2.5%) | 0.223 (4.8%) | 0.314 (27.8%) |
+| native real / user CPU, seconds | 8.70 / 7.00 | **4.72 / 3.08** | 1.19 / 0.89 |
+| native peak RSS, MiB | 94.2 | 94.9 | 63.9 |
+
+Scoring scope: relay 0.0616 → 0.0799 s (serialization 3.0% → 1.1%; the difference is
+run noise at this scale, not a regression claim), count 0.0412 s. File-API time is
+unchanged, as expected — it was never the hashing. The remaining serialization cost
+is encode/decode of the 328-byte layout, not hashing. Per-page CRC (a format change)
+is not needed and is not pursued. Same limits as R6: instrumented wall time, OS cache
+warm, one run each, not a benchmark.
+
+# Item 4 registration — memory-limited guest run of the 16x model (before any result)
+
+Goal: the only untested part of the memory thesis is behaviour when the OS page cache
+cannot hold the model. Every prior query measurement showed zero kernel disk reads on
+a 32 GiB host caching a 1.5 GiB snapshot. This run puts the frozen capacity16 model
+(`/private/tmp/gm-capacity16-20260917-seed201-m256/complete`, snapshot SHA256
+`5F4473A1…`, 4,470,045 records, 1,466,174,760 payload bytes) inside a Linux VM whose
+total RAM is smaller than the snapshot, in a container with a cgroup memory cap, and
+re-runs the registered 128 queries (64 direct, 64 composed; first-forward then
+repeat-reverse) at the 128 MiB budget, paged, buffered I/O.
+
+Environment: colima/lima on Apple Silicon (native arm64; the first Rosetta install
+was discarded), guest RAM **1 GiB**, container `--memory 256m --memory-swap 256m`.
+The model is COPIED into a volume on the guest's own disk so the guest kernel, not
+a host share, serves reads; `gm` is built for linux-arm64 in an SDK container and
+run in the runtime image. New Linux instrument: `/proc/self/io` read/write bytes,
+`/proc/self/status` VmRSS/VmHWM and, when readable, cgroup `memory.peak`/`memory.max`,
+reported in the same `Usage` shape as the macOS sampler; missing counters fail
+explicitly rather than reading zero. `--io nocache` (F_NOCACHE) is macOS-only and
+is not used here.
+
+Gates: all 256 score vectors bit-equal to the capacity16 resident reference
+(`seed201-m256-model256-query-resident-buffered.json`); snapshot hash unchanged; zero
+writes; process RSS peak ≤ the original bound B + 1.25·M (388,710,400 bytes) and the
+container never OOM-kills; guest-level disk read bytes on the first pass are
+substantial (expected ≥ the logical record bytes read, since the cache cannot hold
+the model). p95 latency is reported but not gated.
+
+Honest limit, fixed now: the VM's virtual disk is a file on the macOS host, and the
+host's page cache still sits beneath it. Guest-level reads are real kernel I/O to the
+virtual device and the guest cannot cache the model, so bounded-memory correctness
+and eviction under page-cache pressure are tested; **device-cold latency is not**.
+A raw-device or purged-host measurement remains outside this machine's means.
+One run; if the environment cannot be brought up, report the block, not a pass.
+
+### Item 4 — two environment attempts and one additional cell, declared before the result
+
+Attempt 1 failed because `/private/tmp` is not shared into the colima guest (empty
+copy); attempt 2 copied macOS AppleDouble sidecars (`._*.bin`) into the snapshot, which
+the `*.bin` physical hash includes, so the worker reported `Immutable=false` although
+all 256 scores were exact and the model bytes were intact. Both attempts are kept under
+`artifacts/recovery/item4/attempt*/`. Attempt 2 also showed that the store's mandatory
+open-time index checksum warms the 134 MB index inside a 256 MiB cgroup, so record reads
+hit the virtual disk but index reads did not. Therefore a second cell at
+`--memory 128m` is declared now, in addition to the registered 256 MiB cell: with
+~48 MB process RSS the page cache cannot hold the index either. Same gates; latency
+reported, not gated. Nothing else changes.
+
+## Item 4 result — bounded guest memory: exact recall, real block-layer reads (2026-09-21)
+
+Environment: colima 0.10.3 (native arm64 lima; PATH must prefer `/opt/homebrew/bin`
+over the Rosetta install), guest 1 GiB RAM / 4 CPU / aarch64 / cgroup v2, Docker 29.5.2.
+Snapshot streamed into a guest-disk volume with `COPYFILE_DISABLE=1 tar --exclude '._*'`
+(1.5 GiB in 6.8 s); `gm` published for linux-arm64 in `mcr.microsoft.com/dotnet/sdk:8.0`;
+worker run in `mcr.microsoft.com/dotnet/runtime:8.0`. Ledger and raw outputs:
+`artifacts/recovery/item4/commands.json`, `query-paged-{256m,128m}.stdout.txt`,
+`container-out/query-paged-{256m,128m}.json`, `summary-{256m,128m}.json`. Failed
+attempts retained under `attempt1-failed-mount/`, `attempt2-appledouble/`,
+`attempt3-128m-gcheaplimit/`. Tests 224/224 (NativeIo parser and host sampler added).
+
+The 128 MiB cell first died with a .NET `OutOfMemoryException` (cgroup `oom_kill 0`):
+the runtime's GC hard limit defaults to 75% of the cgroup (96 MiB) and the worker
+preallocates its ~125 MiB record-cache array. Only the runtime self-limit was raised
+(`DOTNET_GCHeapHardLimit=256MiB`); the cgroup stayed at 128 MiB. Untouched cache pages
+are never committed, which is why RSS stays near 46 MB in both cells.
+
+| cell | cgroup max = peak | oom_kill | reclaim events (`max`) | process peak RSS | first p95 ms | repeat p95 ms | resident p95 (host) | first-pass kernel reads | repeat kernel reads | exact / immutable / writes |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| 256 MiB | 268,435,456 | 0 | 5,180 | 48.6 MB | 1.437 | 0.360 | 0.334 / 0.260 | 1,867,776 B | 0 | 256/256 · yes · 0 |
+| 128 MiB | 134,217,728 | 0 | 4,503 | 48.6 MB | 1.063 | 0.423 | 0.334 / 0.260 | 1,540,096 B | 0 | 256/256 · yes · 0 |
+
+All 256 score vectors in each cell are bit-equal to the capacity16 resident reference;
+snapshot hash `5F4473A1…` unchanged; zero data/index writes; top-1 123.16/128 with tie
+credit, as before. Process RSS is 8× below the original B+1.25M bound. The guest page
+cache was pinned at the cgroup cap throughout (memory.peak == memory.max, thousands
+of reclaim events), so the 1.47 GB record file could not be cached; first-pass record
+reads were served by the virtual block device (cgroup `io.stat` rbytes 1.60 GB / 1.30 GB
+including the immutability hash; per-process `read_bytes` 1.87 MB / 1.54 MB for the
+query passes). Repeat passes read nothing from the block layer because the queries'
+own working set (~2 MB) fits any cache. Index probes mostly hit because the store's
+open-time index checksum leaves the tail of the 134 MB index cached even at 128 MiB.
+
+Verdict for the memory thesis: **a 1.5 GiB learned model is queried exactly by a process
+holding ~46 MB, inside an OS that cannot cache the model, with real kernel I/O.** The
+registered limit stands: the guest's virtual disk is a host file and the 32 GiB host
+page cache sits beneath it, so first-pass latencies (≈1.1–1.4 ms p95, 3–4× resident)
+are not device-cold numbers. Bounded memory and eviction-under-pressure correctness are
+now demonstrated at the OS level; cold-device latency remains unmeasured on this machine.

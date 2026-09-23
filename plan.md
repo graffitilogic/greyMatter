@@ -2,7 +2,7 @@
 
 **Directive:** Bill, 2026-09-09. Build the proof of concept originally requested: learn from local data, recall related material through a learned network, and execute that network with substantially less resident memory than its complete learned state requires.
 
-**Status:** Packed storage PASS (2026-09-16):203 tests, exact8192-chain learning/restart/recall; snapshot allocation3.19GiB ->120.71MiB (96.31% reduction). Warm query p95 unchanged; logical read traffic~10x higher. R4 remains stopped.
+**Status:** Campaign CLOSED at R6. Post-closeout items 1–5 complete (2026-09-21): fan-out diagnosis; D1 (forgetting caps successors ~6); CB count policy now default (.907 MRR, 1/8 bytes); item 5 disk-boundary checksums (training 8.6→4.6 s, exact); item 4 memory-capped guest run (1.5 GiB model, 46 MB RSS, exact, real block reads; device-cold latency still unmeasured). 224 tests. No open work without a new directive.
 
 ## Authorized continuation — activation-travel review (2026-09-09)
 
@@ -18,7 +18,7 @@ state. Distinguish edge existence from usable activation; no new pass bar or suc
 claim is allowed from this diagnostic. Bound: one development run, targeted observer
 correctness tests, one written design recommendation and handoff. No parameter tuning.
 
-**Current work:** Authorized fixed-record packing complete. Records/learning unchanged; bounded disk index and version4 checkpoints verified. No tuning or variable-length compression attempted.
+**Current work:** None. All five post-closeout items delivered and recorded; colima guest can be stopped/deleted; scratch models under /private/tmp are reproducible from the ledgers.
 
 ## A1 — protected assembly relay (authorized by Bill)
 
@@ -219,11 +219,11 @@ The campaign ends at R6 or at its first exhausted prerequisite gate. No R7, new 
 
 At every phase boundary, before a long run, and before a context/usage handoff, append a compact recovery checkpoint to RESULTS. Keep the following active pointer current in this guide:
 
-- **Current phase:** Packed fixed-record integration complete: PASS.
-- **Passed gates:** R0, A1, R2 storage, R3 exact paged traversal; original R1 remains failed. Evidence: artifacts/recovery/a1, r2 and r3.
-- **Next action:** Register a bounded memory-pressure/resource follow-up, explicitly measuring index read amplification and OS-cache effects. Do not silently claim R4 passed or launch a long grid.
-- **Open decision:** none for deferred-decay implementation (approved); runtime budget remains a gate for projected long jobs.
-- **Running jobs/artifacts:** None. artifacts/recovery/packed/summary.json, source-manifest.json, command ledgers and full-tests.trx (203/203). Models /private/tmp/gm-packed-20260916-seed100 and -seed201. All workers completed.
+- **Current phase:** Post-closeout complete (items 1–5).
+- **Established:** R6 capstone plus: R5 zeros structural; D1 slot cost fixed, forgetting binds at ~6; CB count policy beats the learner through the same substrate and is the utility default; checksums at the disk boundary (bit-exact, −46% training wall); exact recall of a 1.5 GiB model in a 128/256 MiB cgroup with ~46 MB RSS and kernel-level reads.
+- **Next action:** none without a new directive. Candidate directives: D2 forgetting rule (research); device-cold latency on a machine with a raw device; commit the post-closeout work.
+- **Open decisions:** whether to commit; whether to keep colima installed.
+- **Running jobs/artifacts:** none. artifacts/recovery/{fanout,d1,count-baseline,item5,item4}; docker volumes gm-item4-{model,app}; models under /private/tmp/gm-{d1,count,item5}-2026092*. Tests 224/224.
 
 Each checkpoint must contain: exact current phase and gate status; changed files; completed test commands and outcomes; full effective configuration and dataset checksum; raw artifact paths; process/session IDs and completion state; attempts used; unresolved defects; and one concrete next command/action. Never copy a prior agent's PASS without an artifact reference.
 

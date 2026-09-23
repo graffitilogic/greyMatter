@@ -8,7 +8,8 @@ namespace GreyMatter.Poc.Storage;
 public static class RelayRecord
 {
     public const int Cap = 32, PayloadBytes = 8 + 9 * Cap, Bytes = PayloadBytes + 32;
-    public static void Encode(uint id, SynapseStore synapses, Span<byte> record)
+    /// <summary>Item 5: <paramref name="seal"/> false leaves the hash slot zero for a store that seals at its disk boundary.</summary>
+    public static void Encode(uint id, SynapseStore synapses, Span<byte> record, bool seal = true)
     {
         using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Serialization);
         record.Clear();
@@ -21,6 +22,12 @@ public static class RelayRecord
             BinaryPrimitives.WriteSingleLittleEndian(record[(at + 4)..], synapses.Weight[e]);
             record[at + 8] = synapses.Population[e];
         }
+        if (seal) Seal(record);
+    }
+    /// <summary>Compute the record's SHA-256 into its hash slot. Called once per disk write by a sealing store.</summary>
+    public static void Seal(Span<byte> record)
+    {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Serialization);
         SHA256.HashData(record[..PayloadBytes], record[PayloadBytes..]);
     }
     /// <summary>
@@ -49,10 +56,12 @@ public static class RelayRecord
                 throw new InvalidDataException("Invalid synapse");
         }
     }
-    public static void Decode(uint id, ReadOnlySpan<byte> record, SynapseStore synapses)
+    /// <summary>Item 5: <paramref name="validate"/> false trusts a copy the store already verified at its disk boundary.</summary>
+    public static void Decode(uint id, ReadOnlySpan<byte> record, SynapseStore synapses, bool validate = true)
     {
         using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.Serialization);
-        Validate(id, record);
+        if (validate) Validate(id, record);
+        else if (record.Length != RelayRecord.Bytes || BinaryPrimitives.ReadUInt32LittleEndian(record) != id) throw new InvalidDataException("Record identity");
         synapses.Degree[0] = BinaryPrimitives.ReadInt32LittleEndian(record[4..]);
         for (int e = 0; e < synapses.Degree[0]; e++)
         {
@@ -72,6 +81,15 @@ public interface IRelayRecords : IDisposable
     void Write(uint id, ReadOnlySpan<byte> record);
     void Flush();
     void VisitPresent(Action<uint> visit);
+    /// <summary>
+    /// Item 5 (2026-09-21): a store that verifies checksums when loading from disk and
+    /// seals them when writing to disk. Its cache copies are trusted between those
+    /// boundaries, so callers may write unsealed records and decode without re-hashing.
+    /// Reference and legacy stores keep per-write validation.
+    /// </summary>
+    bool SealsAtDiskBoundary => false;
+    /// <summary>Existence without copying or validating the record.</summary>
+    bool Contains(uint id) { Span<byte> scratch = stackalloc byte[RelayRecord.Bytes]; return Read(id, scratch); }
 }
 
 /// <summary>Deliberately unbounded reference backend, never hidden inside disk mode.</summary>

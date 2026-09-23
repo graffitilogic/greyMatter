@@ -236,9 +236,16 @@ public sealed class PackedRelayRecords : IRelayRecords
         }
         _ids[slot] = id; InsertHash(slot); Prepend(slot); return slot;
     }
+    public bool SealsAtDiskBoundary => true;
+    public bool Contains(uint id)
+    {
+        using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.CacheIndex);
+        return Find(id) >= 0 || Address(id, false) != 0;
+    }
     private void Writeback(int slot)
     {
         if (!_dirty[slot]) return;
+        RelayRecord.Seal(At(slot));   // item 5: one hash per disk write, sealed in place so the cache copy is valid too
         GreyMatter.Poc.Eval.CostProfile.Write(_data, At(slot), checked((long)_ordinals[slot] * RelayRecord.Bytes));
         _dirty[slot] = false; DirtyWrites++; BytesWritten += RelayRecord.Bytes;
     }
@@ -258,7 +265,10 @@ public sealed class PackedRelayRecords : IRelayRecords
     {
         using var attribution = GreyMatter.Poc.Eval.CostProfile.Enter(GreyMatter.Poc.Eval.CostProfile.Kind.CacheIndex);
         if (_readOnly) throw new InvalidOperationException("Committed packed generations are immutable");
-        RelayRecord.Validate(id, record); int slot = Find(id);
+        // Item 5: no per-write hash. Identity and degree are checked; the record is sealed at writeback.
+        if (record.Length != RelayRecord.Bytes || BinaryPrimitives.ReadUInt32LittleEndian(record) != id) throw new InvalidDataException("Record identity");
+        int degree = BinaryPrimitives.ReadInt32LittleEndian(record[4..]); if (degree < 0 || degree > RelayRecord.Cap) throw new InvalidDataException("Degree");
+        int slot = Find(id);
         if (slot < 0) { ulong address = Address(id, true); slot = Allocate(id, out _); _ordinals[slot] = address - 1; }
         record.CopyTo(At(slot)); _dirty[slot] = true;
     }

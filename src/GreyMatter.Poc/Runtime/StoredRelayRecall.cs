@@ -89,7 +89,7 @@ public sealed class StoredRelayRecall
                 var source = _active[i]; if (source.Drive < .5f) continue;
                 // Truly unseen cue IDs are the empty baseline, never fabricated edges.
                 if (!_records.Read(source.Id, _source)) continue;
-                RelayRecord.Decode(source.Id, _source, _synapses);
+                RelayRecord.Decode(source.Id, _source, _synapses, validate: !_records.SealsAtDiskBoundary);
                 int degree = _synapses.Degree[0]; double sum = 0;
                 for (int e = 0; e < degree; e++) sum += Math.Max(0, _synapses.Weight[e]);
                 if (sum <= 0) continue;
@@ -100,7 +100,7 @@ public sealed class StoredRelayRecall
                     uint target = _synapses.Target[e];
                     // Load now, even at the last tick. Source adjacency has already been copied,
                     // so a one-record cache can evict that source without corrupting this step.
-                    if (target >= _records.IdLimit || !_records.Read(target, _target))
+                    if (target >= _records.IdLimit || !_records.Contains(target))
                         throw new InvalidDataException("Learned edge points to missing target record");
                     Add(target, (float)(source.Drive * weight / sum));
                 }

@@ -11,11 +11,12 @@ public static class CloseoutProfileEval
         string root=args.Value("--model",null)??throw new ArgumentException("model required");
         string output=args.Value("--output",null)??throw new ArgumentException("output required");
         if(File.Exists(output))throw new IOException("Output exists");object attribution;object result;
-        var nativeBefore=MacFileIo.Sample();int[] gcBefore=Enumerable.Range(0,3).Select(GC.CollectionCount).ToArray();
+        var nativeBefore=NativeIo.Sample();int[] gcBefore=Enumerable.Range(0,3).Select(GC.CollectionCount).ToArray();
         if(action=="train")
         {
             string source=args.Value("--source",null)??throw new ArgumentException("source required");
-            using(var profile=new CostProfile()){result=LocalModel.Train(source,"text",root,201,128);attribution=profile.Finish();}
+            string policy=args.Value("--policy","count-baseline")!;   // item 5: profile either policy; relay reproduces the R6 model
+            using(var profile=new CostProfile()){result=LocalModel.Train(source,"text",root,201,128,policy);attribution=profile.Finish();}
         }
         else if(action=="score")
         {
@@ -27,7 +28,7 @@ public static class CloseoutProfileEval
                 var saved=LocalModel.Open(root,128);using var store=saved.Store;
                 foreach(var q in questions.Questions)
                 {
-                    var answer=LocalModel.Query(store,saved.Description.Seed,q.Cue,q.Candidates,1);
+                    var answer=LocalModel.Query(store,saved.Description.Seed,q.Cue,q.Candidates,1,saved.Policy);
                     rows.Add(new {q.Cue,Scores=answer.Results.Select(x=>x.Score).ToArray(),answer.DataRead,answer.IndexRead,answer.Evictions});
                 }
                 if(store.BytesWritten!=0||store.IndexBytesWritten!=0)throw new InvalidOperationException("Query wrote model");
@@ -35,7 +36,7 @@ public static class CloseoutProfileEval
             }
         }
         else throw new ArgumentException("train or score required");
-        var nativeAfter=MacFileIo.Sample();
+        var nativeAfter=NativeIo.Sample();
         File.WriteAllText(output,JsonSerializer.Serialize(new {Action=action,Result=result,Profile=attribution,
             DiskReadBytes=nativeAfter.DiskReadBytes-nativeBefore.DiskReadBytes,DiskWrittenBytes=nativeAfter.DiskWrittenBytes-nativeBefore.DiskWrittenBytes,
             GcCollections=Enumerable.Range(0,3).Select(i=>GC.CollectionCount(i)-gcBefore[i]).ToArray(),
